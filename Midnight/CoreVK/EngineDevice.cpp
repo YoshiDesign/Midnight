@@ -92,6 +92,7 @@ namespace aveng {
     // Destructor
     EngineDevice::~EngineDevice() 
     {
+        std::cout << "Destroying EngineDevice." << std::endl;
         vkDestroyCommandPool(_device, _commandPool, nullptr);
         vkDestroyDevice(_device, nullptr);
 

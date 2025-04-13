@@ -29,6 +29,12 @@ namespace aveng {
 		ImageSystem(EngineDevice& device);
 		~ImageSystem();
 
+		// Not copyable or movable
+		ImageSystem(const ImageSystem&) = delete;
+		ImageSystem& operator=(const ImageSystem&) = delete;
+		ImageSystem(ImageSystem&&) = delete;
+		ImageSystem& operator=(ImageSystem&&) = delete;
+
 		void createTextureImage(const char* filepath, size_t i);
 		VkImageView createImageView(VkImage image, VkFormat format, uint32_t mipLevels);
 		void createTextureImageView(VkImage image, size_t i);

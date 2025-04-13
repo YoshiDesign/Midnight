@@ -2,7 +2,6 @@
 #include "XOne.h"
 #include "Core/Math/aveng_math.h"
 #include "Core/data.h"
-#include "Core/Utils/aveng_utils.h"
 #include "Core/aveng_frame_content.h"
 #include "Core/Camera/aveng_camera.h"
 #include "Core/Events/window_callbacks.h"
@@ -20,11 +19,8 @@ namespace aveng {
 
 	XOne::XOne()
 	{
-		//DependencyChecks();
 		loadAppObjects();
 		objectRenderSystem.descriptorSetup();
-		//Setup();
-
 	}
 
 	void XOne::run()
@@ -55,34 +51,13 @@ namespace aveng {
 			updateCamera(frameTime, viewerObject, keyboardController, camera);
 			updateData();
 
-			//// Get a command buffer for this frame
-			//VkCommandBuffer commandBuffer = renderer.beginFrame();
+			FrameContent frame_content = {
+				frameTime,
+				camera,
+				appObjects
+			};
 
-			//if (commandBuffer) {
-
-				/*int frameIndex = renderer.getFrameIndex();*/
-
-				FrameContent frame_content = {
-					//frameIndex,
-					frameTime,
-					//commandBuffer,
-					camera,
-					//globalDescriptorSets[frameIndex],
-					//objectDescriptorSets[frameIndex],
-					appObjects
-				};
-
-				objectRenderSystem.render(frame_content, data); //,  *u_ObjBuffers[frameIndex]
-				//pointLightSystem.render(frame_content);
-
-				//aveng_imgui.newFrame();
-				//aveng_imgui.runGUI(data);
-				//aveng_imgui.render(commandBuffer);
-
-				//renderer.endSwapChainRenderPass(commandBuffer);
-				//renderer.endFrame();
-
-			// }
+			objectRenderSystem.render(frame_content, data); //,  *u_ObjBuffers[frameIndex]
 
 		}
 
@@ -185,110 +160,6 @@ namespace aveng {
 		data.cameraRot = viewerObject.transform.rotation;
 		data.fly_mode = WindowCallbacks::flightMode;
 	}
-
-	/*
-	* @function XOne::Setup()
-	* Write the descriptor set layouts, build the descriptor sets for our uniforms,
-	* and initialize each render system with their appropriate descriptor set layouts.
-	* Finally, initialize ImGUI
-	*/
-	//void XOne::Setup()
-	//{
-
-		//auto imageInfo = imageSystem.descriptorInfoForAllImages();
-
-		///*
-		// * Create Descriptor Pools
-		// */
-		//descriptorPool = AvengDescriptorPool::Builder(engineDevice)
-		//	.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 3)
-		//	// Type									// Max no. of descriptor sets
-		//	.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT) // No. descriptor sets is implementation dependent
-		//	.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * imageInfo.size()) // Dependent upon no. of images/textures
-		//	.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT) // No. descriptor sets is implementation dependent
-		//	.build();
-
-
-		//// Buffer vectors. One for each frame-in-flight
-		//u_GlobalBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		//u_ObjBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-
-		//// Descriptor Set vectors. One for each frame-in-flight
-		//globalDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		//objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-
-		///*
-		//* Create Buffers
-		//*/
-		//for (int i = 0; i < u_GlobalBuffers.size(); i++) {
-		//	u_GlobalBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-		//		sizeof(GlobalUbo), // The size can remain static because every object accesses its data at the same location.
-		//		1,
-		//		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		//		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-		//	u_GlobalBuffers[i]->map();
-		//}
-
-		//for (int i = 0; i < u_ObjBuffers.size(); i++) {
-		//	u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-		//		sizeof(ObjectRenderSystem::ObjectUniformData) * engineDevice.properties.limits.minUniformBufferOffsetAlignment * appObjects.size(), // The size <VkDeviceSize> of the entire dynamic uniform buffer. Each object has a particular dynamic offset from which to access its data
-		//		1,
-		//		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		//		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-		//		engineDevice.properties.limits.minUniformBufferOffsetAlignment);
-		//	u_ObjBuffers[i]->map();
-		//}
-
-		///*
-		//* Create Descriptor Set Layouts
-		//*/
-		//// Descriptor Layout 0 -- Global
-		//std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout =
-		//	AvengDescriptorSetLayout::Builder(engineDevice)
-		//	.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-		//	.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, imageInfo.size())	// Combined image samplers use 1 descriptor for each image
-		//	.build();
-
-		//// Descriptor Set 1 -- Per object
-		//std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout =
-		//	AvengDescriptorSetLayout::Builder(engineDevice)
-		//	.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-		//	.build();
-
-		//// Write each descriptor set, once for each swapchain frame
-		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
-		//{
-		//	// Global descriptor set
-		//	auto globalBufferInfo = u_GlobalBuffers[i]->descriptorInfo(sizeof(GlobalUbo), 0);
-		//	AvengDescriptorSetWriter(*globalDescriptorSetLayout, *descriptorPool)
-		//		.writeBuffer(0, &globalBufferInfo)	// First Binding descriptor: Buffer
-		//		.writeImage(1, imageInfo.data(), imageInfo.size()) // Second Binding descriptor: Image
-		//		.build(globalDescriptorSets[i]);
-
-		//	// Object descriptor set
-		//	auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(sizeof(ObjectRenderSystem::ObjectUniformData), 0); // 0 here refers to the position (in the buffer) to begin reading from before any offsets are applied
-		//	AvengDescriptorSetWriter(*objDescriptorSetLayout, *descriptorPool)
-		//		.writeBuffer(0, &objBufferInfo)
-		//		.build(objectDescriptorSets[i]);
-		//}
-
-		// Rendering subsystem initializers
-		//objectRenderSystem.initialize(
-		//	renderer.getSwapChainRenderPass(),
-		//	globalDescriptorSetLayout->getDescriptorSetLayout(),
-		//	objDescriptorSetLayout->getDescriptorSetLayout()
-		//);
-		//pointLightSystem.initialize(
-		//	renderer.getSwapChainRenderPass(),
-		//	globalDescriptorSetLayout->getDescriptorSetLayout()
-		//);
-		//// GUI
-		//aveng_imgui.init(
-		//	aveng_window,
-		//	renderer.getSwapChainRenderPass(),
-		//	renderer.getImageCount()
-		//);
-	//}
 
 	void XOne::pendulum(EngineDevice& engineDevice, int _max_rows)
 	{
