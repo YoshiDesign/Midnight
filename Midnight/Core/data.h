@@ -11,7 +11,8 @@ namespace aveng {
 	
 
 	enum texture {
-		SURFACE_GRID_1 = 0,
+		DESERT1 = 0,
+		GRID,
 		THEME_1,
 		THEME_2,
 		THEME_3, 

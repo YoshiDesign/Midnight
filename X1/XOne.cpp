@@ -71,21 +71,20 @@ namespace aveng {
 	void XOne::loadAppObjects()
 	{
 
-		auto ship = AvengAppObject::createAppObject(THEME_1);
+		auto ship = AvengAppObject::createAppObject(THEME_4);
 		ship.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
-		ship.transform.translation = { 0.f, 0.f, 0.f };
+		ship.transform.translation = { 0.f, -130.f, 0.f };
+		ship.transform.rotation = {0.f, 0.f, 180.0f};
 		appObjects.emplace(ship.getId(), std::move(ship));
 
-		auto ship_1 = AvengAppObject::createAppObject(THEME_3);
-		ship_1.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
-		ship_1.transform.translation = { 25.f, 0.f, 0.f };
-		appObjects.emplace(ship_1.getId(), std::move(ship_1));
+		auto terrain = AvengAppObject::createAppObject(DESERT1);
+		terrain.model = AvengModel::createModelFromFile(engineDevice, "3D/LargeTerrain2.obj");
+		terrain.transform.translation = { 0.f, 0.f, 0.f };
+		appObjects.emplace(terrain.getId(), std::move(terrain));
 
 		objectRenderSystem.setNumObjects(appObjects.size());
 
 		// AvengModel::drawTriangle(engineDevice, { 1.0f, 1.0f, 1.0f });
-
-
 
 		//for (size_t i = 0; i < 1; i++)
 		//{

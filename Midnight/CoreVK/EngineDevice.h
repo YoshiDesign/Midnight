@@ -37,11 +37,11 @@ namespace aveng {
 
     public:
 
-//#ifdef NDEBUG
+#ifdef NDEBUG
           const bool enableValidationLayers = true;
-//#else
-//          const bool enableValidationLayers = true;
-//#endif
+#else
+          const bool enableValidationLayers = false;
+#endif
 
         EngineDevice(AvengWindow &window);
         ~EngineDevice();

@@ -21,8 +21,8 @@ namespace aveng {
 		struct GlobalUbo {
 			glm::mat4 projection{ 1.f };
 			glm::mat4 view{ 1.f };
-			glm::vec4 ambientLightColor{ 0.f, 0.f, 1.f, .04f };
-			glm::vec3 lightPosition{ 5.0f, -1.0f, 2.8f };
+			glm::vec4 ambientLightColor{ 0.f, 0.f, 1.f, .14f };
+			glm::vec3 lightPosition{ 5.0f, -20.0f, 2.8f };
 			alignas(16) glm::vec4 lightColor{ 1.f, 1.f, 1.f, 1.f };
 			//alignas(16) glm::vec3 lightDirection = glm::normalize(glm::vec3{ -1.f, -3.f, 1.f });
 		};

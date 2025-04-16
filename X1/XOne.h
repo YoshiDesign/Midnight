@@ -2,11 +2,7 @@
 #include <vector>
 
 #include "Core/Renderer/ObjectRenderSystem.h"
-//#include "CoreVK/aveng_descriptors.h"
-//#include "Core/Renderer/AvengImageSystem.h"
-//#include "Core/Renderer/PointLightSystem.h"
 #include "Core/Scene/app_object.h"
-//#include "GUI/aveng_imgui.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVk/aveng_buffer.h"

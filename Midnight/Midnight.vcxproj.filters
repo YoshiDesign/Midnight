@@ -72,12 +72,6 @@
     <ClCompile Include="Core\UUID.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\glm\detail\glm.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\glm\glm.cppm">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="GUI\aveng_imgui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
