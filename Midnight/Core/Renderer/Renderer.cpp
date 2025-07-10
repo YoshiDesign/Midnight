@@ -61,9 +61,6 @@ namespace aveng {
 
 		}
 
-		// Reinitialize ImGui
-		//ImGui_ImplVulkan_SetMinImageCount(swapchain_image_count());
-
 	}
 
 	/*

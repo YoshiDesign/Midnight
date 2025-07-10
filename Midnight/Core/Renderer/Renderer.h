@@ -6,9 +6,7 @@
 #include "../aveng_window.h"
 #include "../../CoreVK/EngineDevice.h"
 #include "../../CoreVK/swapchain.h"
-#include "../../GUI/imgui.h"
-#include "../../GUI/imgui_impl_glfw.h"
-#include "../../GUI/imgui_impl_vulkan.h"
+
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -64,9 +62,7 @@ namespace aveng {
 		AvengWindow& aveng_window;
 		EngineDevice& engineDevice;
 
-		VkCommandBuffer imGuiCommandBuffer;
 		std::vector<VkCommandBuffer> commandBuffers;
-		VkCommandPool imGuiCommandPool;
 
 		// SwapChain aveng_swapchain{ engineDevice, aveng_window.getExtent() };	// previous stack allocated. Ptr makes it easier to rebuild when the window resizes
 		std::unique_ptr<SwapChain> aveng_swapchain;

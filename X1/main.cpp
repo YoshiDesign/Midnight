@@ -1,4 +1,7 @@
 #include "XOne.h"
+#ifdef ENABLE_EDITOR
+#include "Editor.h"
+#endif
 #include "avpch.h"
 // #include "Apps/Gravity.h"
 
@@ -10,6 +13,9 @@ int main(void)
 	aveng::XOne app{};
 
 	try {
+#ifdef ENABLE_EDITOR
+		aveng::Editor editor(app.context());
+#endif
 		app.run();
 	}
 	catch (const std::exception& e)

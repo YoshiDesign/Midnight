@@ -3,7 +3,7 @@
 #include <iostream>
 #include <unordered_map>
 #include "aveng_model.h"
-#include "Utils/aveng_utils.h"
+#include "../Utils/aveng_utils.h"
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader/tiny_obj_loader.h>
 #define GLM_ENABLE_EXPERIMENTAL

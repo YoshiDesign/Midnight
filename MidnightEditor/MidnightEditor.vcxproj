@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{b7e60fef-4e61-46f4-9e79-ed8394397203}</ProjectGuid>
-    <RootNamespace>X1</RootNamespace>
+    <ProjectGuid>{198730c9-2101-46bf-b07d-222bfb728ef3}</ProjectGuid>
+    <RootNamespace>MidnightEditor</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -76,14 +76,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\include;$(SolutionDir)Midnight;$(VULKAN_SDK)\Include;$(SolutionDir)X1</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Midnight;$(SolutionDir)X1;$(SolutionDir)MidnightEditor;$(SolutionDir)vendor;$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories);$(SolutionDir)MidnightEditor</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;MidnightEngine.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -94,32 +93,30 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\include;$(SolutionDir)Midnight;$(VULKAN_SDK)\Include;$(SolutionDir)X1</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Midnight;$(SolutionDir)X1;$(SolutionDir)MidnightEditor;$(SolutionDir)vendor;$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories);$(SolutionDir)MidnightEditor</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;MidnightEngine.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ENABLE_EDITOR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\include;$(SolutionDir)Midnight;$(VULKAN_SDK)\Include;$(SolutionDir)X1;$(SolutionDir)MidnightEditor;$(SolutionDir)vendor</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Midnight;$(SolutionDir)X1;$(SolutionDir)vendor;$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories);$(SolutionDir)MidnightEditor</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;MidnightEngine.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -130,62 +127,39 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\include;$(SolutionDir)Midnight;$(VULKAN_SDK)\Include;$(SolutionDir)X1</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Midnight;$(SolutionDir)X1;$(SolutionDir)MidnightEditor;$(SolutionDir)vendor;$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories);$(SolutionDir)MidnightEditor</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;MidnightEngine.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Midnight\Midnight.vcxproj">
-      <Project>{77f66662-a85b-4904-af4d-659851d2333f}</Project>
-    </ProjectReference>
+    <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="GUI\aveng_imgui.cpp" />
+    <ClCompile Include="GUI\imgui.cpp" />
+    <ClCompile Include="GUI\imgui_demo.cpp" />
+    <ClCompile Include="GUI\imgui_draw.cpp" />
+    <ClCompile Include="GUI\imgui_impl_glfw.cpp" />
+    <ClCompile Include="GUI\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="GUI\imgui_tables.cpp" />
+    <ClCompile Include="GUI\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Game\Math\aveng_math.cpp" />
-    <ClCompile Include="Game\Player\GameplayFunctions.cpp" />
-    <ClCompile Include="Game\app_object.cpp" />
-    <ClCompile Include="Game\UUID.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="System\Camera\aveng_camera.cpp" />
-    <ClCompile Include="System\Events\window_callbacks.cpp" />
-    <ClCompile Include="System\Peripheral\Controller.cpp" />
-    <ClCompile Include="System\Peripheral\KeyboardController.cpp" />
-    <ClCompile Include="System\Render\AvengImageSystem.cpp" />
-    <ClCompile Include="System\Render\ObjectRenderSystem.cpp" />
-    <ClCompile Include="System\Render\PointLightSystem.cpp" />
-    <ClCompile Include="Utils\SystemData.cpp" />
-    <ClCompile Include="Utils\VulkanXTools.cpp" />
-    <ClCompile Include="XOne.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Game\aveng_frame_content.h" />
-    <ClInclude Include="Game\data.h" />
-    <ClInclude Include="Game\Math\aveng_math.h" />
-    <ClInclude Include="Game\Player\Action.h" />
-    <ClInclude Include="Game\Player\Command.h" />
-    <ClInclude Include="Game\Player\GameplayFunctions.h" />
-    <ClInclude Include="Game\app_object.h" />
-    <ClInclude Include="Game\AvengComponent.h" />
-    <ClInclude Include="Game\UUID.h" />
-    <ClInclude Include="System\Camera\aveng_camera.h" />
-    <ClInclude Include="System\Events\window_callbacks.h" />
-    <ClInclude Include="System\Peripheral\Controller.h" />
-    <ClInclude Include="System\Peripheral\KeyboardController.h" />
-    <ClInclude Include="System\Render\AvengImageSystem.h" />
-    <ClInclude Include="System\Render\ObjectRenderSystem.h" />
-    <ClInclude Include="System\Render\PointLightSystem.h" />
-    <ClInclude Include="Utils\SystemData.h" />
-    <ClInclude Include="Utils\threadpool.h" />
-    <ClInclude Include="vendor\GLFW\glfw3.h" />
-    <ClInclude Include="vendor\GLFW\glfw3native.h" />
-    <ClInclude Include="XOne.h" />
+    <ClInclude Include="Editor.h" />
+    <ClInclude Include="GUI\aveng_imgui.h" />
+    <ClInclude Include="GUI\imconfig.h" />
+    <ClInclude Include="GUI\imgui.h" />
+    <ClInclude Include="GUI\imgui_impl_glfw.h" />
+    <ClInclude Include="GUI\imgui_impl_vulkan.h" />
+    <ClInclude Include="GUI\imgui_internal.h" />
+    <ClInclude Include="GUI\imstb_rectpack.h" />
+    <ClInclude Include="GUI\imstb_textedit.h" />
+    <ClInclude Include="GUI\imstb_truetype.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
