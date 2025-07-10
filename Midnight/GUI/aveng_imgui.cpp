@@ -50,7 +50,7 @@ namespace aveng {
         // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
         // Setup Dear ImGui style
-        ImGui::StyleColorsDark();
+        ImGui::StyleColorsLight();
         // ImGui::StyleColorsClassic();
 
         // Setup Platform/Renderer backends
@@ -106,24 +106,26 @@ namespace aveng {
     }
 
     void AvengImgui::runGUI(Data& data) {
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can
-        // browse its code to learn more about Dear ImGui!).
-        if (show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named
-        // window.
+        
+        //static float slider = 0.0f;
+        static float value = 3.1415926f;
+        static bool hasChanged = false;
+        static int counter = 0;
+
         {
-            //static float slider = 0.0f;
-            static float value = 3.1415926f;
-            static bool hasChanged = false;
-            static int counter = 0;
+            ImGui::Begin("Engine Info");
+            ImGui::Text("Video Device:\t %s", device.properties.deviceName);
+            ImGui::End();
+        }
 
-            ImGui::Begin("Debug you fool!"); 
+        {
+            ImGui::Begin("Debug");
 
             ImGui::Checkbox("Player Debug", &show_player_controller_window);
 
             ImGui::Text(
-                "Objects: %d", data.num_objs); 
+                "Objects: %d", data.num_objs);
             ImGui::Text(
                 "Flight Mode: %d", data.fly_mode);
             ImGui::Text(
@@ -131,7 +133,7 @@ namespace aveng {
             ImGui::Text(
                 "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", data.cameraRot.x, data.cameraRot.y, data.cameraRot.z);
             ImGui::Text(
-                "Camera Position:\t(%.03lf, %.03lf, %.03lf)", data.cameraPos.x, data.cameraPos.y, data.cameraPos.z); 
+                "Camera Position:\t(%.03lf, %.03lf, %.03lf)", data.cameraPos.x, data.cameraPos.y, data.cameraPos.z);
             ImGui::Text(
                 "Player Rotation:\t(%.03lf, %.03lf, %.03lf)", data.playerRot.x, data.playerRot.y, data.playerRot.z);
             ImGui::Text(
@@ -142,27 +144,27 @@ namespace aveng {
                 "Mod Position:\t(%.03lf, %.03lf, %.03lf)", data.modPos.x, data.modPos.y, data.modPos.z);
             ImGui::Text(
                 "Forward Direction:\t(%.03lf, %.03lf, %.03lf)", data.forwardDir.x, data.forwardDir.y, data.forwardDir.z);
-            ImGui::SliderFloat("float", &data.player_modPI, 0.0f, 2*PI);
-            ImGui::SliderFloat("float", &data.camera_modPI, 0.0f, 2*PI);
+            ImGui::SliderFloat("float", &data.player_modPI, 0.0f, 2 * PI);
+            ImGui::SliderFloat("float", &data.camera_modPI, 0.0f, 2 * PI);
 
             //ImGui::ColorEdit3("clear color",
                 //(float*)&clear_color);  // Edit 3 floats representing a color
-            
+
             if (ImGui::Button("GFX"))
                 WindowCallbacks::updatePipeline();
 
             ImGui::SameLine();
             ImGui::Text("GFX-Pipe:\t%d", data.cur_pipe);
-           
+
             ImGui::Text(
                 "Frame = %.3f ms/frame (%.1f FPS)",
                 1000.0f / ImGui::GetIO().Framerate,
-            ImGui::GetIO().Framerate);
+                ImGui::GetIO().Framerate);
             //ImGui::Text("c = %d", counter);
             ImGui::End();
         }
 
-        // 3. Show another simple window.
+        // Show the player info window
         if (show_player_controller_window) {
             ImGui::Begin("Player Debug", &show_player_controller_window);
             ImGui::Text("Speed:\t%f", data.speed);
@@ -176,4 +178,4 @@ namespace aveng {
         }
     }
 
-}  // namespace lve
+}

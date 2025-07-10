@@ -15,8 +15,8 @@ namespace aveng {
 
 	public:
 
-		static constexpr int WIDTH = 800;
-		static constexpr int HEIGHT = 600;
+		static constexpr int WIDTH = 2080;
+		static constexpr int HEIGHT = 960;
 
 		XOne();
 		~XOne() {};
@@ -32,7 +32,6 @@ namespace aveng {
 		void loadAppObjects();
 		void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
 		void updateData();
-		glm::vec3 clear_color = { 0.3f, 0.9f, 0.7f };
 
 		/*
 		* !! Order of member initialization matters !!

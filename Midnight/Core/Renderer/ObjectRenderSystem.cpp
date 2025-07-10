@@ -122,6 +122,7 @@ namespace aveng {
 			renderer.getSwapChainRenderPass(),
 			globalDescriptorSetLayout->getDescriptorSetLayout()
 		);
+
 		// GUI
 		aveng_imgui.init(
 			aveng_window,

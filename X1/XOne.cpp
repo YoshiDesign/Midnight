@@ -73,14 +73,21 @@ namespace aveng {
 
 		auto ship = AvengAppObject::createAppObject(THEME_4);
 		ship.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
-		ship.transform.translation = { 0.f, -130.f, 0.f };
+		ship.transform.translation = { 0.f, -10.f, 0.f };
 		ship.transform.rotation = {0.f, 0.f, 180.0f};
 		appObjects.emplace(ship.getId(), std::move(ship));
 
-		auto terrain = AvengAppObject::createAppObject(DESERT1);
+		auto ship2 = AvengAppObject::createAppObject(GRID);
+		ship2.model = AvengModel::createModelFromFile(engineDevice, "3D/canyon1.obj");
+		ship2.transform.translation = { 0.f, 0, 0.f };
+		ship2.transform.rotation = { 0.f, 0.f, 0.f };
+		appObjects.emplace(ship2.getId(), std::move(ship2));
+
+
+		/*auto terrain = AvengAppObject::createAppObject(GRID);
 		terrain.model = AvengModel::createModelFromFile(engineDevice, "3D/LargeTerrain2.obj");
 		terrain.transform.translation = { 0.f, 0.f, 0.f };
-		appObjects.emplace(terrain.getId(), std::move(terrain));
+		appObjects.emplace(terrain.getId(), std::move(terrain));*/
 
 		objectRenderSystem.setNumObjects(appObjects.size());
 

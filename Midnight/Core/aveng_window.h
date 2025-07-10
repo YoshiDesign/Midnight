@@ -13,7 +13,7 @@ namespace aveng {
 		int width;
 		int height;
 
-	public:
+	public: 
 
 		AvengWindow(int w, int h, std::string name);
 		~AvengWindow();

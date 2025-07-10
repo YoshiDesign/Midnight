@@ -37,7 +37,7 @@ namespace aveng {
 
     public:
 
-#ifdef NDEBUG
+#ifdef _DEBUG
           const bool enableValidationLayers = true;
 #else
           const bool enableValidationLayers = false;
