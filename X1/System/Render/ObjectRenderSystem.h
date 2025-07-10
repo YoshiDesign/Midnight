@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
 // #include "../Scene/app_object.h"
-#include "Game/aveng_frame_content.h"
+#include "Core/aveng_frame_content.h"
 #include "System/Render/AvengImageSystem.h"
 #include "System/Render/PointLightSystem.h"
 #include "Core/Renderer/Renderer.h"
@@ -9,7 +9,7 @@
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/GFXPipeline.h"
 #include "CoreVK/aveng_descriptors.h"
-#include "Game/data.h"
+#include "Core/data.h"
 #include "avpch.h"
 
 namespace aveng {

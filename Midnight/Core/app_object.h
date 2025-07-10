@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/aveng_model.h"
+#include "aveng_model.h"
 #include "AvengComponent.h"
 #include <iostream>
 #include <memory>

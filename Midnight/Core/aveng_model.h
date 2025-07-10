@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../CoreVK/EngineDevice.h"
-#include "../CoreVK/aveng_buffer.h"
+#include "CoreVK/EngineDevice.h"
+#include "CoreVK/aveng_buffer.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE

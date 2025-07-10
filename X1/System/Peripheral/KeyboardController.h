@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Game/app_object.h"
+#include "Core/app_object.h"
 #include "Core/aveng_window.h"
 #include "Game/Player/Action.h"
-#include "Game/data.h"
+#include "Core/data.h"
 
 
 namespace aveng {

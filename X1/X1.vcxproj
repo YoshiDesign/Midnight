@@ -83,7 +83,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;MidnightEditor.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -103,7 +103,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;MidnightEditor.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -119,7 +119,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;MidnightEditor.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -139,7 +139,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.309.0\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)$(Platform)\$(Configuration)\;$(SolutionDir)Midnight;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;$(CoreLibraryDependencies);MidnightEngine.lib;MidnightEditor.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -150,11 +150,8 @@
   <ItemGroup>
     <ClCompile Include="Game\Math\aveng_math.cpp" />
     <ClCompile Include="Game\Player\GameplayFunctions.cpp" />
-    <ClCompile Include="Game\app_object.cpp" />
-    <ClCompile Include="Game\UUID.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="System\Camera\aveng_camera.cpp" />
-    <ClCompile Include="System\Events\window_callbacks.cpp" />
     <ClCompile Include="System\Peripheral\Controller.cpp" />
     <ClCompile Include="System\Peripheral\KeyboardController.cpp" />
     <ClCompile Include="System\Render\AvengImageSystem.cpp" />
@@ -165,17 +162,11 @@
     <ClCompile Include="XOne.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game\aveng_frame_content.h" />
-    <ClInclude Include="Game\data.h" />
     <ClInclude Include="Game\Math\aveng_math.h" />
     <ClInclude Include="Game\Player\Action.h" />
     <ClInclude Include="Game\Player\Command.h" />
     <ClInclude Include="Game\Player\GameplayFunctions.h" />
-    <ClInclude Include="Game\app_object.h" />
-    <ClInclude Include="Game\AvengComponent.h" />
-    <ClInclude Include="Game\UUID.h" />
     <ClInclude Include="System\Camera\aveng_camera.h" />
-    <ClInclude Include="System\Events\window_callbacks.h" />
     <ClInclude Include="System\Peripheral\Controller.h" />
     <ClInclude Include="System\Peripheral\KeyboardController.h" />
     <ClInclude Include="System\Render\AvengImageSystem.h" />

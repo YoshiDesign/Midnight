@@ -1,5 +1,5 @@
 #pragma once
-#include "aveng/SystemContext.h"
+#include "Utils/SystemContext.h"
 #include "Core/Renderer/Renderer.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/aveng_buffer.h"
@@ -7,8 +7,8 @@
 #include "Core/aveng_window.h"
 #include "Core/aveng_model.h"
 #include "System/Camera/aveng_camera.h"
-#include "Game/app_object.h"
-#include "Game/data.h"
+#include "Core/app_object.h"
+#include "Core/data.h"
 
 namespace aveng {
 
@@ -21,8 +21,9 @@ namespace aveng {
 			AvengWindow& aveng_window, 
 			AvengCamera& camera, 
 			Renderer& renderer, 
-			AvengAppObject::Map& appObjects, 
-			GameData& gameData);
+			GameData& gameData,
+			AvengAppObject::Map& appObjects
+			);
 
 		~SystemData();
 		

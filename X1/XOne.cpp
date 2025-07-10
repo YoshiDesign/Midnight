@@ -1,10 +1,10 @@
 #include "avpch.h"
 #include "XOne.h"
 #include "Game/Math/aveng_math.h"
-#include "Game/data.h"
-#include "Game/aveng_frame_content.h"
+#include "Core/data.h"
+#include "Core/aveng_frame_content.h"
 #include "System/Camera/aveng_camera.h"
-#include "System/Events/window_callbacks.h"
+#include "Utils/window_callbacks.h"
 #include "Game/Player/GameplayFunctions.h"
 
 namespace aveng {

@@ -1,5 +1,5 @@
 #pragma once
-#include "Game/app_object.h"
+#include "Core/app_object.h"
 
 namespace aveng {
 	class Command

@@ -1,9 +1,9 @@
 #pragma once
 #include <vector>
-#include "aveng/SystemContext.h"
-#include "Game/data.h"
+#include "Utils/SystemContext.h"
+#include "Core/data.h"
 #include "System/Render/ObjectRenderSystem.h"
-#include "Game/app_object.h"
+#include "Core/app_object.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVk/aveng_buffer.h"
@@ -49,7 +49,7 @@ namespace aveng {
 		AvengCamera camera{};
 		ObjectRenderSystem objectRenderSystem{ engineDevice, viewerObject, aveng_window};
 		KeyboardController keyboardController{ viewerObject, data };
-		SystemData systemData{ engineDevice, aveng_window, camera, objectRenderSystem.pRenderer(), appObjects, data};
+		SystemData systemData{ engineDevice, aveng_window, camera, objectRenderSystem.pRenderer(), data, appObjects};
 
 		float aspect;
 		float frameTime;

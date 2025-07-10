@@ -1,16 +1,16 @@
 #pragma once
 
 #include "CoreVK/EngineDevice.h"
-#include "Game/data.h"
+#include "Core/data.h"
 #include "Core/aveng_window.h"
-#include "System/Events/window_callbacks.h"
+#include "Utils/window_callbacks.h"
 
 // libs
 #include <glm/glm.hpp>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
-#include "aveng/SystemContext.h"
+#include "Utils/SystemContext.h"
 
 // std
 #include <stdexcept>

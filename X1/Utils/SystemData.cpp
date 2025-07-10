@@ -8,8 +8,8 @@ namespace aveng {
         AvengWindow& aveng_window,
         AvengCamera& camera,
         Renderer& renderer,
-        AvengAppObject::Map& appObjects,
-        GameData& gameData
+        GameData& gameData,
+        AvengAppObject::Map& appObjects
     ) : 
         device(device),
         aveng_window(aveng_window),
@@ -32,6 +32,7 @@ namespace aveng {
         context.window = &aveng_window;
         context.renderer = &renderer;
         context.appObjects = &appObjects;
+        context.camera = &camera;
     }
 
     // TODO - make this a const 
@@ -42,7 +43,7 @@ namespace aveng {
         assert(context.window && "SystemContext: window is nullptr");
         assert(context.renderer && "SystemContext: renderer is nullptr");
         assert(context.game_data && "SystemContext: game_data is nullptr");
-        assert(context.game_data && "SystemContext: gameData is nullptr");
+        assert(context.camera && "SystemContext: camera is nullptr");
         assert(context.appObjects && "SystemContext: appObjects is nullptr");
         return context;
     }

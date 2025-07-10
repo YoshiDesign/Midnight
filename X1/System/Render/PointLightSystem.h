@@ -1,13 +1,13 @@
 #pragma once
 
-#include "Game/app_object.h"
-#include "Game/aveng_frame_content.h"
+#include "Core/app_object.h"
+#include "Core/aveng_frame_content.h"
 #include "System/Camera/aveng_camera.h"
 #include "Core/aveng_window.h"
 #include "System/Peripheral/KeyboardController.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/GFXPipeline.h"
-#include "Game/data.h"
+#include "Core/data.h"
 
 #include "avpch.h"
 

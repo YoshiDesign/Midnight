@@ -94,7 +94,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor;$(SolutionDir)Midnight</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -114,7 +114,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor;$(SolutionDir)Midnight</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -134,7 +134,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor;$(SolutionDir)Midnight</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -154,7 +154,7 @@
       <PreprocessorDefinitions>_CONSOLE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)vendor;$(SolutionDir)Midnight</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -173,9 +173,12 @@
     <ClCompile Include="CoreVK\EngineDevice.cpp" />
     <ClCompile Include="CoreVK\GFXPipeline.cpp" />
     <ClCompile Include="CoreVK\swapchain.cpp" />
+    <ClCompile Include="Core\app_object.cpp" />
     <ClCompile Include="Core\aveng_model.cpp" />
     <ClCompile Include="Core\aveng_window.cpp" />
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
+    <ClCompile Include="Core\UUID.cpp" />
+    <ClCompile Include="Utils\window_callbacks.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="avpch.h" />
@@ -184,9 +187,14 @@
     <ClInclude Include="CoreVK\EngineDevice.h" />
     <ClInclude Include="CoreVK\GFXPipeline.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
+    <ClInclude Include="Core\app_object.h" />
+    <ClInclude Include="Core\AvengComponent.h" />
+    <ClInclude Include="Core\aveng_frame_content.h" />
     <ClInclude Include="Core\aveng_model.h" />
     <ClInclude Include="Core\aveng_window.h" />
+    <ClInclude Include="Core\data.h" />
     <ClInclude Include="Core\Renderer\Renderer.h" />
+    <ClInclude Include="Core\UUID.h" />
     <ClInclude Include="stb\stb_connected_components.h" />
     <ClInclude Include="stb\stb_c_lexer.h" />
     <ClInclude Include="stb\stb_divide.h" />
@@ -207,6 +215,8 @@
     <ClInclude Include="stb\stb_truetype.h" />
     <ClInclude Include="stb\stb_voxel_render.h" />
     <ClInclude Include="Utils\aveng_utils.h" />
+    <ClInclude Include="Utils\SystemContext.h" />
+    <ClInclude Include="Utils\window_callbacks.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />
     <ClInclude Include="vendor\GLFW\glfw3native.h" />
     <ClInclude Include="vendor\glm\common.hpp" />
