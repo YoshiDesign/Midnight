@@ -11,14 +11,16 @@ namespace aveng {
 		glm::mat4 normalMatrix{ 1.f };
 	};
 
-	//ObjectRenderSystem::ObjectRenderSystem()
-	//{
-	//	descriptorSetup();
-	//}
-
-	ObjectRenderSystem::ObjectRenderSystem(EngineDevice& device, AvengAppObject& viewer, AvengWindow& window)
-		: engineDevice{ device }, viewerObject{ viewer }, aveng_window{ window }
+	ObjectRenderSystem::ObjectRenderSystem(EngineDevice& device, AvengWindow& window)
+		: engineDevice{ device }, aveng_window{ window }
 	{
+#ifdef _DEBUG
+		std::cout << "Running Dependency Checks..." << std::endl;
+		DependencyChecks();
+#endif
+		// Initial camera position
+		viewerObject.transform.translation.z = -5.5f;
+		viewerObject.transform.translation.y = -2.5f;
 	}
 
 	void ObjectRenderSystem::initialize( VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout objDescriptorSetLayout)
@@ -191,14 +193,17 @@ namespace aveng {
 		);
 	}
 
-	void ObjectRenderSystem::render(FrameContent& frame_content, GameData& data /*, AvengBuffer& u_ObjBuffer*/)
+	void ObjectRenderSystem::render(float frameTime /*, AvengBuffer& u_ObjBuffer*/)
 	{
 
 		// 1s tick, convenient
-		if (last_sec != data.sec) {
-			last_sec = data.sec;
+		if (last_sec != game_data.sec) {
+			last_sec = game_data.sec;
 			std::cout << "Tick..." << std::endl;
 		}
+
+		updateCamera(frameTime, viewerObject, keyboardController);
+		updateData(frameTime);
 
 		// Get a command buffer for this frame
 		VkCommandBuffer commandBuffer = renderer.beginFrame();
@@ -210,15 +215,15 @@ namespace aveng {
 		renderer.beginSwapChainRenderPass(commandBuffer);
 
 		// Pack our vertex shader uniform buffer
-		u_GlobalData.projection = frame_content.camera.getProjection();
-		u_GlobalData.view = frame_content.camera.getView();
+		u_GlobalData.projection = aveng_camera.getProjection();
+		u_GlobalData.view = aveng_camera.getView();
 
 		// Update our global uniform buffer 
 		u_GlobalBuffers[frameIndex]->writeToBuffer(&u_GlobalData);
 		u_GlobalBuffers[frameIndex]->flush();
 
 		// Bind our current pipeline configuration
-		switch (data.cur_pipe)
+		switch (game_data.cur_pipe)
 		{
 			case 98: gfxPipeline->bind(commandBuffer);  break;
 			case 99: gfxPipeline2->bind(commandBuffer); break;
@@ -236,13 +241,13 @@ namespace aveng {
 			0,
 			nullptr);
 
-		updateData(frame_content.appObjects.size(), frame_content.frameTime, data);
+		// updateData(frame_content.appObjects.size(), frame_content.frameTime, data);
 
 		/*
 		* Thread object bind/draw calls here
 		*/
 		int i = 0;
-		for (auto& kv : frame_content.appObjects)
+		for (auto& kv : appObjects)
 		{
 			i++;
 			ObjectUniformData u_ObjData{ kv.second.get_texture() };	// Contains texture index
@@ -288,23 +293,34 @@ namespace aveng {
 		}
 
 		pointLightSystem.render(globalDescriptorSets[frameIndex], commandBuffer);
-
-		//aveng_imgui.newFrame();
-		//aveng_imgui.runGUI(data);
-		//aveng_imgui.render(commandBuffer);
+		editor.render(commandBuffer);
 
 		renderer.endSwapChainRenderPass(commandBuffer);
 		renderer.endFrame();
 
 	}
 
-	void ObjectRenderSystem::updateData(size_t size, float frameTime, GameData& data)
+	void ObjectRenderSystem::updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& keyboardController)
+	{
+		aspect = getAspectRatio();
+		// Updates the viewer object transform component based on key input, proportional to the time elapsed since the last frame
+		keyboardController.moveCameraXZ(aveng_window.getGLFWwindow(), frameTime);
+		aveng_camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation + glm::vec3());
+		aveng_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
+	}
+
+	void ObjectRenderSystem::updateData(float frameTime)
 	{
 
-		data.num_objs = size;
-		data.cur_pipe = WindowCallbacks::getCurPipeline();
-		data.dt = frameTime;
-		data.camera_modPI = viewerObject.transform.modPI;
+		game_data.num_objs = 2;
+		game_data.cur_pipe = WindowCallbacks::getCurPipeline();
+		game_data.dt = frameTime;
+		game_data.camera_modPI = viewerObject.transform.modPI;
+
+		game_data.cameraView = aveng_camera.getCameraView();
+		game_data.cameraPos = viewerObject.transform.translation;
+		game_data.cameraRot = viewerObject.transform.rotation;
+		game_data.fly_mode = WindowCallbacks::flightMode;
 
 	}
 

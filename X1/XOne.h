@@ -8,7 +8,7 @@
 #include "CoreVK/EngineDevice.h"
 #include "CoreVk/aveng_buffer.h"
 #include "System/Peripheral/KeyboardController.h"
-#include "Utils/SystemData.h"
+
 
 namespace aveng {
 
@@ -25,34 +25,25 @@ namespace aveng {
 		XOne(const XOne&) = delete;
 		XOne& operator=(const XOne&) = delete;
 		void run();
-
-		SystemContext& context() { return systemData.systemContext(); };
-
 		void pendulum(EngineDevice& engineDevice, int _max_rows);
 
 	private:
 
+		float frameTime;
+
 		void loadAppObjects();
-		void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
-		void updateData();
+		//void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
+		//void updateData();
 
 		/*
 		* !! Order of member initialization matters !!
 		* See: § 12.6.2 of the C++ Standard
 		*/
-		GameData data;
 		// The window API - Stack allocated
 		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
-		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
 		EngineDevice engineDevice{ aveng_window };
-		AvengAppObject::Map appObjects;
-		AvengCamera camera{};
-		ObjectRenderSystem objectRenderSystem{ engineDevice, viewerObject, aveng_window};
-		KeyboardController keyboardController{ viewerObject, data };
-		SystemData systemData{ engineDevice, aveng_window, camera, objectRenderSystem.pRenderer(), data, appObjects};
+		ObjectRenderSystem objectRenderSystem{ engineDevice, aveng_window };
 
-		float aspect;
-		float frameTime;
 
 	};
 

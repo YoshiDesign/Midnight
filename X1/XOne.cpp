@@ -3,7 +3,6 @@
 #include "Game/Math/aveng_math.h"
 #include "Core/data.h"
 #include "Core/aveng_frame_content.h"
-#include "System/Camera/aveng_camera.h"
 #include "Utils/window_callbacks.h"
 #include "Game/Player/GameplayFunctions.h"
 
@@ -25,16 +24,13 @@ namespace aveng {
 
 	void XOne::run()
 	{
+
 		// Set callback functions for keys bound to the window
 		glfwSetKeyCallback(aveng_window.getGLFWwindow(), WindowCallbacks::testKeyCallback);
 
 		//camera.setViewTarget(glm::vec3(-1.f, -2.f, -20.f), glm::vec3(0.f, 0.f, 3.5f));
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
-
-		// Initial camera position
-		viewerObject.transform.translation.z = -5.5f;
-		viewerObject.transform.translation.y = -2.5f;
 
 		// Render Loop
 		while (!aveng_window.shouldClose()) {
@@ -47,17 +43,7 @@ namespace aveng {
 			frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
 			currentTime = newTime;
 
-			// Data & Debug
-			updateCamera(frameTime, viewerObject, keyboardController, camera);
-			updateData();
-
-			FrameContent frame_content = {
-				frameTime,
-				camera,
-				appObjects
-			};
-
-			objectRenderSystem.render(frame_content, data); //,  *u_ObjBuffers[frameIndex]
+			objectRenderSystem.render(frameTime); //,  *u_ObjBuffers[frameIndex]
 
 		}
 
@@ -70,18 +56,18 @@ namespace aveng {
 	*/
 	void XOne::loadAppObjects()
 	{
+		std::cout << "Pretending to load stuff... " << std::endl;
+		//auto ship = AvengAppObject::createAppObject(THEME_4);
+		//ship.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
+		//ship.transform.translation = { 0.f, -10.f, 0.f };
+		//ship.transform.rotation = {0.f, 0.f, 180.0f};
+		//appObjects.emplace(ship.getId(), std::move(ship));
 
-		auto ship = AvengAppObject::createAppObject(THEME_4);
-		ship.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
-		ship.transform.translation = { 0.f, -10.f, 0.f };
-		ship.transform.rotation = {0.f, 0.f, 180.0f};
-		appObjects.emplace(ship.getId(), std::move(ship));
-
-		auto ship2 = AvengAppObject::createAppObject(GRID);
-		ship2.model = AvengModel::createModelFromFile(engineDevice, "3D/canyon1.obj");
-		ship2.transform.translation = { 0.f, 0, 0.f };
-		ship2.transform.rotation = { 0.f, 0.f, 0.f };
-		appObjects.emplace(ship2.getId(), std::move(ship2));
+		//auto ship2 = AvengAppObject::createAppObject(GRID);
+		//ship2.model = AvengModel::createModelFromFile(engineDevice, "3D/canyon1.obj");
+		//ship2.transform.translation = { 0.f, 0, 0.f };
+		//ship2.transform.rotation = { 0.f, 0.f, 0.f };
+		//appObjects.emplace(ship2.getId(), std::move(ship2));
 
 
 		/*auto terrain = AvengAppObject::createAppObject(GRID);
@@ -89,7 +75,8 @@ namespace aveng {
 		terrain.transform.translation = { 0.f, 0.f, 0.f };
 		appObjects.emplace(terrain.getId(), std::move(terrain));*/
 
-		objectRenderSystem.setNumObjects(appObjects.size());
+		//objectRenderSystem.setNumObjects(appObjects.size());
+		objectRenderSystem.setNumObjects(2);
 
 		// AvengModel::drawTriangle(engineDevice, { 1.0f, 1.0f, 1.0f });
 
@@ -150,65 +137,48 @@ namespace aveng {
 
 	}
 
-	void XOne::updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& keyboardController, AvengCamera& camera)
-	{
-		aspect = objectRenderSystem.getAspectRatio();
-		// Updates the viewer object transform component based on key input, proportional to the time elapsed since the last frame
-		keyboardController.moveCameraXZ(aveng_window.getGLFWwindow(), frameTime);
-		camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation + glm::vec3());
-		camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
-	}
+	//void XOne::pendulum(EngineDevice& engineDevice, int _max_rows)
+	//{
 
-	void XOne::updateData()
-	{
-		data.cameraView = camera.getCameraView();
-		data.cameraPos = viewerObject.transform.translation;
-		data.cameraRot = viewerObject.transform.rotation;
-		data.fly_mode = WindowCallbacks::flightMode;
-	}
+	//	std::vector<float> factors;
+	//	float length;
+	//	float time = 7.0f;
+	//	float gravity = 3.45f;
+	//	float k = 7.0f;
+	//	int max_rows = _max_rows;
+	//	int row_modifier = 0;
 
-	void XOne::pendulum(EngineDevice& engineDevice, int _max_rows)
-	{
+	//	//std::unique_ptr<AvengModel> coloredCubeModel = AvengModel::createModelFromFile(engineDevice, "3D/colored_cube.obj");
 
-		std::vector<float> factors;
-		float length;
-		float time = 7.0f;
-		float gravity = 3.45f;
-		float k = 7.0f;
-		int max_rows = _max_rows;
-		int row_modifier = 0;
+	//	for (size_t i = 0; i < max_rows; i++)
+	//	{
+	//		//row_modifier = row_modifier % static_cast<int>(ceil(max_rows / 2) + 1);
+	//		for (size_t j = 0; j < 1; j++) {
+	//			auto gameObj = AvengAppObject::createAppObject(1000);
+	//			//gameObj.model = coloredCubeModel;
+	//			gameObj.model = AvengModel::createModelFromFile(engineDevice, "3D/colored_cube.obj");
+	//			gameObj.meta.type = SCENE;
 
-		//std::unique_ptr<AvengModel> coloredCubeModel = AvengModel::createModelFromFile(engineDevice, "3D/colored_cube.obj");
+	//			if (i >= std::floor(max_rows / 2))
+	//				gameObj.visual.pendulum_row = max_rows - row_modifier;
+	//			else
+	//				gameObj.visual.pendulum_row = row_modifier;
 
-		for (size_t i = 0; i < max_rows; i++)
-		{
-			//row_modifier = row_modifier % static_cast<int>(ceil(max_rows / 2) + 1);
-			for (size_t j = 0; j < 1; j++) {
-				auto gameObj = AvengAppObject::createAppObject(1000);
-				//gameObj.model = coloredCubeModel;
-				gameObj.model = AvengModel::createModelFromFile(engineDevice, "3D/colored_cube.obj");
-				gameObj.meta.type = SCENE;
+	//			length = gravity * glm::pow((time / (2 * glm::pi<float>()) * (k + gameObj.visual.pendulum_row + 1)), 2);
+	//			length = length * .003;
 
-				if (i >= std::floor(max_rows / 2))
-					gameObj.visual.pendulum_row = max_rows - row_modifier;
-				else
-					gameObj.visual.pendulum_row = row_modifier;
+	//			gameObj.visual.pendulum_delta = 0.0f;
+	//			// To make this an actual pendulum, make the extent constant across all objects
+	//			gameObj.visual.pendulum_extent = 70;
+	//			gameObj.transform.velocity.x = length;
+	//			gameObj.transform.translation = { 0.0f, static_cast<float>((i * -1.0f)), 0.0f };
+	//			gameObj.transform.scale = { .4f, 0.4f, 0.4f };
 
-				length = gravity * glm::pow((time / (2 * glm::pi<float>()) * (k + gameObj.visual.pendulum_row + 1)), 2);
-				length = length * .003;
+	//			appObjects.emplace(gameObj.getId(), std::move(gameObj));
+	//		}
+	//		row_modifier++;
+	//	}
 
-				gameObj.visual.pendulum_delta = 0.0f;
-				// To make this an actual pendulum, make the extent constant across all objects
-				gameObj.visual.pendulum_extent = 70;
-				gameObj.transform.velocity.x = length;
-				gameObj.transform.translation = { 0.0f, static_cast<float>((i * -1.0f)), 0.0f };
-				gameObj.transform.scale = { .4f, 0.4f, 0.4f };
-
-				appObjects.emplace(gameObj.getId(), std::move(gameObj));
-			}
-			row_modifier++;
-		}
-
-	}
+	//}
 
 }

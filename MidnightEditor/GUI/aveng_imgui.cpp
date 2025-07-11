@@ -8,11 +8,9 @@
 
 namespace aveng {
 
-    AvengImgui::AvengImgui(EngineDevice& _device) : device{_device} {}
+    AvengImgui::AvengImgui(EngineDevice& _device, SystemContext& context) : device{ _device }, context{context} {}
 
-    // ok this just initializes imgui using the provided integration files. So in our case we need to
-    // initialize the vulkan and glfw imgui implementations, since that's what our engine is built
-    // using.
+    // Initialize the vulkan and glfw imgui implementations
     void AvengImgui::init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount)
     {
         // set up a descriptor pool stored on this instance, see header for more comments on this.

@@ -3,8 +3,10 @@
 
 namespace aveng {
 
-	Editor::Editor(SystemContext& context) : game_context(context)
+	Editor::Editor(SystemContext& context) : aveng_context(context)
 	{
+		std::cout << context.game_data->modPI << std::endl;
+		init();
 	}
 	 
 	Editor::~Editor() 
@@ -12,13 +14,18 @@ namespace aveng {
 
 	void Editor::init() 
 	{
-		AvengImgui aveng_imgui(*game_context.device);
 		aveng_imgui.init(
-			*game_context.window,
-			game_context.renderer->getSwapChainRenderPass(),
-			game_context.renderer->getImageCount()
+			*aveng_context.window,
+			aveng_context.renderer->getSwapChainRenderPass(),
+			aveng_context.renderer->getImageCount()
 		);
+	}
 
+	void Editor::render(VkCommandBuffer& commandBuffer)
+	{
+		aveng_imgui.newFrame();
+		aveng_imgui.runGUI();
+		aveng_imgui.render(commandBuffer);
 	}
 	
 }

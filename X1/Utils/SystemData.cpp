@@ -27,15 +27,19 @@ namespace aveng {
 
     void SystemData::createContext()
     {
+
         context.game_data = &gameData;
         context.device = &device;
         context.window = &aveng_window;
         context.renderer = &renderer;
         context.appObjects = &appObjects;
         context.camera = &camera;
+
+        std::cout << "CHECKING FOR NULLS:\t" 
+            << context.game_data->modPI << "\n"
+            << context.device->properties.limits.maxVertexInputBindings << std::endl;
     }
 
-    // TODO - make this a const 
     SystemContext& SystemData::systemContext()
     {
         // Runtime check ((c)asserts are automatically stripped in release builds)

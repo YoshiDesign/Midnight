@@ -9,9 +9,11 @@ namespace aveng {
 		Editor(SystemContext& context);
 		~Editor();
 		void init();
+		void render(VkCommandBuffer& commandBuffer);
 
 	private:
-		SystemContext& game_context;
+		SystemContext& aveng_context;
+		AvengImgui aveng_imgui{ *aveng_context.device, aveng_context };
 	};
 
 }

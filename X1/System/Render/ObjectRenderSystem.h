@@ -4,13 +4,19 @@
 #include "Core/aveng_frame_content.h"
 #include "System/Render/AvengImageSystem.h"
 #include "System/Render/PointLightSystem.h"
+#include "System/Camera/aveng_camera.h"
 #include "Core/Renderer/Renderer.h"
 #include "System/Peripheral/KeyboardController.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/GFXPipeline.h"
 #include "CoreVK/aveng_descriptors.h"
+#include "Utils/SystemData.h"
 #include "Core/data.h"
 #include "avpch.h"
+
+#ifdef ENABLE_EDITOR
+#include "Editor.h"
+#endif
 
 namespace aveng {
 
@@ -31,49 +37,61 @@ namespace aveng {
 		};
 	public:
 		//ObjectRenderSystem();
-		ObjectRenderSystem(EngineDevice& device, AvengAppObject& viewer, AvengWindow& window);
+		ObjectRenderSystem(EngineDevice& device, AvengWindow& window);
 		~ObjectRenderSystem();
-
+		ObjectRenderSystem& operator=(const ObjectRenderSystem&) = delete;
 		ObjectRenderSystem(const ObjectRenderSystem&) = delete;
+
 		void initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout fragDescriptorSetLayouts);
+		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 		void descriptorSetup();
 		void addObjects(AvengAppObject);
-
-		ObjectRenderSystem& operator=(const ObjectRenderSystem&) = delete;
-		void render(FrameContent& frame_content, GameData& data /*, AvengBuffer& fragBuffer*/);
-		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 		float getAspectRatio() { return renderer.getAspectRatio(); }
+		void setNumObjects(int n) { num_objects = n; } // REQUIRED - This number is used when initializing buffers
+
+		void render(float frameTime);
 		void DependencyChecks();
-		void setNumObjects(int n) { num_objects = n; }
-		Renderer& pRenderer() { return renderer; }
+		void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& keyboardController);
+
+		// Renderer& pRenderer() { return renderer; }
+		SystemContext& context() { return systemData.systemContext(); };
 
 	private:
 
 		void createPipelineLayout(VkDescriptorSetLayout* descriptorSetLayouts);
-		void updateData(size_t size, float frameTime, GameData& data);
+		void updateData(float frameTime);
 		void createPipeline(VkRenderPass renderPass);
 
 		int last_sec;
-		int num_objects;
-		//EngineDevice &engineDevice;
-		//AvengAppObject& viewerObject;
+		int num_objects{1};
+		float aspect;
+
+		
 
 		// Rendering Pipelines - Heap Allocated
 		std::unique_ptr<GFXPipeline> gfxPipeline;
 		std::unique_ptr<GFXPipeline> gfxPipeline2;
+
+		AvengAppObject::Map appObjects;
+		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
 		VkPipelineLayout pipelineLayout;
+
 		AvengWindow& aveng_window;
 		EngineDevice& engineDevice;
-		AvengAppObject& viewerObject;
-		// size_t deviceAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
-
+		GameData game_data;
+		AvengCamera aveng_camera;
+		KeyboardController keyboardController{ viewerObject, game_data };
 		Renderer renderer{ aveng_window, engineDevice };
 		ImageSystem imageSystem{ engineDevice };
-		
-		/*ObjectRenderSystem objectRenderSystem{ engineDevice, viewerObject };*/
 		PointLightSystem pointLightSystem{ engineDevice };
 		GlobalUbo u_GlobalData{};
+		SystemData systemData{ engineDevice, aveng_window, aveng_camera, renderer, game_data, appObjects };
+		
 
+#ifdef ENABLE_EDITOR
+		aveng::Editor editor{systemData.systemContext()};
+#endif
+		
 		std::unique_ptr<AvengDescriptorPool> descriptorPool{};
 		std::vector<std::unique_ptr<AvengBuffer>> u_GlobalBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> u_ObjBuffers;

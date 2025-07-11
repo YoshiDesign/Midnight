@@ -26,7 +26,7 @@ namespace aveng {
 	class AvengImgui {
 	public:
 
-		AvengImgui(EngineDevice& device);
+		AvengImgui(EngineDevice& device, SystemContext& context );
 		void init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount);
 		~AvengImgui();
 
@@ -40,7 +40,7 @@ namespace aveng {
 	private:
 		EngineDevice& device;
 		VkDescriptorPool descriptorPool;
-		SystemContext context;
+		SystemContext& context;
 
 	};
 }  // namespace lve
