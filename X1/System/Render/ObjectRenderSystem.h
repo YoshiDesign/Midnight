@@ -12,6 +12,7 @@
 #include "CoreVK/aveng_descriptors.h"
 #include "Utils/SystemData.h"
 #include "Core/data.h"
+#include "Core/aveng_scene_loader.h"
 #include "avpch.h"
 
 #ifdef ENABLE_EDITOR
@@ -70,7 +71,7 @@ namespace aveng {
 		void initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout fragDescriptorSetLayouts);
 		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 		void descriptorSetup();
-		void addObjects(AvengAppObject);
+		void loadGame(const std::string& scenePath);
 		float getAspectRatio() { return renderer.getAspectRatio(); }
 		void setNumObjects(int n) { num_objects = n; } // REQUIRED - This number is used when initializing buffers
 
@@ -105,7 +106,7 @@ namespace aveng {
 		std::unique_ptr<GFXPipeline> gfxPipeline;
 		std::unique_ptr<GFXPipeline> gfxPipeline2;
 
-		AvengAppObject::Map appObjects;
+		AvengSceneLoader sceneLoader;
 		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
 		VkPipelineLayout pipelineLayout;
 
@@ -119,7 +120,7 @@ namespace aveng {
 		PointLightSystem pointLightSystem{ engineDevice };
 		GlobalUbo u_GlobalData{};
 		LightsUbo u_LightsData{};
-		SystemData systemData{ engineDevice, aveng_window, aveng_camera, renderer, game_data, appObjects };
+		SystemData systemData{ engineDevice, aveng_window, aveng_camera, renderer, game_data, sceneLoader.getAppObjects() };
 		
 
 #ifdef ENABLE_EDITOR

@@ -276,7 +276,7 @@ namespace aveng {
 		* Thread object bind/draw calls here
 		*/
 		int i = 0;
-		for (auto& kv : appObjects)
+		for (auto& kv : sceneLoader.getAppObjects())
 		{
 			ObjectUniformData u_ObjData{ kv.second.get_texture() };	// Contains texture index
 
@@ -415,11 +415,14 @@ namespace aveng {
 		memset(u_LightsData.lights, 0, sizeof(u_LightsData.lights));
 	}
 
-	void ObjectRenderSystem::addObjects(AvengAppObject object)
+	void ObjectRenderSystem::loadGame(const std::string& scenePath)
 	{
-		auto objectId = object.getId(); // Get ID before moving
-		appObjects.emplace(objectId, std::move(object));
-		std::cout << "Added object with ID " << objectId << " to render system. Total objects: " << appObjects.size() << std::endl;
+		sceneLoader.load(scenePath.c_str(), engineDevice);
+		
+		// Update the number of objects for buffer allocation
+		setNumObjects(static_cast<int>(sceneLoader.getObjectCount()));
+		
+		std::cout << "Loaded scene with " << sceneLoader.getObjectCount() << " objects" << std::endl;
 	}
 
 } //

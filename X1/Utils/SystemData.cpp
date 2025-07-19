@@ -9,7 +9,7 @@ namespace aveng {
         AvengCamera& camera,
         Renderer& renderer,
         GameData& gameData,
-        AvengAppObject::Map& appObjects
+        const AvengAppObject::Map& appObjects
     ) : 
         device(device),
         aveng_window(aveng_window),

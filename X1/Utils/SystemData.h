@@ -22,7 +22,7 @@ namespace aveng {
 			AvengCamera& camera, 
 			Renderer& renderer, 
 			GameData& gameData,
-			AvengAppObject::Map& appObjects
+			const AvengAppObject::Map& appObjects
 			);
 
 		~SystemData();
@@ -37,7 +37,7 @@ namespace aveng {
 		AvengCamera& camera;
 		Renderer& renderer;
 		GameData& gameData;
-		AvengAppObject::Map& appObjects;
+		const AvengAppObject::Map& appObjects;
 		SystemContext context;
 	};
 }

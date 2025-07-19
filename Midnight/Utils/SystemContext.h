@@ -13,6 +13,6 @@ namespace aveng {
         AvengCamera* camera = nullptr;
         Renderer* renderer = nullptr;
         GameData* game_data = nullptr;
-        AvengAppObject::Map* appObjects = nullptr;
+        const AvengAppObject::Map* appObjects = nullptr;
     };
 }

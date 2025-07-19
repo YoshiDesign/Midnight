@@ -1,0 +1,25 @@
+{
+  "scene-id-1": {
+    "title": "Demo Scene with Ships",
+    "objects": [
+      {
+        "path": "3D/ship.obj",
+        "qty": 2,
+        "data": [
+          { "x": 0, "y": -10, "z": 0 },
+          { "x": 5, "y": -8, "z": -3 }
+        ]
+      }
+    ]
+  },
+  "scene-id-2": {
+    "title": "Another Scene",
+    "objects": [
+      {
+        "path": "3D/ship.obj",
+        "qty": 1,
+        "data": [{ "x": -2, "y": -5, "z": 2 }]
+      }
+    ]
+  }
+}

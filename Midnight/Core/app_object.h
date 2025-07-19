@@ -27,10 +27,10 @@ namespace aveng {
 		AvengAppObject(AvengAppObject&&) = default;
 		AvengAppObject& operator=(AvengAppObject&&) = default;
 
-		const id_t getId() { return id; }
+		id_t getId() const { return id; }
 		std::unique_ptr<AvengModel> model{};
 
-		inline int get_texture() { return texture_id; }
+		inline int get_texture() const { return texture_id; }
 		inline void set_texture(int texture) { texture_id = texture; }
 
 		glm::vec3 color{};
