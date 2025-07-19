@@ -117,7 +117,9 @@ namespace aveng {
 		ship.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
 		ship.transform.translation = { 0.f, -10.f, 0.f };
 		ship.transform.rotation = {0.f, 0.f, 180.0f};
-		// appObjects.emplace(ship.getId(), std::move(ship));
+		
+		// Add ship to the render system
+		objectRenderSystem.addObjects(std::move(ship));
 
 		//auto ship2 = AvengAppObject::createAppObject(GRID);
 		//ship2.model = AvengModel::createModelFromFile(engineDevice, "3D/canyon1.obj");

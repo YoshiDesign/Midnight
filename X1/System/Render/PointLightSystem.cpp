@@ -33,12 +33,6 @@ namespace aveng {
 	void PointLightSystem::createPipelineLayout(VkDescriptorSetLayout* descriptorSetLayouts)
 	{
 
-		// Initialize push constant range(s)
-		//VkPushConstantRange pushConstantRange{};
-		//pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		//pushConstantRange.offset = 0;
-		//pushConstantRange.size = sizeof(SimplePushConstantData);	// Must be a multiple of 4
-
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = 2;										// How many descriptor set layouts are to be hooked into the pipeline

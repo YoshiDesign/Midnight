@@ -81,17 +81,15 @@ namespace aveng {
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 			u_LightsBuffers[i]->map();
 		}
-
 		for (int i = 0; i < u_ObjBuffers.size(); i++) {
 			u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(/*ObjectRenderSystem:: */ ObjectUniformData) * engineDevice.properties.limits.minUniformBufferOffsetAlignment * num_objects, // appObjects.size(), // The size <VkDeviceSize> of the entire dynamic uniform buffer. Each object has a particular dynamic offset from which to access its data
+				calculateDynamicUBOStride() * num_objects, // Total buffer size: stride × number of objects
 				1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-				engineDevice.properties.limits.minUniformBufferOffsetAlignment);
+				calculateDynamicUBOStride()); // Pass stride as alignment parameter
 			u_ObjBuffers[i]->map();
 		}
-
 		/*
 		* Create Descriptor Set Layouts
 		*/
@@ -221,7 +219,7 @@ namespace aveng {
 	{
 
 		// Clear Color for now
-		frame_content.rgb = glm::vec3(0.10f, 0.395f, 0.410f);
+		frame_content.rgb = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
 		
 		// 1s tick, convenient
 		if (last_sec != game_data.sec) {
@@ -280,7 +278,6 @@ namespace aveng {
 		int i = 0;
 		for (auto& kv : appObjects)
 		{
-			i++;
 			ObjectUniformData u_ObjData{ kv.second.get_texture() };	// Contains texture index
 
 			// Push Constant Data
@@ -288,17 +285,11 @@ namespace aveng {
 			push.modelMatrix  = kv.second.transform._mat4();
 			push.normalMatrix = kv.second.transform.normalMatrix();
 
-			uint32_t dynamicOffset = engineDevice.properties.limits.minUniformBufferOffsetAlignment * i;
-			if (dynamicOffset > engineDevice.properties.limits.maxUniformBufferRange) {
-			    //This will (should) never occur because we're taking measurments from the same source when instantiating the dynamic uniform buffer
-				// Remove this for any release builds
-				DEBUG("Max Uniform Buffer Range Exceeded.");
-				throw std::runtime_error("Attempting to allocate buffer beyond device uniform buffer memory limit.");
-			}
-
-			// Bind the descriptor set for our pixel (fragment) shader
-			u_ObjBuffers[frameIndex]->writeToBuffer(&u_ObjData, sizeof(ObjectUniformData), dynamicOffset);
-			u_ObjBuffers[frameIndex]->flush();
+			// Instead of manual offset calculation, use these built-in methods:
+			u_ObjBuffers[frameIndex]->writeToIndex(&u_ObjData, i);  // Handles stride automatically
+			u_ObjBuffers[frameIndex]->flushIndex(i);               // Flushes correct range
+			auto descriptorInfo = u_ObjBuffers[frameIndex]->descriptorInfoForIndex(i); // Perfect offset
+			uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset); // Extract offset for binding
 
 			vkCmdBindDescriptorSets(
 				commandBuffer,
@@ -321,6 +312,7 @@ namespace aveng {
 			kv.second.model->bind(commandBuffer);
 			kv.second.model->draw(commandBuffer);
 
+			i++; // Increment AFTER using the index
 		}
 
 		pointLightSystem.render(globalDescriptorSets[frameIndex], lightsDescriptorSets[frameIndex], commandBuffer, u_LightsData.numLights);
@@ -367,12 +359,40 @@ namespace aveng {
 		if (!m.shaderSampledImageArrayDynamicIndexing) {
 			throw std::runtime_error("Your hardware does not support this specific VulkanAPI implementation. Sorry!");
 		}
-		// If ObjectUniformData exceeds minUniformBufferOffsetAlignment we'll need to handle it.
-		if (sizeof(ObjectRenderSystem::ObjectUniformData) > engineDevice.properties.limits.minUniformBufferOffsetAlignment)
-		{
-			throw std::runtime_error("ObjectUniformData is larger than the minimum offset alignment. Uniform Data size needs to be updated.");
+		
+		// Validate ObjectUniformData alignment requirements
+		size_t objectSize = sizeof(ObjectUniformData);
+		size_t minAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
+		
+		std::cout << "ObjectUniformData size: " << objectSize << " bytes" << std::endl;
+		std::cout << "minUniformBufferOffsetAlignment: " << minAlignment << " bytes" << std::endl;
+		
+		// Check if ObjectUniformData fits within one alignment boundary (recommended for performance)
+		if (objectSize > minAlignment) {
+			std::cout << "Warning: ObjectUniformData (" << objectSize << " bytes) exceeds minUniformBufferOffsetAlignment (" 
+			          << minAlignment << " bytes). This may impact performance." << std::endl;
 		}
+		
+		// Calculate how many alignment boundaries our object spans
+		size_t alignmentBoundaries = (objectSize + minAlignment - 1) / minAlignment;
+		std::cout << "ObjectUniformData spans " << alignmentBoundaries << " alignment boundaries" << std::endl;
 
+	}
+
+	/**
+	 * 
+	 * This function calculates the stride for the PER OBJECT dynamic uniform buffer.
+	 */
+	size_t ObjectRenderSystem::calculateDynamicUBOStride() const
+	{
+		size_t objectSize = sizeof(ObjectUniformData);
+		size_t minAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
+		
+		// Calculate stride: round up to next alignment boundary
+		// Formula: ((size + alignment - 1) / alignment) * alignment
+		size_t stride = ((objectSize + minAlignment - 1) / minAlignment) * minAlignment;
+		
+		return stride;
 	}
 
 	void ObjectRenderSystem::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
@@ -393,6 +413,13 @@ namespace aveng {
 		u_LightsData.numLights = 0;
 		// Zero out the lights array for clean state
 		memset(u_LightsData.lights, 0, sizeof(u_LightsData.lights));
+	}
+
+	void ObjectRenderSystem::addObjects(AvengAppObject object)
+	{
+		auto objectId = object.getId(); // Get ID before moving
+		appObjects.emplace(objectId, std::move(object));
+		std::cout << "Added object with ID " << objectId << " to render system. Total objects: " << appObjects.size() << std::endl;
 	}
 
 } //

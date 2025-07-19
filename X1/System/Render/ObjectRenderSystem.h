@@ -23,15 +23,10 @@ namespace aveng {
 	class ObjectRenderSystem {
 
 		/**
-		* Global UBO matches this vertex shader Uniform
+		* Pro Tip:
+		* Radius in position.w, intensity in color.w saves space.
+		* 
 		*/
-		//layout(set = 0, binding = 0) uniform GlobalUbo {
-		//	mat4 projection;
-		//	mat4 view;
-		//	vec4 ambientLightColor; // w is intensity
-		//	vec3 lightPosition;
-		//	vec4 lightColor;
-		//} ubo;
 
 		// Individual point light data
 		struct PointLight {
@@ -96,6 +91,9 @@ namespace aveng {
 		void createPipelineLayout(VkDescriptorSetLayout* descriptorSetLayouts);
 		void updateData(float frameTime);
 		void createPipeline(VkRenderPass renderPass);
+		
+		// Helper function to calculate dynamic uniform buffer stride
+		size_t calculateDynamicUBOStride() const;
 
 		int last_sec;
 		int num_objects{1}; // TODO - This will cause a crash if it's 0, not idea but not a real issue yet
