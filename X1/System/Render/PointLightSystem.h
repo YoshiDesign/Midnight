@@ -23,10 +23,10 @@ namespace aveng {
 
 		PointLightSystem(EngineDevice& device);
 		~PointLightSystem();
-		void initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout);
+		void initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout lightsDescriptorSetLayout);
 		PointLightSystem(const PointLightSystem&) = delete;
 		PointLightSystem& operator=(const PointLightSystem&) = delete;
-		void render(VkDescriptorSet descriptorSet, VkCommandBuffer commandBuffer);
+		void render(VkDescriptorSet globalDescriptorSet, VkDescriptorSet lightsDescriptorSet, VkCommandBuffer commandBuffer, int numLights);
 		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 
 	private:

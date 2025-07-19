@@ -32,12 +32,13 @@ namespace aveng {
 		float frameTime;
 
 		void loadAppObjects();
+		void setupLights();
 		//void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
 		//void updateData();
 
 		/*
 		* !! Order of member initialization matters !!
-		* See: § 12.6.2 of the C++ Standard
+		* See: ï¿½ 12.6.2 of the C++ Standard
 		*/
 		// The window API - Stack allocated
 		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };

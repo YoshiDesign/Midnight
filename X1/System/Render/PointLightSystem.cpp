@@ -13,9 +13,9 @@ namespace aveng {
 	PointLightSystem::PointLightSystem(EngineDevice& device) : engineDevice{ device } 
 	{}
 
-	void PointLightSystem::initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayouts)
+	void PointLightSystem::initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout lightsDescriptorSetLayout)
 	{
-		VkDescriptorSetLayout descriptorSetLayouts[1] = { globalDescriptorSetLayouts };
+		VkDescriptorSetLayout descriptorSetLayouts[2] = { globalDescriptorSetLayout, lightsDescriptorSetLayout };
 		createPipelineLayout(descriptorSetLayouts);
 		createPipeline(renderPass);
 	}
@@ -41,7 +41,7 @@ namespace aveng {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 1;										// How many descriptor set layouts are to be hooked into the pipeline
+		pipelineLayoutInfo.setLayoutCount = 2;										// How many descriptor set layouts are to be hooked into the pipeline
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts;						// a pointer to an array of VkDescriptorSetLayout objects.
 		pipelineLayoutInfo.pushConstantRangeCount = 0;
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
@@ -87,23 +87,28 @@ namespace aveng {
 		//	);
 	}
 
-	void PointLightSystem::render(VkDescriptorSet globalDescriptorSet, VkCommandBuffer commandBuffer)
+	void PointLightSystem::render(VkDescriptorSet globalDescriptorSet, VkDescriptorSet lightsDescriptorSet, VkCommandBuffer commandBuffer, int numLights)
 	{
+		if (numLights <= 0) {
+			return; // Nothing to render
+		}
 
-		gfxPipeline->bind(commandBuffer); // 0
+		gfxPipeline->bind(commandBuffer);
 	
+		// Bind both descriptor sets
+		VkDescriptorSet descriptorSets[2] = { globalDescriptorSet, lightsDescriptorSet };
 		vkCmdBindDescriptorSets(
 			commandBuffer,
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
 			pipelineLayout,
 			0,
-			1,
-			&globalDescriptorSet,
+			2, // binding 2 descriptor sets
+			descriptorSets,
 			0,
 			nullptr);
 
-		vkCmdDraw(commandBuffer, 6, 1, 0, 0);
-
+		// Use instanced rendering: 6 vertices per light, numLights instances
+		vkCmdDraw(commandBuffer, 6, numLights, 0, 0);
 	}
 
 } //

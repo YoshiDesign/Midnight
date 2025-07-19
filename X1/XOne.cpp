@@ -20,6 +20,7 @@ namespace aveng {
 	{
 		loadAppObjects();
 		objectRenderSystem.descriptorSetup();
+		setupLights();
 	}
 
 	void XOne::run()
@@ -54,6 +55,56 @@ namespace aveng {
 		vkDeviceWaitIdle(engineDevice.device());
 	}
 
+	void XOne::setupLights()
+	{
+		// Clear any existing lights first
+		objectRenderSystem.clearLights();
+
+		// Add 5 diverse point lights to showcase the multiple light system
+		
+		// 1. Bright red light - positioned to the left
+		objectRenderSystem.addLight(
+			glm::vec3(-8.0f, -5.0f, 2.0f),  // position
+			glm::vec3(1.0f, 0.2f, 0.2f),   // red color
+			2.0f,                           // high intensity
+			0.15f                           // slightly larger radius
+		);
+
+		// 2. Cool blue light - positioned to the right
+		objectRenderSystem.addLight(
+			glm::vec3(8.0f, -3.0f, -1.0f), // position
+			glm::vec3(0.2f, 0.4f, 1.0f),   // blue color
+			1.5f,                           // medium intensity
+			0.12f                           // medium radius
+		);
+
+		// 3. Vibrant green light - positioned above
+		objectRenderSystem.addLight(
+			glm::vec3(0.0f, -15.0f, 5.0f), // position
+			glm::vec3(0.2f, 1.0f, 0.3f),   // green color
+			1.8f,                           // high intensity
+			0.1f                            // standard radius
+		);
+
+		// 4. Warm white light - positioned as main lighting
+		objectRenderSystem.addLight(
+			glm::vec3(2.0f, -8.0f, 8.0f),  // position
+			glm::vec3(1.0f, 0.9f, 0.7f),   // warm white
+			3.0f,                           // very high intensity
+			0.2f                            // larger radius for main light
+		);
+
+		// 5. Purple accent light - positioned for dramatic effect
+		objectRenderSystem.addLight(
+			glm::vec3(-3.0f, -12.0f, -4.0f), // position
+			glm::vec3(0.8f, 0.2f, 1.0f),     // purple/magenta
+			1.2f,                             // lower intensity for accent
+			0.08f                             // smaller radius
+		);
+
+		std::cout << "Added " << objectRenderSystem.getLightCount() << " lights to the scene!" << std::endl;
+	}
+
 	/*
 	*
 	*/
@@ -81,7 +132,7 @@ namespace aveng {
 		appObjects.emplace(terrain.getId(), std::move(terrain));*/
 
 		//objectRenderSystem.setNumObjects(appObjects.size());
-		objectRenderSystem.setNumObjects(2);
+		objectRenderSystem.setNumObjects(1);
 
 		// AvengModel::drawTriangle(engineDevice, { 1.0f, 1.0f, 1.0f });
 

@@ -32,6 +32,20 @@ namespace aveng {
 		//	vec3 lightPosition;
 		//	vec4 lightColor;
 		//} ubo;
+
+		// Individual point light data
+		struct PointLight {
+			glm::vec4 position{ 0.f, 0.f, 0.f, 1.f };  // w can be used for radius
+			glm::vec4 color{ 1.f, 1.f, 1.f, 1.f };     // w is intensity
+		};
+
+		// Lights uniform buffer for multiple lights
+		struct LightsUbo {
+			static constexpr int MAX_LIGHTS = 100;
+			uint32_t numLights{ 0 };
+			alignas(16) PointLight lights[MAX_LIGHTS]; // Cache locality win
+		};
+
 		struct GlobalUbo {
 			glm::mat4 projection{ 1.f };							// 64 bytes
 			glm::mat4 view{ 1.f };									// 64 bytes
@@ -64,6 +78,11 @@ namespace aveng {
 		void addObjects(AvengAppObject);
 		float getAspectRatio() { return renderer.getAspectRatio(); }
 		void setNumObjects(int n) { num_objects = n; } // REQUIRED - This number is used when initializing buffers
+
+		// Light management
+		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity = 1.0f, float radius = 0.1f);
+		void clearLights();
+		int getLightCount() const { return u_LightsData.numLights; }
 
 		void render(float frameTime, FrameContent& frameContent);
 		void DependencyChecks();
@@ -101,6 +120,7 @@ namespace aveng {
 		ImageSystem imageSystem{ engineDevice };
 		PointLightSystem pointLightSystem{ engineDevice };
 		GlobalUbo u_GlobalData{};
+		LightsUbo u_LightsData{};
 		SystemData systemData{ engineDevice, aveng_window, aveng_camera, renderer, game_data, appObjects };
 		
 
@@ -111,8 +131,10 @@ namespace aveng {
 		std::unique_ptr<AvengDescriptorPool> descriptorPool{};
 		std::vector<std::unique_ptr<AvengBuffer>> u_GlobalBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> u_ObjBuffers;
+		std::vector<std::unique_ptr<AvengBuffer>> u_LightsBuffers;
 		std::vector<VkDescriptorSet> globalDescriptorSets;
 		std::vector<VkDescriptorSet> objectDescriptorSets;
+		std::vector<VkDescriptorSet> lightsDescriptorSets;
 
 	};
 

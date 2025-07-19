@@ -43,9 +43,9 @@ namespace aveng {
 		 * Create Descriptor Pools
 		 */
 		descriptorPool = AvengDescriptorPool::Builder(engineDevice)
-			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 3)
+			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 4) // Increased for lights descriptor sets
 			// Type									// Max no. of descriptor sets
-			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT) // No. descriptor sets is implementation dependent
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 2) // Global + Lights buffers
 			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * imageInfo.size()) // Dependent upon no. of images/textures
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT) // No. descriptor sets is implementation dependent
 			.build();
@@ -54,10 +54,12 @@ namespace aveng {
 		// Buffer vectors. One for each frame-in-flight
 		u_GlobalBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		u_ObjBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		u_LightsBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Descriptor Set vectors. One for each frame-in-flight
 		globalDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		lightsDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		/*
 		* Create Buffers
@@ -69,6 +71,15 @@ namespace aveng {
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 			u_GlobalBuffers[i]->map();
+		}
+
+		for (int i = 0; i < u_LightsBuffers.size(); i++) {
+			u_LightsBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo),
+				1,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			u_LightsBuffers[i]->map();
 		}
 
 		for (int i = 0; i < u_ObjBuffers.size(); i++) {
@@ -97,6 +108,12 @@ namespace aveng {
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
 
+		// Descriptor Set 2 -- Lights
+		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.build();
+
 		// Write each descriptor set, once for each swapchain frame
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
@@ -112,6 +129,12 @@ namespace aveng {
 			AvengDescriptorSetWriter(*objDescriptorSetLayout, *descriptorPool)
 				.writeBuffer(0, &objBufferInfo)
 				.build(objectDescriptorSets[i]);
+
+			// Lights descriptor set
+			auto lightsBufferInfo = u_LightsBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
+			AvengDescriptorSetWriter(*lightsDescriptorSetLayout, *descriptorPool)
+				.writeBuffer(0, &lightsBufferInfo)
+				.build(lightsDescriptorSets[i]);
 		}
 
 		initialize(
@@ -122,7 +145,8 @@ namespace aveng {
 
 		pointLightSystem.initialize(
 			renderer.getSwapChainRenderPass(),
-			globalDescriptorSetLayout->getDescriptorSetLayout()
+			globalDescriptorSetLayout->getDescriptorSetLayout(),
+			lightsDescriptorSetLayout->getDescriptorSetLayout()
 		);
 
 		// GUI
@@ -225,6 +249,10 @@ namespace aveng {
 		u_GlobalBuffers[frameIndex]->writeToBuffer(&u_GlobalData);
 		u_GlobalBuffers[frameIndex]->flush();
 
+		// Update our lights uniform buffer
+		u_LightsBuffers[frameIndex]->writeToBuffer(&u_LightsData);
+		u_LightsBuffers[frameIndex]->flush();
+
 		// Bind our current pipeline configuration
 		switch (game_data.cur_pipe)
 		{
@@ -295,7 +323,7 @@ namespace aveng {
 
 		}
 
-		pointLightSystem.render(globalDescriptorSets[frameIndex], commandBuffer);
+		pointLightSystem.render(globalDescriptorSets[frameIndex], lightsDescriptorSets[frameIndex], commandBuffer, u_LightsData.numLights);
 		editor.render(commandBuffer);
 
 		renderer.endSwapChainRenderPass(commandBuffer);
@@ -345,6 +373,26 @@ namespace aveng {
 			throw std::runtime_error("ObjectUniformData is larger than the minimum offset alignment. Uniform Data size needs to be updated.");
 		}
 
+	}
+
+	void ObjectRenderSystem::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
+	{
+		if (u_LightsData.numLights >= LightsUbo::MAX_LIGHTS) {
+			std::cout << "Warning: Maximum number of lights (" << LightsUbo::MAX_LIGHTS << ") reached. Cannot add more lights." << std::endl;
+			return;
+		}
+
+		PointLight& light = u_LightsData.lights[u_LightsData.numLights];
+		light.position = glm::vec4(position, radius);
+		light.color = glm::vec4(color, intensity);
+		u_LightsData.numLights++;
+	}
+
+	void ObjectRenderSystem::clearLights()
+	{
+		u_LightsData.numLights = 0;
+		// Zero out the lights array for clean state
+		memset(u_LightsData.lights, 0, sizeof(u_LightsData.lights));
 	}
 
 } //
