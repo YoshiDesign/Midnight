@@ -17,9 +17,9 @@ namespace aveng {
 
 	public:
 
-		struct FragUbo {
-			alignas(sizeof(int)) int imDex;
-		};
+		//struct FragUbo {
+		//	alignas(sizeof(int)) int imDex;
+		//};
 
 		PointLightSystem(EngineDevice& device);
 		~PointLightSystem();

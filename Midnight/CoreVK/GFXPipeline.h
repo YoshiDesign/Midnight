@@ -39,8 +39,8 @@ namespace aveng {
 	* The Vulkan Graphics Pipeline implementation
 	*/
 	class GFXPipeline {
-		// @warn - A reference member var to our engine device. If we have a GFX Pipeline, the necessity of an engine device is implicit.
-		// You should never copy a GFXPipeline
+		// A reference member var to our engine device. If we have a GFX Pipeline, the necessity of an engine device is implicit.
+		// @warn - You should never copy a GFXPipeline
 		EngineDevice& engDevice;
 		VkPipeline graphicsPipeline;		// typedef pointer
 		VkShaderModule vertShaderModule;	// typedef pointer

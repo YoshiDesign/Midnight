@@ -164,7 +164,7 @@ namespace aveng {
 	}
 
 
-	void  Renderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer)
+	void  Renderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer, glm::vec3 rgb)
 	{
 	
 		assert(isFrameStarted && "Can't call beginSwapChain if frame is not in progress.");
@@ -187,8 +187,10 @@ namespace aveng {
 		renderPassInfo.renderArea.offset = { 0,0 };
 		renderPassInfo.renderArea.extent = aveng_swapchain->getSwapChainExtent();
 
+		std::cout << "{" << rgb.r << ", " << rgb.g << ", " << rgb.b << "}" << std::endl;
+
 		std::array<VkClearValue, 2> clearValues{};
-		clearValues[0].color = { 0.001f, 0.003f, 0.01f, 1.0f };
+		clearValues[0].color = { rgb.r, rgb.g, rgb.b, 1.0f };
 		clearValues[1].depthStencil = { 1.0f, 0 };
 		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 		renderPassInfo.pClearValues = clearValues.data();

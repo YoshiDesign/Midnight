@@ -22,15 +22,31 @@ namespace aveng {
 
 	class ObjectRenderSystem {
 
+		/**
+		* Global UBO matches this vertex shader Uniform
+		*/
+		//layout(set = 0, binding = 0) uniform GlobalUbo {
+		//	mat4 projection;
+		//	mat4 view;
+		//	vec4 ambientLightColor; // w is intensity
+		//	vec3 lightPosition;
+		//	vec4 lightColor;
+		//} ubo;
 		struct GlobalUbo {
-			glm::mat4 projection{ 1.f };
-			glm::mat4 view{ 1.f };
-			glm::vec4 ambientLightColor{ 0.f, 0.f, 1.f, .14f };
-			glm::vec3 lightPosition{ 5.0f, -20.0f, 2.8f };
-			alignas(16) glm::vec4 lightColor{ 1.f, 1.f, 1.f, 1.f };
-			//alignas(16) glm::vec3 lightDirection = glm::normalize(glm::vec3{ -1.f, -3.f, 1.f });
+			glm::mat4 projection{ 1.f };							// 64 bytes
+			glm::mat4 view{ 1.f };									// 64 bytes
+			glm::vec4 ambientLightColor{ 0.f, 0.f, 1.f, .14f };		// 32 bytes
+			glm::vec3 lightPosition{ 5.0f, -20.0f, 2.8f };			// 24 bytes
+			alignas(16) glm::vec4 lightColor{ 1.f, 1.f, 1.f, 1.f };	// 32 bytes
+			// glm::vec3 lightDirection = glm::normalize(glm::vec3{ -1.f, -3.f, 1.f });
 		};
 
+		/**
+		* Per-object uniform. This one is passed directly to the Fragment Shader
+		*/
+		// layout(set = 1, binding = 0) uniform ObjectUniformData {
+		// 	 uint texIndex;
+		// } u_ObjData;
 		struct ObjectUniformData {
 			//  Data alignment must be a multiple of VkPhysicalDeviceLimits::minUniformBufferOffsetAlignment
 			alignas(16) int texIndex;
@@ -49,7 +65,7 @@ namespace aveng {
 		float getAspectRatio() { return renderer.getAspectRatio(); }
 		void setNumObjects(int n) { num_objects = n; } // REQUIRED - This number is used when initializing buffers
 
-		void render(float frameTime);
+		void render(float frameTime, FrameContent& frameContent);
 		void DependencyChecks();
 		void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& keyboardController);
 
@@ -63,7 +79,7 @@ namespace aveng {
 		void createPipeline(VkRenderPass renderPass);
 
 		int last_sec;
-		int num_objects{1};
+		int num_objects{1}; // TODO - This will cause a crash if it's 0, not idea but not a real issue yet
 		float aspect;
 
 		

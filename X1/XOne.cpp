@@ -25,6 +25,9 @@ namespace aveng {
 	void XOne::run()
 	{
 
+		// Currently only used for clear color
+		FrameContent frame_content = { glm::vec3{1, 1, 1}, glm::vec3{0.01f, 0.01f, 0.01f} };
+
 		// Set callback functions for keys bound to the window
 		glfwSetKeyCallback(aveng_window.getGLFWwindow(), WindowCallbacks::testKeyCallback);
 
@@ -43,7 +46,7 @@ namespace aveng {
 			frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
 			currentTime = newTime;
 
-			objectRenderSystem.render(frameTime); //,  *u_ObjBuffers[frameIndex]
+			objectRenderSystem.render(frameTime, frame_content);
 
 		}
 
@@ -56,12 +59,14 @@ namespace aveng {
 	*/
 	void XOne::loadAppObjects()
 	{
+
+		// objectRenderSystem.create3DObject("3D/ship.obj", THEME_4); // Model and Texture
 		std::cout << "Pretending to load stuff... " << std::endl;
-		//auto ship = AvengAppObject::createAppObject(THEME_4);
-		//ship.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
-		//ship.transform.translation = { 0.f, -10.f, 0.f };
-		//ship.transform.rotation = {0.f, 0.f, 180.0f};
-		//appObjects.emplace(ship.getId(), std::move(ship));
+		auto ship = AvengAppObject::createAppObject(THEME_4);
+		ship.model = AvengModel::createModelFromFile(engineDevice, "3D/ship.obj");
+		ship.transform.translation = { 0.f, -10.f, 0.f };
+		ship.transform.rotation = {0.f, 0.f, 180.0f};
+		// appObjects.emplace(ship.getId(), std::move(ship));
 
 		//auto ship2 = AvengAppObject::createAppObject(GRID);
 		//ship2.model = AvengModel::createModelFromFile(engineDevice, "3D/canyon1.obj");

@@ -193,9 +193,12 @@ namespace aveng {
 		);
 	}
 
-	void ObjectRenderSystem::render(float frameTime /*, AvengBuffer& u_ObjBuffer*/)
+	void ObjectRenderSystem::render(float frameTime, FrameContent& frame_content /*, AvengBuffer& u_ObjBuffer*/)
 	{
 
+		// Clear Color for now
+		frame_content.rgb = glm::vec3(0.10f, 0.395f, 0.410f);
+		
 		// 1s tick, convenient
 		if (last_sec != game_data.sec) {
 			last_sec = game_data.sec;
@@ -212,7 +215,7 @@ namespace aveng {
 		}
 		int frameIndex = renderer.getFrameIndex();
 		// Render
-		renderer.beginSwapChainRenderPass(commandBuffer);
+		renderer.beginSwapChainRenderPass(commandBuffer, frame_content.rgb);
 
 		// Pack our vertex shader uniform buffer
 		u_GlobalData.projection = aveng_camera.getProjection();

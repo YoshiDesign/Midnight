@@ -48,7 +48,7 @@ namespace aveng {
 
 		VkCommandBuffer beginFrame();
 		void endFrame();
-		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer);
+		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, glm::vec3 rgb);
 		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
 	private:

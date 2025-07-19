@@ -19,7 +19,7 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
 	vec4 lightColor;
 } ubo;
 
-const float LIGHT_RADIUS = 0.561; // Can be a push constant?
+const float LIGHT_RADIUS = 0.1; // Can be a push constant?
 
 void main() {
 

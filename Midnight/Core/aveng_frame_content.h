@@ -7,12 +7,14 @@ namespace aveng {
 	struct FrameContent {
 
 		//int frameIndex;
-		float frameTime;
+		glm::vec3 mods;
+		glm::vec3 rgb;
+		//float frameTime;
 		//VkCommandBuffer commandBuffer;
-		AvengCamera& camera;
+		//AvengCamera& camera;
 		//VkDescriptorSet globalDescriptorSet;
 		//VkDescriptorSet objectDescriptorSet;
-		AvengAppObject::Map& appObjects;
+		//AvengAppObject::Map& appObjects;
 
 	};
 }
