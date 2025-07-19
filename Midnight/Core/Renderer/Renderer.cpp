@@ -187,8 +187,6 @@ namespace aveng {
 		renderPassInfo.renderArea.offset = { 0,0 };
 		renderPassInfo.renderArea.extent = aveng_swapchain->getSwapChainExtent();
 
-		std::cout << "{" << rgb.r << ", " << rgb.g << ", " << rgb.b << "}" << std::endl;
-
 		std::array<VkClearValue, 2> clearValues{};
 		clearValues[0].color = { rgb.r, rgb.g, rgb.b, 1.0f };
 		clearValues[1].depthStencil = { 1.0f, 0 };
