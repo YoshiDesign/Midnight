@@ -126,7 +126,7 @@ namespace aveng {
 				.writeImage(1, imageInfo.data(), imageInfo.size()) // Second Binding descriptor: Image
 				.build(globalDescriptorSets[i]);
 
-					// Object descriptor set - use stride size for dynamic uniform buffers
+		// Object descriptor set - use stride size for dynamic uniform buffers
 		auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0); // Use stride size for dynamic buffer range
 		AvengDescriptorSetWriter(*objDescriptorSetLayout, *descriptorPool)
 			.writeBuffer(0, &objBufferInfo)

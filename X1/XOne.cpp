@@ -182,13 +182,13 @@ namespace aveng {
 		
 		//
 		objectRenderSystem.addLight(
-			glm::vec3(20, -16, 7.8f), // position
+			glm::vec3(20.3, -16, 7.8f), // position
 			glm::vec3(0.8f, 1.0f, 0.3f),     // purple/magenta
 			1.f,                             // lower intensity for accent
 			1.f                             // smaller radius
 		);
 		objectRenderSystem.addLight(
-			glm::vec3(-18.6, -16, 7.8f), // position
+			glm::vec3(-18.2, -16, 7.8f), // position
 			glm::vec3(0.2f, 1.0f, 0.8f),     // purple/magenta
 			1.f,                             // lower intensity for accent
 			1.f                             // smaller radius
