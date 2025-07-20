@@ -23,9 +23,9 @@ namespace aveng {
 		viewerObject.transform.translation.y = -2.5f;
 	}
 
-	void ObjectRenderSystem::initialize( VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout objDescriptorSetLayout)
+	void ObjectRenderSystem::initialize( VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout objDescriptorSetLayout, VkDescriptorSetLayout lightsDescriptorSetLayout)
 	{
-		VkDescriptorSetLayout descriptorSetLayouts[2] = { globalDescriptorSetLayout , objDescriptorSetLayout };
+		VkDescriptorSetLayout descriptorSetLayouts[3] = { globalDescriptorSetLayout , objDescriptorSetLayout, lightsDescriptorSetLayout };
 		createPipelineLayout(descriptorSetLayouts);
 		createPipeline(renderPass);
 	}
@@ -81,10 +81,14 @@ namespace aveng {
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 			u_LightsBuffers[i]->map();
 		}
+		std::cout << "Allocating object buffers with num_objects: " << num_objects << std::endl;
+		std::cout << "Buffer size per frame: " << (calculateDynamicUBOStride() * num_objects) << " bytes" << std::endl;
+		std::cout << "Stride size: " << calculateDynamicUBOStride() << " bytes" << std::endl;
+		
 		for (int i = 0; i < u_ObjBuffers.size(); i++) {
 			u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				calculateDynamicUBOStride() * num_objects, // Total buffer size: stride × number of objects
-				1,
+				calculateDynamicUBOStride(), // Size of one instance (stride)
+				num_objects, // Number of instances (objects)
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 				calculateDynamicUBOStride()); // Pass stride as alignment parameter
@@ -122,11 +126,11 @@ namespace aveng {
 				.writeImage(1, imageInfo.data(), imageInfo.size()) // Second Binding descriptor: Image
 				.build(globalDescriptorSets[i]);
 
-			// Object descriptor set
-			auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(sizeof(ObjectRenderSystem::ObjectUniformData), 0); // 0 here refers to the position (in the buffer) to begin reading from before any offsets are applied
-			AvengDescriptorSetWriter(*objDescriptorSetLayout, *descriptorPool)
-				.writeBuffer(0, &objBufferInfo)
-				.build(objectDescriptorSets[i]);
+					// Object descriptor set - use stride size for dynamic uniform buffers
+		auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0); // Use stride size for dynamic buffer range
+		AvengDescriptorSetWriter(*objDescriptorSetLayout, *descriptorPool)
+			.writeBuffer(0, &objBufferInfo)
+			.build(objectDescriptorSets[i]);
 
 			// Lights descriptor set
 			auto lightsBufferInfo = u_LightsBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
@@ -138,7 +142,8 @@ namespace aveng {
 		initialize(
 			renderer.getSwapChainRenderPass(),
 			globalDescriptorSetLayout->getDescriptorSetLayout(),
-			objDescriptorSetLayout->getDescriptorSetLayout()
+			objDescriptorSetLayout->getDescriptorSetLayout(),
+			lightsDescriptorSetLayout->getDescriptorSetLayout()
 		);
 
 		pointLightSystem.initialize(
@@ -171,7 +176,7 @@ namespace aveng {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 2;										// How many descriptor set layouts are to be hooked into the pipeline
+		pipelineLayoutInfo.setLayoutCount = 3;										// How many descriptor set layouts are to be hooked into the pipeline (Global, Object, Lights)
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts;						// a pointer to an array of VkDescriptorSetLayout objects.
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
@@ -260,6 +265,7 @@ namespace aveng {
 				gfxPipeline->bind(commandBuffer); // 0
 		}
 
+		// Bind global descriptor set (set 0)
 		vkCmdBindDescriptorSets(
 			commandBuffer,
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -267,6 +273,17 @@ namespace aveng {
 			0,
 			1,
 			&globalDescriptorSets[frameIndex],
+			0,
+			nullptr);
+
+		// Bind lights descriptor set (set 2) - all objects use the same lights
+		vkCmdBindDescriptorSets(
+			commandBuffer,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipelineLayout,
+			2,
+			1,
+			&lightsDescriptorSets[frameIndex],
 			0,
 			nullptr);
 
@@ -291,6 +308,7 @@ namespace aveng {
 			auto descriptorInfo = u_ObjBuffers[frameIndex]->descriptorInfoForIndex(i); // Perfect offset
 			uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset); // Extract offset for binding
 
+			// Bind object descriptor set (set 1) with dynamic offset for this specific object
 			vkCmdBindDescriptorSets(
 				commandBuffer,
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -417,12 +435,16 @@ namespace aveng {
 
 	void ObjectRenderSystem::loadGame(const std::string& scenePath)
 	{
+		std::cout << "Loading scene from: " << scenePath << std::endl;
+		std::cout << "num_objects before loading: " << num_objects << std::endl;
+		
 		sceneLoader.load(scenePath.c_str(), engineDevice);
 		
 		// Update the number of objects for buffer allocation
 		setNumObjects(static_cast<int>(sceneLoader.getObjectCount()));
 		
 		std::cout << "Loaded scene with " << sceneLoader.getObjectCount() << " objects" << std::endl;
+		std::cout << "num_objects after setNumObjects: " << num_objects << std::endl;
 	}
 
 } //

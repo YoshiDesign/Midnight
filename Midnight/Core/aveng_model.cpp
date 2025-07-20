@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iostream>
 #include <unordered_map>
+#include <algorithm>
 #include "aveng_model.h"
 #include "Utils/aveng_utils.h"
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -312,6 +313,16 @@ namespace aveng {
 
 		//std::cout << filepath << " - Vertices: " << vertices.size() << std::endl;
 		//std::cout << filepath << " - Indices: " << indices.size() << std::endl;
+		
+		// Debug UV coordinate ranges
+		float minU = 1000.0f, maxU = -1000.0f, minV = 1000.0f, maxV = -1000.0f;
+		for (const auto& vertex : vertices) {
+			minU = std::min(minU, vertex.texCoord.x);
+			maxU = std::max(maxU, vertex.texCoord.x);
+			minV = std::min(minV, vertex.texCoord.y);
+			maxV = std::max(maxV, vertex.texCoord.y);
+		}
+		std::cout << filepath << " - UV Range: U(" << minU << " to " << maxU << ") V(" << minV << " to " << maxV << ")" << std::endl;
 
 	}
 

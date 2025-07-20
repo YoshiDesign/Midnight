@@ -68,7 +68,7 @@ namespace aveng {
 		ObjectRenderSystem& operator=(const ObjectRenderSystem&) = delete;
 		ObjectRenderSystem(const ObjectRenderSystem&) = delete;
 
-		void initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout fragDescriptorSetLayouts);
+		void initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout fragDescriptorSetLayouts, VkDescriptorSetLayout lightsDescriptorSetLayout);
 		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 		void descriptorSetup();
 		void loadGame(const std::string& scenePath);

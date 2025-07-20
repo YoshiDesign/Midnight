@@ -61,34 +61,80 @@ namespace aveng {
 		objectRenderSystem.clearLights();
 
 		// Add 5 diverse point lights to showcase the multiple light system
+
+		for (int i = 1; i < 6; i++) {
+		
+			objectRenderSystem.addLight(
+				glm::vec3(7.f, -i * 12.f, -i * 20.0f),  // position
+				glm::vec3(i *.25f, i * .25f, 1.0f),    // red color
+				i * .75f,                        // intensity
+				0.8f                           // slightly larger radius
+			);
+
+		}
+
+		for (int i = 1; i <= 2; i++) {
+
+			objectRenderSystem.addLight(
+				glm::vec3(50.f, -i * 4.5f, -85.0f),  // position
+				glm::vec3(1.f, 1.f, 1.f),    // red color
+				i * 2.f,                        // intensity
+				i * 0.8f                           // slightly larger radius
+			);
+
+		}
 		
 		// 1. Bright red light - positioned to the left
 		objectRenderSystem.addLight(
-			glm::vec3(-8.0f, -5.0f, 2.0f),  // position
+			glm::vec3(-69.f, -12.f, 89.f),  // position
 			glm::vec3(1.0f, 0.2f, 0.2f),   // red color
-			2.0f,                           // high intensity
-			0.15f                           // slightly larger radius
+			4.0f,                           // high intensity
+			0.45f                           // slightly larger radius
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(-55.f, -12.f, 90.f),  // position
+			glm::vec3(1.0f, 0.2f, 0.2f),   // red color
+			4.0f,                           // high intensity
+			0.45f                           // slightly larger radius
 		);
 
 		// 2. Cool blue light - positioned to the right
 		objectRenderSystem.addLight(
-			glm::vec3(8.0f, -3.0f, -1.0f), // position
-			glm::vec3(0.2f, 0.4f, 1.0f),   // blue color
-			1.5f,                           // medium intensity
-			0.12f                           // medium radius
+			glm::vec3(-43.f, -28.f, 100.f), // position
+			glm::vec3(0.2f, 1.0f, 0.3f),   // 
+			4.f,                           // medium intensity
+			0.42f                           // medium radius
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(-30.f, -28.f, 100.f), // position
+			glm::vec3(0.2f, 0.4f, 1.0f),   // 
+			2.f,                           // medium intensity
+			0.42f                           // medium radius
 		);
 
 		// 3. Vibrant green light - positioned above
 		objectRenderSystem.addLight(
-			glm::vec3(0.0f, -15.0f, 5.0f), // position
-			glm::vec3(0.2f, 1.0f, 0.3f),   // green color
-			1.8f,                           // high intensity
+			glm::vec3(-22.f, -53.f, 118.f), // position
+			glm::vec3(0.2f, 0.4f, 1.0f),   // 
+			4.0f,                           // high intensity
+			0.1f                            // standard radius
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(-7.f, -53.f, 118.f), // position
+			glm::vec3(0.2f, 0.4f, 1.0f),   // 
+			4.0f,                           // high intensity
 			0.1f                            // standard radius
 		);
 
 		// 4. Warm white light - positioned as main lighting
 		objectRenderSystem.addLight(
-			glm::vec3(2.0f, -8.0f, 8.0f),  // position
+			glm::vec3(13.f, -49.f, 87.f),  // position
+			glm::vec3(1.0f, 0.9f, 0.7f),   // warm white
+			3.0f,                           // very high intensity
+			0.2f                            // larger radius for main light
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(28.f, -50.f, 87.f),  // position
 			glm::vec3(1.0f, 0.9f, 0.7f),   // warm white
 			3.0f,                           // very high intensity
 			0.2f                            // larger radius for main light
@@ -96,12 +142,57 @@ namespace aveng {
 
 		// 5. Purple accent light - positioned for dramatic effect
 		objectRenderSystem.addLight(
-			glm::vec3(-3.0f, -12.0f, -4.0f), // position
+			glm::vec3(31, -96, 109), // position
 			glm::vec3(0.8f, 0.2f, 1.0f),     // purple/magenta
-			1.2f,                             // lower intensity for accent
-			0.08f                             // smaller radius
+			4.2f,                             // lower intensity for accent
+			0.1f                             // smaller radius
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(50, -96, 109), // position
+			glm::vec3(0.8f, 0.2f, 1.0f),     // purple/magenta
+			4.2f,                             // lower intensity for accent
+			0.1f                             // smaller radius
 		);
 
+		objectRenderSystem.addLight(
+			glm::vec3(60, -121, 99), // position
+			glm::vec3(0.8f, 0.2f, 1.0f),     // purple/magenta
+			3.2f,                             // lower intensity for accent
+			0.1f                             // smaller radius
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(74, -122, 101), // position
+			glm::vec3(0.8f, 0.2f, 1.0f),     // purple/magenta
+			3.2f,                             // lower intensity for accent
+			0.1f                             // smaller radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(103, -108, 127), // position
+			glm::vec3(0.8f, 0.2f, 1.0f),     // purple/magenta
+			2.f,                             // lower intensity for accent
+			0.1f                             // smaller radius
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(103, -108, 127), // position
+			glm::vec3(0.8f, 0.2f, 1.0f),     // purple/magenta
+			2.f,                             // lower intensity for accent
+			0.1f                             // smaller radius
+		);
+		
+		//
+		objectRenderSystem.addLight(
+			glm::vec3(20, -16, 7.8f), // position
+			glm::vec3(0.8f, 1.0f, 0.3f),     // purple/magenta
+			1.f,                             // lower intensity for accent
+			1.f                             // smaller radius
+		);
+		objectRenderSystem.addLight(
+			glm::vec3(-18.6, -16, 7.8f), // position
+			glm::vec3(0.2f, 1.0f, 0.8f),     // purple/magenta
+			1.f,                             // lower intensity for accent
+			1.f                             // smaller radius
+		);
 		std::cout << "Added " << objectRenderSystem.getLightCount() << " lights to the scene!" << std::endl;
 	}
 
