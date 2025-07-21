@@ -19,7 +19,7 @@ namespace aveng {
 	XOne::XOne()
 	{
 		loadAppObjects();
-		objectRenderSystem.descriptorSetup();
+		objectRenderSystem.initialize();
 		setupLights();
 	}
 

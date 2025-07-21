@@ -11,7 +11,8 @@
 
 namespace aveng {
 
-	Renderer::Renderer(AvengWindow& window, EngineDevice& device) : aveng_window{ window }, engineDevice{ device }
+	Renderer::Renderer(AvengWindow& window, EngineDevice& device) 
+		: aveng_window{ window }, engineDevice{ device }, imageSystem{ engineDevice }, pointLightSystem{ engineDevice }
 	{
 		recreateSwapChain();
 		createCommandBuffers();
@@ -20,6 +21,7 @@ namespace aveng {
 	Renderer::~Renderer()
 	{
 		freeCommandBuffers();
+		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
 	}
 
 	/*
@@ -221,6 +223,240 @@ namespace aveng {
 			commandBuffer == getCurrentCommandBuffer() &&
 			"Can't end render pass on command buffer from a different frame");
 		vkCmdEndRenderPass(commandBuffer);
+	}
+
+	void Renderer::setupDescriptors(int numObjects)
+	{
+		num_objects = numObjects;
+		auto imageInfo = imageSystem.descriptorInfoForAllImages();
+
+		// Create Descriptor Pools
+		descriptorPool = AvengDescriptorPool::Builder(engineDevice)
+			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 4)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 2)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * imageInfo.size())
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT)
+			.build();
+
+		// Resize buffer vectors
+		u_GlobalBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		u_ObjBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		u_LightsBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+		// Resize descriptor set vectors
+		globalDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		lightsDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+		// Create Buffers
+		for (int i = 0; i < u_GlobalBuffers.size(); i++) {
+			u_GlobalBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(GlobalUbo), 1,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			u_GlobalBuffers[i]->map();
+		}
+
+		for (int i = 0; i < u_LightsBuffers.size(); i++) {
+			u_LightsBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			u_LightsBuffers[i]->map();
+		}
+
+		for (int i = 0; i < u_ObjBuffers.size(); i++) {
+			u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				calculateDynamicUBOStride(), num_objects,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+				calculateDynamicUBOStride());
+			u_ObjBuffers[i]->map();
+		}
+
+		// Create Descriptor Set Layouts
+		std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, imageInfo.size())
+			.build();
+
+		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.build();
+
+		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.build();
+
+		// Write descriptor sets
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			auto globalBufferInfo = u_GlobalBuffers[i]->descriptorInfo(sizeof(GlobalUbo), 0);
+			AvengDescriptorSetWriter(*globalDescriptorSetLayout, *descriptorPool)
+				.writeBuffer(0, &globalBufferInfo)
+				.writeImage(1, imageInfo.data(), imageInfo.size())
+				.build(globalDescriptorSets[i]);
+
+			auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
+			AvengDescriptorSetWriter(*objDescriptorSetLayout, *descriptorPool)
+				.writeBuffer(0, &objBufferInfo)
+				.build(objectDescriptorSets[i]);
+
+			auto lightsBufferInfo = u_LightsBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
+			AvengDescriptorSetWriter(*lightsDescriptorSetLayout, *descriptorPool)
+				.writeBuffer(0, &lightsBufferInfo)
+				.build(lightsDescriptorSets[i]);
+		}
+
+		// Create pipelines
+		createPipelineLayout();
+		createPipeline();
+
+		// Initialize point light system
+		pointLightSystem.initialize(
+			getSwapChainRenderPass(),
+			globalDescriptorSetLayout->getDescriptorSetLayout(),
+			lightsDescriptorSetLayout->getDescriptorSetLayout()
+		);
+	}
+
+	void Renderer::updateFrameData(const GlobalUbo& globalData, const LightsUbo& lightsData)
+	{
+		// Update global uniform buffer
+		u_GlobalBuffers[currentFrameIndex]->writeToBuffer(&globalData);
+		u_GlobalBuffers[currentFrameIndex]->flush();
+
+		// Update lights uniform buffer
+		u_LightsBuffers[currentFrameIndex]->writeToBuffer(&lightsData);
+		u_LightsBuffers[currentFrameIndex]->flush();
+	}
+
+	void Renderer::renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
+	{
+		auto commandBuffer = getCurrentCommandBuffer();
+
+		// Bind pipeline
+		gfxPipeline->bind(commandBuffer);
+
+		// Bind global descriptor set (set 0)
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
+
+		// Bind lights descriptor set (set 2)
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
+
+		// Render each object
+		for (size_t i = 0; i < objectData.size(); ++i) {
+			const auto& [objUniform, modelMatrix, normalMatrix, model] = objectData[i];
+
+			// Update object buffer
+			u_ObjBuffers[currentFrameIndex]->writeToIndex(&objUniform, i);
+			u_ObjBuffers[currentFrameIndex]->flushIndex(i);
+			auto descriptorInfo = u_ObjBuffers[currentFrameIndex]->descriptorInfoForIndex(i);
+			uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset);
+
+			// Bind object descriptor set (set 1)
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+				1, 1, &objectDescriptorSets[currentFrameIndex], 1, &dynamicOffset);
+
+			// Push constants - now properly handled
+			struct PushConstantData {
+				glm::mat4 modelMatrix;
+				glm::mat4 normalMatrix;
+			} pushData{ modelMatrix, normalMatrix };
+
+			vkCmdPushConstants(commandBuffer, pipelineLayout,
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				0, sizeof(PushConstantData), &pushData);
+
+			// Bind and draw model
+			model->bind(commandBuffer);
+			model->draw(commandBuffer);
+		}
+	}
+
+	void Renderer::renderLights(int numLights)
+	{
+		pointLightSystem.render(globalDescriptorSets[currentFrameIndex], 
+			lightsDescriptorSets[currentFrameIndex], getCurrentCommandBuffer(), numLights);
+	}
+
+	void Renderer::createPipelineLayout()
+	{
+		// Create descriptor set layouts array
+		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(3);
+		
+		// This is a simplified version - in practice, we'd need to store the layouts
+		// For now, we'll create them inline (not ideal, but functional)
+		auto imageInfo = imageSystem.descriptorInfoForAllImages();
+		
+		auto globalDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, imageInfo.size())
+			.build();
+			
+		auto objDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.build();
+			
+		auto lightsDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.build();
+
+		descriptorSetLayouts[0] = globalDescriptorSetLayout->getDescriptorSetLayout();
+		descriptorSetLayouts[1] = objDescriptorSetLayout->getDescriptorSetLayout();
+		descriptorSetLayouts[2] = lightsDescriptorSetLayout->getDescriptorSetLayout();
+
+		// Push constant range
+		VkPushConstantRange pushConstantRange{};
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = sizeof(glm::mat4) * 2; // modelMatrix + normalMatrix
+
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo.setLayoutCount = 3;
+		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
+		pipelineLayoutInfo.pushConstantRangeCount = 1;
+		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+
+		if (vkCreatePipelineLayout(engineDevice.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create pipeline layout!");
+		}
+	}
+
+	void Renderer::createPipeline()
+	{
+		assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
+
+		PipelineConfig pipelineConfig{};
+		GFXPipeline::defaultPipelineConfig(pipelineConfig);
+		pipelineConfig.renderPass = getSwapChainRenderPass();
+		pipelineConfig.pipelineLayout = pipelineLayout;
+
+		gfxPipeline = std::make_unique<GFXPipeline>(
+			engineDevice,
+			"shaders/simple_shader.vert.spv",
+			"shaders/simple_shader.frag.spv",
+			pipelineConfig
+		);
+
+		gfxPipeline2 = std::make_unique<GFXPipeline>(
+			engineDevice,
+			"shaders/simple_shader2.vert.spv",
+			"shaders/simple_shader2.frag.spv",
+			pipelineConfig
+		);
+	}
+
+	size_t Renderer::calculateDynamicUBOStride() const
+	{
+		size_t objectSize = sizeof(ObjectUniformData);
+		size_t minAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
+		return ((objectSize + minAlignment - 1) / minAlignment) * minAlignment;
 	}
 
 } // NS

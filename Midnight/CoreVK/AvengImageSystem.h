@@ -1,7 +1,5 @@
 #pragma once
-#include "CoreVK/EngineDevice.h"
-#include "Core/Renderer/Renderer.h"
-
+#include "EngineDevice.h"
 
 #include <iostream>
 #include <unordered_map>
@@ -63,4 +61,4 @@ namespace aveng {
 
 	};
 
-}
+} 

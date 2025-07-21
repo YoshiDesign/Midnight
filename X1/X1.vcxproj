@@ -154,9 +154,7 @@
     <ClCompile Include="System\Camera\aveng_camera.cpp" />
     <ClCompile Include="System\Peripheral\Controller.cpp" />
     <ClCompile Include="System\Peripheral\KeyboardController.cpp" />
-    <ClCompile Include="System\Render\AvengImageSystem.cpp" />
     <ClCompile Include="System\Render\ObjectRenderSystem.cpp" />
-    <ClCompile Include="System\Render\PointLightSystem.cpp" />
     <ClCompile Include="Utils\SystemData.cpp" />
     <ClCompile Include="Utils\VulkanXTools.cpp" />
     <ClCompile Include="XOne.cpp" />
@@ -169,9 +167,7 @@
     <ClInclude Include="System\Camera\aveng_camera.h" />
     <ClInclude Include="System\Peripheral\Controller.h" />
     <ClInclude Include="System\Peripheral\KeyboardController.h" />
-    <ClInclude Include="System\Render\AvengImageSystem.h" />
     <ClInclude Include="System\Render\ObjectRenderSystem.h" />
-    <ClInclude Include="System\Render\PointLightSystem.h" />
     <ClInclude Include="Utils\SystemData.h" />
     <ClInclude Include="Utils\threadpool.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />

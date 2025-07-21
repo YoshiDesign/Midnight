@@ -1,10 +1,10 @@
 #include "AvengImageSystem.h"
-#include "Core/aveng_model.h"
+#include "../Core/aveng_model.h"
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
+#include "../../vendor/stb/stb_image.h"
 
 /*
 *	This class is not responsible for rendering. Here we are creating our VkImageSamplers and ImageViews
@@ -387,4 +387,4 @@ namespace aveng {
 		std::cout << "Created " << imageInfosArray.size() << " image descriptors." << std::endl;
 	}
 
-}
+} 

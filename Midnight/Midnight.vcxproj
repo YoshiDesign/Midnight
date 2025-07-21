@@ -168,10 +168,12 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CoreVK\AvengImageSystem.cpp" />
     <ClCompile Include="CoreVK\aveng_buffer.cpp" />
     <ClCompile Include="CoreVK\aveng_descriptors.cpp" />
     <ClCompile Include="CoreVK\EngineDevice.cpp" />
     <ClCompile Include="CoreVK\GFXPipeline.cpp" />
+    <ClCompile Include="CoreVK\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\swapchain.cpp" />
     <ClCompile Include="Core\app_object.cpp" />
     <ClCompile Include="Core\aveng_model.cpp" />
@@ -183,10 +185,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="avpch.h" />
+    <ClInclude Include="CoreVK\AvengImageSystem.h" />
     <ClInclude Include="CoreVK\aveng_buffer.h" />
     <ClInclude Include="CoreVK\aveng_descriptors.h" />
     <ClInclude Include="CoreVK\EngineDevice.h" />
     <ClInclude Include="CoreVK\GFXPipeline.h" />
+    <ClInclude Include="CoreVK\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
     <ClInclude Include="Core\app_object.h" />
     <ClInclude Include="Core\AvengComponent.h" />

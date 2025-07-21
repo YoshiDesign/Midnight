@@ -1,12 +1,6 @@
 #include "PointLightSystem.h"
-#include "Game/Math/aveng_math.h"
-#include "Utils/window_callbacks.h"
-#include "Game/Player/GameplayFunctions.h"
-
-#define exe GameplayFunctions
-
-#define LOG(x, y) std::cout << x << "\t" << y << std::endl
-#define BYPASS_FBO 0
+#include <stdexcept>
+#include <cassert>
 
 namespace aveng {
 
@@ -71,14 +65,6 @@ namespace aveng {
 			"shaders/point_light.frag.spv",
 			pipelineConfig
 		);
-
-		// Another GFXPipeline
-		//gfxPipeline2 = std::make_unique<GFXPipeline>(
-		//	engineDevice,
-		//	"shaders/simple_shader2.vert.spv",
-		//	"shaders/simple_shader2.frag.spv",
-		//	pipelineConfig
-		//	);
 	}
 
 	void PointLightSystem::render(VkDescriptorSet globalDescriptorSet, VkDescriptorSet lightsDescriptorSet, VkCommandBuffer commandBuffer, int numLights)
@@ -105,4 +91,4 @@ namespace aveng {
 		vkCmdDraw(commandBuffer, 6, numLights, 0, 0);
 	}
 
-} //
+} 

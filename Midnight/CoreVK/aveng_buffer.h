@@ -26,13 +26,13 @@ namespace aveng {
         VkResult map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         void unmap();
 
-        void writeToBuffer(void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+        	void writeToBuffer(const void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         VkResult flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         VkDescriptorBufferInfo descriptorInfo(VkDeviceSize range = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         VkResult invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 
         // Indexes help wrap multiple instances into a single buffer
-        void writeToIndex(void* data, int index);
+        	void writeToIndex(const void* data, int index);
         VkResult flushIndex(int index);
         VkDescriptorBufferInfo descriptorInfoForIndex(int index);
         VkResult invalidateIndex(int index);

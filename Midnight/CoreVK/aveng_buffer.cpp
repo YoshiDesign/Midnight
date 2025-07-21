@@ -116,7 +116,7 @@ namespace aveng {
      * @param offset (Optional) Byte offset from beginning of mapped region
      *
      */
-    void AvengBuffer::writeToBuffer(void* data, VkDeviceSize size, VkDeviceSize offset) 
+    void AvengBuffer::writeToBuffer(const void* data, VkDeviceSize size, VkDeviceSize offset) 
     {
         assert(mapped && "Cannot copy to unmapped buffer");
 
@@ -196,7 +196,7 @@ namespace aveng {
      * @param index Used in offset calculation
      *
      */
-    void AvengBuffer::writeToIndex(void* data, int index) 
+    void AvengBuffer::writeToIndex(const void* data, int index) 
     {
         writeToBuffer(data, instanceSize, index * alignmentSize);
     }

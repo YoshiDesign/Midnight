@@ -51,6 +51,9 @@
     <ClCompile Include="Core\aveng_scene_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CoreVK\AvengImageSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1092,6 +1095,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\aveng_scene_loader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\AvengImageSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
