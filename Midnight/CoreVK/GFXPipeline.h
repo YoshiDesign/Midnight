@@ -33,6 +33,9 @@ namespace aveng {
 		VkPipelineLayout pipelineLayout = nullptr;
 		VkRenderPass renderPass = nullptr;
 		uint32_t subpass = 0;
+
+		// Specialization constants support
+		VkSpecializationInfo* fragmentSpecializationInfo = nullptr;
 	};
 	
 	/**

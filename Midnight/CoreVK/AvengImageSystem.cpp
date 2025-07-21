@@ -44,11 +44,23 @@ namespace aveng {
 			texture_paths.push_back(path.c_str());
 		}
 
-		// Create images and views
-		for (size_t i = 0; i < texture_paths.size(); i++)
-		{
-			createTextureImage(texture_paths[i], i);
-			createTextureImageView(images[i], i);
+		if (!texture_paths.empty()) {
+			std::cout << "Using batched command submission for " << texture_paths.size() << " textures" << std::endl;
+			
+			// Begin batched command recording
+			beginSetupCommands();
+			
+			// Create images and views using batched approach
+			for (size_t i = 0; i < texture_paths.size(); i++)
+			{
+				createTextureImageBatched(texture_paths[i], i);
+				createTextureImageView(images[i], i);
+			}
+			
+			// Submit all commands at once
+			flushSetupCommands();
+			
+			std::cout << "Batch texture loading complete!" << std::endl;
 		}
 		
 		// Create sampler and descriptors
@@ -63,22 +75,274 @@ namespace aveng {
 		size_t index = images.size();
 		texture_paths.push_back(texturePath.c_str());
 		
-		// Create texture image and view
-		createTextureImage(texturePath.c_str(), index);
+		// Use batched approach for dynamic texture addition
+		beginSetupCommands();
+		createTextureImageBatched(texturePath.c_str(), index);
 		createTextureImageView(images[index], index);
+		flushSetupCommands();
 		
-		// Update image descriptors with the new texture
-		VkDescriptorImageInfo descriptorImageInfo{};
-		descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		descriptorImageInfo.imageView = textureImageViews[index];
-		descriptorImageInfo.sampler = textureSampler;
-		imageInfosArray.push_back(descriptorImageInfo);
+		// Rebuild descriptor array with new texture count
+		imageInfosArray.clear();
+		createImageDescriptors(textureImageViews);
 		
 		std::cout << "Total textures now: " << getTextureCount() << std::endl;
+		std::cout << "Note: Pipeline will need to be recreated with new texture count for runtime additions" << std::endl;
+	}
+
+	void ImageSystem::beginSetupCommands()
+	{
+		if (setupCommandBuffer != VK_NULL_HANDLE) {
+			throw std::runtime_error("Setup command buffer already active!");
+		}
+		
+		setupCommandBuffer = engineDevice.beginSingleTimeCommands();
+		stagingBuffers.clear(); // Clear any previous staging buffers
+		std::cout << "Started batched command recording" << std::endl;
+	}
+
+	void ImageSystem::flushSetupCommands()
+	{
+		if (setupCommandBuffer == VK_NULL_HANDLE) {
+			throw std::runtime_error("No setup command buffer to flush!");
+		}
+		
+		std::cout << "Submitting batched commands..." << std::endl;
+		engineDevice.endSingleTimeCommands(setupCommandBuffer);
+		setupCommandBuffer = VK_NULL_HANDLE;
+		
+		// Now it's safe to destroy staging buffers - commands have been executed
+		stagingBuffers.clear();
+		std::cout << "Batched commands completed" << std::endl;
+	}
+
+	void ImageSystem::createTextureImageBatched(const char* filepath, size_t i)
+	{
+		VkImage image;
+		VmaAllocation allocation;
+
+		// Load our image
+		int texWidth, texHeight, texChannels;
+		stbi_uc* pixels = stbi_load(filepath, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+		// Take the number of available mip lvls +1 for level 0
+		uint32_t mipLevel = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+		mipLevels.push_back(mipLevel); // Store for later when we take the LCM
+
+		if (!pixels || !mipLevel) 
+		{
+			std::cout << "TexWidth\t" << texWidth << std::endl;
+			std::cout << "TexHeight\t" << texHeight << std::endl;
+			std::cout << "MipLvl\t" << mipLevel << std::endl;
+			std::cout << filepath << std::endl;
+			throw std::runtime_error("Error: failed to load texture image!");
+		}
+
+		// Move the pixels into a staging buffer - store in member vector to keep alive
+		auto stagingBuffer = std::make_unique<AvengBuffer>(
+			engineDevice,
+			imageSize,
+			1,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+		);
+
+		// Staging allocation of pixel data
+		stagingBuffer->map();
+		stagingBuffer->writeToBuffer(pixels, imageSize);
+		stbi_image_free(pixels);
+
+		// Image creation info (same as original)
+		VkImageCreateInfo imageInfo{};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.extent.width = static_cast<uint32_t>(texWidth);
+		imageInfo.extent.height = static_cast<uint32_t>(texHeight);
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = mipLevel;
+		imageInfo.arrayLayers = 1;
+		imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.flags = 0;
+
+		// Create image with VMA
+		engineDevice.createImageWithVMA(imageInfo, VMA_MEMORY_USAGE_GPU_ONLY, image, allocation);
+		allImageAllocations.push_back(allocation);
+
+		// BATCHED OPERATIONS - Record into setupCommandBuffer instead of separate submissions
+		transitionImageLayoutBatched(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevel);
+		
+		// Record copy operation into setup command buffer
+		VkBufferImageCopy region{};
+		region.bufferOffset = 0;
+		region.bufferRowLength = 0;
+		region.bufferImageHeight = 0;
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.mipLevel = 0;
+		region.imageSubresource.baseArrayLayer = 0;
+		region.imageSubresource.layerCount = 1;
+		region.imageOffset = {0, 0, 0};
+		region.imageExtent = {static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1};
+		
+		vkCmdCopyBufferToImage(setupCommandBuffer, stagingBuffer->getBuffer(), image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+		
+		// Store staging buffer to keep it alive until commands are executed
+		stagingBuffers.push_back(std::move(stagingBuffer));
+		
+		generateMipmapsBatched(image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevel);
+
+		// Store the image for later use
+		images.push_back(image);
+	}
+
+	void ImageSystem::transitionImageLayoutBatched(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)
+	{
+		// BATCHED VERSION - Record into setupCommandBuffer instead of creating new command buffer
+		VkImageMemoryBarrier barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.oldLayout = oldLayout;
+		barrier.newLayout = newLayout;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = image;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = mipLevels;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+
+		VkPipelineStageFlags sourceStage;
+		VkPipelineStageFlags destinationStage;
+
+		if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
+		{
+			barrier.srcAccessMask = 0;
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		}
+		else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) 
+		{
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+			destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		}
+		else {
+			throw std::invalid_argument("Error: unsupported layout transition!");
+		}
+
+		// Record into setup command buffer
+		vkCmdPipelineBarrier(
+			setupCommandBuffer,
+			sourceStage,
+			destinationStage,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &barrier
+		);
+	}
+
+	void ImageSystem::generateMipmapsBatched(VkImage _image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t _mipLevels)
+	{
+		// Check if image format supports linear blitting
+		VkFormatProperties formatProperties;
+		vkGetPhysicalDeviceFormatProperties(engineDevice.physicalDevice(), imageFormat, &formatProperties);
+
+		if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) 
+		{
+			// Continue without MipMapping - use batched transition
+			std::cout << "This image does not support linear blitting" << std::endl;
+			transitionImageLayoutBatched(_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _mipLevels);
+			return;
+		}
+
+		// BATCHED VERSION - Record into setupCommandBuffer instead of creating new command buffer
+		VkImageMemoryBarrier barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.image = _image;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.subresourceRange.levelCount = 1;
+
+		int32_t mipWidth = texWidth;
+		int32_t mipHeight = texHeight;
+
+		for (uint32_t i = 1; i < _mipLevels; i++) {
+			barrier.subresourceRange.baseMipLevel = i - 1;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+			vkCmdPipelineBarrier(setupCommandBuffer,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+				0, nullptr,
+				0, nullptr,
+				1, &barrier);
+
+			VkImageBlit blit{};
+			blit.srcOffsets[0] = { 0, 0, 0 };
+			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.srcSubresource.mipLevel = i - 1;
+			blit.srcSubresource.baseArrayLayer = 0;
+			blit.srcSubresource.layerCount = 1;
+			blit.dstOffsets[0] = { 0, 0, 0 };
+			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.dstSubresource.mipLevel = i;
+			blit.dstSubresource.baseArrayLayer = 0;
+			blit.dstSubresource.layerCount = 1;
+
+			vkCmdBlitImage(setupCommandBuffer,
+				_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				1, &blit,
+				VK_FILTER_LINEAR);
+
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+			vkCmdPipelineBarrier(setupCommandBuffer,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+				0, nullptr,
+				0, nullptr,
+				1, &barrier);
+
+			if (mipWidth > 1) mipWidth /= 2;
+			if (mipHeight > 1) mipHeight /= 2;
+		}
+
+		// Final transition for the last mip level
+		barrier.subresourceRange.baseMipLevel = _mipLevels - 1;
+		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		vkCmdPipelineBarrier(setupCommandBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+			0, nullptr,
+			0, nullptr,
+			1, &barrier);
 	}
 
 	ImageSystem::~ImageSystem() 
 	{
+		// Ensure all GPU operations are complete before cleanup
+		vkDeviceWaitIdle(engineDevice.device());
+		
 		vkDestroySampler(engineDevice.device(), textureSampler, nullptr);
 		std::cout << "Destroying ImageSystem:\t" << images.size() << std::endl;
 		for (int i=0; i < images.size(); i++) 
@@ -411,9 +675,8 @@ namespace aveng {
 
 	void ImageSystem::createImageDescriptors(std::vector<VkImageView> views)
 	{
-
+		// Dynamic texture array - create exactly the number of descriptors we have
 		for (VkImageView view : views) {
-
 			// Image Descriptor
 			VkDescriptorImageInfo descriptorImageInfo{};
 			descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -421,9 +684,14 @@ namespace aveng {
 			descriptorImageInfo.sampler = textureSampler;
 
 			imageInfosArray.push_back(descriptorImageInfo);
-
 		}
-		std::cout << "Created " << imageInfosArray.size() << " image descriptors." << std::endl;
+
+		// Ensure we have at least one descriptor for empty scenes
+		if (imageInfosArray.empty()) {
+			throw std::runtime_error("No texture descriptors available - scenes must have at least one texture");
+		}
+
+		std::cout << "Created " << imageInfosArray.size() << " image descriptors (dynamic array size)." << std::endl;
 	}
 
 } 

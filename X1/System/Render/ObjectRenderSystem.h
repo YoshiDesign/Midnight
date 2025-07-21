@@ -17,7 +17,6 @@
 namespace aveng {
 
 	// Use engine types
-	using PointLight = aveng::PointLight;
 	using LightsUbo = aveng::LightsUbo;
 	using GlobalUbo = aveng::GlobalUbo;
 	using ObjectUniformData = aveng::ObjectUniformData;

@@ -74,7 +74,7 @@ namespace aveng {
 		shaderStages[1].pName = "main";		// Name of the entry function in our fragment shader
 		shaderStages[1].flags = 0;
 		shaderStages[1].pNext = nullptr;
-		shaderStages[1].pSpecializationInfo = nullptr;
+		shaderStages[1].pSpecializationInfo = configInfo.fragmentSpecializationInfo;
 
 		auto& bindingDescriptions = configInfo.bindingDescriptions;
 		auto& attributeDescriptions = configInfo.attributeDescriptions;

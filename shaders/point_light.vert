@@ -20,16 +20,11 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
 	vec4 lightColor;
 } ubo;
 
-// Define the PointLight struct outside the uniform block
-struct PointLight {
-	vec4 position; // w is radius
-	vec4 color;    // w is intensity
-};
-
-// Lights uniform buffer
+// Lights uniform buffer - matches fragment shader layout
 layout(set = 1, binding = 0) uniform LightsUbo {
 	uint numLights;
-	PointLight lights[100];
+	vec4 lightPositions[100];  // w component is radius
+	vec4 lightColors[100];     // w component is intensity
 } lightsUbo;
 
 void main() {
@@ -42,13 +37,14 @@ void main() {
 		return;
 	}
 
-	PointLight light = lightsUbo.lights[lightIndex];
-	float lightRadius = light.position.w;
+	vec4 lightPosition = lightsUbo.lightPositions[lightIndex];
+	vec4 lightColorData = lightsUbo.lightColors[lightIndex];
+	float lightRadius = lightPosition.w;
 
 	fragOffset = OFFSETS[gl_VertexIndex];
-	lightColor = light.color;
+	lightColor = lightColorData;
 
-	vec4 lightCameraSpace = ubo.view * vec4(light.position.xyz, 1.0);
+	vec4 lightCameraSpace = ubo.view * vec4(lightPosition.xyz, 1.0);
 	vec4 positionCameraSpace = lightCameraSpace + lightRadius * vec4(fragOffset, 0.0, 0.0);
 
 	gl_Position = ubo.projection * positionCameraSpace;

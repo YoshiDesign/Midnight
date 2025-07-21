@@ -232,11 +232,22 @@ namespace aveng {
 		if (texturePaths.empty()) {
 			// Use empty texture list - ImageSystem will handle this gracefully
 			imageSystem = std::make_unique<ImageSystem>(engineDevice, std::vector<std::string>());
+			currentTextureCount = 1; // Minimum of 1 for empty scenes
 		} else {
 			imageSystem = std::make_unique<ImageSystem>(engineDevice, texturePaths);
+			currentTextureCount = static_cast<uint32_t>(imageSystem->getTextureCount());
 		}
 		
 		std::cout << "ImageSystem initialized with " << imageSystem->getTextureCount() << " textures" << std::endl;
+		std::cout << "Pipeline will be created with texture array size: " << currentTextureCount << std::endl;
+
+		// Create pipelines now that we have the correct texture count
+		if (!pipelineCreated) {
+			createPipelineLayout();
+			createPipeline();
+			pipelineCreated = true;
+			std::cout << "Pipelines created with correct texture array size" << std::endl;
+		}
 	}
 
 	void Renderer::setupDescriptors(int numObjects)
@@ -248,11 +259,11 @@ namespace aveng {
 		num_objects = numObjects;
 		auto imageInfo = imageSystem->descriptorInfoForAllImages();
 
-		// Create Descriptor Pools
+		// Create Descriptor Pools using dynamic texture count
 		descriptorPool = AvengDescriptorPool::Builder(engineDevice)
 			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 4)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 2)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * imageInfo.size())
+			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * currentTextureCount)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT)
 			.build();
 
@@ -296,7 +307,7 @@ namespace aveng {
 		std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, imageInfo.size())
+			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
 			.build();
 
 		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout =
@@ -328,9 +339,8 @@ namespace aveng {
 				.build(lightsDescriptorSets[i]);
 		}
 
-		// Create pipelines
-		createPipelineLayout();
-		createPipeline();
+		// Note: Pipeline creation moved to after ImageSystem initialization
+		// Pipelines will be created in initializeImageSystem() or initializePointLightSystem()
 	}
 
 	void Renderer::initializePointLightSystem()
@@ -346,7 +356,7 @@ namespace aveng {
 		
 		auto globalDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, imageInfo.size())
+			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
 			.build();
 			
 		auto lightsDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
@@ -436,7 +446,7 @@ namespace aveng {
 		
 		auto globalDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, imageInfo.size())
+			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
 			.build();
 			
 		auto objDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
@@ -477,6 +487,22 @@ namespace aveng {
 		GFXPipeline::defaultPipelineConfig(pipelineConfig);
 		pipelineConfig.renderPass = getSwapChainRenderPass();
 		pipelineConfig.pipelineLayout = pipelineLayout;
+
+		// Setup specialization constants for dynamic texture array size
+		VkSpecializationMapEntry specEntry{};
+		specEntry.constantID = 0;  // Matches constant_id = 0 in shader
+		specEntry.offset = 0;
+		specEntry.size = sizeof(uint32_t);
+
+		VkSpecializationInfo specInfo{};
+		specInfo.mapEntryCount = 1;
+		specInfo.pMapEntries = &specEntry;
+		specInfo.dataSize = sizeof(uint32_t);
+		specInfo.pData = &currentTextureCount;
+
+		pipelineConfig.fragmentSpecializationInfo = &specInfo;
+
+		std::cout << "Creating pipeline with texture array size: " << currentTextureCount << std::endl;
 
 		gfxPipeline = std::make_unique<GFXPipeline>(
 			engineDevice,

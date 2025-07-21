@@ -102,8 +102,6 @@ namespace aveng {
 
 	}
 
-
-
 	void ObjectRenderSystem::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
 	{
 		if (u_LightsData.numLights >= LightsUbo::MAX_LIGHTS) {
@@ -111,17 +109,17 @@ namespace aveng {
 			return;
 		}
 
-		PointLight& light = u_LightsData.lights[u_LightsData.numLights];
-		light.position = glm::vec4(position, radius);
-		light.color = glm::vec4(color, intensity);
+		u_LightsData.lightPositions[u_LightsData.numLights] = glm::vec4(position, radius);
+		u_LightsData.lightColors[u_LightsData.numLights] = glm::vec4(color, intensity);
 		u_LightsData.numLights++;
 	}
 
 	void ObjectRenderSystem::clearLights()
 	{
 		u_LightsData.numLights = 0;
-		// Zero out the lights array for clean state
-		memset(u_LightsData.lights, 0, sizeof(u_LightsData.lights));
+		// Zero out the light arrays for clean state
+		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));
+		memset(u_LightsData.lightColors, 0, sizeof(u_LightsData.lightColors));
 	}
 
 	void ObjectRenderSystem::loadGame(const std::string& scenePath)

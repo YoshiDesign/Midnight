@@ -23,15 +23,11 @@ namespace aveng {
 	class AvengAppObject;
 
 	// Data structures moved from ObjectRenderSystem
-	struct PointLight {
-		glm::vec4 position{ 0.f, 0.f, 0.f, 1.f };  // w can be used for radius
-		glm::vec4 color{ 1.f, 1.f, 1.f, 1.f };     // w is intensity
-	};
-
 	struct LightsUbo {
 		static constexpr int MAX_LIGHTS = 100;
 		uint32_t numLights{ 0 };
-		alignas(16) PointLight lights[MAX_LIGHTS];
+		alignas(16) glm::vec4 lightPositions[MAX_LIGHTS];  // w component is radius
+		alignas(16) glm::vec4 lightColors[MAX_LIGHTS];     // w component is intensity
 	};
 
 	struct GlobalUbo {
@@ -92,6 +88,9 @@ namespace aveng {
 		void renderLights(int numLights);
 
 	private:
+		// Dynamic texture array support
+		uint32_t currentTextureCount = 8; // Track current texture count for pipeline creation
+		bool pipelineCreated = false; // Guard against double pipeline creation
 
 		VkResult err;
 

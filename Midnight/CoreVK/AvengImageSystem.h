@@ -1,10 +1,12 @@
 #pragma once
 #include "EngineDevice.h"
 #include "AMD/vk_mem_alloc.h"
+#include "aveng_buffer.h"
 
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 /**
 	All of the helper functions that submit commands so far have been set up to execute synchronously
@@ -50,6 +52,17 @@ namespace aveng {
 
 		// mipLevels is one dependency keeping us from merging some of these functions with SwapChain's impelmentations of them
 		void initializeWithPaths(const std::vector<std::string>& texturePaths);
+		
+		// Batched command submission optimization
+		VkCommandBuffer setupCommandBuffer = VK_NULL_HANDLE;
+		std::vector<std::unique_ptr<AvengBuffer>> stagingBuffers; // Keep staging buffers alive
+		void beginSetupCommands();
+		void flushSetupCommands();
+		
+		// Batch-friendly versions of helper functions
+		void createTextureImageBatched(const char* filepath, size_t i);
+		void transitionImageLayoutBatched(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+		void generateMipmapsBatched(VkImage _image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t _mipLevels);
 
 		EngineDevice& engineDevice;
 		VkSampler textureSampler;
