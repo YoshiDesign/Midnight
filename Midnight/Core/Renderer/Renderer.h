@@ -101,6 +101,7 @@ namespace aveng {
 		// Moved from ObjectRenderSystem
 		void createPipelineLayout();
 		void createPipeline();
+		void createPipelines();
 		size_t calculateDynamicUBOStride() const;
 
 		AvengWindow& aveng_window;
@@ -128,6 +129,11 @@ namespace aveng {
 		std::vector<VkDescriptorSet> globalDescriptorSets;
 		std::vector<VkDescriptorSet> objectDescriptorSets;
 		std::vector<VkDescriptorSet> lightsDescriptorSets;
+
+		// Descriptor set layouts (reused by multiple systems)
+		std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout;
+		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout;
+		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout;
 
 		// Engine systems
 		std::unique_ptr<ImageSystem> imageSystem;

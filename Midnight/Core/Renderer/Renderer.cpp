@@ -240,20 +240,12 @@ namespace aveng {
 		
 		std::cout << "ImageSystem initialized with " << imageSystem->getTextureCount() << " textures" << std::endl;
 		std::cout << "Pipeline will be created with texture array size: " << currentTextureCount << std::endl;
-
-		// Create pipelines now that we have the correct texture count
-		if (!pipelineCreated) {
-			createPipelineLayout();
-			createPipeline();
-			pipelineCreated = true;
-			std::cout << "Pipelines created with correct texture array size" << std::endl;
-		}
 	}
 
 	void Renderer::setupDescriptors(int numObjects)
 	{
 		if (!imageSystem) {
-			throw std::runtime_error("ImageSystem must be initialized before setting up descriptors");
+			throw std::runtime_error("ImageSystem must be initialized before setting up descriptors (call initializeImageSystem first)");
 		}
 		
 		num_objects = numObjects;
@@ -303,19 +295,19 @@ namespace aveng {
 			u_ObjBuffers[i]->map();
 		}
 
-		// Create Descriptor Set Layouts
-		std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout =
+		// Create Descriptor Set Layouts (stored as members for reuse)
+		globalDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
 			.build();
 
-		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout =
+		objDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
 
-		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout =
+		lightsDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
@@ -339,31 +331,19 @@ namespace aveng {
 				.build(lightsDescriptorSets[i]);
 		}
 
-		// Note: Pipeline creation moved to after ImageSystem initialization
-		// Pipelines will be created in initializeImageSystem() or initializePointLightSystem()
+		// Create pipelines now that descriptor layouts are ready
+		createPipelines();
 	}
 
 	void Renderer::initializePointLightSystem()
 	{
-		if (!imageSystem) {
-			throw std::runtime_error("ImageSystem must be initialized before initializing PointLightSystem");
+		if (!globalDescriptorSetLayout || !lightsDescriptorSetLayout) {
+			throw std::runtime_error("Descriptor set layouts must be created before initializing PointLightSystem (call setupDescriptors first)");
 		}
 
 		std::cout << "Initializing PointLightSystem" << std::endl;
 
-		// Create the descriptor set layouts needed by PointLightSystem
-		auto imageInfo = imageSystem->descriptorInfoForAllImages();
-		
-		auto globalDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
-			.build();
-			
-		auto lightsDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.build();
-
-		// Initialize point light system
+		// Initialize point light system using existing descriptor set layouts
 		pointLightSystem.initialize(
 			getSwapChainRenderPass(),
 			globalDescriptorSetLayout->getDescriptorSetLayout(),
@@ -437,26 +417,12 @@ namespace aveng {
 
 	void Renderer::createPipelineLayout()
 	{
-		// Create descriptor set layouts array
-		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(3);
-		
-		// This is a simplified version - in practice, we'd need to store the layouts
-		// For now, we'll create them inline (not ideal, but functional)
-		auto imageInfo = imageSystem->descriptorInfoForAllImages();
-		
-		auto globalDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
-			.build();
-			
-		auto objDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.build();
-			
-		auto lightsDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.build();
+		if (!globalDescriptorSetLayout || !objDescriptorSetLayout || !lightsDescriptorSetLayout) {
+			throw std::runtime_error("Descriptor set layouts must be created before pipeline layout (call setupDescriptors first)");
+		}
 
+		// Create descriptor set layouts array using stored layouts
+		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(3);
 		descriptorSetLayouts[0] = globalDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[1] = objDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[2] = lightsDescriptorSetLayout->getDescriptorSetLayout();
@@ -517,6 +483,21 @@ namespace aveng {
 			"shaders/simple_shader2.frag.spv",
 			pipelineConfig
 		);
+	}
+
+	void Renderer::createPipelines()
+	{
+		if (!imageSystem) {
+			throw std::runtime_error("ImageSystem must be initialized before creating pipelines");
+		}
+
+		// Create pipelines now that we have the correct texture count
+		if (!pipelineCreated) {
+			createPipelineLayout();
+			createPipeline();
+			pipelineCreated = true;
+			std::cout << "Pipelines created with correct texture array size" << std::endl;
+		}
 	}
 
 	size_t Renderer::calculateDynamicUBOStride() const

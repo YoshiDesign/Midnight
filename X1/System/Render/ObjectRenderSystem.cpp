@@ -15,11 +15,16 @@ namespace aveng {
 
 	void ObjectRenderSystem::initialize() 
 	{
+		// Note: ImageSystem should be initialized first in loadGame() before calling this
+		
 		// Delegate to renderer for all engine-specific setup
 		int numObjects = static_cast<int>(sceneLoader.getObjectCount());
 		if (numObjects == 0) numObjects = 1; // Prevent crash with empty scenes
 		
 		renderer.setupDescriptors(numObjects);
+		
+		// Initialize PointLightSystem now that descriptor layouts are created
+		renderer.initializePointLightSystem();
 		
 		std::cout << "ObjectRenderSystem initialized with " << numObjects << " objects" << std::endl;
 	}
@@ -55,7 +60,7 @@ namespace aveng {
 		// Update frame data in renderer
 		renderer.updateFrameData(u_GlobalData, u_LightsData);
 
-		// Prepare object data for rendering - now complete with all needed data
+		// Prepare object data for rendering
 		std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>> objectData;
 		for (auto& kv : sceneLoader.getAppObjects()) {
 			ObjectUniformData objUniform{ kv.second.get_texture() };
@@ -132,9 +137,6 @@ namespace aveng {
 		const auto& sceneTextures = sceneLoader.getSceneTextures();
 		std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
 		renderer.initializeImageSystem(sceneTextures);
-		
-		// Initialize PointLightSystem after ImageSystem
-		renderer.initializePointLightSystem();
 		
 		std::cout << "Loaded scene with " << sceneLoader.getObjectCount() << " objects" << std::endl;
 	}
