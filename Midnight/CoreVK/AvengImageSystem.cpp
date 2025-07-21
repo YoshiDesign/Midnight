@@ -23,12 +23,10 @@ namespace aveng {
 
 	ImageSystem::ImageSystem(EngineDevice& device) : engineDevice{ device }
 	{
-		// Use default hardcoded textures for backwards compatibility
-		std::vector<std::string> defaultTextures;
-		for (auto text : textures) {
-			defaultTextures.push_back(std::string(text));
-		}
-		initializeWithPaths(defaultTextures);
+		// Default constructor creates empty ImageSystem
+		// Textures must be provided via the vector constructor or addTexture()
+		std::vector<std::string> emptyTextures;
+		initializeWithPaths(emptyTextures);
 	}
 
 	ImageSystem::ImageSystem(EngineDevice& device, const std::vector<std::string>& texturePaths) 

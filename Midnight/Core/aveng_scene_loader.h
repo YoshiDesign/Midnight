@@ -25,6 +25,7 @@ namespace aveng {
     struct SceneData {
         std::string title;
         std::vector<ObjectData> objects;
+        std::vector<std::string> textures;  // Scene-specific texture list
     };
 
     class AvengSceneLoader {
@@ -57,6 +58,11 @@ namespace aveng {
          * Get total number of objects in current scene
          */
         size_t getObjectCount() const { return currentSceneObjects.size(); }
+        
+        /**
+         * Get texture paths from current scene
+         */
+        const std::vector<std::string>& getSceneTextures() const;
 
     private:
         void createObjectsFromScene(const SceneData& scene, EngineDevice& engineDevice);

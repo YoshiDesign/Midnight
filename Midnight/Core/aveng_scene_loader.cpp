@@ -56,12 +56,30 @@ namespace aveng {
         return it != scenes.end() ? &it->second : nullptr;
     }
 
+    const std::vector<std::string>& AvengSceneLoader::getSceneTextures() const {
+        const SceneData* scene = getCurrentSceneData();
+        if (scene) {
+            return scene->textures;
+        }
+        
+        // Return empty vector if no current scene
+        static std::vector<std::string> empty;
+        return empty;
+    }
+
     void AvengSceneLoader::createObjectsFromScene(const SceneData& scene, EngineDevice& engineDevice) {
         std::cout << "Creating objects for scene: " << scene.title << std::endl;
         
         for (const auto& objectData : scene.objects) {
             for (size_t i = 0; i < objectData.instances.size() && i < static_cast<size_t>(objectData.qty); ++i) {
                 const auto& instance = objectData.instances[i];
+                
+                // Validate texture index
+                if (instance.textureId < 0 || static_cast<size_t>(instance.textureId) >= scene.textures.size()) {
+                    throw std::runtime_error("Object texture ID " + std::to_string(instance.textureId) + 
+                                           " is out of range. Scene has " + std::to_string(scene.textures.size()) + " textures.");
+                }
+                
                 auto object = AvengAppObject::createAppObject(instance.textureId);
                 
                 // Load model with EngineDevice
@@ -127,16 +145,32 @@ namespace aveng {
                                 }
                             }
                             
-                            // Parse texture ID
-                            if (instanceJson.contains("tex")) {
-                                instance.textureId = instanceJson["tex"].get<int>();
+                            // Parse texture ID - STRICT VALIDATION
+                            if (!instanceJson.contains("tex")) {
+                                throw std::runtime_error("Object instance missing required 'tex' key in scene data");
                             }
+                            
+                            if (!instanceJson["tex"].is_number_integer()) {
+                                throw std::runtime_error("Object instance 'tex' key must be an integer value");
+                            }
+                            
+                            instance.textureId = instanceJson["tex"].get<int>();
                             
                             obj.instances.push_back(instance);
                         }
                     }
                     
                     scene.objects.push_back(obj);
+                }
+            }
+            
+            // Parse textures array
+            if (sceneJson.contains("textures") && sceneJson["textures"].is_array()) {
+                for (const auto& textureJson : sceneJson["textures"]) {
+                    if (textureJson.is_string()) {
+                        std::string texturePath = "textures/" + textureJson.get<std::string>();
+                        scene.textures.push_back(texturePath);
+                    }
                 }
             }
             

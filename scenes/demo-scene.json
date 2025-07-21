@@ -6,28 +6,49 @@
         "path": "3D/ship.obj",
         "qty": 4,
         "data": [
-          { "pos": {"x": 25, "y": -10, "z": -5}, "tex": 1},
-          { "pos": {"x": 55, "y": -10, "z": -5}, "tex": 1},
-          { "pos": {"x": 25, "y": -20, "z": -5}, "tex": 1},
-          { "pos": {"x": 55, "y": -20, "z": -5}, "tex": 1}
+          {
+            "pos": { "x": 25, "y": -10, "z": -5 },
+            "tex": 1,
+            "name": "player 1 ship"
+          },
+          {
+            "pos": { "x": 55, "y": -10, "z": -5 },
+            "tex": 1,
+            "name": "player 2 ship"
+          },
+          {
+            "pos": { "x": 25, "y": -20, "z": -5 },
+            "tex": 1,
+            "name": "player 3 ship"
+          },
+          {
+            "pos": { "x": 55, "y": -20, "z": -5 },
+            "tex": 1,
+            "name": "player 4 ship"
+          }
         ]
       },
       {
         "path": "3D/sandbox-2.obj",
         "qty": 1,
-        "data" : [{ "pos": {"x": 0,  "y": 0, "z": 0}, "tex": 0}]
+        "data": [
+          { "pos": { "x": 0, "y": 0, "z": 0 }, "tex": 0, "name": "the world" }
+        ]
       }
-      
-    ]
+    ],
+    "textures": ["BW-Grid.png", "HolyShip.png", "BYgrid.png", "theme2.png"]
   },
   "scene-id-2": {
-    "title": "Another Scene",
+    "title": "Minimal Test Scene",
     "objects": [
       {
         "path": "3D/ship.obj",
         "qty": 1,
-        "data": [{ "pos": {"x": 0,  "y": 0, "z": 0}, "tex": 1}]
+        "data": [
+          { "pos": { "x": 0, "y": 0, "z": 0 }, "tex": 0, "name": "single ship" }
+        ]
       }
-    ]
+    ],
+    "textures": ["HolyShip.png"]
   }
 }

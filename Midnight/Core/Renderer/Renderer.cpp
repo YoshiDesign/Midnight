@@ -12,7 +12,7 @@
 namespace aveng {
 
 	Renderer::Renderer(AvengWindow& window, EngineDevice& device) 
-		: aveng_window{ window }, engineDevice{ device }, imageSystem{ engineDevice }, pointLightSystem{ engineDevice }
+		: aveng_window{ window }, engineDevice{ device }, pointLightSystem{ engineDevice }
 	{
 		recreateSwapChain();
 		createCommandBuffers();
@@ -225,10 +225,28 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
+	void Renderer::initializeImageSystem(const std::vector<std::string>& texturePaths)
+	{
+		std::cout << "Initializing ImageSystem with " << texturePaths.size() << " textures from scene" << std::endl;
+		
+		if (texturePaths.empty()) {
+			// Use empty texture list - ImageSystem will handle this gracefully
+			imageSystem = std::make_unique<ImageSystem>(engineDevice, std::vector<std::string>());
+		} else {
+			imageSystem = std::make_unique<ImageSystem>(engineDevice, texturePaths);
+		}
+		
+		std::cout << "ImageSystem initialized with " << imageSystem->getTextureCount() << " textures" << std::endl;
+	}
+
 	void Renderer::setupDescriptors(int numObjects)
 	{
+		if (!imageSystem) {
+			throw std::runtime_error("ImageSystem must be initialized before setting up descriptors");
+		}
+		
 		num_objects = numObjects;
-		auto imageInfo = imageSystem.descriptorInfoForAllImages();
+		auto imageInfo = imageSystem->descriptorInfoForAllImages();
 
 		// Create Descriptor Pools
 		descriptorPool = AvengDescriptorPool::Builder(engineDevice)
@@ -313,6 +331,27 @@ namespace aveng {
 		// Create pipelines
 		createPipelineLayout();
 		createPipeline();
+	}
+
+	void Renderer::initializePointLightSystem()
+	{
+		if (!imageSystem) {
+			throw std::runtime_error("ImageSystem must be initialized before initializing PointLightSystem");
+		}
+
+		std::cout << "Initializing PointLightSystem" << std::endl;
+
+		// Create the descriptor set layouts needed by PointLightSystem
+		auto imageInfo = imageSystem->descriptorInfoForAllImages();
+		
+		auto globalDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, imageInfo.size())
+			.build();
+			
+		auto lightsDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.build();
 
 		// Initialize point light system
 		pointLightSystem.initialize(
@@ -320,6 +359,8 @@ namespace aveng {
 			globalDescriptorSetLayout->getDescriptorSetLayout(),
 			lightsDescriptorSetLayout->getDescriptorSetLayout()
 		);
+
+		std::cout << "PointLightSystem initialized" << std::endl;
 	}
 
 	void Renderer::updateFrameData(const GlobalUbo& globalData, const LightsUbo& lightsData)
@@ -391,7 +432,7 @@ namespace aveng {
 		
 		// This is a simplified version - in practice, we'd need to store the layouts
 		// For now, we'll create them inline (not ideal, but functional)
-		auto imageInfo = imageSystem.descriptorInfoForAllImages();
+		auto imageInfo = imageSystem->descriptorInfoForAllImages();
 		
 		auto globalDescriptorSetLayout = AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)

@@ -130,6 +130,14 @@ namespace aveng {
 		
 		sceneLoader.load(scenePath.c_str(), engineDevice);
 		
+		// Initialize ImageSystem with scene textures
+		const auto& sceneTextures = sceneLoader.getSceneTextures();
+		std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
+		renderer.initializeImageSystem(sceneTextures);
+		
+		// Initialize PointLightSystem after ImageSystem
+		renderer.initializePointLightSystem();
+		
 		std::cout << "Loaded scene with " << sceneLoader.getObjectCount() << " objects" << std::endl;
 	}
 

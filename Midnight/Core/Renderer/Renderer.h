@@ -84,7 +84,9 @@ namespace aveng {
 		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
 		// New methods for descriptor/buffer management
+		void initializeImageSystem(const std::vector<std::string>& texturePaths);
 		void setupDescriptors(int numObjects);
+		void initializePointLightSystem();
 		void updateFrameData(const GlobalUbo& globalData, const LightsUbo& lightsData);
 		void renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
 		void renderLights(int numLights);
@@ -129,7 +131,7 @@ namespace aveng {
 		std::vector<VkDescriptorSet> lightsDescriptorSets;
 
 		// Engine systems
-		ImageSystem imageSystem;
+		std::unique_ptr<ImageSystem> imageSystem;
 		PointLightSystem pointLightSystem;
 
 		// State
