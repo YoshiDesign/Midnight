@@ -368,8 +368,34 @@ namespace aveng {
 	{
 		auto commandBuffer = getCurrentCommandBuffer();
 
-		// Bind pipeline
-		gfxPipeline->bind(commandBuffer);
+		// Bind pipeline based on current render mode
+		GFXPipeline* activePipeline = nullptr;
+		
+		// PRIMARY: Use JSON-configured pipeline manager
+		if (pipelineManager) {
+			activePipeline = pipelineManager->getPipeline(static_cast<int>(currentObjectMode));
+			if (activePipeline) {
+				activePipeline->bind(commandBuffer);
+			}
+		}
+		
+		if (!activePipeline) {
+			std::cerr << "WARNING: No pipeline found for mode " << static_cast<int>(currentObjectMode) 
+			         << ". Check PipelineConfig.json or add missing pipeline definition." << std::endl;
+			
+			// DEPRECATED FALLBACKS (should not be reached in production)
+			if (static_cast<size_t>(currentObjectMode) < objectPipelines.size() && objectPipelines[static_cast<size_t>(currentObjectMode)]) {
+				std::cerr << "Using deprecated hardcoded pipeline fallback" << std::endl;
+				objectPipelines[static_cast<size_t>(currentObjectMode)]->bind(commandBuffer);
+			}
+			else if (gfxPipeline) {
+				std::cerr << "Using legacy gfxPipeline fallback - this should be removed!" << std::endl;
+				gfxPipeline->bind(commandBuffer);
+			}
+			else {
+				throw std::runtime_error("No pipelines available - system misconfigured!");
+			}
+		}
 
 		// Bind global descriptor set (set 0)
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
@@ -445,6 +471,7 @@ namespace aveng {
 		}
 	}
 
+	// DEPRECATED: Legacy pipeline creation - use PipelineConfigManager instead
 	void Renderer::createPipeline()
 	{
 		assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
@@ -494,10 +521,153 @@ namespace aveng {
 		// Create pipelines now that we have the correct texture count
 		if (!pipelineCreated) {
 			createPipelineLayout();
-			createPipeline();
+			
+			// PRIMARY: JSON-configured pipeline system
+			pipelineManager = std::make_unique<PipelineConfigManager>(engineDevice);
+			try {
+				std::cout << "Loading pipelines from JSON configuration..." << std::endl;
+				pipelineManager->loadPipelineConfig("Midnight/Core/Renderer/PipelineConfig.json");
+				pipelineManager->createPipelines(getSwapChainRenderPass(), pipelineLayout, currentTextureCount);
+				std::cout << "JSON pipeline system successfully initialized!" << std::endl;
+			} catch (const std::exception& e) {
+				std::cerr << "Failed to load pipeline config: " << e.what() << std::endl;
+				std::cerr << "Creating deprecated fallback pipelines..." << std::endl;
+				
+				// DEPRECATED: Create legacy pipelines as fallback
+				//createPipeline();         // Legacy gfxPipeline
+				//createObjectPipelines();  // Hardcoded array
+			}
+			
+			createPostProcessPipelines();  // Post-processing pipelines (placeholder)
 			pipelineCreated = true;
-			std::cout << "Pipelines created with correct texture array size" << std::endl;
+			std::cout << "Pipeline initialization complete" << std::endl;
 		}
+	}
+
+	// DEPRECATED: Hardcoded pipeline array - use PipelineConfigManager instead
+	void Renderer::createObjectPipelines()
+	{
+		assert(pipelineLayout != nullptr && "Cannot create pipelines before pipeline layout");
+
+		// Setup specialization constants for dynamic texture array size (shared by all pipelines)
+		VkSpecializationMapEntry specEntry{};
+		specEntry.constantID = 0;  // Matches constant_id = 0 in shader
+		specEntry.offset = 0;
+		specEntry.size = sizeof(uint32_t);
+
+		VkSpecializationInfo specInfo{};
+		specInfo.mapEntryCount = 1;
+		specInfo.pMapEntries = &specEntry;
+		specInfo.dataSize = sizeof(uint32_t);
+		specInfo.pData = &currentTextureCount;
+
+		// Resize pipeline vector to match enum size
+		objectPipelines.resize(static_cast<size_t>(ObjectRenderMode::DISTORTED) + 1);
+
+		std::cout << "Creating object rendering pipelines..." << std::endl;
+
+		// STANDARD pipeline
+		{
+			PipelineConfig standardConfig{};
+			GFXPipeline::defaultPipelineConfig(standardConfig);
+			standardConfig.renderPass = getSwapChainRenderPass();
+			standardConfig.pipelineLayout = pipelineLayout;
+			standardConfig.fragmentSpecializationInfo = &specInfo;
+
+			objectPipelines[static_cast<size_t>(ObjectRenderMode::STANDARD)] = std::make_unique<GFXPipeline>(
+				engineDevice,
+				"shaders/simple_shader.vert.spv",
+				"shaders/simple_shader.frag.spv",
+				standardConfig
+			);
+		}
+
+		// WIREFRAME pipeline
+		{
+			PipelineConfig wireframeConfig{};
+			GFXPipeline::defaultPipelineConfig(wireframeConfig);
+			wireframeConfig.renderPass = getSwapChainRenderPass();
+			wireframeConfig.pipelineLayout = pipelineLayout;
+			wireframeConfig.fragmentSpecializationInfo = &specInfo;
+			wireframeConfig.rasterizationInfo.polygonMode = VK_POLYGON_MODE_LINE;
+
+			objectPipelines[static_cast<size_t>(ObjectRenderMode::WIREFRAME)] = std::make_unique<GFXPipeline>(
+				engineDevice,
+				"shaders/simple_shader.vert.spv",
+				"shaders/simple_shader.frag.spv",
+				wireframeConfig
+			);
+		}
+
+		// DISTORTED pipeline (temporarily use same shaders as standard - we'll add effects later)
+		{
+			PipelineConfig distortedConfig{};
+			GFXPipeline::defaultPipelineConfig(distortedConfig);
+			distortedConfig.renderPass = getSwapChainRenderPass();
+			distortedConfig.pipelineLayout = pipelineLayout;
+			distortedConfig.fragmentSpecializationInfo = &specInfo;
+
+			objectPipelines[static_cast<size_t>(ObjectRenderMode::DISTORTED)] = std::make_unique<GFXPipeline>(
+				engineDevice,
+				"shaders/simple_shader.vert.spv",  // Use working shaders for now
+				"shaders/simple_shader.frag.spv",
+				distortedConfig
+			);
+		}
+
+		std::cout << "Created " << objectPipelines.size() << " object pipelines" << std::endl;
+	}
+
+	void Renderer::createPostProcessPipelines()
+	{
+		std::cout << "Creating post-processing pipelines..." << std::endl;
+
+		// For now, create placeholder - full post-processing setup would require:
+		// 1. Offscreen render targets
+		// 2. Full-screen quad rendering
+		// 3. Screen-space effect shaders
+
+		// Resize pipeline vector to match enum size  
+		postProcessPipelines.resize(static_cast<size_t>(PostProcessMode::CHROMATIC_ABERRATION) + 1);
+
+		// TODO: Implement full post-processing system
+		// This would include:
+		// - Creating offscreen framebuffers
+		// - Post-process specific pipeline layouts
+		// - Full-screen quad geometry generation
+		// - Screen-space effect shaders (toxic_cloud.frag, night_vision.frag, etc.)
+
+		std::cout << "Post-processing system placeholder created (full implementation needed)" << std::endl;
+	}
+
+	bool Renderer::reloadPipelineConfig(const std::string& configPath)
+	{
+		if (!pipelineManager) {
+			std::cerr << "Pipeline manager not initialized" << std::endl;
+			return false;
+		}
+
+		try {
+			std::string path = configPath.empty() ? "Midnight/Core/Renderer/PipelineConfig.json" : configPath;
+			std::cout << "Reloading pipeline configuration from: " << path << std::endl;
+			
+			pipelineManager->loadPipelineConfig(path);
+			pipelineManager->createPipelines(getSwapChainRenderPass(), pipelineLayout, currentTextureCount);
+			
+			std::cout << "Pipeline configuration reloaded successfully!" << std::endl;
+			return true;
+		} catch (const std::exception& e) {
+			std::cerr << "Failed to reload pipeline config: " << e.what() << std::endl;
+			return false;
+		}
+	}
+
+	std::vector<std::string> Renderer::getAvailablePipelines() const
+	{
+		if (pipelineManager) {
+			return pipelineManager->getPipelineNames();
+		}
+		return {};
 	}
 
 	size_t Renderer::calculateDynamicUBOStride() const

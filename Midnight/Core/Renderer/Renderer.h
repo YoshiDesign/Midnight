@@ -12,6 +12,7 @@
 #include "../../CoreVK/AvengImageSystem.h"
 #include "../../CoreVK/PointLightSystem.h"
 #include "../aveng_model.h"
+#include "PipelineConfigManager.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -21,6 +22,22 @@ namespace aveng {
 
 	// Forward declarations
 	class AvengAppObject;
+
+	// Pipeline management enums
+	enum class ObjectRenderMode {
+		STANDARD = 0,
+		WIREFRAME = 1,
+		DISTORTED = 2,
+		// Add more as needed
+	};
+
+	enum class PostProcessMode {
+		NONE = 0,
+		TOXIC_CLOUD = 1,
+		NIGHT_VISION = 2,
+		CHROMATIC_ABERRATION = 3,
+		// Add more effects
+	};
 
 	// Data structures moved from ObjectRenderSystem
 	struct LightsUbo {
@@ -36,6 +53,8 @@ namespace aveng {
 		glm::vec4 ambientLightColor{ 0.f, 0.f, 1.f, .14f };
 		glm::vec3 lightPosition{ 5.0f, -20.0f, 2.8f };
 		alignas(16) glm::vec4 lightColor{ 1.f, 1.f, 1.f, 1.f };
+		alignas(16) int renderMode{ 0 };  // 0 = STANDARD, 1 = WIREFRAME, 2 = DISTORTED
+		alignas(16) float time{ 0.0f };   // For animated effects
 	};
 
 	struct ObjectUniformData {
@@ -87,10 +106,24 @@ namespace aveng {
 		void renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
 		void renderLights(int numLights);
 
+		// Pipeline switching methods
+		void setObjectRenderMode(ObjectRenderMode mode) { currentObjectMode = mode; }
+		void setPostProcessMode(PostProcessMode mode) { currentPostProcessMode = mode; }
+		ObjectRenderMode getObjectRenderMode() const { return currentObjectMode; }
+		PostProcessMode getPostProcessMode() const { return currentPostProcessMode; }
+		
+		// Pipeline management methods
+		bool reloadPipelineConfig(const std::string& configPath = "");
+		std::vector<std::string> getAvailablePipelines() const;
+
 	private:
 		// Dynamic texture array support
 		uint32_t currentTextureCount = 8; // Track current texture count for pipeline creation
 		bool pipelineCreated = false; // Guard against double pipeline creation
+
+		// Pipeline mode tracking
+		ObjectRenderMode currentObjectMode = ObjectRenderMode::STANDARD;
+		PostProcessMode currentPostProcessMode = PostProcessMode::NONE;
 
 		VkResult err;
 
@@ -100,8 +133,13 @@ namespace aveng {
 
 		// Moved from ObjectRenderSystem
 		void createPipelineLayout();
-		void createPipeline();
-		void createPipelines();
+		void createPipelines();                 // Main pipeline creation entry point
+		void createPostProcessPipelines();
+		
+		// DEPRECATED: Legacy pipeline creation (to be removed)
+		void createPipeline();                  // DEPRECATED: Creates legacy gfxPipeline
+		void createObjectPipelines();           // DEPRECATED: Creates hardcoded pipeline array
+		
 		size_t calculateDynamicUBOStride() const;
 
 		AvengWindow& aveng_window;
@@ -116,10 +154,26 @@ namespace aveng {
 		int currentFrameIndex; // Not tied to the image index
 		bool isFrameStarted{ false };
 
-		// Moved from ObjectRenderSystem - Engine resources
-		std::unique_ptr<GFXPipeline> gfxPipeline;
-		std::unique_ptr<GFXPipeline> gfxPipeline2;
+		// Pipeline management
+		std::unique_ptr<PipelineConfigManager> pipelineManager;
+		std::vector<std::unique_ptr<GFXPipeline>> objectPipelines;  // DEPRECATED: Fallback only
+		// DEPRECATED: Remove these legacy pipelines - use PipelineConfigManager instead
+		std::unique_ptr<GFXPipeline> gfxPipeline;  // Legacy - to be removed
+		std::unique_ptr<GFXPipeline> gfxPipeline2; // Legacy - to be removed
+		
+		// Post-processing pipelines and resources
+		std::vector<std::unique_ptr<GFXPipeline>> postProcessPipelines;  // Index corresponds to PostProcessMode
+		VkRenderPass offscreenRenderPass{};
+		std::vector<VkFramebuffer> offscreenFramebuffers;
+		VkImage offscreenColorImage{};
+		VkDeviceMemory offscreenColorImageMemory{};
+		VkImageView offscreenColorImageView{};
+		VkImage offscreenDepthImage{};
+		VkDeviceMemory offscreenDepthImageMemory{};
+		VkImageView offscreenDepthImageView{};
+		
 		VkPipelineLayout pipelineLayout{};
+		VkPipelineLayout postProcessPipelineLayout{};
 
 		// Descriptor and Buffer management
 		std::unique_ptr<AvengDescriptorPool> descriptorPool{};
@@ -130,10 +184,14 @@ namespace aveng {
 		std::vector<VkDescriptorSet> objectDescriptorSets;
 		std::vector<VkDescriptorSet> lightsDescriptorSets;
 
+		// Post-processing descriptor sets
+		std::vector<VkDescriptorSet> postProcessDescriptorSets;
+
 		// Descriptor set layouts (reused by multiple systems)
 		std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout;
+		std::unique_ptr<AvengDescriptorSetLayout> postProcessDescriptorSetLayout;
 
 		// Engine systems
 		std::unique_ptr<ImageSystem> imageSystem;

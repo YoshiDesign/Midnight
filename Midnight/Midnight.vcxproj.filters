@@ -54,6 +54,12 @@
     <ClCompile Include="CoreVK\AvengImageSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CoreVK\PointLightSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1100,6 +1106,15 @@
     <ClInclude Include="CoreVK\AvengImageSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CoreVK\PointLightSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Renderer\PipelineConfigManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Renderer\TextureStreamingManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="vendor\glm\detail\func_common.inl">
@@ -1532,6 +1547,7 @@
     <None Include="shaders\simple_shader2.vert" />
     <None Include="shaders\simple_shader2.vert.spv" />
     <None Include="shaders\vv.vert" />
+    <None Include="Core\Renderer\PipelineConfig.json" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="textures\grid.png">

@@ -179,6 +179,7 @@
     <ClCompile Include="Core\aveng_model.cpp" />
     <ClCompile Include="Core\aveng_scene_loader.cpp" />
     <ClCompile Include="Core\aveng_window.cpp" />
+    <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp" />
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
     <ClCompile Include="Utils\window_callbacks.cpp" />
@@ -199,7 +200,9 @@
     <ClInclude Include="Core\aveng_scene_loader.h" />
     <ClInclude Include="Core\aveng_window.h" />
     <ClInclude Include="Core\data.h" />
+    <ClInclude Include="Core\Renderer\PipelineConfigManager.h" />
     <ClInclude Include="Core\Renderer\Renderer.h" />
+    <ClInclude Include="Core\Renderer\TextureStreamingManager.h" />
     <ClInclude Include="Core\UUID.h" />
     <ClInclude Include="stb\stb_connected_components.h" />
     <ClInclude Include="stb\stb_c_lexer.h" />
@@ -535,6 +538,7 @@
     <ClInclude Include="vendor\tiny_obj_loader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Core\Renderer\PipelineConfig.json" />
     <None Include="shaders\ff.frag" />
     <None Include="shaders\ff.frag.spv" />
     <None Include="shaders\point_light.frag" />

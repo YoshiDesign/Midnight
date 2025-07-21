@@ -27,6 +27,8 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
     vec4 ambientLightColor;  // w is intensity
     vec3 lightPosition;      // Position of a single light
     vec4 lightColor;         // w is light intensity
+    int renderMode;          // 0 = STANDARD, 1 = WIREFRAME, 2 = DISTORTED
+    float time;              // For animated effects
 } ubo;
 
 void main() {
@@ -69,6 +71,35 @@ void main() {
     // Apply lighting with gamma correction
     vec3 finalColor = result.xyz * diffuseLight;
     finalColor = pow(finalColor, vec3(1.0/2.2)); // Gamma correction
+    
+    // Apply toxic cloud effect if in DISTORTED mode (renderMode == 2)
+    if (ubo.renderMode == 2) {
+        // Create distortion based on screen position and time
+        vec2 screenPos = fragTexCoord;
+        float wave = sin(screenPos.y * 10.0 + ubo.time * 2.0) * 0.02;
+        float noiseX = sin(screenPos.x * 15.0 + ubo.time * 1.5) * 0.01;
+        
+        // Apply toxic green color tint
+        vec3 toxicColor = vec3(0.2, 1.0, 0.3); // Toxic green
+        float desaturation = 0.4;
+        
+        // Desaturate the original color
+        float gray = dot(finalColor, vec3(0.299, 0.587, 0.114));
+        vec3 desaturated = mix(finalColor, vec3(gray), desaturation);
+        
+        // Apply toxic tint
+        finalColor = mix(desaturated, desaturated * toxicColor, 0.6);
+        
+        // Add pulsing effect
+        float pulse = (sin(ubo.time * 3.0) + 1.0) * 0.5;
+        finalColor += toxicColor * pulse * 0.15;
+        
+        // Add some chromatic aberration simulation
+        float aberration = wave + noiseX;
+        finalColor.r *= (1.0 + aberration);
+        finalColor.g *= (1.0 - aberration * 0.5);
+        finalColor.b *= (1.0 + aberration * 0.3);
+    }
     
     outColor = vec4(finalColor, result.a);
 }
