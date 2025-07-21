@@ -8,12 +8,17 @@
 
 namespace aveng {
     
+    // Structure to represent individual object instance data
+    struct ObjectInstanceData {
+        glm::vec3 position;
+        int textureId = 0;
+    };
+
     // Structure to represent object data from JSON
     struct ObjectData {
         std::string path;
         int qty;
-        std::vector<glm::vec3> positions;
-        int textureId = 0; // Default texture
+        std::vector<ObjectInstanceData> instances;
     };
 
     // Structure to represent a scene from JSON

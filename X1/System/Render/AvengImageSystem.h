@@ -20,7 +20,7 @@ namespace aveng {
 	class ImageSystem {
 
 		const char* textures[9] = {
-			"textures/BW-Grid.png", "textures/BlueRedGrid.png", "textures/BYgrid.png", "textures/theme2.png", "textures/theme2.png",
+			"textures/BW-Grid.png", "textures/HolyShip.png", "textures/BYgrid.png", "textures/theme2.png", "textures/theme2.png",
 			"textures/theme2.png", "textures/theme2.png", "textures/theme2.png", "textures/theme2.png"
 		};
 

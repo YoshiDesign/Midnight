@@ -8,20 +8,6 @@ namespace aveng {
 	const int LEFT = 1;
 	const int PI = 3.14159265f; // 3589793238462643383279502884197969399375105820974944592 check yo'self
 	const float viewRadius{ .5f };	// Radius of the invisible sphere for which our viewer is at the origin
-	
-
-	enum texture {
-		DESERT1 = 0,
-		GRID,
-		THEME_1,
-		THEME_2,
-		THEME_3, 
-		THEME_4,
-		RAND_1,
-		RAND_2,
-		RAND_3,
-		NO_TEXTURE
-	};
 
 	// Used by Components System
 	enum types {

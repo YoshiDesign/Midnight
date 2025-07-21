@@ -60,21 +60,23 @@ namespace aveng {
         std::cout << "Creating objects for scene: " << scene.title << std::endl;
         
         for (const auto& objectData : scene.objects) {
-            for (size_t i = 0; i < objectData.positions.size() && i < static_cast<size_t>(objectData.qty); ++i) {
-                auto object = AvengAppObject::createAppObject(objectData.textureId);
+            for (size_t i = 0; i < objectData.instances.size() && i < static_cast<size_t>(objectData.qty); ++i) {
+                const auto& instance = objectData.instances[i];
+                auto object = AvengAppObject::createAppObject(instance.textureId);
                 
                 // Load model with EngineDevice
                 object.model = AvengModel::createModelFromFile(engineDevice, objectData.path);
                 
                 // Set position
-                object.transform.translation = objectData.positions[i];
+                object.transform.translation = instance.position;
                 
                 currentSceneObjects.emplace(object.getId(), std::move(object));
                 
                 std::cout << "Created object from " << objectData.path 
-                         << " at position (" << objectData.positions[i].x 
-                         << ", " << objectData.positions[i].y 
-                         << ", " << objectData.positions[i].z << ")" << std::endl;
+                         << " at position (" << instance.position.x 
+                         << ", " << instance.position.y 
+                         << ", " << instance.position.z << ")"
+                         << " with texture ID " << instance.textureId << std::endl;
             }
         }
     }
@@ -108,17 +110,29 @@ namespace aveng {
                         obj.qty = objJson["qty"].get<int>();
                     }
                     
-                    // Parse data array (positions)
+                    // Parse data array (instances with position and texture)
                     if (objJson.contains("data") && objJson["data"].is_array()) {
-                        for (const auto& posJson : objJson["data"]) {
-                            if (posJson.contains("x") && posJson.contains("y") && posJson.contains("z")) {
-                                glm::vec3 position(
-                                    posJson["x"].get<float>(),
-                                    posJson["y"].get<float>(),
-                                    posJson["z"].get<float>()
-                                );
-                                obj.positions.push_back(position);
+                        for (const auto& instanceJson : objJson["data"]) {
+                            ObjectInstanceData instance;
+                            
+                            // Parse position
+                            if (instanceJson.contains("pos")) {
+                                const auto& posJson = instanceJson["pos"];
+                                if (posJson.contains("x") && posJson.contains("y") && posJson.contains("z")) {
+                                    instance.position = glm::vec3(
+                                        posJson["x"].get<float>(),
+                                        posJson["y"].get<float>(),
+                                        posJson["z"].get<float>()
+                                    );
+                                }
                             }
+                            
+                            // Parse texture ID
+                            if (instanceJson.contains("tex")) {
+                                instance.textureId = instanceJson["tex"].get<int>();
+                            }
+                            
+                            obj.instances.push_back(instance);
                         }
                     }
                     

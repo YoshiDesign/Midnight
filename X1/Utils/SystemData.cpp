@@ -35,9 +35,6 @@ namespace aveng {
         context.appObjects = &appObjects;
         context.camera = &camera;
 
-        std::cout << "CHECKING FOR NULLS:\t" 
-            << context.game_data->modPI << "\n"
-            << context.device->properties.limits.maxVertexInputBindings << std::endl;
     }
 
     SystemContext& SystemData::systemContext()
