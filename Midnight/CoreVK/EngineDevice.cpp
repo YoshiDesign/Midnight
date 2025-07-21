@@ -1,5 +1,8 @@
 #include "EngineDevice.h"
 
+#define VMA_IMPLEMENTATION
+#include "AMD/vk_mem_alloc.h"
+
 #include <cstring>
 #include <iostream>
 #include <set>
@@ -85,6 +88,17 @@ namespace aveng {
         // Determine thefeatures of our GPU we will be utilizing
         createLogicalDevice();
 
+        // Initialize VMA allocator
+        VmaAllocatorCreateInfo allocatorInfo = {};
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_0;
+        allocatorInfo.physicalDevice = _physicalDevice;
+        allocatorInfo.device = _device;
+        allocatorInfo.instance = _instance;
+        
+        if (vmaCreateAllocator(&allocatorInfo, &_allocator) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create VMA allocator!");
+        }
+
         // For command buffer allocation
         createCommandPool();
     }
@@ -94,6 +108,10 @@ namespace aveng {
     {
         std::cout << "Destroying EngineDevice." << std::endl;
         vkDestroyCommandPool(_device, _commandPool, nullptr);
+        
+        // Destroy VMA allocator before destroying device
+        vmaDestroyAllocator(_allocator);
+        
         vkDestroyDevice(_device, nullptr);
 
         if (enableValidationLayers) 
@@ -817,6 +835,23 @@ namespace aveng {
         if (vkBindImageMemory(_device, image, imageMemory, 0) != VK_SUCCESS) 
         {
             throw std::runtime_error("failed to bind image memory!");
+        }
+    }
+
+    /*
+     * VMA-based image creation with automatic memory management
+     */
+    void EngineDevice::createImageWithVMA(
+        const VkImageCreateInfo &imageInfo,
+        VmaMemoryUsage memoryUsage,
+        VkImage &image,
+        VmaAllocation &allocation
+    ) {
+        VmaAllocationCreateInfo allocCreateInfo = {};
+        allocCreateInfo.usage = memoryUsage;
+
+        if (vmaCreateImage(_allocator, &imageInfo, &allocCreateInfo, &image, &allocation, nullptr) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create image with VMA!");
         }
     }
 

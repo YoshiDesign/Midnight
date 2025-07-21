@@ -1,11 +1,12 @@
 #pragma once
 #include "EngineDevice.h"
+#include "AMD/vk_mem_alloc.h"
 
 #include <iostream>
 #include <unordered_map>
 #include <vector>
 
-/*
+/**
 	All of the helper functions that submit commands so far have been set up to execute synchronously
 	by waiting for the queue to become idle. For practical applications it is recommended to combine
 	these operations in a single command buffer and execute them asynchronously for higher throughput,
@@ -25,6 +26,7 @@ namespace aveng {
 	public:
 
 		ImageSystem(EngineDevice& device);
+		ImageSystem(EngineDevice& device, const std::vector<std::string>& texturePaths);
 		~ImageSystem();
 
 		// Not copyable or movable
@@ -45,16 +47,21 @@ namespace aveng {
 		std::vector<VkDescriptorImageInfo> descriptorInfoForAllImages(){ return imageInfosArray; }
 		std::vector<const char*> texture_paths;
 
+		// Dynamic texture management
+		void addTexture(const std::string& texturePath);
+		size_t getTextureCount() const { return images.size(); }
+
 	private:
 
 		// mipLevels is one dependency keeping us from merging some of these functions with SwapChain's impelmentations of them
+		void initializeWithPaths(const std::vector<std::string>& texturePaths);
 
 		EngineDevice& engineDevice;
 		VkSampler textureSampler;
 		std::vector<VkImage> images;
 		std::vector<uint32_t> mipLevels;
 		std::vector<VkImageView> textureImageViews;
-		std::vector<VkDeviceMemory> allImageMemory;
+		std::vector<VmaAllocation> allImageAllocations;
 		std::vector<VkDescriptorImageInfo> imageInfosArray;
 		
 		//std::unordered_map<std::string, Texture> textures;

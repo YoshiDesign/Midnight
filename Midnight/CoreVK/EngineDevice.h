@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Core/aveng_window.h"
+#include "AMD/vk_mem_alloc.h"
 #include <string>
 #include <vector>
 
@@ -34,6 +35,7 @@ namespace aveng {
         VkSurfaceKHR    _surface;
         VkQueue         _graphicsQueue;
         VkQueue         _presentQueue;
+        VmaAllocator    _allocator;
 
     public:
 
@@ -60,6 +62,7 @@ namespace aveng {
         VkSurfaceKHR surface()                  { return _surface; }
         VkQueue graphicsQueue()                 { return _graphicsQueue; }
         VkQueue presentQueue()                  { return _presentQueue; }
+        VmaAllocator allocator()                { return _allocator; }
 
 
         SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(_physicalDevice); }
@@ -94,6 +97,14 @@ namespace aveng {
             VkMemoryPropertyFlags properties,
             VkImage &image,
             VkDeviceMemory &imageMemory
+        );
+
+        // VMA-based image creation
+        void createImageWithVMA(
+            const VkImageCreateInfo &imageInfo,
+            VmaMemoryUsage memoryUsage,
+            VkImage &image,
+            VmaAllocation &allocation
         );
 
         VkPhysicalDeviceProperties properties;

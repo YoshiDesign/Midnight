@@ -23,19 +23,60 @@ namespace aveng {
 
 	ImageSystem::ImageSystem(EngineDevice& device) : engineDevice{ device }
 	{
-
+		// Use default hardcoded textures for backwards compatibility
+		std::vector<std::string> defaultTextures;
 		for (auto text : textures) {
-			std::cout << "Loading Texture: " << text << std::endl;
-			texture_paths.push_back(text);
+			defaultTextures.push_back(std::string(text));
+		}
+		initializeWithPaths(defaultTextures);
+	}
+
+	ImageSystem::ImageSystem(EngineDevice& device, const std::vector<std::string>& texturePaths) 
+		: engineDevice{ device }
+	{
+		initializeWithPaths(texturePaths);
+	}
+
+	void ImageSystem::initializeWithPaths(const std::vector<std::string>& texturePaths)
+	{
+		// Store texture paths
+		texture_paths.clear();
+		for (const auto& path : texturePaths) {
+			std::cout << "Loading Texture: " << path << std::endl;
+			texture_paths.push_back(path.c_str());
 		}
 
+		// Create images and views
 		for (size_t i = 0; i < texture_paths.size(); i++)
 		{
-			createTextureImage(textures[i], i);
+			createTextureImage(texture_paths[i], i);
 			createTextureImageView(images[i], i);
 		}
+		
+		// Create sampler and descriptors
 		createTextureSampler();
 		createImageDescriptors(textureImageViews);
+	}
+
+	void ImageSystem::addTexture(const std::string& texturePath)
+	{
+		std::cout << "Adding dynamic texture: " << texturePath << std::endl;
+		
+		size_t index = images.size();
+		texture_paths.push_back(texturePath.c_str());
+		
+		// Create texture image and view
+		createTextureImage(texturePath.c_str(), index);
+		createTextureImageView(images[index], index);
+		
+		// Update image descriptors with the new texture
+		VkDescriptorImageInfo descriptorImageInfo{};
+		descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		descriptorImageInfo.imageView = textureImageViews[index];
+		descriptorImageInfo.sampler = textureSampler;
+		imageInfosArray.push_back(descriptorImageInfo);
+		
+		std::cout << "Total textures now: " << getTextureCount() << std::endl;
 	}
 
 	ImageSystem::~ImageSystem() 
@@ -45,10 +86,10 @@ namespace aveng {
 		for (int i=0; i < images.size(); i++) 
 		{
 			std::cout << "Destroying image " << i << " : " << images[i] << std::endl;
-			// Order matters
+			// Order matters - destroy image view first
 			vkDestroyImageView(engineDevice.device(), textureImageViews[i], nullptr);
-			vkDestroyImage(engineDevice.device(), images[i], nullptr);
-			vkFreeMemory(engineDevice.device(), allImageMemory[i], nullptr);
+			// Use VMA to destroy image and free memory automatically
+			vmaDestroyImage(engineDevice.allocator(), images[i], allImageAllocations[i]);
 		}
 		
 	}
@@ -56,7 +97,7 @@ namespace aveng {
 	void ImageSystem::createTextureImage(const char* filepath, size_t i)
 	{
 		VkImage image;
-		VkDeviceMemory imageMemory;
+		VmaAllocation allocation;
 
 		// Load our image
 		int texWidth, texHeight, texChannels;
@@ -118,15 +159,15 @@ namespace aveng {
 		* You should have a list of acceptable alternatives and go with the best one that is supported.
 		*/
 
-		engineDevice.createImageWithInfo(
+		engineDevice.createImageWithVMA(
 			imageInfo,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // Memory properties - This is GPU heap allocated and super fast
+			VMA_MEMORY_USAGE_GPU_ONLY, // GPU-only memory for optimal performance
 			image,
-			imageMemory
+			allocation
 		);
 
-		// Track our memory
-		allImageMemory.push_back(imageMemory);
+		// Track our VMA allocations
+		allImageAllocations.push_back(allocation);
 
 		transitionImageLayout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevel);
 		engineDevice.copyBufferToImage(stagingBuffer.getBuffer(), image, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1);
