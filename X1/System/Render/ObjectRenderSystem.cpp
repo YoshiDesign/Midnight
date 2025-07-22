@@ -54,7 +54,7 @@ namespace aveng {
 				std::cout << "Entering toxic cloud - switching to distorted rendering!" << std::endl;
 				renderer.setObjectRenderMode(ObjectRenderMode::DISTORTED);
 				// Temporarily disable post-processing until system is complete
-				// renderer.setPostProcessMode(PostProcessMode::TOXIC_CLOUD);
+				renderer.setPostProcessMode(PostProcessMode::TOXIC_CLOUD);
 				
 				// Example: Print available pipelines for debugging
 				auto pipelines = renderer.getAvailablePipelines();
