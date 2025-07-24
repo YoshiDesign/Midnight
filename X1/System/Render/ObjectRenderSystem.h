@@ -51,6 +51,7 @@ namespace aveng {
 	private:
 
 		void updateData(float frameTime);
+		void updatePostProcessing(float frameTime);
 
 		int last_sec;
 		float aspect;
