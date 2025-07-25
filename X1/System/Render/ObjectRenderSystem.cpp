@@ -67,8 +67,15 @@ namespace aveng {
 			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
 		}
 
-		// Delegate complete object rendering to renderer
-		renderer.renderObjects(objectData);
+		// Use instanced rendering for better performance
+		static bool firstFrame = true;
+		if (firstFrame) {
+			std::cout << "Instanced Rendering Enabled!" << std::endl;
+			std::cout << "   Objects this frame: " << objectData.size() << std::endl;
+			firstFrame = false;
+		}
+		
+		renderer.renderObjectsInstanced(objectData);
 
 		// Render lights
 		renderer.renderLights(u_LightsData.numLights);
