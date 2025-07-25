@@ -309,6 +309,12 @@ namespace aveng {
 		std::cout << "  Lights Buffer [0] using VMA: " << (u_LightsBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
 		std::cout << "  Object Buffer [0] using VMA: " << (u_ObjBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
 
+		// Check memory budget after buffer creation
+		engineDevice.printMemoryStats();
+		if (engineDevice.isMemoryPressureHigh()) {
+			std::cout << "WARNING: High memory pressure detected!" << std::endl;
+		}
+
 		// Create Descriptor Set Layouts (stored as members for reuse)
 		globalDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)

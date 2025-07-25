@@ -117,6 +117,11 @@ namespace aveng {
             VmaAllocation &allocation
         );
 
+        // VMA Memory Budget Monitoring
+        void checkMemoryBudget();
+        void printMemoryStats();
+        bool isMemoryPressureHigh(); // Returns true if >80% memory used
+
         VkPhysicalDeviceProperties properties;
 
     private:

@@ -144,7 +144,9 @@ namespace aveng {
 			imageSize,
 			1,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+			VMA_MEMORY_USAGE_AUTO,
+			1, // minOffsetAlignment
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
 		);
 
 		// Staging allocation of pixel data
@@ -385,8 +387,9 @@ namespace aveng {
 			imageSize,
 			1,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			// Host Coherent bit ensures the *data buffer is flushed to the device's buffer automatically, so we dont have to call the VkFlushMappedMemoryRanges
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			VMA_MEMORY_USAGE_AUTO,
+			1, // minOffsetAlignment
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
 		};
 
 		// Staging allocation of pixel data

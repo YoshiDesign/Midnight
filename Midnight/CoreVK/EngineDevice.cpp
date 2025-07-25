@@ -885,4 +885,94 @@ namespace aveng {
         }
     }
 
+    /*
+     * VMA Memory Budget Monitoring - Check current memory usage across all heaps
+     */
+    void EngineDevice::checkMemoryBudget() {
+        VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
+        vmaGetHeapBudgets(_allocator, budgets);
+
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(_physicalDevice, &memProperties);
+
+        std::cout << "\n=== VMA Memory Budget Report ===" << std::endl;
+        
+        bool highPressure = false;
+        for (uint32_t i = 0; i < memProperties.memoryHeapCount; i++) {
+            VkDeviceSize heapSize = memProperties.memoryHeaps[i].size;
+            VkDeviceSize used = budgets[i].usage;
+            VkDeviceSize budget = budgets[i].budget;
+            
+            float usagePercent = (float)used / (float)budget * 100.0f;
+            
+            std::cout << "Heap " << i << " (" << (memProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ? "DEVICE_LOCAL" : "HOST") << "):" << std::endl;
+            std::cout << "  Size: " << heapSize / (1024 * 1024) << " MB" << std::endl;
+            std::cout << "  Used: " << used / (1024 * 1024) << " MB" << std::endl;
+            std::cout << "  Budget: " << budget / (1024 * 1024) << " MB" << std::endl;
+            std::cout << "  Usage: " << usagePercent << "%" << std::endl;
+            
+            if (usagePercent > 80.0f) {
+                std::cout << "  WARNING: High memory pressure!" << std::endl;
+                highPressure = true;
+            } else if (usagePercent > 95.0f) {
+                std::cout << "  CRITICAL: Memory nearly exhausted!" << std::endl;
+                highPressure = true;
+            }
+            std::cout << std::endl;
+        }
+        
+        if (highPressure) {
+            std::cout << "💡 Consider reducing texture quality or model complexity" << std::endl;
+        }
+    }
+
+    /*
+     * Print VMA allocation statistics for debugging
+     */
+    void EngineDevice::printMemoryStats() {
+        std::cout << "\n=== VMA Memory Overview ===" << std::endl;
+        
+        // Use budget information which is more universally available
+        VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
+        vmaGetHeapBudgets(_allocator, budgets);
+
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(_physicalDevice, &memProperties);
+
+        VkDeviceSize totalUsed = 0;
+        VkDeviceSize totalBudget = 0;
+        
+        for (uint32_t i = 0; i < memProperties.memoryHeapCount; i++) {
+            totalUsed += budgets[i].usage;
+            totalBudget += budgets[i].budget;
+        }
+        
+        std::cout << "Total Used Memory: " << totalUsed / (1024 * 1024) << " MB" << std::endl;
+        std::cout << "Total Available Budget: " << totalBudget / (1024 * 1024) << " MB" << std::endl;
+        std::cout << "Memory Efficiency: " << ((float)totalUsed / (float)totalBudget * 100.0f) << "%" << std::endl;
+        std::cout << "==============================" << std::endl;
+    }
+
+    /*
+     * Check if memory pressure is high (>80% usage)
+     */
+    bool EngineDevice::isMemoryPressureHigh() {
+        VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
+        vmaGetHeapBudgets(_allocator, budgets);
+
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(_physicalDevice, &memProperties);
+
+        for (uint32_t i = 0; i < memProperties.memoryHeapCount; i++) {
+            VkDeviceSize used = budgets[i].usage;
+            VkDeviceSize budget = budgets[i].budget;
+            
+            float usagePercent = (float)used / (float)budget * 100.0f;
+            if (usagePercent > 80.0f) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }  // namespace aveng
