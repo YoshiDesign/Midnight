@@ -28,7 +28,7 @@ namespace aveng {
 		AvengAppObject& operator=(AvengAppObject&&) = default;
 
 		id_t getId() const { return id; }
-		std::unique_ptr<AvengModel> model{};
+		std::shared_ptr<AvengModel> model{};
 
 		inline int get_texture() const { return texture_id; }
 		inline void set_texture(int texture) { texture_id = texture; }

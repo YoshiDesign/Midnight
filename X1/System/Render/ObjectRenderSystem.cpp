@@ -38,43 +38,13 @@ namespace aveng {
 		
 		updateCamera(frameTime, viewerObject, keyboardController);
 		updateData(frameTime);
-
-		// Example: Dynamic shader switching based on game state
-		// This is where you'd implement your toxic cloud detection logic
-		static bool inToxicCloud = false;
-		static float toxicTimer = 0.0f;
-		toxicTimer += frameTime;
-
-		// Toggle toxic cloud effect every 5 seconds for demo
-		if (toxicTimer > 5.0f) {
-			inToxicCloud = !inToxicCloud;
-			toxicTimer = 0.0f;
-			
-			if (inToxicCloud) {
-				std::cout << "Entering toxic cloud - switching to distorted rendering!" << std::endl;
-				renderer.setObjectRenderMode(ObjectRenderMode::DISTORTED);
-				// Temporarily disable post-processing until system is complete
-				renderer.setPostProcessMode(PostProcessMode::TOXIC_CLOUD);
-				
-				// Example: Print available pipelines for debugging
-				auto pipelines = renderer.getAvailablePipelines();
-				std::cout << "Available pipelines: ";
-				for (const auto& name : pipelines) {
-					std::cout << name << " ";
-				}
-				std::cout << std::endl;
-			} else {
-				std::cout << "Exiting toxic cloud - returning to normal rendering" << std::endl;
-				renderer.setObjectRenderMode(ObjectRenderMode::STANDARD);
-				// renderer.setPostProcessMode(PostProcessMode::NONE);
-			}
-		}
+		// updatePostProcessing(frameTime);
 
 		// Prepare frame data
 		u_GlobalData.projection = aveng_camera.getProjection();
 		u_GlobalData.view = aveng_camera.getView();
 		u_GlobalData.renderMode = static_cast<int>(renderer.getObjectRenderMode());
-		u_GlobalData.time = toxicTimer;  // Pass time for animated effects
+		// u_GlobalData.time = toxicTimer;  // Pass time for animated effects
 
 		// Start frame rendering
 		VkCommandBuffer commandBuffer = renderer.beginFrame();
@@ -97,8 +67,15 @@ namespace aveng {
 			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
 		}
 
-		// Delegate complete object rendering to renderer
-		renderer.renderObjects(objectData);
+		// Use instanced rendering for better performance
+		static bool firstFrame = true;
+		if (firstFrame) {
+			std::cout << "Instanced Rendering Enabled!" << std::endl;
+			std::cout << "   Objects this frame: " << objectData.size() << std::endl;
+			firstFrame = false;
+		}
+		
+		renderer.renderObjectsInstanced(objectData);
 
 		// Render lights
 		renderer.renderLights(u_LightsData.numLights);
@@ -107,6 +84,7 @@ namespace aveng {
 		editor.render(commandBuffer);
 
 		renderer.endSwapChainRenderPass(commandBuffer);
+
 		renderer.endFrame();
 	}
 
@@ -132,6 +110,41 @@ namespace aveng {
 		game_data.cameraRot = viewerObject.transform.rotation;
 		game_data.fly_mode = WindowCallbacks::flightMode;
 
+	}
+
+	void ObjectRenderSystem::updatePostProcessing(float frameTime)
+	{
+		// Example: Dynamic shader switching based on game state
+		// This is where you'd implement your toxic cloud detection logic
+		static bool inToxicCloud = false;
+		static float toxicTimer = 0.0f;
+		toxicTimer += frameTime;
+
+		// Toggle toxic cloud effect every 5 seconds for demo
+		if (toxicTimer > 5.0f) {
+			inToxicCloud = !inToxicCloud;
+			toxicTimer = 0.0f;
+
+			if (inToxicCloud) {
+				std::cout << "Entering toxic cloud - switching to distorted rendering!" << std::endl;
+				renderer.setObjectRenderMode(ObjectRenderMode::DISTORTED);
+				// Temporarily disable post-processing until system is complete
+				renderer.setPostProcessMode(PostProcessMode::TOXIC_CLOUD);
+
+				// Example: Print available pipelines for debugging
+				auto pipelines = renderer.getAvailablePipelines();
+				std::cout << "Available pipelines: ";
+				for (const auto& name : pipelines) {
+					std::cout << name << " ";
+				}
+				std::cout << std::endl;
+			}
+			else {
+				std::cout << "Exiting toxic cloud - returning to normal rendering" << std::endl;
+				renderer.setObjectRenderMode(ObjectRenderMode::STANDARD);
+				// renderer.setPostProcessMode(PostProcessMode::NONE);
+			}
+		}
 	}
 
 	void ObjectRenderSystem::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)

@@ -269,12 +269,17 @@ namespace aveng {
 		objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		lightsDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
-		// Create Buffers
+		// Create Buffers using VMA
+		// VMA_MEMORY_USAGE_AUTO: Let VMA choose optimal memory type
+		// VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT: CPU will write to this buffer frequently  
+		// VMA_ALLOCATION_CREATE_MAPPED_BIT: Keep buffer persistently mapped for performance
 		for (int i = 0; i < u_GlobalBuffers.size(); i++) {
 			u_GlobalBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				sizeof(GlobalUbo), 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_GlobalBuffers[i]->map();
 		}
 
@@ -282,7 +287,9 @@ namespace aveng {
 			u_LightsBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				sizeof(LightsUbo), 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment  
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_LightsBuffers[i]->map();
 		}
 
@@ -290,9 +297,22 @@ namespace aveng {
 			u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				calculateDynamicUBOStride(), num_objects,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-				calculateDynamicUBOStride());
+				VMA_MEMORY_USAGE_AUTO,
+				calculateDynamicUBOStride(), // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_ObjBuffers[i]->map();
+		}
+
+		// Verify VMA allocation is working
+		std::cout << "VMA Buffer Allocation Verification:" << std::endl;
+		std::cout << "  Global Buffer [0] using VMA: " << (u_GlobalBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
+		std::cout << "  Lights Buffer [0] using VMA: " << (u_LightsBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
+		std::cout << "  Object Buffer [0] using VMA: " << (u_ObjBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
+
+		// Check memory budget after buffer creation
+		engineDevice.printMemoryStats();
+		if (engineDevice.isMemoryPressureHigh()) {
+			std::cout << "WARNING: High memory pressure detected!" << std::endl;
 		}
 
 		// Create Descriptor Set Layouts (stored as members for reuse)
@@ -333,6 +353,9 @@ namespace aveng {
 
 		// Create pipelines now that descriptor layouts are ready
 		createPipelines();
+		
+		// Initialize instanced rendering system
+		setupInstanceBuffers();
 	}
 
 	void Renderer::initializePointLightSystem()
@@ -439,6 +462,194 @@ namespace aveng {
 	{
 		pointLightSystem.render(globalDescriptorSets[currentFrameIndex], 
 			lightsDescriptorSets[currentFrameIndex], getCurrentCommandBuffer(), numLights);
+	}
+
+	void Renderer::renderObjectsInstanced(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
+	{
+		if (!instancedRenderingEnabled || objectData.empty()) {
+			// Fallback to traditional rendering
+			renderObjects(objectData);
+			return;
+		}
+
+		std::cout << "=== Instanced Rendering ===" << std::endl;
+		std::cout << "Processing " << objectData.size() << " objects for instancing" << std::endl;
+
+		auto commandBuffer = getCurrentCommandBuffer();
+
+		// Clear existing batches for this frame
+		for (auto& [model, batch] : renderBatches) {
+			batch->instances.clear();
+		}
+
+		// Group objects by model
+		for (const auto& [objUniform, modelMatrix, normalMatrix, model] : objectData) {
+			// Create batch if it doesn't exist
+			if (renderBatches.find(model) == renderBatches.end()) {
+				renderBatches[model] = std::make_unique<RenderBatch>(model);
+			}
+
+			// Add instance data to the batch
+			InstanceData instanceData{};
+			instanceData.modelMatrix = modelMatrix;
+			instanceData.normalMatrix = normalMatrix;
+			instanceData.textureIndex = objUniform.texIndex;
+
+			renderBatches[model]->instances.push_back(instanceData);
+		}
+
+		// Bind pipeline based on current render mode
+		GFXPipeline* activePipeline = nullptr;
+		
+		if (pipelineManager) {
+			activePipeline = pipelineManager->getPipeline(static_cast<int>(currentObjectMode));
+			if (activePipeline) {
+				activePipeline->bind(commandBuffer);
+			}
+		}
+		
+		if (!activePipeline) {
+			std::cerr << "WARNING: No pipeline found for instanced mode " << static_cast<int>(currentObjectMode) << std::endl;
+			renderObjects(objectData); // Fallback
+			return;
+		}
+
+		// Bind global descriptor set (set 0)
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
+
+		// Bind lights descriptor set (set 2)
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
+
+		// Render each batch
+		uint32_t totalInstancesRendered = 0;
+		uint32_t batchesRendered = 0;
+		
+		for (auto& [model, batch] : renderBatches) {
+			if (batch->instances.empty()) continue;
+
+			uint32_t instanceCount = static_cast<uint32_t>(batch->instances.size());
+			std::cout << "Rendering batch: " << instanceCount << " instances of model " << model << std::endl;
+
+			// Update instance buffer for this batch
+			updateInstanceBuffer(*batch);
+
+			// For now, use push constants for the first instance (we'll optimize this later)
+			if (!batch->instances.empty()) {
+				struct PushConstantData {
+					glm::mat4 modelMatrix;
+					glm::mat4 normalMatrix;
+				} pushData{ 
+					batch->instances[0].modelMatrix,
+					batch->instances[0].normalMatrix 
+				};
+
+				vkCmdPushConstants(commandBuffer, pipelineLayout,
+					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+					0, sizeof(PushConstantData), &pushData);
+			}
+
+			// Bind object descriptor set (set 1) - use first instance's texture
+			if (!batch->instances.empty()) {
+				ObjectUniformData objUniform{ batch->instances[0].textureIndex };
+				u_ObjBuffers[currentFrameIndex]->writeToIndex(&objUniform, 0);
+				u_ObjBuffers[currentFrameIndex]->flushIndex(0);
+				auto descriptorInfo = u_ObjBuffers[currentFrameIndex]->descriptorInfoForIndex(0);
+				uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset);
+
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+					1, 1, &objectDescriptorSets[currentFrameIndex], 1, &dynamicOffset);
+			}
+
+			// Bind model vertex and index buffers
+			model->bind(commandBuffer);
+
+			// TODO: Bind instance buffer as additional vertex buffer
+			// For now, render multiple instances using traditional draw calls
+			// This gives us the batching benefit while we work on shader updates
+			for (uint32_t i = 0; i < instanceCount; ++i) {
+				// Update push constants for each instance
+				struct PushConstantData {
+					glm::mat4 modelMatrix;
+					glm::mat4 normalMatrix;
+				} pushData{ 
+					batch->instances[i].modelMatrix,
+					batch->instances[i].normalMatrix 
+				};
+
+				vkCmdPushConstants(commandBuffer, pipelineLayout,
+					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+					0, sizeof(PushConstantData), &pushData);
+
+				// Draw single instance
+				model->draw(commandBuffer);
+			}
+
+			totalInstancesRendered += instanceCount;
+			batchesRendered++;
+		}
+
+		std::cout << "Instanced rendering complete: " << batchesRendered << " batches, " 
+		          << totalInstancesRendered << " total instances" << std::endl;
+		
+		// Performance analysis
+		float efficiency = (float)totalInstancesRendered / (float)batchesRendered;
+		if (efficiency > 2.0f) {
+			std::cout << "Instancing is BENEFICIAL! Avg " << efficiency << " instances per batch" << std::endl;
+		} else if (efficiency > 1.0f) {
+			std::cout << "Instancing provides MINOR benefit. Avg " << efficiency << " instances per batch" << std::endl;
+		} else {
+			std::cout << "Instancing provides NO benefit (efficiency: " << efficiency << ")" << std::endl;
+			std::cout << "Auto-switching to traditional rendering for better performance" << std::endl;
+			
+			// Automatically disable instancing for inefficient scenes
+			static int inefficientFrameCount = 0;
+			inefficientFrameCount++;
+			if (inefficientFrameCount >= 5) {
+				std::cout << "Automatically disabling instanced rendering - scene not suitable" << std::endl;
+				instancedRenderingEnabled = false;
+			}
+		}
+	}
+
+	void Renderer::setupInstanceBuffers()
+	{
+		std::cout << "Setting up instance buffers for instanced rendering" << std::endl;
+		// Instance buffers will be created on-demand in updateInstanceBuffer()
+		// This avoids pre-allocating buffers for models that might not be used
+	}
+
+	void Renderer::updateInstanceBuffer(RenderBatch& batch)
+	{
+		if (batch.instances.empty()) return;
+
+		uint32_t instanceCount = static_cast<uint32_t>(batch.instances.size());
+		
+		// Create or resize instance buffer if needed
+		if (!batch.instanceBuffer || 
+		    batch.instanceBuffer->getInstanceCount() < instanceCount) {
+			
+			std::cout << "Creating instance buffer for " << instanceCount << " instances" << std::endl;
+			
+			// Create new instance buffer with VMA
+			batch.instanceBuffer = std::make_unique<AvengBuffer>(
+				engineDevice,
+				sizeof(InstanceData),
+				instanceCount,
+				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
+			);
+			
+			batch.instanceBuffer->map();
+		}
+
+		// Update instance buffer with current instance data
+		batch.instanceBuffer->writeToBuffer(batch.instances.data(), 
+			sizeof(InstanceData) * instanceCount);
+		batch.instanceBuffer->flush();
 	}
 
 	void Renderer::createPipelineLayout()

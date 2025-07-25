@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include <cassert>
+#include <unordered_map>
 #include "../aveng_window.h"
 #include "../../CoreVK/EngineDevice.h"
 #include "../../CoreVK/swapchain.h"
@@ -61,6 +62,23 @@ namespace aveng {
 		alignas(16) int texIndex;
 	};
 
+	// Instance data for instanced rendering - per object instance
+	struct InstanceData {
+		alignas(16) glm::mat4 modelMatrix;
+		alignas(16) glm::mat4 normalMatrix;
+		alignas(16) int textureIndex;
+		alignas(16) int padding[3]; // Ensure 16-byte alignment
+	};
+
+	// Batch data for grouping instances by model
+	struct RenderBatch {
+		AvengModel* model;
+		std::vector<InstanceData> instances;
+		std::unique_ptr<AvengBuffer> instanceBuffer;
+		
+		RenderBatch(AvengModel* m) : model(m) {}
+	};
+
 	class Renderer {
 
 	public:
@@ -105,6 +123,16 @@ namespace aveng {
 		void updateFrameData(const GlobalUbo& globalData, const LightsUbo& lightsData);
 		void renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
 		void renderLights(int numLights);
+
+		// Instanced rendering methods
+		void renderObjectsInstanced(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
+		void setupInstanceBuffers();
+		void updateInstanceBuffer(RenderBatch& batch);
+
+		// Instanced rendering controls
+		void setInstancedRenderingEnabled(bool enabled) { instancedRenderingEnabled = enabled; }
+		bool getInstancedRenderingEnabled() const { return instancedRenderingEnabled; }
+		uint32_t getBatchCount() const { return static_cast<uint32_t>(renderBatches.size()); }
 
 		// Pipeline switching methods
 		void setObjectRenderMode(ObjectRenderMode mode) { currentObjectMode = mode; }
@@ -192,6 +220,11 @@ namespace aveng {
 		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> postProcessDescriptorSetLayout;
+
+		// Instanced rendering data
+		std::unordered_map<AvengModel*, std::unique_ptr<RenderBatch>> renderBatches;
+		bool instancedRenderingEnabled = true; // Toggle for A/B testing
+		uint32_t maxInstancesPerBatch = 1000;  // Reasonable default
 
 		// Engine systems
 		std::unique_ptr<ImageSystem> imageSystem;

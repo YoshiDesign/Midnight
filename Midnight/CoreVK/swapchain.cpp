@@ -49,8 +49,7 @@ namespace aveng {
 
         for (int i = 0; i < depthImages.size(); i++) {
             vkDestroyImageView(device.device(), depthImageViews[i], nullptr);
-            vkDestroyImage(device.device(), depthImages[i], nullptr);
-            vkFreeMemory(device.device(), depthImageMemorys[i], nullptr);
+            vmaDestroyImage(device.allocator(), depthImages[i], depthImageAllocations[i]);
         }
 
         for (auto framebuffer : swapChainFramebuffers) {
@@ -325,7 +324,7 @@ namespace aveng {
         VkExtent2D swapChainExtent = getSwapChainExtent();
 
         depthImages.resize(imageCount());
-        depthImageMemorys.resize(imageCount());
+        depthImageAllocations.resize(imageCount());
         depthImageViews.resize(imageCount());
 
         for (int i = 0; i < depthImages.size(); i++) {
@@ -345,11 +344,11 @@ namespace aveng {
             imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             imageInfo.flags = 0;
 
-            device.createImageWithInfo(
+            device.createImageWithVMA(
                 imageInfo,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // Memory properties - This is GPU heap allocated and super fast
+                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, // GPU-only memory for optimal depth buffer performance
                 depthImages[i],
-                depthImageMemorys[i]);
+                depthImageAllocations[i]);
 
             VkImageViewCreateInfo viewInfo{};
             viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;

@@ -2,6 +2,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 #include "app_object.h"
 #include "../CoreVK/EngineDevice.h"
 #include "nlohmann/json.hpp"
@@ -71,8 +72,15 @@ namespace aveng {
         // JSON parsing
         void parseSceneData(const nlohmann::json& jsonData);
         
+        // Model caching for instanced rendering
+        std::shared_ptr<AvengModel> getOrCreateModel(const std::string& modelPath, EngineDevice& engineDevice);
+        void clearModelCache();
+        
         std::string currentSceneId;
         std::unordered_map<std::string, SceneData> scenes;
         AvengAppObject::Map currentSceneObjects;
+        
+        // Model cache - shared models by file path
+        std::unordered_map<std::string, std::shared_ptr<AvengModel>> modelCache;
     };
 }

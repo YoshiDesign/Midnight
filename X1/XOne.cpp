@@ -66,10 +66,10 @@ namespace aveng {
 			for (int j = 1; j < 5; j++) {
 
 				objectRenderSystem.addLight(
-					glm::vec3(i * -10.f, -2.f, j * 4.0f),  // position
+					glm::vec3(-100 + i * -10.f, -2.f, 33 + j * 4.0f),  // position
 					glm::vec3( 1.f, 0.0f, 0.0f),    // red color
-					i * 0.15f,                       // reduced intensity (was i * .75f)
-					0.8f                           // slightly larger radius
+					0.75f,                       
+					i * j * 0.1f                           // slightly larger radius
 				);
 
 			}
@@ -79,29 +79,78 @@ namespace aveng {
 		objectRenderSystem.addLight(
 			glm::vec3(20.3, -16, 7.8f), // position
 			glm::vec3(0.8f, 1.0f, 0.3f),     // yellow-green
-			3.0f,                             // high intensity for point light
+			2.0f,                             // high intensity for point light
 			0.15f                             // small radius = tight falloff
 		);
 		objectRenderSystem.addLight(
 			glm::vec3(22.2, -16, 7.8f), // position
 			glm::vec3(0.2f, 1.0f, 0.8f),     // cyan
-			3.0f,                             // high intensity for point light  
+			2.0f,                             // high intensity for point light  
 			0.15f                             // small radius = tight falloff
 		);
 
 		// Add a few more point lights for testing
 		objectRenderSystem.addLight(
 			glm::vec3(-26.0f, -16.0f, 8.0f), // position
-			glm::vec3(1.0f, 0.3f, 0.2f),     // red-orange
-			4.0f,                             // very high intensity
-			0.1f                              // very small radius = very tight
+			glm::vec3(.0f, 0.4f, 0.8f),     // red-orange
+			2.0f,                             // very high intensity
+			0.5f                              // very small radius = very tight
 		);
 		
 		objectRenderSystem.addLight(
-			glm::vec3(-18.0f, -16.0f, 8.0f), // position
+			glm::vec3(-18.0f, -250.0f, 8.0f), // position
+			glm::vec3(0.3f, 0.2f, 1.0f),      // blue
+			2.0f,                              // medium-high intensity
+			0.5f                               // slightly larger radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(18.0f, -250.0f, 0.0f), // position
 			glm::vec3(0.3f, 0.2f, 1.0f),      // blue
 			2.5f,                              // medium-high intensity
-			0.2f                               // slightly larger radius
+			1.0f                               // slightly larger radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(18.0f, -250.0f, -60.0f), // position
+			glm::vec3(0.0f, 0.7f, 1.0f),      // blue
+			2.5f,                              // medium-high intensity
+			0.5f                               // slightly larger radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(18, -250.0f, -96.0f), // position
+			glm::vec3(0.0f, 0.6f, 1.0f),      // blue
+			2.5f,                              // medium-high intensity
+			0.5f                               // slightly larger radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(44, -250.0f, -142.0f), // position
+			glm::vec3(0.0f, 0.6f, 1.0f),      // blue
+			2.5f,                              // medium-high intensity
+			0.5f                               // slightly larger radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(89, -250.0f, -133.0f), // position
+			glm::vec3(0.3f, 0.2f, 1.0f),      // blue
+			2.5f,                              // medium-high intensity
+			0.5f                               // slightly larger radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(92.4f, -250.0f, -93.0f), // position
+			glm::vec3(0.3f, 0.2f, 1.0f),      // blue
+			2.5f,                              // medium-high intensity
+			0.5f                               // slightly larger radius
+		);
+
+		objectRenderSystem.addLight(
+			glm::vec3(92.4f, -250.0f, -41.0f), // position
+			glm::vec3(0.3f, 0.2f, 1.0f),      // blue
+			2.5f,                              // medium-high intensity
+			0.5f                               // slightly larger radius
 		);
 		std::cout << "Added " << objectRenderSystem.getLightCount() << " lights to the scene!" << std::endl;
 	}

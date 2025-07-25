@@ -82,8 +82,8 @@ namespace aveng {
                 
                 auto object = AvengAppObject::createAppObject(instance.textureId);
                 
-                // Load model with EngineDevice
-                object.model = AvengModel::createModelFromFile(engineDevice, objectData.path);
+                // Use shared model from cache for instanced rendering
+                object.model = getOrCreateModel(objectData.path, engineDevice);
                 
                 // Set position
                 object.transform.translation = instance.position;
@@ -102,6 +102,7 @@ namespace aveng {
     void AvengSceneLoader::clearCurrentScene() {
         currentSceneObjects.clear();
         currentSceneId.clear();
+        clearModelCache();
     }
 
     void AvengSceneLoader::parseSceneData(const json& jsonData) {
@@ -177,6 +178,28 @@ namespace aveng {
             scenes[sceneId] = scene;
             std::cout << "Parsed scene: " << sceneId << " (" << scene.title << ") with " << scene.objects.size() << " object types" << std::endl;
         }
+    }
+
+    std::shared_ptr<AvengModel> AvengSceneLoader::getOrCreateModel(const std::string& modelPath, EngineDevice& engineDevice) {
+        // Check if model is already cached
+        auto it = modelCache.find(modelPath);
+        if (it != modelCache.end()) {
+            std::cout << "Using cached model for: " << modelPath << std::endl;
+            return it->second;
+        }
+        
+        // Create new model and cache it
+        std::cout << "Loading new model: " << modelPath << std::endl;
+        auto model = AvengModel::createModelFromFile(engineDevice, modelPath);
+        auto sharedModel = std::shared_ptr<AvengModel>(model.release());
+        modelCache[modelPath] = sharedModel;
+        
+        return sharedModel;
+    }
+
+    void AvengSceneLoader::clearModelCache() {
+        std::cout << "Clearing model cache (" << modelCache.size() << " models)" << std::endl;
+        modelCache.clear();
     }
 
 }

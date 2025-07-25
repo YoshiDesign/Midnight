@@ -48,6 +48,13 @@ namespace aveng {
 		std::cout << "Instantiating Model..." << std::endl;
 		createVertexBuffers(vertices); // The vertex shader takes input from a vertex buffer from `layout(location = n) in vec3 vertexAttribute`. The vertexAttribute is defined by the vertex Buffer
 		createIndexBuffers(indices);
+		
+		// Verify VMA allocation for model buffers
+		std::cout << "  Model VMA Verification:" << std::endl;
+		std::cout << "    Vertex Buffer using VMA: " << (vertexBuffer->isUsingVMA() ? "YES" : "NO") << std::endl;
+		if (hasIndexBuffer) {
+			std::cout << "    Index Buffer using VMA: " << (indexBuffer->isUsingVMA() ? "YES" : "NO") << std::endl;
+		}
 	}
 
 	AvengModel::~AvengModel() 
@@ -93,8 +100,9 @@ namespace aveng {
 			vertexSize,
 			vertexCount,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			// Host Coherent bit ensures the *data buffer is flushed to the device's buffer automatically, so we dont have to call the VkFlushMappedMemoryRanges
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+			VMA_MEMORY_USAGE_AUTO,
+			1, // minOffsetAlignment
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
 		};
 
 		// This takes care of vkMapMemory -> memcpy(vertices.data() ...) -> vkUnmapMemory
@@ -106,8 +114,7 @@ namespace aveng {
 			vertexSize,
 			vertexCount,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			// Host Coherent bit ensures the *data buffer is flushed automatically so we dont have to call the VkFlushMappedMemoryRanges
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT // Memory properties - This is GPU heap allocated and super fast
+			VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // VMA automatically chooses fastest memory type available
 		);
 
 		// Copy memory from the staging buffer to the vertex buffer
@@ -139,8 +146,9 @@ namespace aveng {
 			indexSize,
 			indexCount,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			// Host Coherent bit ensures the *data buffer is flushed to the device's buffer automatically, so we dont have to call the VkFlushMappedMemoryRanges
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			VMA_MEMORY_USAGE_AUTO,
+			1, // minOffsetAlignment
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
 		};
 
 		stagingBuffer.map();
@@ -151,8 +159,7 @@ namespace aveng {
 			indexSize,
 			indexCount,
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			// Transfer bit ensures that this buffer's location in device memory will receive data from our transfer source bit
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT // // Memory properties - This is GPU heap allocated and super fast
+			VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // VMA automatically chooses fastest memory type available
 		);
 
 		engineDevice.copyBuffer(stagingBuffer.getBuffer(), indexBuffer->getBuffer(), bufferSize);

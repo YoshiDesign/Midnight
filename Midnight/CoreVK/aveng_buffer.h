@@ -7,9 +7,11 @@ namespace aveng {
     /*
     * @class AvengBuffer
     * This class can be used to generate staging, index, uniform and storage buffers.
+    * Now supports both traditional Vulkan memory allocation and VMA allocation.
     */
     class AvengBuffer {
     public:
+        // Traditional constructor (existing - backward compatible)
         AvengBuffer(
             EngineDevice& device,
             VkDeviceSize instanceSize,
@@ -18,6 +20,18 @@ namespace aveng {
             VkMemoryPropertyFlags memoryPropertyFlags,
             VkDeviceSize minOffsetAlignment = 1
         );
+
+        // New VMA constructor
+        AvengBuffer(
+            EngineDevice& device,
+            VkDeviceSize instanceSize,
+            uint32_t instanceCount,
+            VkBufferUsageFlags usageFlags,
+            VmaMemoryUsage memoryUsage,
+            VkDeviceSize minOffsetAlignment = 1,
+            VmaAllocationCreateFlags vmaFlags = 0
+        );
+
         ~AvengBuffer();
 
         AvengBuffer(const AvengBuffer&) = delete;
@@ -26,13 +40,13 @@ namespace aveng {
         VkResult map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         void unmap();
 
-        	void writeToBuffer(const void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+        void writeToBuffer(const void* data, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         VkResult flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         VkDescriptorBufferInfo descriptorInfo(VkDeviceSize range = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
         VkResult invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 
         // Indexes help wrap multiple instances into a single buffer
-        	void writeToIndex(const void* data, int index);
+        void writeToIndex(const void* data, int index);
         VkResult flushIndex(int index);
         VkDescriptorBufferInfo descriptorInfoForIndex(int index);
         VkResult invalidateIndex(int index);
@@ -41,10 +55,14 @@ namespace aveng {
         void* getMappedMemory() const { return mapped; }
         uint32_t getInstanceCount() const { return instanceCount; }
         VkDeviceSize getInstanceSize() const { return instanceSize; }
-        VkDeviceSize getAlignmentSize() const { return instanceSize; }
+        VkDeviceSize getAlignmentSize() const { return alignmentSize; }
         VkBufferUsageFlags getUsageFlags() const { return usageFlags; }
-        VkMemoryPropertyFlags getMemoryPropertyFlags() const { return memoryPropertyFlags; }
         VkDeviceSize getBufferSize() const { return bufferSize; }
+        
+        // New getters for VMA support
+        bool isUsingVMA() const { return usingVMA; }
+        VmaAllocation getVmaAllocation() const { return vmaAllocation; }
+        VkMemoryPropertyFlags getMemoryPropertyFlags() const { return memoryPropertyFlags; }
 
     private:
 
@@ -57,7 +75,11 @@ namespace aveng {
         EngineDevice& engineDevice;
         void* mapped = nullptr;
         VkBuffer buffer = VK_NULL_HANDLE;
-        VkDeviceMemory memory = VK_NULL_HANDLE;
+        
+        // Memory allocation - either traditional or VMA
+        VkDeviceMemory memory = VK_NULL_HANDLE;      // Traditional allocation
+        VmaAllocation vmaAllocation = VK_NULL_HANDLE; // VMA allocation
+        bool usingVMA = false;                        // Track which allocation method is used
 
         VkDeviceSize bufferSize;
         uint32_t instanceCount;
@@ -67,4 +89,4 @@ namespace aveng {
         VkMemoryPropertyFlags memoryPropertyFlags;
     };
 
-}  // namespace lve
+}  // namespace aveng
