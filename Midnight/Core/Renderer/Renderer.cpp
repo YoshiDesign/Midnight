@@ -472,8 +472,8 @@ namespace aveng {
 			return;
 		}
 
-		std::cout << "=== Instanced Rendering ===" << std::endl;
-		std::cout << "Processing " << objectData.size() << " objects for instancing" << std::endl;
+		//std::cout << "=== Instanced Rendering ===" << std::endl;
+		//std::cout << "Processing " << objectData.size() << " objects for instancing" << std::endl;
 
 		auto commandBuffer = getCurrentCommandBuffer();
 
@@ -530,7 +530,7 @@ namespace aveng {
 			if (batch->instances.empty()) continue;
 
 			uint32_t instanceCount = static_cast<uint32_t>(batch->instances.size());
-			std::cout << "Rendering batch: " << instanceCount << " instances of model " << model << std::endl;
+			// std::cout << "Rendering batch: " << instanceCount << " instances of model " << model << std::endl;
 
 			// Update instance buffer for this batch
 			updateInstanceBuffer(*batch);
@@ -590,19 +590,22 @@ namespace aveng {
 			batchesRendered++;
 		}
 
-		std::cout << "Instanced rendering complete: " << batchesRendered << " batches, " 
-		          << totalInstancesRendered << " total instances" << std::endl;
+		/*std::cout << "Instanced rendering complete: " << batchesRendered << " batches, " 
+		          << totalInstancesRendered << " total instances" << std::endl;*/
 		
+#if !NDEBUG
 		// Performance analysis
 		float efficiency = (float)totalInstancesRendered / (float)batchesRendered;
 		if (efficiency > 2.0f) {
 			std::cout << "Instancing is BENEFICIAL! Avg " << efficiency << " instances per batch" << std::endl;
-		} else if (efficiency > 1.0f) {
+		}
+		else if (efficiency > 1.0f) {
 			std::cout << "Instancing provides MINOR benefit. Avg " << efficiency << " instances per batch" << std::endl;
-		} else {
+		}
+		if (efficiency < 1.0f) {
 			std::cout << "Instancing provides NO benefit (efficiency: " << efficiency << ")" << std::endl;
 			std::cout << "Auto-switching to traditional rendering for better performance" << std::endl;
-			
+
 			// Automatically disable instancing for inefficient scenes
 			static int inefficientFrameCount = 0;
 			inefficientFrameCount++;
@@ -611,6 +614,10 @@ namespace aveng {
 				instancedRenderingEnabled = false;
 			}
 		}
+		else {
+			instancedRenderingEnabled = true;
+		}
+#endif
 	}
 
 	void Renderer::setupInstanceBuffers()

@@ -25,7 +25,7 @@ namespace aveng {
 		XOne(const XOne&) = delete;
 		XOne& operator=(const XOne&) = delete;
 		void run();
-		void pendulum(EngineDevice& engineDevice, int _max_rows);
+		// void pendulum(EngineDevice& engineDevice, int _max_rows);
 
 	private:
 

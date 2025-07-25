@@ -6,6 +6,9 @@ namespace aveng {
 	ObjectRenderSystem::ObjectRenderSystem(EngineDevice& device, AvengWindow& window)
 		: engineDevice{ device }, aveng_window{ window }
 	{
+
+		firstFrame = true;
+
 		// Initial camera position
 		viewerObject.transform.translation.z = -5.5f;
 		viewerObject.transform.translation.y = -2.5f;
@@ -67,8 +70,7 @@ namespace aveng {
 			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
 		}
 
-		// Use instanced rendering for better performance
-		static bool firstFrame = true;
+
 		if (firstFrame) {
 			std::cout << "Instanced Rendering Enabled!" << std::endl;
 			std::cout << "   Objects this frame: " << objectData.size() << std::endl;
@@ -79,10 +81,10 @@ namespace aveng {
 
 		// Render lights
 		renderer.renderLights(u_LightsData.numLights);
-
+#ifdef ENABLE_EDITOR
 		// Render editor
 		editor.render(commandBuffer);
-
+#endif
 		renderer.endSwapChainRenderPass(commandBuffer);
 
 		renderer.endFrame();

@@ -63,7 +63,7 @@ namespace aveng {
         VkQueue graphicsQueue()                 { return _graphicsQueue; }
         VkQueue presentQueue()                  { return _presentQueue; }
         VmaAllocator allocator()                { return _allocator; }
-
+        void checkBufferCoherence(VmaAllocation& allocation);
 
         SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(_physicalDevice); }
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);

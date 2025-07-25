@@ -741,6 +741,9 @@ namespace aveng {
         if (vmaCreateBuffer(_allocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create buffer with VMA!");
         }
+#if !NDEBUG
+        checkBufferCoherence(allocation);
+#endif
     }
 
     /*
@@ -973,6 +976,29 @@ namespace aveng {
             }
         }
         return false;
+    }
+    
+    /**
+     * Report whether or not a vma allocated memory buffer requires flushing.
+     * TODO: More debug output to determine which buffer is being audited.
+     */
+    void EngineDevice::checkBufferCoherence(VmaAllocation& allocation) {
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(_physicalDevice, &memProperties);
+
+        VmaAllocationInfo info;
+        vmaGetAllocationInfo(_allocator, allocation, &info);
+
+        VkMemoryPropertyFlags _flags = memProperties.memoryTypes[info.memoryType].propertyFlags;
+
+        if (_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) {
+            // No need to flush
+            std::cout << "NO NEED TO FLUSH" << std::endl;
+        }
+        else {
+            // Must flush
+            std::cout << "MUST FLUSH" << std::endl;
+        }
     }
 
 }  // namespace aveng

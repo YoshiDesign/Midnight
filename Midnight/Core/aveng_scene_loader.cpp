@@ -124,19 +124,19 @@ namespace aveng {
                         obj.path = objJson["path"].get<std::string>();
                     }
                     
-                    // Parse qty
+                    // Parse qty -- TODO: this doesn't provide any benefit to apply to each object. We can just use obj.instances.size()
                     if (objJson.contains("qty")) {
                         obj.qty = objJson["qty"].get<int>();
                     }
                     
                     // Parse data array (instances with position and texture)
                     if (objJson.contains("data") && objJson["data"].is_array()) {
-                        for (const auto& instanceJson : objJson["data"]) {
+                        for (const auto& instanceData : objJson["data"]) {
                             ObjectInstanceData instance;
                             
                             // Parse position
-                            if (instanceJson.contains("pos")) {
-                                const auto& posJson = instanceJson["pos"];
+                            if (instanceData.contains("pos")) {
+                                const auto& posJson = instanceData["pos"];
                                 if (posJson.contains("x") && posJson.contains("y") && posJson.contains("z")) {
                                     instance.position = glm::vec3(
                                         posJson["x"].get<float>(),
@@ -146,16 +146,16 @@ namespace aveng {
                                 }
                             }
                             
-                            // Parse texture ID - STRICT VALIDATION
-                            if (!instanceJson.contains("tex")) {
+                            // Parse texture ID - STRICT VALIDATION. Assumes we always use external textures
+                            if (!instanceData.contains("tex")) {
                                 throw std::runtime_error("Object instance missing required 'tex' key in scene data");
                             }
                             
-                            if (!instanceJson["tex"].is_number_integer()) {
+                            if (!instanceData["tex"].is_number_integer()) {
                                 throw std::runtime_error("Object instance 'tex' key must be an integer value");
                             }
                             
-                            instance.textureId = instanceJson["tex"].get<int>();
+                            instance.textureId = instanceData["tex"].get<int>();
                             
                             obj.instances.push_back(instance);
                         }

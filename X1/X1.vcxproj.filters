@@ -24,9 +24,6 @@
     <ClCompile Include="System\Render\ObjectRenderSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="System\Render\PointLightSystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="System\Camera\aveng_camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -60,9 +57,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="System\Render\ObjectRenderSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="System\Render\PointLightSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="System\Camera\aveng_camera.h">
