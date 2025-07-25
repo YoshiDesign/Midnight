@@ -714,6 +714,36 @@ namespace aveng {
     }
 
     /*
+    * @function void EngineDevice::createBufferWithVMA
+    * Create a buffer using VMA for automatic memory management
+    */
+    void EngineDevice::createBufferWithVMA(
+        VkDeviceSize size,
+        VkBufferUsageFlags usage,
+        VmaMemoryUsage memoryUsage,
+        VkBuffer &buffer,
+        VmaAllocation &allocation,
+        VmaAllocationCreateFlags flags
+    ) {
+        // Create buffer info
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        // Create allocation info
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = memoryUsage;
+        allocInfo.flags = flags;
+
+        // Create buffer and allocate memory with VMA
+        if (vmaCreateBuffer(_allocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create buffer with VMA!");
+        }
+    }
+
+    /*
     * @function beginSingleTimeCommands(void)
     * Allocate a command buffer in memory and return a pointer to it
     */

@@ -38,7 +38,7 @@ namespace aveng {
     }
 
     /*
-    * Constructor - Calls to engineDevice.createBuffer
+    * Traditional Constructor - Calls to engineDevice.createBuffer (existing - backward compatible)
     */
     AvengBuffer::AvengBuffer(
         EngineDevice& device,
@@ -52,7 +52,8 @@ namespace aveng {
         instanceSize{ instanceSize },
         instanceCount{ instanceCount },
         usageFlags{ usageFlags },
-        memoryPropertyFlags{ memoryPropertyFlags } 
+        memoryPropertyFlags{ memoryPropertyFlags },
+        usingVMA{ false }
     {
 
         alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
@@ -60,7 +61,7 @@ namespace aveng {
 
         if (usageFlags == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
 
-            std::cout << "Creating Uniform Buffer\n"
+            std::cout << "Creating Traditional Uniform Buffer\n"
                 << "instanceSize\t" << instanceSize
                 << "\ninstanceCount\t" << instanceCount
                 << "\nMinimumOffsetAlignment\t" << minOffsetAlignment
@@ -69,15 +70,61 @@ namespace aveng {
 
         }
 
-        // Call to engineDevice
+        // Call to engineDevice - traditional allocation
         device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory);
+    }
+
+    /*
+    * VMA Constructor - Uses VMA for memory allocation
+    */
+    AvengBuffer::AvengBuffer(
+        EngineDevice& device,
+        VkDeviceSize instanceSize,
+        uint32_t instanceCount,
+        VkBufferUsageFlags usageFlags,
+        VmaMemoryUsage memoryUsage,
+        VkDeviceSize minOffsetAlignment,
+        VmaAllocationCreateFlags vmaFlags
+    )
+        : engineDevice{ device },
+        instanceSize{ instanceSize },
+        instanceCount{ instanceCount },
+        usageFlags{ usageFlags },
+        memoryPropertyFlags{ 0 }, // Not used for VMA
+        usingVMA{ true }
+    {
+
+        alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
+        bufferSize = alignmentSize * instanceCount;
+
+        if (usageFlags == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
+
+            std::cout << "Creating VMA Uniform Buffer\n"
+                << "instanceSize\t" << instanceSize
+                << "\ninstanceCount\t" << instanceCount
+                << "\nMinimumOffsetAlignment\t" << minOffsetAlignment
+                << "\nAlignmentSize\t" << alignmentSize 
+                << "\nMemoryUsage\t" << memoryUsage
+                << std::endl;
+
+        }
+
+        // Call to engineDevice - VMA allocation
+        device.createBufferWithVMA(bufferSize, usageFlags, memoryUsage, buffer, vmaAllocation, vmaFlags);
     }
 
     AvengBuffer::~AvengBuffer() 
     {
         unmap();
-        vkDestroyBuffer(engineDevice.device(), buffer, nullptr);
-        vkFreeMemory(engineDevice.device(), memory, nullptr);
+        
+        if (usingVMA) {
+            // VMA cleanup
+            vmaDestroyBuffer(engineDevice.allocator(), buffer, vmaAllocation);
+        } else {
+            // Traditional cleanup
+            vkDestroyBuffer(engineDevice.device(), buffer, nullptr);
+            vkFreeMemory(engineDevice.device(), memory, nullptr);
+        }
     }
 
     /**
@@ -90,8 +137,13 @@ namespace aveng {
      * @return VkResult of the buffer mapping call
      */
     VkResult AvengBuffer::map(VkDeviceSize size, VkDeviceSize offset) {
-        assert(buffer && memory && "Called map on buffer before create");
-        return vkMapMemory(engineDevice.device(), memory, offset, size, 0, &mapped);
+        assert(buffer && (memory || vmaAllocation) && "Called map on buffer before create");
+        
+        if (usingVMA) {
+            return vmaMapMemory(engineDevice.allocator(), vmaAllocation, &mapped);
+        } else {
+            return vkMapMemory(engineDevice.device(), memory, offset, size, 0, &mapped);
+        }
     }
 
     /**
@@ -102,7 +154,11 @@ namespace aveng {
     void AvengBuffer::unmap() 
     {
         if (mapped) {
-            vkUnmapMemory(engineDevice.device(), memory);
+            if (usingVMA) {
+                vmaUnmapMemory(engineDevice.allocator(), vmaAllocation);
+            } else {
+                vkUnmapMemory(engineDevice.device(), memory);
+            }
             mapped = nullptr;
         }
     }
@@ -143,12 +199,16 @@ namespace aveng {
      */
     VkResult AvengBuffer::flush(VkDeviceSize size, VkDeviceSize offset) 
     {
-        VkMappedMemoryRange mappedRange = {};
-        mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = memory;
-        mappedRange.offset = offset;
-        mappedRange.size = size;
-        return vkFlushMappedMemoryRanges(engineDevice.device(), 1, &mappedRange);
+        if (usingVMA) {
+            return vmaFlushAllocation(engineDevice.allocator(), vmaAllocation, offset, size);
+        } else {
+            VkMappedMemoryRange mappedRange = {};
+            mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+            mappedRange.memory = memory;
+            mappedRange.offset = offset;
+            mappedRange.size = size;
+            return vkFlushMappedMemoryRanges(engineDevice.device(), 1, &mappedRange);
+        }
     }
 
     /**
@@ -164,12 +224,16 @@ namespace aveng {
      */
     VkResult AvengBuffer::invalidate(VkDeviceSize size, VkDeviceSize offset) 
     {
-        VkMappedMemoryRange mappedRange = {};
-        mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = memory;
-        mappedRange.offset = offset;
-        mappedRange.size = size;
-        return vkInvalidateMappedMemoryRanges(engineDevice.device(), 1, &mappedRange);
+        if (usingVMA) {
+            return vmaInvalidateAllocation(engineDevice.allocator(), vmaAllocation, offset, size);
+        } else {
+            VkMappedMemoryRange mappedRange = {};
+            mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+            mappedRange.memory = memory;
+            mappedRange.offset = offset;
+            mappedRange.size = size;
+            return vkInvalidateMappedMemoryRanges(engineDevice.device(), 1, &mappedRange);
+        }
     }
 
     /**
@@ -235,4 +299,4 @@ namespace aveng {
         return invalidate(alignmentSize, index * alignmentSize);
     }
 
-}  // namespace lve
+}  // namespace aveng

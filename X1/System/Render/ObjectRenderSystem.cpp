@@ -77,6 +77,7 @@ namespace aveng {
 		editor.render(commandBuffer);
 
 		renderer.endSwapChainRenderPass(commandBuffer);
+
 		renderer.endFrame();
 	}
 

@@ -80,6 +80,16 @@ namespace aveng {
             VkDeviceMemory &bufferMemory
         );
 
+        // VMA-based buffer creation
+        void createBufferWithVMA(
+            VkDeviceSize size,
+            VkBufferUsageFlags usage,
+            VmaMemoryUsage memoryUsage,
+            VkBuffer &buffer,
+            VmaAllocation &allocation,
+            VmaAllocationCreateFlags flags = 0
+        );
+
         VkCommandBuffer beginSingleTimeCommands();
 
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);

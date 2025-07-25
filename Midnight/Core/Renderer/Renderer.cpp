@@ -269,12 +269,17 @@ namespace aveng {
 		objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		lightsDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
-		// Create Buffers
+		// Create Buffers using VMA
+		// VMA_MEMORY_USAGE_AUTO: Let VMA choose optimal memory type
+		// VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT: CPU will write to this buffer frequently  
+		// VMA_ALLOCATION_CREATE_MAPPED_BIT: Keep buffer persistently mapped for performance
 		for (int i = 0; i < u_GlobalBuffers.size(); i++) {
 			u_GlobalBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				sizeof(GlobalUbo), 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_GlobalBuffers[i]->map();
 		}
 
@@ -282,7 +287,9 @@ namespace aveng {
 			u_LightsBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				sizeof(LightsUbo), 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment  
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_LightsBuffers[i]->map();
 		}
 
@@ -290,10 +297,17 @@ namespace aveng {
 			u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				calculateDynamicUBOStride(), num_objects,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-				calculateDynamicUBOStride());
+				VMA_MEMORY_USAGE_AUTO,
+				calculateDynamicUBOStride(), // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_ObjBuffers[i]->map();
 		}
+
+		// Verify VMA allocation is working
+		std::cout << "VMA Buffer Allocation Verification:" << std::endl;
+		std::cout << "  Global Buffer [0] using VMA: " << (u_GlobalBuffers[0]->isUsingVMA() ? "✓ YES" : "✗ NO") << std::endl;
+		std::cout << "  Lights Buffer [0] using VMA: " << (u_LightsBuffers[0]->isUsingVMA() ? "✓ YES" : "✗ NO") << std::endl;
+		std::cout << "  Object Buffer [0] using VMA: " << (u_ObjBuffers[0]->isUsingVMA() ? "✓ YES" : "✗ NO") << std::endl;
 
 		// Create Descriptor Set Layouts (stored as members for reuse)
 		globalDescriptorSetLayout =
