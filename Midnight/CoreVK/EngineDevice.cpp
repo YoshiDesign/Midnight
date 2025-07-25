@@ -75,8 +75,9 @@ namespace aveng {
         createInstance();
 
         // Enable Debug validation layer -- Disable for Release Build
+#if NDEBUG
         setupDebugMessenger();
-
+#endif
         // The surface is Vulkan's connection to our Window from GLFW.
         // This calls createWindowSurface from our _window class which is why
         // EnginDevice is constructed with a AvengWindow reference.

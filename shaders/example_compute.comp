@@ -1,0 +1,32 @@
+#version 450
+
+// Local workgroup size - defines how many threads run in parallel per dispatch group
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// Example: Simple buffer that we'll process
+layout(std140, binding = 0) restrict readonly buffer InputBuffer {
+    float inputData[];
+};
+
+layout(std140, binding = 1) restrict writeonly buffer OutputBuffer {
+    float outputData[];
+};
+
+// Example uniform buffer for parameters
+layout(binding = 2) uniform ComputeUBO {
+    float multiplier;
+    uint dataCount;
+} ubo;
+
+void main() {
+    // Get current thread's index
+    uint index = gl_GlobalInvocationID.x;
+    
+    // Bounds check
+    if (index >= ubo.dataCount) {
+        return;
+    }
+    
+    // Simple computation: multiply input by the multiplier
+    outputData[index] = inputData[index] * ubo.multiplier;
+} 

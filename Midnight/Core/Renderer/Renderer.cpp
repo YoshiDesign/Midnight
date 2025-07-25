@@ -25,7 +25,7 @@ namespace aveng {
 	}
 
 	/*
-	* Note: Recreating the swapchain isn't sufficient if the image format changes
+	* Important: Recreating the swapchain isn't sufficient if the image format changes
 	* such as the window being moved to a different monitor. In that event it would
 	* be necessary to recreate the renderpass.
 	 */
@@ -49,7 +49,6 @@ namespace aveng {
 		if (aveng_swapchain == nullptr) {
 			// Create the new swapchain object
 			aveng_swapchain = std::make_unique<SwapChain>(engineDevice, extent);
-
 		}
 		else {
 			// 
@@ -65,8 +64,6 @@ namespace aveng {
 
 	}
 
-	/*
-	*/
 	void Renderer::createCommandBuffers() {
 
 		// Resize our vector of command buffers to match the max number of images the swapchain will allow in flight
@@ -594,14 +591,17 @@ namespace aveng {
 		          << totalInstancesRendered << " total instances" << std::endl;*/
 		
 #if !NDEBUG
+		/**
+		* ToDo - This is not implemented properly. You'll likely want to count the number of instances of an object BEFORE any of this function's code executes.
+		*/
 		// Performance analysis
 		float efficiency = (float)totalInstancesRendered / (float)batchesRendered;
-		if (efficiency > 2.0f) {
-			std::cout << "Instancing is BENEFICIAL! Avg " << efficiency << " instances per batch" << std::endl;
-		}
-		else if (efficiency > 1.0f) {
-			std::cout << "Instancing provides MINOR benefit. Avg " << efficiency << " instances per batch" << std::endl;
-		}
+		//if (efficiency > 2.0f) {
+		//	std::cout << "Instancing is BENEFICIAL! Avg " << efficiency << " instances per batch" << std::endl;
+		//}
+		//else if (efficiency > 1.0f) {
+		//	std::cout << "Instancing provides MINOR benefit. Avg " << efficiency << " instances per batch" << std::endl;
+		//}
 		if (efficiency < 1.0f) {
 			std::cout << "Instancing provides NO benefit (efficiency: " << efficiency << ")" << std::endl;
 			std::cout << "Auto-switching to traditional rendering for better performance" << std::endl;
@@ -690,45 +690,45 @@ namespace aveng {
 	}
 
 	// DEPRECATED: Legacy pipeline creation - use PipelineConfigManager instead
-	void Renderer::createPipeline()
-	{
-		assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
+	//void Renderer::createPipeline()
+	//{
+	//	assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
 
-		PipelineConfig pipelineConfig{};
-		GFXPipeline::defaultPipelineConfig(pipelineConfig);
-		pipelineConfig.renderPass = getSwapChainRenderPass();
-		pipelineConfig.pipelineLayout = pipelineLayout;
+	//	PipelineConfig pipelineConfig{};
+	//	GFXPipeline::defaultPipelineConfig(pipelineConfig);
+	//	pipelineConfig.renderPass = getSwapChainRenderPass();
+	//	pipelineConfig.pipelineLayout = pipelineLayout;
 
-		// Setup specialization constants for dynamic texture array size
-		VkSpecializationMapEntry specEntry{};
-		specEntry.constantID = 0;  // Matches constant_id = 0 in shader
-		specEntry.offset = 0;
-		specEntry.size = sizeof(uint32_t);
+	//	// Setup specialization constants for dynamic texture array size
+	//	VkSpecializationMapEntry specEntry{};
+	//	specEntry.constantID = 0;  // Matches constant_id = 0 in shader
+	//	specEntry.offset = 0;
+	//	specEntry.size = sizeof(uint32_t);
 
-		VkSpecializationInfo specInfo{};
-		specInfo.mapEntryCount = 1;
-		specInfo.pMapEntries = &specEntry;
-		specInfo.dataSize = sizeof(uint32_t);
-		specInfo.pData = &currentTextureCount;
+	//	VkSpecializationInfo specInfo{};
+	//	specInfo.mapEntryCount = 1;
+	//	specInfo.pMapEntries = &specEntry;
+	//	specInfo.dataSize = sizeof(uint32_t);
+	//	specInfo.pData = &currentTextureCount;
 
-		pipelineConfig.fragmentSpecializationInfo = &specInfo;
+	//	pipelineConfig.fragmentSpecializationInfo = &specInfo;
 
-		std::cout << "Creating pipeline with texture array size: " << currentTextureCount << std::endl;
+	//	std::cout << "Creating pipeline with texture array size: " << currentTextureCount << std::endl;
 
-		gfxPipeline = std::make_unique<GFXPipeline>(
-			engineDevice,
-			"shaders/simple_shader.vert.spv",
-			"shaders/simple_shader.frag.spv",
-			pipelineConfig
-		);
+	//	gfxPipeline = std::make_unique<GFXPipeline>(
+	//		engineDevice,
+	//		"shaders/simple_shader.vert.spv",
+	//		"shaders/simple_shader.frag.spv",
+	//		pipelineConfig
+	//	);
 
-		gfxPipeline2 = std::make_unique<GFXPipeline>(
-			engineDevice,
-			"shaders/simple_shader2.vert.spv",
-			"shaders/simple_shader2.frag.spv",
-			pipelineConfig
-		);
-	}
+	//	gfxPipeline2 = std::make_unique<GFXPipeline>(
+	//		engineDevice,
+	//		"shaders/simple_shader2.vert.spv",
+	//		"shaders/simple_shader2.frag.spv",
+	//		pipelineConfig
+	//	);
+	//}
 
 	void Renderer::createPipelines()
 	{

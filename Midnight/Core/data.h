@@ -49,4 +49,33 @@ namespace aveng {
 
 	};
 
+	/* data format to be uploaded to compute shader */
+	struct NodeTransformData {
+		glm::vec4 translation = glm::vec4(0.0f);
+		glm::vec4 scale = glm::vec4(1.0f);
+		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion
+	};
+
+	struct RenderData {
+
+		int   rdMatricesSize = 0;
+		float rdUploadToUBOTime = 0.0f;
+		float rdUploadToVBOTime = 0.0f;
+		float rdMatrixGenerateTime = 0.0f;
+		float rdUIGenerateTime = 0.0f;
+		float rdUIDrawTime = 0.0f;
+		float rdFrameTime = 0.0f;
+
+		int rdMoveForward = 0;
+		int rdMoveRight   = 0;
+		int rdMoveUp	  = 0;
+
+		glm::vec3 rdCameraView = glm::vec3(0.f,0.f,0.f);
+		glm::vec3 rdCameraPos  = glm::vec3(0.f,0.f,0.f);
+		glm::vec3 rdCameraRot  = glm::vec3(0.f,0.f,0.f);
+		glm::vec3 rdPlayerPos  = glm::vec3(0.f,0.f,0.f);
+		glm::vec3 rdPlayerRot  = glm::vec3(0.f,0.f,0.f);
+		glm::vec3 rdForwardDir = glm::vec3(0.f,0.f,0.f);
+	};
+
 }

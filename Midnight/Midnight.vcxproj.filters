@@ -60,6 +60,9 @@
     <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CoreVK\ComputePipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1116,6 +1119,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Utils\RenderData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\ComputePipeline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
