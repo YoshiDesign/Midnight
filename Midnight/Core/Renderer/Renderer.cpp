@@ -305,9 +305,9 @@ namespace aveng {
 
 		// Verify VMA allocation is working
 		std::cout << "VMA Buffer Allocation Verification:" << std::endl;
-		std::cout << "  Global Buffer [0] using VMA: " << (u_GlobalBuffers[0]->isUsingVMA() ? "✓ YES" : "✗ NO") << std::endl;
-		std::cout << "  Lights Buffer [0] using VMA: " << (u_LightsBuffers[0]->isUsingVMA() ? "✓ YES" : "✗ NO") << std::endl;
-		std::cout << "  Object Buffer [0] using VMA: " << (u_ObjBuffers[0]->isUsingVMA() ? "✓ YES" : "✗ NO") << std::endl;
+		std::cout << "  Global Buffer [0] using VMA: " << (u_GlobalBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
+		std::cout << "  Lights Buffer [0] using VMA: " << (u_LightsBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
+		std::cout << "  Object Buffer [0] using VMA: " << (u_ObjBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
 
 		// Create Descriptor Set Layouts (stored as members for reuse)
 		globalDescriptorSetLayout =
