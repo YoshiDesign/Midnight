@@ -2,6 +2,8 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
+#include <string>
+#include <vector>
 
 namespace aveng {
 	const int RIGHT = -1;
@@ -76,6 +78,69 @@ namespace aveng {
 		glm::vec3 rdPlayerPos  = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdPlayerRot  = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdForwardDir = glm::vec3(0.f,0.f,0.f);
+
+		// Animation system debug data
+		int rdLoadedModels = 0;
+		int rdAnimatedModels = 0;
+		int rdTotalBones = 0;
+		int rdTotalNodes = 0;
+		int rdTotalAnimationClips = 0;
+		int rdActiveInstances = 0;
+		float rdAnimationUpdateTime = 0.0f;
+		int rdCurrentPipelineMode = 0; // 0=static, 1=animated, etc.
+	};
+
+	// Animation vertex structure with bone weights
+	struct AnimatedVertex {
+		glm::vec3 position{};
+		glm::vec3 color{};
+		glm::vec3 normal{};
+		glm::vec2 texCoord{};
+		
+		// Skeletal animation data - up to 4 bone influences per vertex
+		alignas(16) glm::ivec4 boneIds{-1, -1, -1, -1};
+		alignas(16) glm::vec4 boneWeights{0.0f, 0.0f, 0.0f, 0.0f};
+		
+		bool operator==(const AnimatedVertex& other) const {
+			return position == other.position && 
+			       color == other.color && 
+			       normal == other.normal && 
+			       texCoord == other.texCoord &&
+			       boneIds == other.boneIds &&
+			       boneWeights == other.boneWeights;
+		}
+	};
+
+	// Placeholder mesh and buffer types for animation system
+	struct VkMesh {
+		std::vector<AnimatedVertex> vertices{};
+		std::vector<uint32_t> indices{};
+		std::string name{};
+		bool hasAnimationData = false;
+	};
+
+	struct VkTextureData {
+		std::string texturePath{};
+		// Placeholder for actual Vulkan texture data
+		bool isLoaded = false;
+	};
+
+	struct VkVertexBufferData {
+		// Placeholder for actual Vulkan vertex buffer
+		size_t bufferSize = 0;
+		bool isCreated = false;
+	};
+
+	struct VkIndexBufferData {
+		// Placeholder for actual Vulkan index buffer  
+		size_t bufferSize = 0;
+		bool isCreated = false;
+	};
+
+	struct VkShaderStorageBufferData {
+		// Placeholder for actual Vulkan SSBO
+		size_t bufferSize = 0;
+		bool isCreated = false;
 	};
 
 }

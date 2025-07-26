@@ -141,8 +141,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;assimp-vc143-mt.lib</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -163,8 +163,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\lib-vc2022;$(SolutionDir)lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;assimp-vc143-mt.lib</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -176,6 +176,15 @@
     <ClCompile Include="CoreVK\GFXPipeline.cpp" />
     <ClCompile Include="CoreVK\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\swapchain.cpp" />
+    <ClCompile Include="Core\Animation\AnimationManager.cpp" />
+    <ClCompile Include="Core\Animation\AssimpAnimChannel.cpp" />
+    <ClCompile Include="Core\Animation\AssimpAnimClip.cpp" />
+    <ClCompile Include="Core\Animation\AssimpBone.cpp" />
+    <ClCompile Include="Core\Animation\AssimpInstance.cpp" />
+    <ClCompile Include="Core\Animation\AssimpMesh.cpp" />
+    <ClCompile Include="Core\Animation\AssimpModel.cpp" />
+    <ClCompile Include="Core\Animation\AssimpNode.cpp" />
+    <ClCompile Include="Core\Animation\Logger.cpp" />
     <ClCompile Include="Core\app_object.cpp" />
     <ClCompile Include="Core\aveng_model.cpp" />
     <ClCompile Include="Core\aveng_scene_loader.cpp" />
@@ -195,6 +204,19 @@
     <ClInclude Include="CoreVK\GFXPipeline.h" />
     <ClInclude Include="CoreVK\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
+    <ClInclude Include="Core\Animation\AnimationManager.h" />
+    <ClInclude Include="Core\Animation\AssimpAnimChannel.h" />
+    <ClInclude Include="Core\Animation\AssimpAnimClip.h" />
+    <ClInclude Include="Core\Animation\AssimpBone.h" />
+    <ClInclude Include="Core\Animation\AssimpInstance.h" />
+    <ClInclude Include="Core\Animation\AssimpMesh.h" />
+    <ClInclude Include="Core\Animation\AssimpModel.h" />
+    <ClInclude Include="Core\Animation\AssimpNode.h" />
+    <ClInclude Include="Core\Animation\InstanceSettings.h" />
+    <ClInclude Include="Core\Animation\Logger.h" />
+    <ClInclude Include="Core\Animation\ModelAndInstanceData.h" />
+    <ClInclude Include="Core\Animation\PlaceholderBuffers.h" />
+    <ClInclude Include="Core\Animation\Tools.h" />
     <ClInclude Include="Core\app_object.h" />
     <ClInclude Include="Core\AvengComponent.h" />
     <ClInclude Include="Core\aveng_frame_content.h" />
