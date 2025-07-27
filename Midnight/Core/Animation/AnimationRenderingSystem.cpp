@@ -69,6 +69,7 @@ void AnimationRenderingSystem::createAnimationBuffers(int maxFramesInFlight)
     instanceAnimationBuffers.resize(maxFramesInFlight);
     animatedVertexBuffers.resize(maxFramesInFlight);
     transformedVertexBuffers.resize(maxFramesInFlight);
+    animatedIndexBuffers.resize(maxFramesInFlight);
 
     // Create buffers for each frame in flight
     for (int i = 0; i < maxFramesInFlight; i++) {
@@ -108,14 +109,23 @@ void AnimationRenderingSystem::createAnimationBuffers(int maxFramesInFlight)
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
         animatedVertexBuffers[i]->map();
 
-        // Transformed vertex output SSBO (same size as input)
+        // Transformed vertex output SSBO (using TransformedVertex - no bone data)
         transformedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-            sizeof(AnimatedVertex) * 10000, 1,
+            sizeof(TransformedVertex) * 10000, 1,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             VMA_MEMORY_USAGE_AUTO,
             16, // minOffsetAlignment
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
         transformedVertexBuffers[i]->map();
+
+        // Index buffer for animated meshes (conservative size - will resize as needed)
+        animatedIndexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+            sizeof(uint32_t) * 30000, 1,  // Start with 30k indices (10k triangles)
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VMA_MEMORY_USAGE_AUTO,
+            4, // minOffsetAlignment for uint32_t
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+        animatedIndexBuffers[i]->map();
     }
     
     std::cout << "AnimationRenderingSystem: Created buffers for " << maxFramesInFlight << " frames" << std::endl;
@@ -193,6 +203,7 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
     std::vector<InstanceAnimationData> instanceData;
     std::vector<glm::mat4> allBoneMatrices;
     std::vector<AnimatedVertex> allVertices;
+    std::vector<uint32_t> allIndices;
 
     uint32_t currentBoneOffset = 0;
     uint32_t currentVertexOffset = 0;
@@ -220,6 +231,13 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
         for (const auto& mesh : meshes) {
             // Add all vertices from this mesh
             allVertices.insert(allVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
+            
+            // Add all indices from this mesh (offset by current vertex offset)
+            const auto& meshIndices = mesh.indices;
+            for (uint32_t index : meshIndices) {
+                allIndices.push_back(index + currentVertexOffset);
+            }
+            
             currentVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
         }
 
@@ -247,9 +265,17 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
         animatedVertexBuffers[currentFrameIndex]->flush();
     }
 
+    // Upload animated indices
+    if (!allIndices.empty()) {
+        animatedIndexBuffers[currentFrameIndex]->writeToBuffer(allIndices.data(),
+            sizeof(uint32_t) * allIndices.size());
+        animatedIndexBuffers[currentFrameIndex]->flush();
+    }
+
     std::cout << "AnimationRenderingSystem: Data uploaded - " << instanceData.size() << " instances, " 
               << allBoneMatrices.size() << " bone matrices, " 
-              << allVertices.size() << " vertices" << std::endl;
+              << allVertices.size() << " vertices, " 
+              << allIndices.size() << " indices" << std::endl;
 }
 
 void AnimationRenderingSystem::dispatchAnimationCompute(VkCommandBuffer commandBuffer, uint32_t vertexCount, 
@@ -299,10 +325,22 @@ void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffe
     // Use dedicated animated pipeline (ID 4) that handles AnimatedVertex with bone data
     GFXPipeline* activePipeline = nullptr;
     if (pipelineManager) {
+        // Debug: Print available pipelines
+        //auto availablePipelines = pipelineManager->getPipelineNames();
+        //std::cout << "Available pipelines: ";
+        //for (const auto& name : availablePipelines) {
+        //    std::cout << name << " ";
+        //}
+        //std::cout << std::endl;
+        
         activePipeline = pipelineManager->getPipeline(4);  // ANIMATED pipeline ID
         if (activePipeline) {
             activePipeline->bind(commandBuffer);
+        } else {
+            std::cerr << "Pipeline ID 4 (ANIMATED) not found!" << std::endl;
         }
+    } else {
+        std::cerr << "PipelineManager is null!" << std::endl;
     }
     
     if (!activePipeline) {
@@ -310,7 +348,7 @@ void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffe
         return;
     }
 
-    // NOTE: Global and lights descriptor sets (Set 0, Set 2) are bound by the main renderer
+    // NOTE: Global and lights descriptor sets (Set 0, Set 2) are already bound by the main renderer by now.
     // We only bind the animation descriptor set (Set 3) here
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
         3, 1, &animationDescriptorSets[currentFrameIndex], 0, nullptr);
@@ -336,9 +374,33 @@ void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffe
             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             0, sizeof(PushConstantData), &pushData);
 
-        // TODO: Bind animated vertex buffers and render animated meshes
-        // For now, just print debug info
-        std::cout << "  Animated model with " << meshes.size() << " meshes" << std::endl;
+        // Bind the transformed vertex buffer (output from compute shader)
+        VkBuffer vertexBuffers[] = { transformedVertexBuffers[currentFrameIndex]->getBuffer() };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+        // Bind the index buffer (contains indices for all meshes)
+        vkCmdBindIndexBuffer(commandBuffer, animatedIndexBuffers[currentFrameIndex]->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+        // Render each mesh of the animated model using indexed drawing
+        uint32_t vertexOffset = 0;
+        uint32_t indexOffset = 0;
+        for (const auto& mesh : meshes) {
+            if (!mesh.indices.empty()) {
+                // Use indexed drawing for efficiency
+                uint32_t indexCount = static_cast<uint32_t>(mesh.indices.size());
+                vkCmdDrawIndexed(commandBuffer, indexCount, 1, indexOffset, vertexOffset, 0);
+                indexOffset += indexCount;
+            } else {
+                // Fallback to non-indexed drawing if no indices
+                vkCmdDraw(commandBuffer, static_cast<uint32_t>(mesh.vertices.size()), 1, vertexOffset, 0);
+            }
+            
+            vertexOffset += static_cast<uint32_t>(mesh.vertices.size());
+        }
+        
+        std::cout << "  Rendered animated model with " << meshes.size() << " meshes, " 
+                  << vertexOffset << " total vertices" << std::endl;
     }
 }
 

@@ -90,7 +90,7 @@ namespace aveng {
 		int rdCurrentPipelineMode = 0; // 0=static, 1=animated, etc.
 	};
 
-	// Animation vertex structure with bone weights
+	// Animation vertex structure with bone weights. Is definitely used
 	struct AnimatedVertex {
 		glm::vec3 position{};
 		glm::vec3 color{};
@@ -108,6 +108,22 @@ namespace aveng {
 			       texCoord == other.texCoord &&
 			       boneIds == other.boneIds &&
 			       boneWeights == other.boneWeights;
+		}
+	};
+
+	// Transformed vertex structure (output from compute shader) - matches transformed_shader.vert
+	struct TransformedVertex {
+		glm::vec3 position{};      // Already transformed position
+		glm::vec3 color{};         // Color data
+		glm::vec3 normal{};        // Already transformed normal
+		glm::vec2 texCoord{};      // Texture coordinates
+		// NO bone data - transformation already applied!
+		
+		bool operator==(const TransformedVertex& other) const {
+			return position == other.position && 
+			       color == other.color && 
+			       normal == other.normal && 
+			       texCoord == other.texCoord;
 		}
 	};
 

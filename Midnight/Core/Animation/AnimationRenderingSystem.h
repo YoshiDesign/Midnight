@@ -79,7 +79,8 @@ private:
     std::vector<std::unique_ptr<AvengBuffer>> boneMatrixBuffers;      // Bone transformation matrices
     std::vector<std::unique_ptr<AvengBuffer>> instanceAnimationBuffers; // Per-instance animation data
     std::vector<std::unique_ptr<AvengBuffer>> animatedVertexBuffers;  // Input animated vertices
-    std::vector<std::unique_ptr<AvengBuffer>> transformedVertexBuffers; // Output transformed vertices
+    std::vector<std::unique_ptr<AvengBuffer>> transformedVertexBuffers; // Output transformed vertices (from compute shader)
+    std::vector<std::unique_ptr<AvengBuffer>> animatedIndexBuffers;   // Index buffers for animated meshes
     
     // Statistics for debugging
     uint32_t lastVertexCount = 0;

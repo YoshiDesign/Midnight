@@ -109,20 +109,26 @@ namespace aveng {
             config.fragmentSpecializationInfo = &specInfo;
         }
 
-        // Create the pipeline
-        auto pipeline = std::make_unique<GFXPipeline>(
-            engineDevice,
-            def.vertexShader,
-            def.fragmentShader,
-            config
-        );
+        // Create the pipeline with error handling
+        try {
+            auto pipeline = std::make_unique<GFXPipeline>(
+                engineDevice,
+                def.vertexShader,
+                def.fragmentShader,
+                config
+            );
 
-        // Store by both name and ID
-        GFXPipeline* pipelinePtr = pipeline.get();  // Get raw pointer before moving
-        pipelinesByName[def.name] = std::move(pipeline);
-        pipelinesById[def.id] = pipelinePtr;
+            // Store by both name and ID
+            GFXPipeline* pipelinePtr = pipeline.get();  // Get raw pointer before moving
+            pipelinesByName[def.name] = std::move(pipeline);
+            pipelinesById[def.id] = pipelinePtr;
 
-        std::cout << "Created pipeline: " << def.name << std::endl;
+            std::cout << "Created pipeline: " << def.name << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "FAILED to create pipeline '" << def.name << "' (ID: " << def.id << "): " << e.what() << std::endl;
+            std::cerr << "  Vertex shader: " << def.vertexShader << std::endl;
+            std::cerr << "  Fragment shader: " << def.fragmentShader << std::endl;
+        }
     }
 
     GFXPipeline* PipelineConfigManager::getPipeline(const std::string& name) {

@@ -52,29 +52,9 @@
       }
     },
     {
-      "name": "TRANSPARENT",
-      "id": 3,
-      "vertexShader": "shaders/simple_shader.vert.spv",
-      "fragmentShader": "shaders/transparent.frag.spv",
-      "rasterization": {
-        "polygonMode": "FILL",
-        "cullMode": "NONE",
-        "frontFace": "COUNTER_CLOCKWISE"
-      },
-      "blending": {
-        "enabled": true,
-        "srcColorBlend": "SRC_ALPHA",
-        "dstColorBlend": "ONE_MINUS_SRC_ALPHA",
-        "colorBlendOp": "ADD"
-      },
-      "specialization": {
-        "textureArraySize": true
-      }
-    },
-    {
       "name": "ANIMATED",
       "id": 4,
-      "vertexShader": "shaders/animated_shader.vert.spv",
+      "vertexShader": "shaders/transformed_shader.vert.spv",
       "fragmentShader": "shaders/simple_shader.frag.spv",
       "rasterization": {
         "polygonMode": "FILL",

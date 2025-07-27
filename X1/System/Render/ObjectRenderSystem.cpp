@@ -57,6 +57,7 @@ namespace aveng {
 		}
 
 		// IMPORTANT: Dispatch compute shaders BEFORE render pass begins
+		// TODO: We can probably count the number of vertices of  animatedInstances outside of the render loop, and update it as needed when loading and unloading models.
 		if (!animatedInstances.empty()) {
 			// Calculate total vertices for compute dispatch
 			uint32_t totalVertices = 0;
@@ -82,24 +83,23 @@ namespace aveng {
 		// Prepare object data for rendering
 		std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>> objectData;
 		for (auto& kv : sceneLoader.getAppObjects()) {
-			ObjectUniformData objUniform{ kv.second.get_texture() };
-			glm::mat4 modelMatrix = kv.second.transform._mat4();
-			glm::mat4 normalMatrix = kv.second.transform.normalMatrix();
-			AvengModel* model = kv.second.model.get();
+			ObjectUniformData objUniform{ kv.second.get_texture() };		// Model's texture index
+			glm::mat4 modelMatrix = kv.second.transform._mat4();			// Local model matrix
+			glm::mat4 normalMatrix = kv.second.transform.normalMatrix();	// Local model normal matrix
+			AvengModel* model = kv.second.model.get();						// TODO: This is a shared ptr. Does get() create overhead?
 			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
 		}
 
-
 		if (firstFrame) {
 			std::cout << "Instanced Rendering Enabled!" << std::endl;
-			std::cout << "   Objects this frame: " << objectData.size() << std::endl;
+			std::cout << "Objects this frame: " << objectData.size() << std::endl;
 			firstFrame = false;
 		}
 		
-		// Render regular objects
+		// Render regular objects (standard pipeline)
 		renderer.renderObjectsInstanced(objectData);
 
-		// Render animated models (separate pipeline)
+		// Render animated models (animation pipeline)
 		if (!animatedInstances.empty()) {
 			// Bind global and lights descriptor sets for animated models
 			VkDescriptorSet globalSet = renderer.getGlobalDescriptorSet(renderer.getFrameIndex());

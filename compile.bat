@@ -8,4 +8,5 @@ C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\vv.vert -o shaders\vv.vert.spv
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\ff.frag -o shaders\ff.frag.spv
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\animated_shader.vert -o shaders\animated_shader.vert.spv
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\skeletal_animation.comp -o shaders\skeletal_animation.comp.spv
+C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\transformed_shader.vert -o shaders\transformed_shader.vert.spv
 pause

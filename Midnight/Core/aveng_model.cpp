@@ -258,7 +258,7 @@ namespace aveng {
 		vertices.clear();
 		indices.clear();
 
-		// Will track which vertices have been added to the Builder.vertices vector and store the position at which the vertex wwas originally added
+		// Will track which vertices have been added to the Builder.vertices vector and store the position at which the vertex was originally added
 		std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
 		// For every face of our mesh
