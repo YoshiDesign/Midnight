@@ -250,21 +250,30 @@ namespace aveng {
 
 		// Create Descriptor Pools using dynamic texture count
 		descriptorPool = AvengDescriptorPool::Builder(engineDevice)
-			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 4)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 2)
+			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 5)  // Increased for animation descriptor sets
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 3)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * currentTextureCount)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 5)  // NEW: For animation SSBOs
 			.build();
 
 		// Resize buffer vectors
 		u_GlobalBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		u_ObjBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		u_LightsBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		
+		// Resize animation buffer vectors
+		u_AnimationBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		boneMatrixBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		instanceAnimationBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		animatedVertexBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		transformedVertexBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Resize descriptor set vectors
 		globalDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		lightsDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		animationDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Create Buffers using VMA
 		// VMA_MEMORY_USAGE_AUTO: Let VMA choose optimal memory type
@@ -285,9 +294,57 @@ namespace aveng {
 				sizeof(LightsUbo), 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment  
+				1, // minOffsetAlignment
 				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_LightsBuffers[i]->map();
+		}
+
+		// Animation buffers
+		for (int i = 0; i < u_AnimationBuffers.size(); i++) {
+			// Animation UBO buffer
+			u_AnimationBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(AnimationUbo), 1,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			u_AnimationBuffers[i]->map();
+
+			// Bone matrices SSBO (conservative size for 128 bones)
+			boneMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(glm::mat4) * 128, 1,  // 128 bones max per model
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				16, // minOffsetAlignment for mat4
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			boneMatrixBuffers[i]->map();
+
+			// Instance animation data SSBO (for up to 1000 instances)
+			instanceAnimationBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(InstanceAnimationData) * 1000, 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				16, // minOffsetAlignment for aligned structs
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			instanceAnimationBuffers[i]->map();
+
+			// Animated vertex SSBO (conservative size - will resize as needed)
+			animatedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(AnimatedVertex) * 10000, 1,  // Start with 10k vertices
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				16, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			animatedVertexBuffers[i]->map();
+
+			// Transformed vertex output SSBO (same size as input)
+			transformedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(AnimatedVertex) * 10000, 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				16, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			transformedVertexBuffers[i]->map();
 		}
 
 		for (int i = 0; i < u_ObjBuffers.size(); i++) {
@@ -329,6 +386,16 @@ namespace aveng {
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
 
+		// Animation descriptor set layout (Set 3)
+		animationDescriptorSetLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 1)  // Animation UBO
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 1)  // Bone matrices SSBO
+			.addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)                               // Instance animation data SSBO
+			.addBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)                               // Input animated vertices SSBO
+			.addBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 1)  // Transformed vertices SSBO
+			.build();
+
 		// Write descriptor sets
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 			auto globalBufferInfo = u_GlobalBuffers[i]->descriptorInfo(sizeof(GlobalUbo), 0);
@@ -346,6 +413,21 @@ namespace aveng {
 			AvengDescriptorSetWriter(*lightsDescriptorSetLayout, *descriptorPool)
 				.writeBuffer(0, &lightsBufferInfo)
 				.build(lightsDescriptorSets[i]);
+
+			// Animation descriptor set (Set 3)
+			auto animationBufferInfo = u_AnimationBuffers[i]->descriptorInfo(sizeof(AnimationUbo), 0);
+			auto boneMatrixBufferInfo = boneMatrixBuffers[i]->descriptorInfo();
+			auto instanceAnimationBufferInfo = instanceAnimationBuffers[i]->descriptorInfo();
+			auto animatedVertexBufferInfo = animatedVertexBuffers[i]->descriptorInfo();
+			auto transformedVertexBufferInfo = transformedVertexBuffers[i]->descriptorInfo();
+			
+			AvengDescriptorSetWriter(*animationDescriptorSetLayout, *descriptorPool)
+				.writeBuffer(0, &animationBufferInfo)         // Animation UBO
+				.writeBuffer(1, &boneMatrixBufferInfo)       // Bone matrices SSBO
+				.writeBuffer(2, &instanceAnimationBufferInfo) // Instance animation data SSBO
+				.writeBuffer(3, &animatedVertexBufferInfo)   // Input animated vertices SSBO
+				.writeBuffer(4, &transformedVertexBufferInfo) // Transformed vertices SSBO
+				.build(animationDescriptorSets[i]);
 		}
 
 		// Create pipelines now that descriptor layouts are ready
@@ -666,10 +748,11 @@ namespace aveng {
 		}
 
 		// Create descriptor set layouts array using stored layouts
-		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(3);
+		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(4);  // Increased to 4 for animation
 		descriptorSetLayouts[0] = globalDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[1] = objDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[2] = lightsDescriptorSetLayout->getDescriptorSetLayout();
+		descriptorSetLayouts[3] = animationDescriptorSetLayout->getDescriptorSetLayout();  // NEW: Animation descriptor set
 
 		// Push constant range
 		VkPushConstantRange pushConstantRange{};
@@ -679,7 +762,7 @@ namespace aveng {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 3;
+		pipelineLayoutInfo.setLayoutCount = 4;  // Updated to 4 for animation descriptor set
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;

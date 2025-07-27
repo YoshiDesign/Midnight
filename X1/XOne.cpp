@@ -21,6 +21,9 @@ namespace aveng {
 		loadAppObjects();
 		objectRenderSystem.initialize();
 		setupLights();
+		
+		// Test our new animation system
+		testAnimationSystem();
 	}
 
 	void XOne::run()
@@ -162,6 +165,120 @@ namespace aveng {
 	{
 		// Use the new scene loader system
 		objectRenderSystem.loadGame("scenes/demo-scene.json");
+	}
+
+	/*
+	* Test the new Assimp-based animation system
+	*/
+	void XOne::testAnimationSystem()
+	{
+		std::cout << "\n=== 🎬 ANIMATION SYSTEM TEST ===" << std::endl;
+		std::cout << "Testing with model: 3D/animTVGuy.glb" << std::endl;
+
+		// Set up render data for tracking
+		RenderData renderData{};
+		
+		// Load the animated model
+		bool loadSuccess = animationManager.loadModel("3D/animTVGuy.glb", renderData);
+		
+		if (!loadSuccess) {
+			std::cout << "Failed to load animTVGuy.glb" << std::endl;
+			return;
+		}
+
+		std::cout << "Successfully loaded animTVGuy.glb!" << std::endl;
+
+		// Get the loaded model for inspection
+		auto model = animationManager.getModel("3D/animTVGuy.glb");
+		if (!model) {
+			std::cout << "Could not retrieve loaded model" << std::endl;
+			return;
+		}
+
+		// Display model information
+		std::cout << "\nMODEL INFORMATION:" << std::endl;
+		std::cout << "  Model filename: " << model->getModelFileName() << std::endl;
+		std::cout << "  Triangle count: " << model->getTriangleCount() << std::endl;
+		std::cout << "  Has animations: " << (model->hasAnimations() ? "YES" : "NO") << std::endl;
+
+		// Display mesh information
+		const auto& meshes = model->getModelMeshes();
+		std::cout << "  Mesh count: " << meshes.size() << std::endl;
+		for (size_t i = 0; i < meshes.size(); ++i) {
+			std::cout << "    Mesh " << i << ": " << meshes[i].vertices.size() << " vertices, " 
+			         << meshes[i].indices.size() << " indices" << std::endl;
+			std::cout << "      Has animation data: " << (meshes[i].hasAnimationData ? "YES" : "NO") << std::endl;
+		}
+
+		// Display bone information
+		const auto& bones = model->getBoneList();
+		std::cout << "  Bone count: " << bones.size() << std::endl;
+		for (size_t i = 0; i < bones.size() && i < 10; ++i) { // Show first 10 bones
+			std::cout << "    Bone " << i << ": " << bones[i]->getBoneName() << " (ID: " << bones[i]->getBoneId() << ")" << std::endl;
+		}
+		if (bones.size() > 10) {
+			std::cout << "    ... and " << (bones.size() - 10) << " more bones" << std::endl;
+		}
+
+		// Display node hierarchy information
+		const auto& nodes = model->getNodeList();
+		std::cout << "  Node count: " << nodes.size() << std::endl;
+		for (size_t i = 0; i < nodes.size() && i < 5; ++i) { // Show first 5 nodes
+			std::cout << "    Node " << i << ": " << nodes[i]->getNodeName() << " (Parent: " << nodes[i]->getParentNodeName() << ")" << std::endl;
+		}
+		if (nodes.size() > 5) {
+			std::cout << "    ... and " << (nodes.size() - 5) << " more nodes" << std::endl;
+		}
+
+		// Display animation information
+		const auto& animations = model->getAnimClips();
+		std::cout << "  Animation count: " << animations.size() << std::endl;
+		for (size_t i = 0; i < animations.size(); ++i) {
+			auto& anim = animations[i];
+			std::cout << "    Animation " << i << ": \"" << anim->getClipName() << "\"" << std::endl;
+			std::cout << "      Duration: " << anim->getClipDuration() << " ticks" << std::endl;
+			std::cout << "      Ticks per second: " << anim->getClipTicksPerSecond() << std::endl;
+			std::cout << "      Channels: " << anim->getChannels().size() << std::endl;
+		}
+
+		// Test instance creation
+		std::cout << "\n🎭 TESTING INSTANCE CREATION:" << std::endl;
+		auto instance1 = animationManager.createInstance("3D/animTVGuy.glb", glm::vec3(0, 0, 0));
+		auto instance2 = animationManager.createInstance("3D/animTVGuy.glb", glm::vec3(5, 0, 0));
+		auto instance3 = animationManager.createInstance("3D/animTVGuy.glb", glm::vec3(-5, 0, 0));
+
+		if (instance1 && instance2 && instance3) {
+			std::cout << "✅ Successfully created 3 instances!" << std::endl;
+			
+			// Test animation switching if animations are available
+			if (!animations.empty()) {
+				std::cout << "\n🎬 TESTING ANIMATION CONTROL:" << std::endl;
+				if (animations.size() > 0) {
+					instance1->setAnimationByIndex(0);
+					std::cout << "  Instance 1: Set to animation 0 (\"" << animations[0]->getClipName() << "\")" << std::endl;
+				}
+				if (animations.size() > 1) {
+					instance2->setAnimationByIndex(1);
+					std::cout << "  Instance 2: Set to animation 1 (\"" << animations[1]->getClipName() << "\")" << std::endl;
+				}
+				// Instance 3 keeps default animation
+			}
+		} else {
+			std::cout << "❌ Failed to create instances" << std::endl;
+		}
+
+		// Display final debug information
+		animationManager.updateRenderData(renderData);
+		std::cout << "\n📈 FINAL DEBUG STATS:" << std::endl;
+		std::cout << "  Loaded models: " << renderData.rdLoadedModels << std::endl;
+		std::cout << "  Animated models: " << renderData.rdAnimatedModels << std::endl;
+		std::cout << "  Total bones: " << renderData.rdTotalBones << std::endl;
+		std::cout << "  Total nodes: " << renderData.rdTotalNodes << std::endl;
+		std::cout << "  Total animation clips: " << renderData.rdTotalAnimationClips << std::endl;
+		std::cout << "  Active instances: " << renderData.rdActiveInstances << std::endl;
+
+		std::cout << "\n🎉 Animation system test completed!" << std::endl;
+		std::cout << "=== END ANIMATION TEST ===\n" << std::endl;
 	}
 
 	//void XOne::pendulum(EngineDevice& engineDevice, int _max_rows)

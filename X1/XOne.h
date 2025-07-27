@@ -8,6 +8,7 @@
 #include "CoreVK/EngineDevice.h"
 #include "CoreVk/aveng_buffer.h"
 #include "System/Peripheral/KeyboardController.h"
+#include "Core/Animation/AnimationManager.h"
 
 
 namespace aveng {
@@ -33,6 +34,7 @@ namespace aveng {
 
 		void loadAppObjects();
 		void setupLights();
+		void testAnimationSystem();
 		//void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
 		//void updateData();
 
@@ -44,6 +46,9 @@ namespace aveng {
 		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
 		EngineDevice engineDevice{ aveng_window };
 		ObjectRenderSystem objectRenderSystem{ engineDevice, aveng_window };
+		
+		// Animation system for testing
+		AnimationManager animationManager;
 
 
 	};

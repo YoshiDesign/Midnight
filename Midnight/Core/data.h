@@ -143,4 +143,31 @@ namespace aveng {
 		bool isCreated = false;
 	};
 
+	// === ANIMATION SSBO DATA STRUCTURES ===
+	
+	// Instance animation state for SSBO
+	struct InstanceAnimationData {
+		alignas(16) glm::mat4 modelMatrix{1.0f};           // Instance transform
+		alignas(4) float animationTime{0.0f};              // Current animation time
+		alignas(4) int animationClipIndex{0};              // Which animation to play
+		alignas(4) int boneMatrixOffset{0};                // Offset into bone matrix buffer
+		alignas(4) int boneCount{0};                       // Number of bones for this instance
+		alignas(16) glm::vec4 animationParams{1.0f, 0.0f, 0.0f, 0.0f}; // speed, loop, etc.
+	};
+
+	// Global uniform data for animation compute shader
+	struct AnimationComputeUbo {
+		alignas(4) float deltaTime{0.0f};                  // Frame delta time
+		alignas(4) uint32_t totalInstances{0};            // Number of animated instances
+		alignas(4) uint32_t maxBonesPerInstance{128};     // Maximum bones per model
+		alignas(4) uint32_t verticesPerInstance{0};       // Vertices to process per instance
+		alignas(16) glm::vec4 debugParams{0.0f};          // Debug/experimental parameters
+	};
+
+	// Animation-related UBOs for descriptor sets
+	struct AnimationUbo {
+		AnimationComputeUbo computeData;
+		alignas(16) glm::mat4 reserved[4];                 // Reserved for future expansion
+	};
+
 }

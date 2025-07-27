@@ -13,6 +13,7 @@
 #include "../../CoreVK/AvengImageSystem.h"
 #include "../../CoreVK/PointLightSystem.h"
 #include "../aveng_model.h"
+#include "../data.h"
 #include "PipelineConfigManager.h"
 
 #define GLM_FORCE_RADIANS
@@ -208,18 +209,29 @@ namespace aveng {
 		std::vector<std::unique_ptr<AvengBuffer>> u_GlobalBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> u_ObjBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> u_LightsBuffers;
+		
+		// Animation buffers (SSBOs)
+		std::vector<std::unique_ptr<AvengBuffer>> u_AnimationBuffers;           // Animation UBO data
+		std::vector<std::unique_ptr<AvengBuffer>> boneMatrixBuffers;           // Bone transformation matrices SSBO
+		std::vector<std::unique_ptr<AvengBuffer>> instanceAnimationBuffers;    // Instance animation data SSBO
+		std::vector<std::unique_ptr<AvengBuffer>> animatedVertexBuffers;       // Animated vertex data SSBO
+		std::vector<std::unique_ptr<AvengBuffer>> transformedVertexBuffers;    // Compute shader output SSBO
 		std::vector<VkDescriptorSet> globalDescriptorSets;
 		std::vector<VkDescriptorSet> objectDescriptorSets;
 		std::vector<VkDescriptorSet> lightsDescriptorSets;
 
 		// Post-processing descriptor sets
 		std::vector<VkDescriptorSet> postProcessDescriptorSets;
+		
+		// Animation descriptor sets
+		std::vector<VkDescriptorSet> animationDescriptorSets;
 
 		// Descriptor set layouts (reused by multiple systems)
 		std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> postProcessDescriptorSetLayout;
+		std::unique_ptr<AvengDescriptorSetLayout> animationDescriptorSetLayout;
 
 		// Instanced rendering data
 		std::unordered_map<AvengModel*, std::unique_ptr<RenderBatch>> renderBatches;
