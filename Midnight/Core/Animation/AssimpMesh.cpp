@@ -46,7 +46,6 @@ bool AssimpMesh::processMesh(RenderData &renderData, aiMesh* mesh, const aiScene
     for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
         const aiFace& face = mesh->mFaces[i];
         if (face.mNumIndices == 3) {
-            std::cout << "[DEBUG] Processing Indices" << std::endl;
             mMesh.indices.push_back(face.mIndices[0]);
             mMesh.indices.push_back(face.mIndices[1]);
             mMesh.indices.push_back(face.mIndices[2]);

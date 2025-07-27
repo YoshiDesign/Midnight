@@ -261,6 +261,7 @@ namespace aveng {
         // Config - Device features
         VkPhysicalDeviceFeatures deviceFeatures = {};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
+        deviceFeatures.fillModeNonSolid = VK_TRUE;  // Enable wireframe/line rendering
 
         // Config - Core
         VkDeviceCreateInfo createInfo = {};

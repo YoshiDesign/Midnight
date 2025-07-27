@@ -2,6 +2,8 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include "../data.h"  // For TransformedVertex
+#include "../aveng_model.h"  // For AvengModel::Vertex
 
 namespace aveng {
 
@@ -79,6 +81,21 @@ namespace aveng {
         GFXPipeline::defaultPipelineConfig(config);
         config.renderPass = renderPass;
         config.pipelineLayout = pipelineLayout;
+        
+        // Set vertex input layout based on pipeline type
+        if (def.name == "ANIMATED") {
+            // Use TransformedVertex layout for animated models
+            config.bindingDescriptions = TransformedVertex::getBindingDescriptions();
+            config.attributeDescriptions = TransformedVertex::getAttributeDescriptions();
+            std::cout << "Pipeline '" << def.name << "': Using TransformedVertex layout (" 
+                      << config.attributeDescriptions.size() << " attributes)" << std::endl;
+        } else {
+            // Use AvengModel::Vertex layout for static models  
+            config.bindingDescriptions = AvengModel::Vertex::getBindingDescriptions();
+            config.attributeDescriptions = AvengModel::Vertex::getAttributeDescriptions();
+            std::cout << "Pipeline '" << def.name << "': Using AvengModel::Vertex layout (" 
+                      << config.attributeDescriptions.size() << " attributes)" << std::endl;
+        }
 
         // Apply rasterization settings
         config.rasterizationInfo.polygonMode = def.polygonMode;

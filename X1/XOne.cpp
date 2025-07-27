@@ -22,8 +22,8 @@ namespace aveng {
 		objectRenderSystem.initialize();
 		setupLights();
 		
-		// Test our new animation system
-		testAnimationSystem();
+		// PERFORMANCE DEBUG: Temporarily disable animation system entirely
+		// testAnimationSystem();
 	}
 
 	void XOne::run()
@@ -50,8 +50,8 @@ namespace aveng {
 			frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
 			currentTime = newTime;
 
-			// Update animation system
-			updateAnimationSystem(frameTime);
+			// PERFORMANCE DEBUG: Disable animation updates
+			// updateAnimationSystem(frameTime);
 
 			objectRenderSystem.render(frameTime, frame_content);
 

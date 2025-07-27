@@ -19,8 +19,9 @@ namespace aveng {
 		recreateSwapChain();
 		createCommandBuffers();
 		
-		// Initialize animation rendering system
-		animationSystem = std::make_unique<AnimationRenderingSystem>(engineDevice);
+		// PERFORMANCE: AnimationRenderingSystem will be initialized on first use
+		// This avoids 33MB+ GPU memory allocation when animation is disabled
+		// animationSystem = std::make_unique<AnimationRenderingSystem>(engineDevice);
 	}
 
 	Renderer::~Renderer()
@@ -335,8 +336,10 @@ namespace aveng {
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
 			
-		// Initialize animation rendering system
-		animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
+		// Initialize animation rendering system only if it exists
+		if (animationSystem) {
+			animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
+		}
 
 		// Write descriptor sets
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
@@ -393,23 +396,29 @@ namespace aveng {
 
 	void Renderer::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
 	{
-		// Delegate to animation system
-		animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
+		// Delegate to animation system (only if it exists)
+		if (animationSystem) {
+			animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
+		}
 	}
 
 	void Renderer::dispatchAnimationCompute(uint32_t vertexCount)
 	{
-		// Delegate to animation system
-		animationSystem->dispatchAnimationCompute(getCurrentCommandBuffer(), vertexCount, 
-												 pipelineLayout, currentFrameIndex);
+		// Delegate to animation system (only if it exists)
+		if (animationSystem) {
+			animationSystem->dispatchAnimationCompute(getCurrentCommandBuffer(), vertexCount, 
+													 pipelineLayout, currentFrameIndex);
+		}
 	}
 
 	void Renderer::renderAnimatedModels(const std::vector<std::shared_ptr<AssimpInstance>>& instances)
 	{
-		// Delegate to animation system
-		animationSystem->renderAnimatedModels(getCurrentCommandBuffer(), instances, pipelineLayout,
-											 pipelineManager.get(), static_cast<int>(currentObjectMode), 
-											 currentFrameIndex);
+		// Delegate to animation system (only if it exists)
+		if (animationSystem) {
+			animationSystem->renderAnimatedModels(getCurrentCommandBuffer(), instances, pipelineLayout,
+												 pipelineManager.get(), static_cast<int>(currentObjectMode), 
+												 currentFrameIndex);
+		}
 	}
 
 	void Renderer::renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
@@ -687,11 +696,16 @@ namespace aveng {
 		}
 
 		// Create descriptor set layouts array using stored layouts
-		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(4);  // Increased to 4 for animation
+		// Size depends on whether animation system is enabled
+		size_t descriptorSetCount = animationSystem ? 4 : 3;
+		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(descriptorSetCount);
 		descriptorSetLayouts[0] = globalDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[1] = objDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[2] = lightsDescriptorSetLayout->getDescriptorSetLayout();
-		descriptorSetLayouts[3] = animationSystem->getAnimationDescriptorSetLayout();  // Animation system descriptor set
+		
+		if (animationSystem) {
+			descriptorSetLayouts[3] = animationSystem->getAnimationDescriptorSetLayout();  // Animation system descriptor set
+		}
 
 		// Push constant range
 		VkPushConstantRange pushConstantRange{};
@@ -701,7 +715,7 @@ namespace aveng {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 4;  // Updated to 4 for animation descriptor set
+		pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetCount);
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
@@ -710,8 +724,10 @@ namespace aveng {
 			throw std::runtime_error("failed to create pipeline layout!");
 		}
 		
-		// Create animation compute pipeline now that we have the pipeline layout
-		animationSystem->createAnimationComputePipeline(pipelineLayout);
+		// Create animation compute pipeline now that we have the pipeline layout (if animation system exists)
+		if (animationSystem) {
+			animationSystem->createAnimationComputePipeline(pipelineLayout);
+		}
 	}
 
 	void Renderer::createPipelines()

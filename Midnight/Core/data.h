@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+#include <vulkan/vulkan.h>  // For VkVertexInputAttributeDescription
 
 namespace aveng {
 	const int RIGHT = -1;
@@ -124,6 +125,24 @@ namespace aveng {
 			       color == other.color && 
 			       normal == other.normal && 
 			       texCoord == other.texCoord;
+		}
+		
+		// Required for Vulkan pipeline to understand vertex layout
+		static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
+			std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
+			bindingDescriptions[0].binding = 0;
+			bindingDescriptions[0].stride = sizeof(TransformedVertex);
+			bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			return bindingDescriptions;
+		}
+		
+		static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+			std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
+			attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, position) });
+			attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, color) });
+			attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, normal) });
+			attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(TransformedVertex, texCoord) });
+			return attributeDescriptions;
 		}
 	};
 

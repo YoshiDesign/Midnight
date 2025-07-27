@@ -100,9 +100,9 @@ void AnimationRenderingSystem::createAnimationBuffers(int maxFramesInFlight)
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
         instanceAnimationBuffers[i]->map();
 
-        // Animated vertex SSBO (conservative size - will resize as needed)
+        // Animated vertex SSBO (sized for large models like animTVGuy - 100k vertices)
         animatedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-            sizeof(AnimatedVertex) * 10000, 1,  // Start with 10k vertices
+            sizeof(AnimatedVertex) * 100000, 1,  // Large enough for stress test models
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VMA_MEMORY_USAGE_AUTO,
             16, // minOffsetAlignment
@@ -111,16 +111,16 @@ void AnimationRenderingSystem::createAnimationBuffers(int maxFramesInFlight)
 
         // Transformed vertex output SSBO (using TransformedVertex - no bone data)
         transformedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-            sizeof(TransformedVertex) * 10000, 1,
+            sizeof(TransformedVertex) * 100000, 1,  // Match input buffer size
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             VMA_MEMORY_USAGE_AUTO,
             16, // minOffsetAlignment
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
         transformedVertexBuffers[i]->map();
 
-        // Index buffer for animated meshes (conservative size - will resize as needed)
+        // Index buffer for animated meshes (sized for large models - 350k indices)
         animatedIndexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-            sizeof(uint32_t) * 30000, 1,  // Start with 30k indices (10k triangles)
+            sizeof(uint32_t) * 350000, 1,  // Large enough for 322k+ indices
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VMA_MEMORY_USAGE_AUTO,
             4, // minOffsetAlignment for uint32_t
@@ -185,8 +185,8 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
     lastInstanceCount = static_cast<uint32_t>(instances.size());
     lastVertexCount = calculateTotalVertices(instances);
 
-    std::cout << "AnimationRenderingSystem: Updating data for " << lastInstanceCount 
-              << " instances (" << lastVertexCount << " vertices)" << std::endl;
+    //std::cout << "AnimationRenderingSystem: Updating data for " << lastInstanceCount 
+    //          << " instances (" << lastVertexCount << " vertices)" << std::endl;
 
     // Prepare animation UBO data
     AnimationUbo animUBO{};
@@ -260,6 +260,14 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
 
     // Upload animated vertices
     if (!allVertices.empty()) {
+        // Verify buffer is large enough (should be with our 100k vertex allocation)
+        uint32_t requiredVertexBufferSize = sizeof(AnimatedVertex) * allVertices.size();
+        if (animatedVertexBuffers[currentFrameIndex]->getBufferSize() < requiredVertexBufferSize) {
+            std::cerr << "ERROR: Animated vertex buffer too small! Required: " << requiredVertexBufferSize 
+                      << ", Available: " << animatedVertexBuffers[currentFrameIndex]->getBufferSize() << std::endl;
+            return; // Fail gracefully instead of crashing
+        }
+        
         animatedVertexBuffers[currentFrameIndex]->writeToBuffer(allVertices.data(),
             sizeof(AnimatedVertex) * allVertices.size());
         animatedVertexBuffers[currentFrameIndex]->flush();
@@ -267,15 +275,23 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
 
     // Upload animated indices
     if (!allIndices.empty()) {
+        // Verify buffer is large enough (should be with our 350k index allocation)
+        uint32_t requiredIndexBufferSize = sizeof(uint32_t) * allIndices.size();
+        if (animatedIndexBuffers[currentFrameIndex]->getBufferSize() < requiredIndexBufferSize) {
+            std::cerr << "ERROR: Animated index buffer too small! Required: " << requiredIndexBufferSize 
+                      << ", Available: " << animatedIndexBuffers[currentFrameIndex]->getBufferSize() << std::endl;
+            return; // Fail gracefully instead of crashing
+        }
+        
         animatedIndexBuffers[currentFrameIndex]->writeToBuffer(allIndices.data(),
             sizeof(uint32_t) * allIndices.size());
         animatedIndexBuffers[currentFrameIndex]->flush();
     }
 
-    std::cout << "AnimationRenderingSystem: Data uploaded - " << instanceData.size() << " instances, " 
-              << allBoneMatrices.size() << " bone matrices, " 
-              << allVertices.size() << " vertices, " 
-              << allIndices.size() << " indices" << std::endl;
+    //std::cout << "AnimationRenderingSystem: Data uploaded - " << instanceData.size() << " instances, " 
+    //          << allBoneMatrices.size() << " bone matrices, " 
+    //          << allVertices.size() << " vertices, " 
+    //          << allIndices.size() << " indices" << std::endl;
 }
 
 void AnimationRenderingSystem::dispatchAnimationCompute(VkCommandBuffer commandBuffer, uint32_t vertexCount, 
@@ -285,7 +301,15 @@ void AnimationRenderingSystem::dispatchAnimationCompute(VkCommandBuffer commandB
         return;
     }
 
-    std::cout << "AnimationRenderingSystem: Dispatching compute for " << vertexCount << " vertices" << std::endl;
+    // Verify transformed vertex buffer is large enough for compute output
+    uint32_t requiredTransformedBufferSize = sizeof(TransformedVertex) * vertexCount;
+    if (transformedVertexBuffers[currentFrameIndex]->getBufferSize() < requiredTransformedBufferSize) {
+        std::cerr << "ERROR: Transformed vertex buffer too small! Required: " << requiredTransformedBufferSize 
+                  << ", Available: " << transformedVertexBuffers[currentFrameIndex]->getBufferSize() << std::endl;
+        return; // Fail gracefully instead of crashing
+    }
+
+    //std::cout << "AnimationRenderingSystem: Dispatching compute for " << vertexCount << " vertices" << std::endl;
     
     // Bind compute pipeline
     animationComputePipeline->bind(commandBuffer);
@@ -355,6 +379,16 @@ void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffe
 
     std::cout << "AnimationRenderingSystem: Rendering " << instances.size() << " animated models" << std::endl;
     
+    // Bind the vertex and index buffers once (they contain data for all instances)
+    VkBuffer vertexBuffers[] = { transformedVertexBuffers[currentFrameIndex]->getBuffer() };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, animatedIndexBuffers[currentFrameIndex]->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+    
+    // Track global offsets across all instances
+    uint32_t globalVertexOffset = 0;
+    uint32_t globalIndexOffset = 0;
+    
     // Render each animated instance
     for (const auto& instance : instances) {
         if (!instance || !instance->getModel()) continue;
@@ -374,33 +408,25 @@ void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffe
             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             0, sizeof(PushConstantData), &pushData);
 
-        // Bind the transformed vertex buffer (output from compute shader)
-        VkBuffer vertexBuffers[] = { transformedVertexBuffers[currentFrameIndex]->getBuffer() };
-        VkDeviceSize offsets[] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        std::cout << "  Rendering instance at global vertex offset " << globalVertexOffset 
+                  << ", index offset " << globalIndexOffset << std::endl;
 
-        // Bind the index buffer (contains indices for all meshes)
-        vkCmdBindIndexBuffer(commandBuffer, animatedIndexBuffers[currentFrameIndex]->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-        // Render each mesh of the animated model using indexed drawing
-        uint32_t vertexOffset = 0;
-        uint32_t indexOffset = 0;
+        // Render each mesh of this instance using the correct global offsets
         for (const auto& mesh : meshes) {
             if (!mesh.indices.empty()) {
                 // Use indexed drawing for efficiency
                 uint32_t indexCount = static_cast<uint32_t>(mesh.indices.size());
-                vkCmdDrawIndexed(commandBuffer, indexCount, 1, indexOffset, vertexOffset, 0);
-                indexOffset += indexCount;
+                vkCmdDrawIndexed(commandBuffer, indexCount, 1, globalIndexOffset, globalVertexOffset, 0);
+                globalIndexOffset += indexCount;
             } else {
                 // Fallback to non-indexed drawing if no indices
-                vkCmdDraw(commandBuffer, static_cast<uint32_t>(mesh.vertices.size()), 1, vertexOffset, 0);
+                vkCmdDraw(commandBuffer, static_cast<uint32_t>(mesh.vertices.size()), 1, globalVertexOffset, 0);
             }
             
-            vertexOffset += static_cast<uint32_t>(mesh.vertices.size());
+            globalVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
         }
         
-        std::cout << "  Rendered animated model with " << meshes.size() << " meshes, " 
-                  << vertexOffset << " total vertices" << std::endl;
+        std::cout << "  Finished instance with " << meshes.size() << " meshes" << std::endl;
     }
 }
 

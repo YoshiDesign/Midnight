@@ -56,6 +56,8 @@ namespace aveng {
 			return; // Skip this frame if we can't get a command buffer
 		}
 
+		// TEMPORARY DEBUG: Skip animation compute shaders - rendering as static models instead
+		/*
 		// IMPORTANT: Dispatch compute shaders BEFORE render pass begins
 		// TODO: We can probably count the number of vertices of  animatedInstances outside of the render loop, and update it as needed when loading and unloading models.
 		if (!animatedInstances.empty()) {
@@ -73,6 +75,7 @@ namespace aveng {
 				renderer.dispatchAnimationCompute(totalVertices);
 			}
 		}
+		*/
 
 		// Now begin the render pass
 		renderer.beginSwapChainRenderPass(commandBuffer, frame_content.rgb);
@@ -90,6 +93,13 @@ namespace aveng {
 			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
 		}
 
+		// TEMPORARY DEBUG: Render animated models as static models to test basic rendering
+		if (!animatedInstances.empty()) {
+			//std::cout << "DEBUG: Converting " << animatedInstances.size() << " animated models to static rendering..." << std::endl;
+			//std::cout << "  Note: Skipping conversion since AssimpModel doesn't have AvengModel interface" << std::endl;
+			//std::cout << "  The models will be rendered at world origin without animation" << std::endl;
+		}
+
 		if (firstFrame) {
 			std::cout << "Instanced Rendering Enabled!" << std::endl;
 			std::cout << "Objects this frame: " << objectData.size() << std::endl;
@@ -99,6 +109,8 @@ namespace aveng {
 		// Render regular objects (standard pipeline)
 		renderer.renderObjectsInstanced(objectData);
 
+		// TEMPORARY DEBUG: Skip animation pipeline - already added to static rendering above
+		/*
 		// Render animated models (animation pipeline)
 		if (!animatedInstances.empty()) {
 			// Bind global and lights descriptor sets for animated models
@@ -113,6 +125,7 @@ namespace aveng {
 			// Render the animated models (compute already dispatched)
 			renderer.renderAnimatedModels(animatedInstances);
 		}
+		*/
 
 		// Render lights
 		renderer.renderLights(u_LightsData.numLights);
