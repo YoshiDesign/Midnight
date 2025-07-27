@@ -179,6 +179,7 @@
     <ClCompile Include="CoreVK\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\swapchain.cpp" />
     <ClCompile Include="Core\Animation\AnimationManager.cpp" />
+    <ClCompile Include="Core\Animation\AnimationRenderingSystem.cpp" />
     <ClCompile Include="Core\Animation\AssimpAnimChannel.cpp" />
     <ClCompile Include="Core\Animation\AssimpAnimClip.cpp" />
     <ClCompile Include="Core\Animation\AssimpBone.cpp" />
@@ -207,6 +208,7 @@
     <ClInclude Include="CoreVK\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
     <ClInclude Include="Core\Animation\AnimationManager.h" />
+    <ClInclude Include="Core\Animation\AnimationRenderingSystem.h" />
     <ClInclude Include="Core\Animation\AssimpAnimChannel.h" />
     <ClInclude Include="Core\Animation\AssimpAnimClip.h" />
     <ClInclude Include="Core\Animation\AssimpBone.h" />

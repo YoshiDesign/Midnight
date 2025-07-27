@@ -50,6 +50,9 @@ namespace aveng {
 			frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
 			currentTime = newTime;
 
+			// Update animation system
+			updateAnimationSystem(frameTime);
+
 			objectRenderSystem.render(frameTime, frame_content);
 
 		}
@@ -279,6 +282,18 @@ namespace aveng {
 
 		std::cout << "\n🎉 Animation system test completed!" << std::endl;
 		std::cout << "=== END ANIMATION TEST ===\n" << std::endl;
+	}
+
+	void XOne::updateAnimationSystem(float frameTime)
+	{
+		// Update animation time
+		animationManager.updateAnimations(frameTime);
+		
+		// Get instances and pass to renderer with frame time
+		const auto& instances = animationManager.getInstances();
+		if (!instances.empty()) {
+			objectRenderSystem.updateAnimationData(instances, frameTime);
+		}
 	}
 
 	//void XOne::pendulum(EngineDevice& engineDevice, int _max_rows)

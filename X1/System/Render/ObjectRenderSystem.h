@@ -42,6 +42,9 @@ namespace aveng {
 		// Main render function - simplified interface
 		void render(float frameTime, FrameContent& frameContent);
 		
+		// Animation system integration  
+		void updateAnimationData(const std::vector<std::shared_ptr<class AssimpInstance>>& instances, float deltaTime);
+		
 		// Application-specific updates
 		void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& keyboardController);
 
@@ -56,6 +59,9 @@ namespace aveng {
 		bool firstFrame;
 		int last_sec;
 		float aspect;
+		
+		// Store animated instances for rendering
+		std::vector<std::shared_ptr<class AssimpInstance>> animatedInstances;
 
 		// Application-level components
 		AvengSceneLoader sceneLoader;

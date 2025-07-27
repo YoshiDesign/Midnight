@@ -1,4 +1,5 @@
 #include "ObjectRenderSystem.h"
+#include "Core/Animation/AssimpInstance.h"
 #include "Utils/window_callbacks.h"
 
 namespace aveng {
@@ -55,6 +56,24 @@ namespace aveng {
 			return; // Skip this frame if we can't get a command buffer
 		}
 
+		// IMPORTANT: Dispatch compute shaders BEFORE render pass begins
+		if (!animatedInstances.empty()) {
+			// Calculate total vertices for compute dispatch
+			uint32_t totalVertices = 0;
+			for (const auto& instance : animatedInstances) {
+				const auto& meshes = instance->getModel()->getModelMeshes();
+				for (const auto& mesh : meshes) {
+					totalVertices += static_cast<uint32_t>(mesh.vertices.size());
+				}
+			}
+			
+			if (totalVertices > 0) {
+				// Dispatch compute shader outside render pass
+				renderer.dispatchAnimationCompute(totalVertices);
+			}
+		}
+
+		// Now begin the render pass
 		renderer.beginSwapChainRenderPass(commandBuffer, frame_content.rgb);
 
 		// Update frame data in renderer
@@ -77,7 +96,23 @@ namespace aveng {
 			firstFrame = false;
 		}
 		
+		// Render regular objects
 		renderer.renderObjectsInstanced(objectData);
+
+		// Render animated models (separate pipeline)
+		if (!animatedInstances.empty()) {
+			// Bind global and lights descriptor sets for animated models
+			VkDescriptorSet globalSet = renderer.getGlobalDescriptorSet(renderer.getFrameIndex());
+			VkDescriptorSet lightsSet = renderer.getLightsDescriptorSet(renderer.getFrameIndex());
+			
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.getPipelineLayout(),
+				0, 1, &globalSet, 0, nullptr);
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.getPipelineLayout(),
+				2, 1, &lightsSet, 0, nullptr);
+			
+			// Render the animated models (compute already dispatched)
+			renderer.renderAnimatedModels(animatedInstances);
+		}
 
 		// Render lights
 		renderer.renderLights(u_LightsData.numLights);
@@ -88,6 +123,15 @@ namespace aveng {
 		renderer.endSwapChainRenderPass(commandBuffer);
 
 		renderer.endFrame();
+	}
+
+	void ObjectRenderSystem::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
+	{
+		// Store instances for rendering
+		animatedInstances = instances;
+		
+		// Forward animation data to the renderer with delta time
+		renderer.updateAnimationData(instances, deltaTime);
 	}
 
 	void ObjectRenderSystem::updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& keyboardController)

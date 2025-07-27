@@ -106,6 +106,11 @@ namespace aveng {
 			assert(isFrameStarted && "Cannot get the frame index when frame is not in progress.");
 			return currentFrameIndex;
 		}
+		
+		// Descriptor set accessors
+		VkDescriptorSet getGlobalDescriptorSet(int frameIndex) const { return globalDescriptorSets[frameIndex]; }
+		VkDescriptorSet getLightsDescriptorSet(int frameIndex) const { return lightsDescriptorSets[frameIndex]; }
+		VkPipelineLayout getPipelineLayout() const { return pipelineLayout; }
 
 		// SwapChain getters
 		uint32_t getImageCount() const { return aveng_swapchain->imageCount(); }
@@ -122,12 +127,16 @@ namespace aveng {
 		void setupDescriptors(int numObjects);
 		void initializePointLightSystem();
 		void updateFrameData(const GlobalUbo& globalData, const LightsUbo& lightsData);
+		
+		// Animation system integration (delegated to AnimationRenderingSystem)
+		void updateAnimationData(const std::vector<std::shared_ptr<class AssimpInstance>>& instances, float deltaTime = 0.016f);
+		void dispatchAnimationCompute(uint32_t vertexCount);
+		void renderAnimatedModels(const std::vector<std::shared_ptr<class AssimpInstance>>& instances);
 		void renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
 		void renderLights(int numLights);
 
 		// Instanced rendering methods
 		void renderObjectsInstanced(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
-		void setupInstanceBuffers();
 		void updateInstanceBuffer(RenderBatch& batch);
 
 		// Instanced rendering controls
@@ -166,8 +175,7 @@ namespace aveng {
 		void createPostProcessPipelines();
 		
 		// DEPRECATED: Legacy pipeline creation (to be removed)
-		void createPipeline();                  // DEPRECATED: Creates legacy gfxPipeline
-		void createObjectPipelines();           // DEPRECATED: Creates hardcoded pipeline array
+		void createPipeline();
 		
 		size_t calculateDynamicUBOStride() const;
 
@@ -186,6 +194,9 @@ namespace aveng {
 		// Pipeline management
 		std::unique_ptr<PipelineConfigManager> pipelineManager;
 		std::vector<std::unique_ptr<GFXPipeline>> objectPipelines;  // DEPRECATED: Fallback only
+		// Animation rendering system
+		std::unique_ptr<class AnimationRenderingSystem> animationSystem;
+		
 		// DEPRECATED: Remove these legacy pipelines - use PipelineConfigManager instead
 		std::unique_ptr<GFXPipeline> gfxPipeline;  // Legacy - to be removed
 		std::unique_ptr<GFXPipeline> gfxPipeline2; // Legacy - to be removed
@@ -209,29 +220,18 @@ namespace aveng {
 		std::vector<std::unique_ptr<AvengBuffer>> u_GlobalBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> u_ObjBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> u_LightsBuffers;
-		
-		// Animation buffers (SSBOs)
-		std::vector<std::unique_ptr<AvengBuffer>> u_AnimationBuffers;           // Animation UBO data
-		std::vector<std::unique_ptr<AvengBuffer>> boneMatrixBuffers;           // Bone transformation matrices SSBO
-		std::vector<std::unique_ptr<AvengBuffer>> instanceAnimationBuffers;    // Instance animation data SSBO
-		std::vector<std::unique_ptr<AvengBuffer>> animatedVertexBuffers;       // Animated vertex data SSBO
-		std::vector<std::unique_ptr<AvengBuffer>> transformedVertexBuffers;    // Compute shader output SSBO
 		std::vector<VkDescriptorSet> globalDescriptorSets;
 		std::vector<VkDescriptorSet> objectDescriptorSets;
 		std::vector<VkDescriptorSet> lightsDescriptorSets;
 
 		// Post-processing descriptor sets
 		std::vector<VkDescriptorSet> postProcessDescriptorSets;
-		
-		// Animation descriptor sets
-		std::vector<VkDescriptorSet> animationDescriptorSets;
 
 		// Descriptor set layouts (reused by multiple systems)
 		std::unique_ptr<AvengDescriptorSetLayout> globalDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> objDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> postProcessDescriptorSetLayout;
-		std::unique_ptr<AvengDescriptorSetLayout> animationDescriptorSetLayout;
 
 		// Instanced rendering data
 		std::unordered_map<AvengModel*, std::unique_ptr<RenderBatch>> renderBatches;

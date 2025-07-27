@@ -5,6 +5,8 @@
 #include <array>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
+#include "../Animation/AssimpInstance.h"
+#include "../Animation/AnimationRenderingSystem.h"
 
 #define LOG(a) std::cout<<a<<std::endl;
 #define DESTROY_UNIFORM_BUFFERS 1
@@ -16,6 +18,9 @@ namespace aveng {
 	{
 		recreateSwapChain();
 		createCommandBuffers();
+		
+		// Initialize animation rendering system
+		animationSystem = std::make_unique<AnimationRenderingSystem>(engineDevice);
 	}
 
 	Renderer::~Renderer()
@@ -261,19 +266,11 @@ namespace aveng {
 		u_GlobalBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		u_ObjBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		u_LightsBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		
-		// Resize animation buffer vectors
-		u_AnimationBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		boneMatrixBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		instanceAnimationBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		animatedVertexBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		transformedVertexBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Resize descriptor set vectors
 		globalDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		lightsDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		animationDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Create Buffers using VMA
 		// VMA_MEMORY_USAGE_AUTO: Let VMA choose optimal memory type
@@ -297,54 +294,6 @@ namespace aveng {
 				1, // minOffsetAlignment
 				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			u_LightsBuffers[i]->map();
-		}
-
-		// Animation buffers
-		for (int i = 0; i < u_AnimationBuffers.size(); i++) {
-			// Animation UBO buffer
-			u_AnimationBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(AnimationUbo), 1,
-				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			u_AnimationBuffers[i]->map();
-
-			// Bone matrices SSBO (conservative size for 128 bones)
-			boneMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(glm::mat4) * 128, 1,  // 128 bones max per model
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				16, // minOffsetAlignment for mat4
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			boneMatrixBuffers[i]->map();
-
-			// Instance animation data SSBO (for up to 1000 instances)
-			instanceAnimationBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(InstanceAnimationData) * 1000, 1,
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				16, // minOffsetAlignment for aligned structs
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			instanceAnimationBuffers[i]->map();
-
-			// Animated vertex SSBO (conservative size - will resize as needed)
-			animatedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(AnimatedVertex) * 10000, 1,  // Start with 10k vertices
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				16, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			animatedVertexBuffers[i]->map();
-
-			// Transformed vertex output SSBO (same size as input)
-			transformedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(AnimatedVertex) * 10000, 1,
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				16, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			transformedVertexBuffers[i]->map();
 		}
 
 		for (int i = 0; i < u_ObjBuffers.size(); i++) {
@@ -385,16 +334,9 @@ namespace aveng {
 			AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
-
-		// Animation descriptor set layout (Set 3)
-		animationDescriptorSetLayout =
-			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 1)  // Animation UBO
-			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 1)  // Bone matrices SSBO
-			.addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)                               // Instance animation data SSBO
-			.addBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)                               // Input animated vertices SSBO
-			.addBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 1)  // Transformed vertices SSBO
-			.build();
+			
+		// Initialize animation rendering system
+		animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Write descriptor sets
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
@@ -413,28 +355,11 @@ namespace aveng {
 			AvengDescriptorSetWriter(*lightsDescriptorSetLayout, *descriptorPool)
 				.writeBuffer(0, &lightsBufferInfo)
 				.build(lightsDescriptorSets[i]);
-
-			// Animation descriptor set (Set 3)
-			auto animationBufferInfo = u_AnimationBuffers[i]->descriptorInfo(sizeof(AnimationUbo), 0);
-			auto boneMatrixBufferInfo = boneMatrixBuffers[i]->descriptorInfo();
-			auto instanceAnimationBufferInfo = instanceAnimationBuffers[i]->descriptorInfo();
-			auto animatedVertexBufferInfo = animatedVertexBuffers[i]->descriptorInfo();
-			auto transformedVertexBufferInfo = transformedVertexBuffers[i]->descriptorInfo();
-			
-			AvengDescriptorSetWriter(*animationDescriptorSetLayout, *descriptorPool)
-				.writeBuffer(0, &animationBufferInfo)         // Animation UBO
-				.writeBuffer(1, &boneMatrixBufferInfo)       // Bone matrices SSBO
-				.writeBuffer(2, &instanceAnimationBufferInfo) // Instance animation data SSBO
-				.writeBuffer(3, &animatedVertexBufferInfo)   // Input animated vertices SSBO
-				.writeBuffer(4, &transformedVertexBufferInfo) // Transformed vertices SSBO
-				.build(animationDescriptorSets[i]);
 		}
 
 		// Create pipelines now that descriptor layouts are ready
 		createPipelines();
-		
-		// Initialize instanced rendering system
-		setupInstanceBuffers();
+	
 	}
 
 	void Renderer::initializePointLightSystem()
@@ -464,6 +389,27 @@ namespace aveng {
 		// Update lights uniform buffer
 		u_LightsBuffers[currentFrameIndex]->writeToBuffer(&lightsData);
 		u_LightsBuffers[currentFrameIndex]->flush();
+	}
+
+	void Renderer::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
+	{
+		// Delegate to animation system
+		animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
+	}
+
+	void Renderer::dispatchAnimationCompute(uint32_t vertexCount)
+	{
+		// Delegate to animation system
+		animationSystem->dispatchAnimationCompute(getCurrentCommandBuffer(), vertexCount, 
+												 pipelineLayout, currentFrameIndex);
+	}
+
+	void Renderer::renderAnimatedModels(const std::vector<std::shared_ptr<AssimpInstance>>& instances)
+	{
+		// Delegate to animation system
+		animationSystem->renderAnimatedModels(getCurrentCommandBuffer(), instances, pipelineLayout,
+											 pipelineManager.get(), static_cast<int>(currentObjectMode), 
+											 currentFrameIndex);
 	}
 
 	void Renderer::renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
@@ -672,7 +618,7 @@ namespace aveng {
 		/*std::cout << "Instanced rendering complete: " << batchesRendered << " batches, " 
 		          << totalInstancesRendered << " total instances" << std::endl;*/
 		
-#if !NDEBUG
+#if _DEBUG
 		/**
 		* ToDo - This is not implemented properly. You'll likely want to count the number of instances of an object BEFORE any of this function's code executes.
 		*/
@@ -700,13 +646,6 @@ namespace aveng {
 			instancedRenderingEnabled = true;
 		}
 #endif
-	}
-
-	void Renderer::setupInstanceBuffers()
-	{
-		std::cout << "Setting up instance buffers for instanced rendering" << std::endl;
-		// Instance buffers will be created on-demand in updateInstanceBuffer()
-		// This avoids pre-allocating buffers for models that might not be used
 	}
 
 	void Renderer::updateInstanceBuffer(RenderBatch& batch)
@@ -752,7 +691,7 @@ namespace aveng {
 		descriptorSetLayouts[0] = globalDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[1] = objDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[2] = lightsDescriptorSetLayout->getDescriptorSetLayout();
-		descriptorSetLayouts[3] = animationDescriptorSetLayout->getDescriptorSetLayout();  // NEW: Animation descriptor set
+		descriptorSetLayouts[3] = animationSystem->getAnimationDescriptorSetLayout();  // Animation system descriptor set
 
 		// Push constant range
 		VkPushConstantRange pushConstantRange{};
@@ -770,48 +709,10 @@ namespace aveng {
 		if (vkCreatePipelineLayout(engineDevice.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");
 		}
+		
+		// Create animation compute pipeline now that we have the pipeline layout
+		animationSystem->createAnimationComputePipeline(pipelineLayout);
 	}
-
-	// DEPRECATED: Legacy pipeline creation - use PipelineConfigManager instead
-	//void Renderer::createPipeline()
-	//{
-	//	assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
-
-	//	PipelineConfig pipelineConfig{};
-	//	GFXPipeline::defaultPipelineConfig(pipelineConfig);
-	//	pipelineConfig.renderPass = getSwapChainRenderPass();
-	//	pipelineConfig.pipelineLayout = pipelineLayout;
-
-	//	// Setup specialization constants for dynamic texture array size
-	//	VkSpecializationMapEntry specEntry{};
-	//	specEntry.constantID = 0;  // Matches constant_id = 0 in shader
-	//	specEntry.offset = 0;
-	//	specEntry.size = sizeof(uint32_t);
-
-	//	VkSpecializationInfo specInfo{};
-	//	specInfo.mapEntryCount = 1;
-	//	specInfo.pMapEntries = &specEntry;
-	//	specInfo.dataSize = sizeof(uint32_t);
-	//	specInfo.pData = &currentTextureCount;
-
-	//	pipelineConfig.fragmentSpecializationInfo = &specInfo;
-
-	//	std::cout << "Creating pipeline with texture array size: " << currentTextureCount << std::endl;
-
-	//	gfxPipeline = std::make_unique<GFXPipeline>(
-	//		engineDevice,
-	//		"shaders/simple_shader.vert.spv",
-	//		"shaders/simple_shader.frag.spv",
-	//		pipelineConfig
-	//	);
-
-	//	gfxPipeline2 = std::make_unique<GFXPipeline>(
-	//		engineDevice,
-	//		"shaders/simple_shader2.vert.spv",
-	//		"shaders/simple_shader2.frag.spv",
-	//		pipelineConfig
-	//	);
-	//}
 
 	void Renderer::createPipelines()
 	{
@@ -845,80 +746,7 @@ namespace aveng {
 		}
 	}
 
-	// DEPRECATED: Hardcoded pipeline array - use PipelineConfigManager instead
-	void Renderer::createObjectPipelines()
-	{
-		assert(pipelineLayout != nullptr && "Cannot create pipelines before pipeline layout");
-
-		// Setup specialization constants for dynamic texture array size (shared by all pipelines)
-		VkSpecializationMapEntry specEntry{};
-		specEntry.constantID = 0;  // Matches constant_id = 0 in shader
-		specEntry.offset = 0;
-		specEntry.size = sizeof(uint32_t);
-
-		VkSpecializationInfo specInfo{};
-		specInfo.mapEntryCount = 1;
-		specInfo.pMapEntries = &specEntry;
-		specInfo.dataSize = sizeof(uint32_t);
-		specInfo.pData = &currentTextureCount;
-
-		// Resize pipeline vector to match enum size
-		objectPipelines.resize(static_cast<size_t>(ObjectRenderMode::DISTORTED) + 1);
-
-		std::cout << "Creating object rendering pipelines..." << std::endl;
-
-		// STANDARD pipeline
-		{
-			PipelineConfig standardConfig{};
-			GFXPipeline::defaultPipelineConfig(standardConfig);
-			standardConfig.renderPass = getSwapChainRenderPass();
-			standardConfig.pipelineLayout = pipelineLayout;
-			standardConfig.fragmentSpecializationInfo = &specInfo;
-
-			objectPipelines[static_cast<size_t>(ObjectRenderMode::STANDARD)] = std::make_unique<GFXPipeline>(
-				engineDevice,
-				"shaders/simple_shader.vert.spv",
-				"shaders/simple_shader.frag.spv",
-				standardConfig
-			);
-		}
-
-		// WIREFRAME pipeline
-		{
-			PipelineConfig wireframeConfig{};
-			GFXPipeline::defaultPipelineConfig(wireframeConfig);
-			wireframeConfig.renderPass = getSwapChainRenderPass();
-			wireframeConfig.pipelineLayout = pipelineLayout;
-			wireframeConfig.fragmentSpecializationInfo = &specInfo;
-			wireframeConfig.rasterizationInfo.polygonMode = VK_POLYGON_MODE_LINE;
-
-			objectPipelines[static_cast<size_t>(ObjectRenderMode::WIREFRAME)] = std::make_unique<GFXPipeline>(
-				engineDevice,
-				"shaders/simple_shader.vert.spv",
-				"shaders/simple_shader.frag.spv",
-				wireframeConfig
-			);
-		}
-
-		// DISTORTED pipeline (temporarily use same shaders as standard - we'll add effects later)
-		{
-			PipelineConfig distortedConfig{};
-			GFXPipeline::defaultPipelineConfig(distortedConfig);
-			distortedConfig.renderPass = getSwapChainRenderPass();
-			distortedConfig.pipelineLayout = pipelineLayout;
-			distortedConfig.fragmentSpecializationInfo = &specInfo;
-
-			objectPipelines[static_cast<size_t>(ObjectRenderMode::DISTORTED)] = std::make_unique<GFXPipeline>(
-				engineDevice,
-				"shaders/simple_shader.vert.spv",  // Use working shaders for now
-				"shaders/simple_shader.frag.spv",
-				distortedConfig
-			);
-		}
-
-		std::cout << "Created " << objectPipelines.size() << " object pipelines" << std::endl;
-	}
-
+	
 	void Renderer::createPostProcessPipelines()
 	{
 		std::cout << "Creating post-processing pipelines..." << std::endl;

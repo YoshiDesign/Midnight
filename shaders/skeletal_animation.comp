@@ -1,0 +1,129 @@
+#version 450
+
+// Local workgroup size - process vertices in groups of 64
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// Structure definitions (must be outside buffer blocks)
+struct InstanceAnimationData {
+    mat4 modelMatrix;
+    float animationTime;
+    int animationClipIndex;
+    int boneMatrixOffset;
+    int boneCount;
+    vec4 animationParams; // speed, loop, etc.
+};
+
+struct AnimatedVertex {
+    vec3 position;
+    vec3 color;
+    vec3 normal;
+    vec2 texCoord;
+    ivec4 boneIds;    // Bone indices (up to 4 per vertex)
+    vec4 boneWeights; // Bone weights (up to 4 per vertex)
+};
+
+// Animation uniforms (Set 3) - matches our descriptor set layout
+layout(set = 3, binding = 0) uniform AnimationUbo {
+    float deltaTime;
+    uint totalInstances;
+    uint maxBonesPerInstance;
+    uint verticesPerInstance;
+    vec4 debugParams;
+} animUbo;
+
+// Bone transformation matrices
+layout(set = 3, binding = 1, std430) restrict readonly buffer BoneMatricesSSBO {
+    mat4 boneMatrices[];
+};
+
+// Per-instance animation data
+layout(set = 3, binding = 2, std430) restrict readonly buffer InstanceAnimationSSBO {
+    InstanceAnimationData instances[];
+};
+
+// Input animated vertices (original mesh data)
+layout(set = 3, binding = 3, std430) restrict readonly buffer InputVerticesSSBO {
+    AnimatedVertex inputVertices[];
+};
+
+// Output transformed vertices (result of animation)
+layout(set = 3, binding = 4, std430) restrict writeonly buffer OutputVerticesSSBO {
+    AnimatedVertex outputVertices[];
+};
+
+void main() {
+    uint vertexIndex = gl_GlobalInvocationID.x;
+    
+    // Early exit if we're beyond the vertex count
+    if (vertexIndex >= inputVertices.length()) {
+        return;
+    }
+    
+    // Get the input vertex
+    AnimatedVertex inputVertex = inputVertices[vertexIndex];
+    
+    // Initialize output vertex with input data
+    outputVertices[vertexIndex] = inputVertex;
+    
+    // Find which instance this vertex belongs to
+    // For now, we'll process all vertices as if they belong to instance 0
+    // TODO: Implement proper vertex-to-instance mapping
+    uint instanceIndex = 0;
+    if (instanceIndex >= animUbo.totalInstances) {
+        return;
+    }
+    
+    // Get instance animation data
+    InstanceAnimationData instance = instances[instanceIndex];
+    
+    // Apply skeletal animation transformation
+    vec4 skinnedPosition = vec4(0.0);
+    vec3 skinnedNormal = vec3(0.0);
+    float totalWeight = 0.0;
+    
+    // Process up to 4 bone influences per vertex
+    for (int i = 0; i < 4; i++) {
+        int boneId = inputVertex.boneIds[i];
+        float weight = inputVertex.boneWeights[i];
+        
+        // Skip invalid bones
+        if (boneId < 0 || weight <= 0.0) {
+            continue;
+        }
+        
+        // Calculate bone matrix index (instance offset + bone id)
+        uint boneMatrixIndex = instance.boneMatrixOffset + boneId;
+        
+        // Bounds check for bone matrix array
+        if (boneMatrixIndex >= boneMatrices.length()) {
+            continue;
+        }
+        
+        // Get bone transformation matrix
+        mat4 boneTransform = boneMatrices[boneMatrixIndex];
+        
+        // Apply bone transformation to vertex position and normal
+        skinnedPosition += boneTransform * vec4(inputVertex.position, 1.0) * weight;
+        skinnedNormal += mat3(boneTransform) * inputVertex.normal * weight;
+        totalWeight += weight;
+    }
+    
+    // If no valid bones were found, use original vertex data
+    if (totalWeight <= 0.0) {
+        skinnedPosition = vec4(inputVertex.position, 1.0);
+        skinnedNormal = inputVertex.normal;
+    } else {
+        // Normalize if weights don't sum to 1.0
+        if (abs(totalWeight - 1.0) > 0.001) {
+            skinnedPosition /= totalWeight;
+            skinnedNormal /= totalWeight;
+        }
+    }
+    
+    // Store the transformed vertex data
+    outputVertices[vertexIndex].position = skinnedPosition.xyz;
+    outputVertices[vertexIndex].normal = normalize(skinnedNormal);
+    
+    // Color, texCoord, boneIds, and boneWeights remain unchanged
+    // They're already copied from the input vertex above
+} 

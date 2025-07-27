@@ -35,6 +35,7 @@ namespace aveng {
 		void loadAppObjects();
 		void setupLights();
 		void testAnimationSystem();
+		void updateAnimationSystem(float frameTime);
 		//void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
 		//void updateData();
 
