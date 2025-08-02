@@ -12,7 +12,7 @@
 #include "AssimpMesh.h"
 #include "AssimpNode.h"
 #include "AssimpAnimClip.h"
-#include "PlaceholderBuffers.h"
+
 #include "../data.h"
 
 namespace aveng {
@@ -50,6 +50,7 @@ private:
 
     /* store the root node for direct access */
     std::shared_ptr<AssimpNode> mRootNode = nullptr;
+
     /* a map to find the node by name */
     std::unordered_map<std::string, std::shared_ptr<AssimpNode>> mNodeMap{};
     /* and a 'flat' map to keep the order of insertion  */
@@ -72,6 +73,7 @@ private:
 
     std::string mModelFilenamePath;
     std::string mModelFilename;
+
 };
 
 } // namespace aveng

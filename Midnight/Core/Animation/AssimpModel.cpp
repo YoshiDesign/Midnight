@@ -15,15 +15,24 @@ namespace aveng {
 bool AssimpModel::loadModel(RenderData &renderData, std::string modelFilename, unsigned int extraImportFlags) {
     Assimp::Importer importer;
     
-    // Load with coordinate system conversion and animation-friendly flags
+    // Essential flags for proper mesh loading and deformation debugging
     const aiScene *scene = importer.ReadFile(modelFilename,
-        aiProcess_Triangulate | 
-        aiProcess_GenNormals | 
-        aiProcess_ValidateDataStructure | 
-        aiProcess_FlipUVs |                    // Flip UVs for Vulkan
-        aiProcess_LimitBoneWeights |           // Limit to 4 bones per vertex
-        aiProcess_OptimizeMeshes |             // Optimize mesh structure
-        extraImportFlags);
+        aiProcess_CalcTangentSpace |
+        aiProcess_Triangulate |
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_SortByPType |
+        aiProcess_LimitBoneWeights |        // 🔧 CRITICAL: Limit to 4 bones per vertex
+        aiProcess_GenSmoothNormals |        // 🔧 Generate normals if missing  
+        aiProcess_FixInfacingNormals |      // 🔧 Fix inverted normals
+        aiProcess_FlipUVs |                 // 🔧 ESSENTIAL: Flip V for Vulkan
+        aiProcess_ValidateDataStructure |   // 🔧 Validate mesh integrity
+        aiProcess_ImproveCacheLocality | extraImportFlags
+        //aiProcess_Triangulate | 
+        //aiProcess_ValidateDataStructure | 
+        //aiProcess_FlipUVs |                    // Flip UVs for Vulkan
+        //aiProcess_LimitBoneWeights |           // Limit to 4 bones per vertex
+        // REMOVED: aiProcess_GenNormal
+        );
 
     if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         Logger::log(0, "AssimpModel: Error loading '%s': %s\n", modelFilename.c_str(), importer.GetErrorString());
@@ -41,36 +50,43 @@ bool AssimpModel::loadModel(RenderData &renderData, std::string modelFilename, u
 
     // Count vertices and faces
     for (unsigned int i = 0; i < numMeshes; ++i) {
-        mVertexCount += scene->mMeshes[i]->mNumVertices;
-        mTriangleCount += scene->mMeshes[i]->mNumFaces;
+        unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
+        unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
+
+        mVertexCount += numVertices;
+        mTriangleCount += numFaces;
+        Logger::log(1, "%s: mesh %i contains %i vertices and %i faces\n", __FUNCTION__, i, numVertices, numFaces);
     }
     Logger::log(1, "AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
 
     aiNode* rootNode = scene->mRootNode;
 
-  // This looks for embedded textures.
-  if (scene->HasTextures()) {
-    unsigned int numTextures = scene->mNumTextures;
+  //// This looks for embedded textures.
+  //if (scene->HasTextures()) {
+  //  unsigned int numTextures = scene->mNumTextures;
 
-    for (int i = 0; i < scene->mNumTextures; ++i) {
-      std::string texName = scene->mTextures[i]->mFilename.C_Str();
+  //  for (int i = 0; i < scene->mNumTextures; ++i) {
+  //    std::string texName = scene->mTextures[i]->mFilename.C_Str();
 
-      int height = scene->mTextures[i]->mHeight;
-      int width = scene->mTextures[i]->mWidth;
-      aiTexel* data = scene->mTextures[i]->pcData;
+  //    int height = scene->mTextures[i]->mHeight;
+  //    int width = scene->mTextures[i]->mWidth;
+  //    aiTexel* data = scene->mTextures[i]->pcData;
 
-      VkTextureData newTex{};
-      if (!Texture::loadTexture(renderData, newTex, texName, data, width, height)) {
-        return false;
-      }
+  //    VkTextureData newTex{};
+  //    if (!Texture::loadTexture(renderData, newTex, texName, data, width, height)) {
+  //      return false;
+  //    }
 
-      std::string internalTexName = "*" + std::to_string(i);
-      Logger::log(1, "%s: - added internal texture '%s'\n", __FUNCTION__, internalTexName.c_str());
-      mTextures.insert({internalTexName, newTex});
-    }
+  //    std::string internalTexName = "*" + std::to_string(i);
+  //    Logger::log(1, "%s: - added internal texture '%s'\n", __FUNCTION__, internalTexName.c_str());
+  //    mTextures.insert({internalTexName, newTex});
+  //  }
 
-    Logger::log(1, "%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
-  }
+  //  Logger::log(1, "%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
+  //} 
+  //else {
+  //    Logger::log(1, "%s: The scene has no embedded textures [0]\n", __FUNCTION__);
+  //}
 
   /* nodes */
   Logger::log(1, "%s: ... processing nodes...\n", __FUNCTION__);

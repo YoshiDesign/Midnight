@@ -42,7 +42,7 @@ namespace aveng {
 
 	}
 
-	void AvengWindow::createWindowSurface(VkInstance instance, VkSurfaceKHR* surface)
+	void AvengWindow::createWindowSurface(VkInstance instance, VkSurfaceKHR* surface) const
 	{
 		if (glfwCreateWindowSurface(instance, window, nullptr, surface) != VK_SUCCESS)
 		{

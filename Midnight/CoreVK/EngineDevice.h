@@ -28,14 +28,16 @@ namespace aveng {
 
         // This tells Vulkan about the callback funtion for our validation layer debug
         VkDebugUtilsMessengerEXT debugMessenger;
+
         VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
-        AvengWindow&    window;
         VkCommandPool   _commandPool;
         VkDevice        _device;
         VkSurfaceKHR    _surface;
         VkQueue         _graphicsQueue;
         VkQueue         _presentQueue;
         VmaAllocator    _allocator;
+
+        AvengWindow& aveng_window;
 
     public:
 
@@ -45,7 +47,7 @@ namespace aveng {
           const bool enableValidationLayers = false;
 #endif
 
-        EngineDevice(AvengWindow &window);
+        EngineDevice(AvengWindow& window);
         ~EngineDevice();
 
         // Not copyable or movable

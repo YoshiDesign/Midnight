@@ -30,7 +30,7 @@ namespace aveng {
 
 		void resetWindowResizedFlag() { framebufferResized = false; }
 
-		void createWindowSurface(VkInstance instance, VkSurfaceKHR* surface);
+		void createWindowSurface(VkInstance instance, VkSurfaceKHR* surface) const;
 
 		GLFWwindow* getGLFWwindow() const { return window; }
 

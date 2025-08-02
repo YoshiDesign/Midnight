@@ -30,6 +30,15 @@ public:
     InstanceSettings& getInstanceSettings() { return mInstanceSettings; }
     std::vector<NodeTransformData>& getNodeTransformData() { return mNodeTransformData; }
     const std::vector<glm::mat4>& getBoneTransformMatrices() { return mBoneTransformMatrices; }
+    
+    // Advanced debugging and validation
+    bool validateAnimationData() const;
+    std::string getAnimationReport() const;
+    void debugAnimationState() const;
+    
+    // Geometry debugging controls
+    static void setGeometryDebugLevel(int level) { sGeometryDebugLevel = level; }
+    static int getGeometryDebugLevel() { return sGeometryDebugLevel; }
 
     // Setters
     void setPosition(const glm::vec3& position) { 
@@ -47,10 +56,18 @@ public:
 
 private:
     void updateModelRootMatrix();
+    void optimizeAnimationCache();  // Cache optimization for animation performance
+    
+    // 🔧 FIXED: Hierarchical bone calculation methods
+    void updateAnimationChannels(float wrappedTime);          // Phase 1: Update animated nodes using mNodeMap
+    void calculateBoneTransformsHierarchical();               // Phase 2: Calculate bone matrices using mNodeList
 
     InstanceSettings mInstanceSettings{};
     std::vector<NodeTransformData> mNodeTransformData{};
     std::vector<glm::mat4> mBoneTransformMatrices{};
+    
+    // Static debug control
+    static int sGeometryDebugLevel;
     
     /* transform matrices */
     glm::mat4 mInstanceRootMatrix = glm::mat4(1.0f);

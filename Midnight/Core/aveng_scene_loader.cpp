@@ -71,7 +71,7 @@ namespace aveng {
         std::cout << "Creating objects for scene: " << scene.title << std::endl;
         
         for (const auto& objectData : scene.objects) {
-            for (size_t i = 0; i < objectData.instances.size() && i < static_cast<size_t>(objectData.qty); ++i) {
+            for (size_t i = 0; i < objectData.instances.size(); ++i) {
                 const auto& instance = objectData.instances[i];
                 
                 // Validate texture index
@@ -88,13 +88,14 @@ namespace aveng {
                 // Set position
                 object.transform.translation = instance.position;
                 
-                currentSceneObjects.emplace(object.getId(), std::move(object));
+                // currentSceneObjects.emplace(object.getId(), std::move(object));
+                currentSceneObjects_v.emplace_back(std::move(object));
                 
-                std::cout << "Created object from " << objectData.path 
-                         << " at position (" << instance.position.x 
-                         << ", " << instance.position.y 
-                         << ", " << instance.position.z << ")"
-                         << " with texture ID " << instance.textureId << std::endl;
+                //std::cout << "Created object from " << objectData.path 
+                //         << " at position (" << instance.position.x 
+                //         << ", " << instance.position.y 
+                //         << ", " << instance.position.z << ")"
+                //         << " with texture ID " << instance.textureId << std::endl;
             }
         }
     }
@@ -122,11 +123,6 @@ namespace aveng {
                     // Parse path
                     if (objJson.contains("path")) {
                         obj.path = objJson["path"].get<std::string>();
-                    }
-                    
-                    // Parse qty -- TODO: this doesn't provide any benefit to apply to each object. We can just use obj.instances.size()
-                    if (objJson.contains("qty")) {
-                        obj.qty = objJson["qty"].get<int>();
                     }
                     
                     // Parse data array (instances with position and texture)
@@ -191,7 +187,10 @@ namespace aveng {
         // Create new model and cache it
         std::cout << "Loading new model: " << modelPath << std::endl;
         auto model = AvengModel::createModelFromFile(engineDevice, modelPath);
+
+        // TODO - Bad code smells
         auto sharedModel = std::shared_ptr<AvengModel>(model.release());
+
         modelCache[modelPath] = sharedModel;
         
         return sharedModel;

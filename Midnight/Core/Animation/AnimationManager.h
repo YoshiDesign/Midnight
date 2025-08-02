@@ -39,7 +39,7 @@ public:
     void updateAnimations(float deltaTime);
     
     // Debug information
-    void updateRenderData(RenderData& renderData);
+    void resetRenderDataAnimationTotals(RenderData& renderData);
     
     // Getters
     const std::vector<std::shared_ptr<AssimpModel>>& getModels() const { return mModelInstData.miModelList; }

@@ -6,7 +6,7 @@
 namespace aveng {
 
 AnimationManager::AnimationManager() {
-    // Setup callback functions using lambda expressions as requested
+    // Setup callback functions using lambda expressions
     mModelInstData.miModelCheckCallbackFunction = [this](std::string modelPath) { 
         return checkModel(modelPath); 
     };
@@ -163,7 +163,7 @@ void AnimationManager::updateAnimations(float deltaTime) {
     mCurrentRenderData->rdAnimationUpdateTime = duration.count();
 }
 
-void AnimationManager::updateRenderData(RenderData& renderData) {
+void AnimationManager::resetRenderDataAnimationTotals(RenderData& renderData) {
     renderData.rdLoadedModels = mModelInstData.miModelList.size();
     renderData.rdActiveInstances = mModelInstData.miAssimpInstances.size();
     
@@ -173,13 +173,14 @@ void AnimationManager::updateRenderData(RenderData& renderData) {
     renderData.rdTotalNodes = 0;
     renderData.rdTotalAnimationClips = 0;
     
+    // Specific to AssimpModel
     for (const auto& model : mModelInstData.miModelList) {
         if (model->hasAnimations()) {
             renderData.rdAnimatedModels++;
+            renderData.rdTotalBones += model->getBoneList().size();
+            renderData.rdTotalNodes += model->getNodeList().size();
+            renderData.rdTotalAnimationClips += model->getAnimClips().size();
         }
-        renderData.rdTotalBones += model->getBoneList().size();
-        renderData.rdTotalNodes += model->getNodeList().size();
-        renderData.rdTotalAnimationClips += model->getAnimClips().size();
     }
 }
 

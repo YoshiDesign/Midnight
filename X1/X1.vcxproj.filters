@@ -42,9 +42,6 @@
     <ClCompile Include="System\Peripheral\KeyboardController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\SystemData.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XOne.h">
@@ -81,9 +78,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="System\Peripheral\KeyboardController.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\SystemData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

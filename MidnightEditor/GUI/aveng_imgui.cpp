@@ -8,7 +8,7 @@
 
 namespace aveng {
 
-    AvengImgui::AvengImgui(EngineDevice& _device, SystemContext& context) : device{ _device }, context{context} {}
+    AvengImgui::AvengImgui(RenderData& _renderData, GameData& _gameData) : renderData{ _renderData }, gameData{_gameData} {}
 
     // Initialize the vulkan and glfw imgui implementations
     void AvengImgui::init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount)
@@ -34,7 +34,7 @@ namespace aveng {
         pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
         pool_info.pPoolSizes = pool_sizes;
 
-        if (vkCreateDescriptorPool(device.device(), &pool_info, nullptr, &descriptorPool) != VK_SUCCESS) 
+        if (vkCreateDescriptorPool(renderData.engineDevice->device(), &pool_info, nullptr, &descriptorPool) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to set up descriptor pool for imgui");
         }
@@ -55,11 +55,11 @@ namespace aveng {
         // Initialize imgui for vulkan
         ImGui_ImplGlfw_InitForVulkan(window.getGLFWwindow(), true);
         ImGui_ImplVulkan_InitInfo init_info = {};
-        init_info.Instance = device.instance();
-        init_info.PhysicalDevice = device.physicalDevice();
-        init_info.Device = device.device();
-        init_info.QueueFamily = device.getGraphicsQueueFamily();
-        init_info.Queue = device.graphicsQueue();
+        init_info.Instance = renderData.engineDevice->instance();
+        init_info.PhysicalDevice = renderData.engineDevice->physicalDevice();
+        init_info.Device = renderData.engineDevice->device();
+        init_info.QueueFamily = renderData.engineDevice->getGraphicsQueueFamily();
+        init_info.Queue = renderData.engineDevice->graphicsQueue();
 
         // pipeline cache is a potential future optimization, ignoring for now
         init_info.PipelineCache = VK_NULL_HANDLE;
@@ -73,16 +73,16 @@ namespace aveng {
 
         // upload fonts, this is done by recording and submitting a one time use command buffer
         // which can be done easily by using some existing helper functions on the EngineDevice object
-        auto commandBuffer = device.beginSingleTimeCommands();
+        auto commandBuffer = renderData.engineDevice->beginSingleTimeCommands();
         ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-        device.endSingleTimeCommands(commandBuffer);
+        renderData.engineDevice->endSingleTimeCommands(commandBuffer);
 
         // Cleanup the font object
         ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
     AvengImgui::~AvengImgui() {
-        vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
+        vkDestroyDescriptorPool(renderData.engineDevice->device(), descriptorPool, nullptr);
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -110,11 +110,9 @@ namespace aveng {
         static bool hasChanged = false;
         static int counter = 0;
 
-        GameData& game_data = *context.game_data;
-
         {
             ImGui::Begin("Engine Info");
-            ImGui::Text("Video Device:\t %s", device.properties.deviceName);
+            ImGui::Text("Video Device:\t %s", renderData.engineDevice->properties.deviceName);
             ImGui::End();
         }
 
@@ -124,27 +122,27 @@ namespace aveng {
             ImGui::Checkbox("Player Debug", &show_player_controller_window);
 
             ImGui::Text(
-                "Objects: %d", game_data.num_objs);
+                "Objects: %d", gameData.num_objs);
             ImGui::Text(
-                "Flight Mode: %d", game_data.fly_mode);
+                "Flight Mode: %d", gameData.fly_mode);
             ImGui::Text(
-                "Camera View:\t\t(%.03lf, %.03lf, %.03lf)", game_data.cameraView.x, game_data.cameraView.y, game_data.cameraView.z);
+                "Camera View:\t\t(%.03lf, %.03lf, %.03lf)", gameData.cameraView.x, gameData.cameraView.y, gameData.cameraView.z);
             ImGui::Text(
-                "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", game_data.cameraRot.x, game_data.cameraRot.y, game_data.cameraRot.z);
+                "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", gameData.cameraRot.x, gameData.cameraRot.y, gameData.cameraRot.z);
             ImGui::Text(
-                "Camera Position:\t(%.03lf, %.03lf, %.03lf)", game_data.cameraPos.x, game_data.cameraPos.y, game_data.cameraPos.z);
+                "Camera Position:\t(%.03lf, %.03lf, %.03lf)", gameData.cameraPos.x, gameData.cameraPos.y, gameData.cameraPos.z);
             ImGui::Text(
-                "Player Rotation:\t(%.03lf, %.03lf, %.03lf)", game_data.playerRot.x,game_data.playerRot.y, game_data.playerRot.z);
+                "Player Rotation:\t(%.03lf, %.03lf, %.03lf)", gameData.playerRot.x,gameData.playerRot.y, gameData.playerRot.z);
             ImGui::Text(
-                "Player Position:\t(%.03lf, %.03lf, %.03lf)", game_data.playerPos.x, game_data.playerPos.y, game_data.playerPos.z);
+                "Player Position:\t(%.03lf, %.03lf, %.03lf)", gameData.playerPos.x, gameData.playerPos.y, gameData.playerPos.z);
             ImGui::Text(
-                "Mod Rotation:\t(%.03lf, %.03lf, %.03lf)", game_data.modRot.x, game_data.modRot.y, game_data.modRot.z);
+                "Mod Rotation:\t(%.03lf, %.03lf, %.03lf)", gameData.modRot.x, gameData.modRot.y, gameData.modRot.z);
             ImGui::Text(
-                "Mod Position:\t(%.03lf, %.03lf, %.03lf)", game_data.modPos.x, game_data.modPos.y, game_data.modPos.z);
+                "Mod Position:\t(%.03lf, %.03lf, %.03lf)", gameData.modPos.x, gameData.modPos.y, gameData.modPos.z);
             ImGui::Text(
-                "Forward Direction:\t(%.03lf, %.03lf, %.03lf)", game_data.forwardDir.x, game_data.forwardDir.y, game_data.forwardDir.z);
-            ImGui::SliderFloat("float", &game_data.player_modPI, 0.0f, 2 * PI);
-            ImGui::SliderFloat("float", &game_data.camera_modPI, 0.0f, 2 * PI);
+                "Forward Direction:\t(%.03lf, %.03lf, %.03lf)", gameData.forwardDir.x, gameData.forwardDir.y, gameData.forwardDir.z);
+            ImGui::SliderFloat("float", &gameData.player_modPI, 0.0f, 2 * PI);
+            ImGui::SliderFloat("float", &gameData.camera_modPI, 0.0f, 2 * PI);
 
             //ImGui::ColorEdit3("clear color",
                 //(float*)&clear_color);  // Edit 3 floats representing a color
@@ -154,7 +152,7 @@ namespace aveng {
             }
 
             ImGui::SameLine();
-            ImGui::Text("GFX-Pipe:\t%d", game_data.cur_pipe);
+            ImGui::Text("GFX-Pipe:\t%d", gameData.cur_pipe);
 
             ImGui::Text(
                 "Frame = %.3f ms/frame (%.1f FPS)",
@@ -167,12 +165,12 @@ namespace aveng {
         // Show the player info window
         if (show_player_controller_window) {
             ImGui::Begin("Player Debug", &show_player_controller_window);
-            ImGui::Text("Speed:\t%f", game_data.speed);
-            ImGui::Text("Player center delta:\t%f", game_data.DPI);
-            ImGui::Text("Player roll radians:\t%f", game_data.player_z_rot);
-            ImGui::Text("Roll Cooldown:\t%f", game_data.DeltaRoll);
-            ImGui::Text("Velocity:\t%.02f, %.02f, %.02f", game_data.velocity.x, game_data.velocity.y, game_data.velocity.z);
-            ImGui::Text("Torque Direction:\t%d", game_data.pn);
+            ImGui::Text("Speed:\t%f", gameData.speed);
+            ImGui::Text("Player center delta:\t%f", gameData.DPI);
+            ImGui::Text("Player roll radians:\t%f", gameData.player_z_rot);
+            ImGui::Text("Roll Cooldown:\t%f", gameData.DeltaRoll);
+            ImGui::Text("Velocity:\t%.02f, %.02f, %.02f", gameData.velocity.x, gameData.velocity.y, gameData.velocity.z);
+            ImGui::Text("Torque Direction:\t%d", gameData.pn);
             //if (ImGui::Button("Close")) show_player_controller_window = false;
             ImGui::End();
         }

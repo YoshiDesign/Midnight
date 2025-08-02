@@ -38,8 +38,8 @@ namespace aveng {
     }
 
     /*
-    * Traditional Constructor - Calls to engineDevice.createBuffer (existing - backward compatible)
-    */
+     * Legacy Constructor - Calls to engineDevice.createBuffer (existing - backward compatible)
+     */
     AvengBuffer::AvengBuffer(
         EngineDevice& device,
         VkDeviceSize instanceSize,
@@ -61,7 +61,7 @@ namespace aveng {
 
         if (usageFlags == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
 
-            std::cout << "Creating Traditional Uniform Buffer\n"
+            std::cout << "Creating Legacy Uniform Buffer\n"
                 << "instanceSize\t" << instanceSize
                 << "\ninstanceCount\t" << instanceCount
                 << "\nMinimumOffsetAlignment\t" << minOffsetAlignment
@@ -115,6 +115,7 @@ namespace aveng {
 
     AvengBuffer::~AvengBuffer() 
     {
+        std::cout << "Destroying Buffer: " << usingVMA << std::endl;
         unmap();
         
         if (usingVMA) {

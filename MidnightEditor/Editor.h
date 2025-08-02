@@ -1,19 +1,23 @@
 #pragma once
 #include "GUI/aveng_imgui.h"
-#include "Utils/SystemContext.h"
+#include "Core/data.h"
+#include "CoreVK/swapchain.h"
+#include "Core/aveng_window.h"
+#include "CoreVK/swapchain.h"
 
 namespace aveng {
 
 	class Editor {
 	public:
-		Editor(SystemContext& context);
+		Editor(RenderData& _renderData, GameData& _gameData);
 		~Editor();
-		void init();
+		void init(AvengWindow& window, SwapChain* swapchain);
 		void render(VkCommandBuffer& commandBuffer);
 
 	private:
-		SystemContext& aveng_context;
-		AvengImgui aveng_imgui{ *aveng_context.device, aveng_context };
+		RenderData& renderData;
+		GameData& gameData;
+		AvengImgui aveng_imgui{ renderData, gameData };
 	};
 
 }

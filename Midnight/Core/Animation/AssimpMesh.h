@@ -28,6 +28,8 @@ public:
 
 private:
     void processBoneWeights(aiMesh* mesh);
+    void validateMeshData();  // 🔍 NEW: Mesh validation for debugging deformation issues
+    void debugVertexData();   // 🔍 NEW: Detailed vertex data logging for comparison
 
     std::string mMeshName;
     unsigned int mTriangleCount = 0;

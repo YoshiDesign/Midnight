@@ -81,6 +81,7 @@ namespace aveng {
 	}
 
 	/*
+	* TODO - Make sure these buffers get VMA allocated
 		@function createVertexBuffers
 		Create a vertex buffer in our device memory
 		These buffers are used to write information to device memory
@@ -175,6 +176,17 @@ namespace aveng {
 		}
 		else {
 			vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0);
+		}
+	}
+
+	void AvengModel::drawInstanced(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance)
+	{
+		if (hasIndexBuffer)
+		{
+			vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, 0, 0, firstInstance);
+		}
+		else {
+			vkCmdDraw(commandBuffer, vertexCount, instanceCount, 0, firstInstance);
 		}
 	}
 

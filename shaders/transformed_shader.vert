@@ -27,12 +27,12 @@ layout(push_constant) uniform Push {
 } push;
 
 void main() {
-	// Vertices are already transformed by compute shader, just apply model transform
-	vec4 positionWorld = push.modelMatrix * vec4(position, 1.0);
-	gl_Position = ubo.projection * ubo.view * positionWorld;
+	// Vertices are already transformed to world space by compute shader
+	// Do NOT apply model matrix again to avoid double transformation
+	gl_Position = ubo.projection * ubo.view * vec4(position, 1.0);
 
-	f_fragNormalWorld = normalize(mat3(push.normalMatrix) * normal);
-	f_fragPosWorld    = positionWorld.xyz;
+	f_fragNormalWorld = normalize(normal);  // Normal already transformed in compute shader
+	f_fragPosWorld    = position;  // Position already in world space from compute shader
 	f_fragColor		  = v_fragColor;
 	f_fragTexCoord    = v_fragTexCoord;
 } 

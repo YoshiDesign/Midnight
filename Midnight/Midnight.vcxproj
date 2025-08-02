@@ -131,7 +131,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ENABLE_EDITOR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -219,7 +219,6 @@
     <ClInclude Include="Core\Animation\InstanceSettings.h" />
     <ClInclude Include="Core\Animation\Logger.h" />
     <ClInclude Include="Core\Animation\ModelAndInstanceData.h" />
-    <ClInclude Include="Core\Animation\PlaceholderBuffers.h" />
     <ClInclude Include="Core\Animation\Tools.h" />
     <ClInclude Include="Core\app_object.h" />
     <ClInclude Include="Core\AvengComponent.h" />
@@ -253,7 +252,6 @@
     <ClInclude Include="stb\stb_voxel_render.h" />
     <ClInclude Include="Utils\aveng_utils.h" />
     <ClInclude Include="Utils\RenderData.h" />
-    <ClInclude Include="Utils\SystemContext.h" />
     <ClInclude Include="Utils\window_callbacks.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />
     <ClInclude Include="vendor\GLFW\glfw3native.h" />

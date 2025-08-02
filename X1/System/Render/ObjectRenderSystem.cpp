@@ -4,8 +4,8 @@
 
 namespace aveng {
 
-	ObjectRenderSystem::ObjectRenderSystem(EngineDevice& device, AvengWindow& window)
-		: engineDevice{ device }, aveng_window{ window }
+	ObjectRenderSystem::ObjectRenderSystem(AvengWindow& window)
+		: window{ window }
 	{
 
 		firstFrame = true;
@@ -20,84 +20,46 @@ namespace aveng {
 	void ObjectRenderSystem::initialize() 
 	{
 		// Note: ImageSystem should be initialized first in loadGame() before calling this
+
+		// Lights, temporary placement
+		for (int i = 1; i < 4; i++) {
+			for (int j = 1; j < 5; j++) {
+
+				renderer.addLight(
+					glm::vec3(-100 + i * -10.f, -2.f, 33 + j * 4.0f),  // position
+					glm::vec3(1.f, 0.0f, 0.0f),    // red color
+					0.75f,
+					i * j * 0.1f                           // slightly larger radius
+				);
+
+			}
+		}
 		
-		// Delegate to renderer for all engine-specific setup
-		int numObjects = static_cast<int>(sceneLoader.getObjectCount());
-		if (numObjects == 0) numObjects = 1; // Prevent crash with empty scenes
-		
-		renderer.setupDescriptors(numObjects);
-		
-		// Initialize PointLightSystem now that descriptor layouts are created
-		renderer.initializePointLightSystem();
-		
-		std::cout << "ObjectRenderSystem initialized with " << numObjects << " objects" << std::endl;
 	}
 
 
 
-	void ObjectRenderSystem::render(float frameTime, FrameContent& frame_content)
+	void ObjectRenderSystem::render(float frameTime)
 	{
-		// Clear Color for now
-		frame_content.rgb = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
 		
-		updateCamera(frameTime, viewerObject, keyboardController);
+		updateCamera(frameTime);
+
+		// Deprecate this in favor of the new renderData object
 		updateData(frameTime);
-		// updatePostProcessing(frameTime);
 
-		// Prepare frame data
-		u_GlobalData.projection = aveng_camera.getProjection();
-		u_GlobalData.view = aveng_camera.getView();
-		u_GlobalData.renderMode = static_cast<int>(renderer.getObjectRenderMode());
-		// u_GlobalData.time = toxicTimer;  // Pass time for animated effects
-
-		// Start frame rendering
-		VkCommandBuffer commandBuffer = renderer.beginFrame();
-		if (!commandBuffer) {
-			return; // Skip this frame if we can't get a command buffer
-		}
-
-		// TEMPORARY DEBUG: Skip animation compute shaders - rendering as static models instead
-		/*
-		// IMPORTANT: Dispatch compute shaders BEFORE render pass begins
-		// TODO: We can probably count the number of vertices of  animatedInstances outside of the render loop, and update it as needed when loading and unloading models.
-		if (!animatedInstances.empty()) {
-			// Calculate total vertices for compute dispatch
-			uint32_t totalVertices = 0;
-			for (const auto& instance : animatedInstances) {
-				const auto& meshes = instance->getModel()->getModelMeshes();
-				for (const auto& mesh : meshes) {
-					totalVertices += static_cast<uint32_t>(mesh.vertices.size());
-				}
-			}
-			
-			if (totalVertices > 0) {
-				// Dispatch compute shader outside render pass
-				renderer.dispatchAnimationCompute(totalVertices);
-			}
-		}
-		*/
-
-		// Now begin the render pass
-		renderer.beginSwapChainRenderPass(commandBuffer, frame_content.rgb);
+		renderer.beginFrame();
 
 		// Update frame data in renderer
-		renderer.updateFrameData(u_GlobalData, u_LightsData);
+		renderer.updateFrameData(aveng_camera.getProjection(), aveng_camera.getView());
 
-		// Prepare object data for rendering
+		// Prepare object data for rendering - TODO - This seems highly inefficient
 		std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>> objectData;
-		for (auto& kv : sceneLoader.getAppObjects()) {
-			ObjectUniformData objUniform{ kv.second.get_texture() };		// Model's texture index
-			glm::mat4 modelMatrix = kv.second.transform._mat4();			// Local model matrix
-			glm::mat4 normalMatrix = kv.second.transform.normalMatrix();	// Local model normal matrix
-			AvengModel* model = kv.second.model.get();						// TODO: This is a shared ptr. Does get() create overhead?
+		for (const auto& obj : renderer.getAppObjects()) {
+			ObjectUniformData objUniform{ obj.get_texture() };		// Model's texture index
+			glm::mat4 modelMatrix = obj.transform._mat4();			// Local model matrix
+			glm::mat4 normalMatrix = obj.transform.normalMatrix();	// Local model normal matrix
+			AvengModel* model = obj.model.get();						// TODO: This is a shared ptr
 			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
-		}
-
-		// TEMPORARY DEBUG: Render animated models as static models to test basic rendering
-		if (!animatedInstances.empty()) {
-			//std::cout << "DEBUG: Converting " << animatedInstances.size() << " animated models to static rendering..." << std::endl;
-			//std::cout << "  Note: Skipping conversion since AssimpModel doesn't have AvengModel interface" << std::endl;
-			//std::cout << "  The models will be rendered at world origin without animation" << std::endl;
 		}
 
 		if (firstFrame) {
@@ -106,56 +68,36 @@ namespace aveng {
 			firstFrame = false;
 		}
 		
-		// Render regular objects (standard pipeline)
-		renderer.renderObjectsInstanced(objectData);
+		// Render regular objects (standard pipeline) -- BINDS DESCRIPTORS
+		// renderer.renderObjectsInstanced(objectData);
+		renderer.renderObjects(objectData);
 
-		// TEMPORARY DEBUG: Skip animation pipeline - already added to static rendering above
-		/*
-		// Render animated models (animation pipeline)
-		if (!animatedInstances.empty()) {
-			// Bind global and lights descriptor sets for animated models
-			VkDescriptorSet globalSet = renderer.getGlobalDescriptorSet(renderer.getFrameIndex());
-			VkDescriptorSet lightsSet = renderer.getLightsDescriptorSet(renderer.getFrameIndex());
-			
-			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.getPipelineLayout(),
-				0, 1, &globalSet, 0, nullptr);
-			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.getPipelineLayout(),
-				2, 1, &lightsSet, 0, nullptr);
-			
-			// Render the animated models (compute already dispatched)
-			renderer.renderAnimatedModels(animatedInstances);
-		}
-		*/
+		// STEP 1F: Enable animation rendering pipeline  
+		//if (!animatedInstances.empty()) {
+		//	renderer.renderAnimatedModels(animatedInstances);
+		//}
 
-		// Render lights
-		renderer.renderLights(u_LightsData.numLights);
+		// Render lights -- BINDS DESCRIPTORS
+		renderer.renderLights();
+	
 #ifdef ENABLE_EDITOR
-		// Render editor
-		editor.render(commandBuffer);
+		renderer.renderEditor();
 #endif
-		renderer.endSwapChainRenderPass(commandBuffer);
-
 		renderer.endFrame();
 	}
 
-	void ObjectRenderSystem::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
-	{
-		// Store instances for rendering
-		animatedInstances = instances;
-		
-		// Forward animation data to the renderer with delta time
-		renderer.updateAnimationData(instances, deltaTime);
-	}
-
-	void ObjectRenderSystem::updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& keyboardController)
+	void ObjectRenderSystem::updateCamera(float frameTime)
 	{
 		aspect = getAspectRatio();
 		// Updates the viewer object transform component based on key input, proportional to the time elapsed since the last frame
-		keyboardController.moveCameraXZ(aveng_window.getGLFWwindow(), frameTime);
+		keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
 		aveng_camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation + glm::vec3());
 		aveng_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
 	}
 
+	/**
+	* Deprecated
+	*/
 	void ObjectRenderSystem::updateData(float frameTime)
 	{
 
@@ -206,38 +148,11 @@ namespace aveng {
 		}
 	}
 
-	void ObjectRenderSystem::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
-	{
-		if (u_LightsData.numLights >= LightsUbo::MAX_LIGHTS) {
-			std::cout << "Warning: Maximum number of lights (" << LightsUbo::MAX_LIGHTS << ") reached. Cannot add more lights." << std::endl;
-			return;
-		}
-
-		u_LightsData.lightPositions[u_LightsData.numLights] = glm::vec4(position, radius);
-		u_LightsData.lightColors[u_LightsData.numLights] = glm::vec4(color, intensity);
-		u_LightsData.numLights++;
-	}
-
-	void ObjectRenderSystem::clearLights()
-	{
-		u_LightsData.numLights = 0;
-		// Zero out the light arrays for clean state
-		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));
-		memset(u_LightsData.lightColors, 0, sizeof(u_LightsData.lightColors));
-	}
-
 	void ObjectRenderSystem::loadGame(const std::string& scenePath)
 	{
 		std::cout << "Loading scene from: " << scenePath << std::endl;
 		
-		sceneLoader.load(scenePath.c_str(), engineDevice);
-		
-		// Initialize ImageSystem with scene textures
-		const auto& sceneTextures = sceneLoader.getSceneTextures();
-		std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
-		renderer.initializeImageSystem(sceneTextures);
-		
-		std::cout << "Loaded scene with " << sceneLoader.getObjectCount() << " objects" << std::endl;
+		renderer.loadScenes(scenePath.c_str());
 	}
 
 } //

@@ -2,6 +2,9 @@
 #include "Logger.h"
 #include "Tools.h"
 
+#include <cmath>     // For fmod
+#include <cstdlib>   // For std::abs
+
 namespace aveng {
 
 void AssimpAnimClip::addChannels(aiAnimation* animation, std::vector<std::shared_ptr<AssimpBone>> boneList) {
@@ -54,38 +57,6 @@ float AssimpAnimClip::getClipTicksPerSecond() {
 
 void AssimpAnimClip::setClipName(std::string name) {
     mClipName = name;
-}
-
-glm::mat4 AssimpAnimClip::getBoneTransformation(const std::string& boneName, float animationTime) {
-    auto channel = findChannel(boneName);
-    if (channel) {
-        return channel->getTransformationMatrix(animationTime);
-    }
-    
-    // Return identity matrix if no animation channel found
-    return glm::mat4(1.0f);
-}
-
-void AssimpAnimClip::getBoneTransformations(float animationTime, std::vector<glm::mat4>& transformations, 
-                                           const std::vector<std::shared_ptr<AssimpBone>>& boneList) {
-    transformations.resize(boneList.size(), glm::mat4(1.0f));
-    
-    // Wrap animation time to clip duration
-    float wrappedTime = fmod(animationTime * mClipTicksPerSecond, mClipDuration);
-    
-    for (size_t i = 0; i < boneList.size(); ++i) {
-        const std::string& boneName = boneList[i]->getBoneName();
-        transformations[i] = getBoneTransformation(boneName, wrappedTime);
-    }
-}
-
-std::shared_ptr<AssimpAnimChannel> AssimpAnimClip::findChannel(const std::string& nodeName) {
-    for (auto& channel : mAnimChannels) {
-        if (channel->getTargetNodeName() == nodeName) {
-            return channel;
-        }
-    }
-    return nullptr;
 }
 
 } // namespace aveng 

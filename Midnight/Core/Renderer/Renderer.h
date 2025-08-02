@@ -4,17 +4,25 @@
 #include <vector>
 #include <cassert>
 #include <unordered_map>
-#include "../aveng_window.h"
-#include "../../CoreVK/EngineDevice.h"
-#include "../../CoreVK/swapchain.h"
-#include "../../CoreVK/GFXPipeline.h"
-#include "../../CoreVK/aveng_descriptors.h"
-#include "../../CoreVK/aveng_buffer.h"
-#include "../../CoreVK/AvengImageSystem.h"
-#include "../../CoreVK/PointLightSystem.h"
-#include "../aveng_model.h"
-#include "../data.h"
-#include "PipelineConfigManager.h"
+#include "CoreVK/aveng_descriptors.h"
+#include "CoreVK/AvengImageSystem.h"
+#include "CoreVK/PointLightSystem.h"
+#include "CoreVK/EngineDevice.h"
+#include "CoreVK/aveng_buffer.h"
+#include "CoreVK/GFXPipeline.h"
+#include "CoreVK/swapchain.h"
+#include "Core/Renderer/PipelineConfigManager.h"
+#include "Core/Animation/AnimationManager.h"
+#include "Core/aveng_scene_loader.h"
+#include "Core/aveng_window.h"
+#include "Core/aveng_model.h"
+#include "Core/app_object.h"
+#include "Core/data.h"
+
+
+#ifdef ENABLE_EDITOR
+#include "Editor.h"
+#endif
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -22,73 +30,29 @@
 
 namespace aveng {
 
-	// Forward declarations
-	class AvengAppObject;
-
-	// Pipeline management enums
-	enum class ObjectRenderMode {
-		STANDARD = 0,
-		WIREFRAME = 1,
-		DISTORTED = 2,
-		// Add more as needed
-	};
-
-	enum class PostProcessMode {
-		NONE = 0,
-		TOXIC_CLOUD = 1,
-		NIGHT_VISION = 2,
-		CHROMATIC_ABERRATION = 3,
-		// Add more effects
-	};
-
-	// Data structures moved from ObjectRenderSystem
-	struct LightsUbo {
-		static constexpr int MAX_LIGHTS = 100;
-		uint32_t numLights{ 0 };
-		alignas(16) glm::vec4 lightPositions[MAX_LIGHTS];  // w component is radius
-		alignas(16) glm::vec4 lightColors[MAX_LIGHTS];     // w component is intensity
-	};
-
-	struct GlobalUbo {
-		glm::mat4 projection{ 1.f };
-		glm::mat4 view{ 1.f };
-		glm::vec4 ambientLightColor{ 0.f, 0.f, 1.f, .14f };
-		glm::vec3 lightPosition{ 5.0f, -20.0f, 2.8f };
-		alignas(16) glm::vec4 lightColor{ 1.f, 1.f, 1.f, 1.f };
-		alignas(16) int renderMode{ 0 };  // 0 = STANDARD, 1 = WIREFRAME, 2 = DISTORTED
-		alignas(16) float time{ 0.0f };   // For animated effects
-	};
-
-	struct ObjectUniformData {
-		alignas(16) int texIndex;
-	};
-
-	// Instance data for instanced rendering - per object instance
-	struct InstanceData {
-		alignas(16) glm::mat4 modelMatrix;
-		alignas(16) glm::mat4 normalMatrix;
-		alignas(16) int textureIndex;
-		alignas(16) int padding[3]; // Ensure 16-byte alignment
-	};
+	
 
 	// Batch data for grouping instances by model
-	struct RenderBatch {
-		AvengModel* model;
-		std::vector<InstanceData> instances;
-		std::unique_ptr<AvengBuffer> instanceBuffer;
-		
-		RenderBatch(AvengModel* m) : model(m) {}
-	};
+	//struct RenderBatch {
+	//	AvengModel* model;
+	//	std::vector<InstanceData> instances;
+	//	std::unique_ptr<AvengBuffer> instanceBuffer;
+	//	
+	//	RenderBatch(AvengModel* m) : model(m) {}
+	//};
 
 	class Renderer {
 
 	public:
 
-		Renderer(AvengWindow &window, EngineDevice &device);
+		Renderer(AvengWindow& window, GameData& _gameData);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
 		Renderer &operator=(const Renderer&) = delete;
+
+		RenderData renderData;
+		GameData& gameData;
 
 		// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
 		VkRenderPass getSwapChainRenderPass() const { return aveng_swapchain->getRenderPass(); }
@@ -117,47 +81,66 @@ namespace aveng {
 		VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
 		VkFormat getSwapChainImageFormat() { return aveng_swapchain->getSwapChainImageFormat(); }
 
-		VkCommandBuffer beginFrame();
+		void beginFrame();
 		void endFrame();
 		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, glm::vec3 rgb);
 		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
+		VkDevice getEngineDevice() { return engineDevice.device(); }
+
 		// New methods for descriptor/buffer management
 		void initializeImageSystem(const std::vector<std::string>& texturePaths);
-		void setupDescriptors(int numObjects);
+		void setupDescriptors();
 		void initializePointLightSystem();
-		void updateFrameData(const GlobalUbo& globalData, const LightsUbo& lightsData);
+		void updateFrameData(const glm::mat4& projection, const glm::mat4& view);
+
+		void renderEditor();
 		
 		// Animation system integration (delegated to AnimationRenderingSystem)
 		void updateAnimationData(const std::vector<std::shared_ptr<class AssimpInstance>>& instances, float deltaTime = 0.016f);
 		void dispatchAnimationCompute(uint32_t vertexCount);
 		void renderAnimatedModels(const std::vector<std::shared_ptr<class AssimpInstance>>& instances);
 		void renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
-		void renderLights(int numLights);
-
-		// Instanced rendering methods
 		void renderObjectsInstanced(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
-		void updateInstanceBuffer(RenderBatch& batch);
+		// void updateInstanceBuffer(RenderBatch& batch);
+		const std::vector<AvengAppObject>& getAppObjects() const { return sceneLoader.getAppObjects(); };
+		void renderLights();
+		int getLightCount() const { return u_LightsData.numLights; }
+
+		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
+		void clearLights();
 
 		// Instanced rendering controls
 		void setInstancedRenderingEnabled(bool enabled) { instancedRenderingEnabled = enabled; }
 		bool getInstancedRenderingEnabled() const { return instancedRenderingEnabled; }
-		uint32_t getBatchCount() const { return static_cast<uint32_t>(renderBatches.size()); }
+		//uint32_t getBatchCount() const { return static_cast<uint32_t>(renderBatches.size()); }
 
 		// Pipeline switching methods
 		void setObjectRenderMode(ObjectRenderMode mode) { currentObjectMode = mode; }
 		void setPostProcessMode(PostProcessMode mode) { currentPostProcessMode = mode; }
 		ObjectRenderMode getObjectRenderMode() const { return currentObjectMode; }
 		PostProcessMode getPostProcessMode() const { return currentPostProcessMode; }
+
+		void loadScenes(const char* filepath);
 		
 		// Pipeline management methods
 		bool reloadPipelineConfig(const std::string& configPath = "");
 		std::vector<std::string> getAvailablePipelines() const;
 
 	private:
+
+		const char* default_scene_file = "scenes/demo-scene.json";
+		AvengWindow& aveng_window;
+		EngineDevice engineDevice{ aveng_window };		// The window API - Stack allocated
+		AvengSceneLoader sceneLoader;					// Contains shared pointers to objects with VMA Buffer Allocation
+		
 		// Dynamic texture array support
-		uint32_t currentTextureCount = 8; // Track current texture count for pipeline creation
-		bool pipelineCreated = false; // Guard against double pipeline creation
+		uint32_t currentTextureCount = 8;	// Track current texture count for pipeline creation
+		bool pipelineCreated = false;		// Guard against double pipeline creation
+
+		// Uniform buffers
+		LightsUbo u_LightsData{};
+		GlobalUbo u_GlobalData{};
 
 		// Pipeline mode tracking
 		ObjectRenderMode currentObjectMode = ObjectRenderMode::STANDARD;
@@ -172,16 +155,18 @@ namespace aveng {
 		// Moved from ObjectRenderSystem
 		void createPipelineLayout();
 		void createPipelines();                 // Main pipeline creation entry point
-		void createPostProcessPipelines();
+		//void createPostProcessPipelines();
 		
 		// DEPRECATED: Legacy pipeline creation (to be removed)
 		void createPipeline();
 		
 		size_t calculateDynamicUBOStride() const;
 
-		AvengWindow& aveng_window;
-		EngineDevice& engineDevice;
+		// Animation
+		/*void updateAnimationSystem(float frameTime);
+		void testAnimationSystem();*/
 
+		VkCommandBuffer commandBuffer;
 		std::vector<VkCommandBuffer> commandBuffers;
 
 		// SwapChain aveng_swapchain{ engineDevice, aveng_window.getExtent() };	// previous stack allocated. Ptr makes it easier to rebuild when the window resizes
@@ -194,8 +179,12 @@ namespace aveng {
 		// Pipeline management
 		std::unique_ptr<PipelineConfigManager> pipelineManager;
 		std::vector<std::unique_ptr<GFXPipeline>> objectPipelines;  // DEPRECATED: Fallback only
+
+		// Animation system for testing
+		//AnimationManager animationManager;
+
 		// Animation rendering system
-		std::unique_ptr<class AnimationRenderingSystem> animationSystem;
+		// std::unique_ptr<class AnimationRenderingSystem> animationSystem = nullptr;
 		
 		// DEPRECATED: Remove these legacy pipelines - use PipelineConfigManager instead
 		std::unique_ptr<GFXPipeline> gfxPipeline;  // Legacy - to be removed
@@ -203,14 +192,14 @@ namespace aveng {
 		
 		// Post-processing pipelines and resources
 		std::vector<std::unique_ptr<GFXPipeline>> postProcessPipelines;  // Index corresponds to PostProcessMode
-		VkRenderPass offscreenRenderPass{};
-		std::vector<VkFramebuffer> offscreenFramebuffers;
-		VkImage offscreenColorImage{};
-		VkDeviceMemory offscreenColorImageMemory{};
-		VkImageView offscreenColorImageView{};
-		VkImage offscreenDepthImage{};
-		VkDeviceMemory offscreenDepthImageMemory{};
-		VkImageView offscreenDepthImageView{};
+		//VkRenderPass offscreenRenderPass{};
+		//std::vector<VkFramebuffer> offscreenFramebuffers;
+		//VkImage offscreenColorImage{};
+		//VkDeviceMemory offscreenColorImageMemory{};
+		//VkImageView offscreenColorImageView{};
+		//VkImage offscreenDepthImage{};
+		//VkDeviceMemory offscreenDepthImageMemory{};
+		//VkImageView offscreenDepthImageView{};
 		
 		VkPipelineLayout pipelineLayout{};
 		VkPipelineLayout postProcessPipelineLayout{};
@@ -233,17 +222,21 @@ namespace aveng {
 		std::unique_ptr<AvengDescriptorSetLayout> lightsDescriptorSetLayout;
 		std::unique_ptr<AvengDescriptorSetLayout> postProcessDescriptorSetLayout;
 
-		// Instanced rendering data
-		std::unordered_map<AvengModel*, std::unique_ptr<RenderBatch>> renderBatches;
+		// Instanced rendering data - TODO - Why is a pointer the key? RenderBatch even includes a pointer to AvengModel. wtf?
+		// std::unordered_map<AvengModel*, std::unique_ptr<RenderBatch>> renderBatches;
 		bool instancedRenderingEnabled = true; // Toggle for A/B testing
 		uint32_t maxInstancesPerBatch = 1000;  // Reasonable default
 
 		// Engine systems
 		std::unique_ptr<ImageSystem> imageSystem;
-		PointLightSystem pointLightSystem;
+		PointLightSystem pointLightSystem{ engineDevice };
 
 		// State
 		int num_objects{1};
+		
+#ifdef ENABLE_EDITOR
+		aveng::Editor editor{ renderData, gameData };
+#endif
 
 	};
 

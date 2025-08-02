@@ -98,10 +98,11 @@ void main() {
     // Get instance animation data
     InstanceAnimationData instance = instances[instanceIndex];
     
-    // TEMPORARY: Skip bone transformations to test if they're causing the issue
-    // Just pass through the original vertex data for now
-    vec4 skinnedPosition = vec4(inputVertex.position, 1.0);
-    vec3 skinnedNormal = inputVertex.normal;
+    // FIXED: Apply per-instance model matrix transformation in compute shader
+    // This ensures each vertex gets the correct instance transformation
+    vec4 localPosition = vec4(inputVertex.position, 1.0);
+    vec4 skinnedPosition = instance.modelMatrix * localPosition;
+    vec3 skinnedNormal = mat3(instance.modelMatrix) * inputVertex.normal;
     
     /* COMMENTED OUT: Original bone transformation code
     // Apply skeletal animation transformation
@@ -149,9 +150,10 @@ void main() {
     }
     */
     
-    // Store the transformed vertex data
+    // Store the transformed vertex data (already in world space)
     outputVertices[vertexIndex].position = skinnedPosition.xyz;
-    outputVertices[vertexIndex].normal = normalize(skinnedNormal);
     outputVertices[vertexIndex].color = instanceColor;  // Debug: Use instance color
+    
+    outputVertices[vertexIndex].normal = normalize(skinnedNormal);
     outputVertices[vertexIndex].texCoord = inputVertex.texCoord;
 } 

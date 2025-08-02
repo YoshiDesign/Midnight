@@ -68,7 +68,7 @@ namespace aveng {
      * Class Functions
      */
     // Default Constructor - Initialize Vulkan
-    EngineDevice::EngineDevice(AvengWindow &window) : window{window} 
+    EngineDevice::EngineDevice(AvengWindow& window) : aveng_window{ window }
     {
 
         // Create the Vulkan instance
@@ -102,6 +102,7 @@ namespace aveng {
 
         // For command buffer allocation
         createCommandPool();
+
     }
 
     // Destructor
@@ -315,7 +316,7 @@ namespace aveng {
     /**
     * Call to our window ref to create the window surface with GLFW
     */
-    void EngineDevice::createSurface() { window.createWindowSurface(_instance, &_surface); }
+    void EngineDevice::createSurface() { aveng_window.createWindowSurface(_instance, &_surface); }
 
     /*
      * Determine if there is a non-integrated card and

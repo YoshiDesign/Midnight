@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include "Utils/SystemContext.h"
 #include "Core/data.h"
 #include "System/Render/ObjectRenderSystem.h"
 #include "Core/app_object.h"
@@ -8,7 +7,6 @@
 #include "CoreVK/EngineDevice.h"
 #include "CoreVk/aveng_buffer.h"
 #include "System/Peripheral/KeyboardController.h"
-#include "Core/Animation/AnimationManager.h"
 
 
 namespace aveng {
@@ -31,11 +29,8 @@ namespace aveng {
 	private:
 
 		float frameTime;
-
-		void loadAppObjects();
-		void setupLights();
-		void testAnimationSystem();
-		void updateAnimationSystem(float frameTime);
+		// void testAnimationSystem();
+		// void updateAnimationSystem(float frameTime);
 		//void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
 		//void updateData();
 
@@ -43,15 +38,9 @@ namespace aveng {
 		* !! Order of member initialization matters !!
 		* See: � 12.6.2 of the C++ Standard
 		*/
-		// The window API - Stack allocated
 		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
-		EngineDevice engineDevice{ aveng_window };
-		ObjectRenderSystem objectRenderSystem{ engineDevice, aveng_window };
-		
-		// Animation system for testing
-		AnimationManager animationManager;
-
-
+		ObjectRenderSystem objectRenderSystem{ aveng_window };
+	
 	};
 
 }

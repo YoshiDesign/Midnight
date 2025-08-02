@@ -18,7 +18,6 @@ namespace aveng {
     // Structure to represent object data from JSON
     struct ObjectData {
         std::string path;
-        int qty;
         std::vector<ObjectInstanceData> instances;
     };
 
@@ -47,7 +46,8 @@ namespace aveng {
         /**
          * Get the current scene's app objects for rendering
          */
-        const AvengAppObject::Map& getAppObjects() const { return currentSceneObjects; }
+        const std::vector<AvengAppObject>& getAppObjects() const { return currentSceneObjects_v; }
+        // AvengAppObject::Map&
         
         /**
          * Get current scene info
@@ -58,7 +58,7 @@ namespace aveng {
         /**
          * Get total number of objects in current scene
          */
-        size_t getObjectCount() const { return currentSceneObjects.size(); }
+        size_t getObjectCount() const { return currentSceneObjects_v.size(); }
         
         /**
          * Get texture paths from current scene
@@ -79,6 +79,7 @@ namespace aveng {
         std::string currentSceneId;
         std::unordered_map<std::string, SceneData> scenes;
         AvengAppObject::Map currentSceneObjects;
+        std::vector<AvengAppObject> currentSceneObjects_v;
         
         // Model cache - shared models by file path
         std::unordered_map<std::string, std::shared_ptr<AvengModel>> modelCache;

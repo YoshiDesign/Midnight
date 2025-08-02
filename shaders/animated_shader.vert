@@ -1,10 +1,9 @@
 #version 450
 
-// AnimatedVertex input layout
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec3 v_fragColor;
-layout(location = 2) in vec3 normal;
-layout(location = 3) in vec2 v_fragTexCoord;
+// AnimatedVertex input layout - ALL vec4 for perfect alignment
+layout(location = 0) in vec4 position;      // position.xyz + texCoord.x in .w
+layout(location = 1) in vec4 v_fragColor;   // color.xyz + unused .w
+layout(location = 2) in vec4 normal;        // normal.xyz + texCoord.y in .w
 layout(location = 4) in ivec4 boneIds;
 layout(location = 5) in vec4 boneWeights;
 
@@ -27,39 +26,56 @@ layout(set = 3, binding = 1, std430) restrict readonly buffer BoneMatricesSSBO {
 	mat4 boneMatrices[];
 };
 
-// Model matrix and normal matrix
+// Model matrix and bone offset for instance
 layout(push_constant) uniform Push {
 	mat4 modelMatrix;
 	mat4 normalMatrix;
+	int boneMatrixOffset;  // Offset into bone matrices buffer for this instance
 } push;
 
 void main() {
-	// Calculate skinned vertex position using bone weights
-	vec4 skinnedPosition = vec4(0.0);
-	vec3 skinnedNormal = vec3(0.0);
+	// FIXED: Extract data from packed vec4 layout
+	vec3 pos = position.xyz;         // Extract position
+	vec3 norm = normal.xyz;          // Extract normal  
+	vec3 color = v_fragColor.xyz;    // Extract color
+	vec2 texCoord = vec2(position.w, normal.w);  // Extract UV from .w components
 	
-	// Apply bone transformations
+	// Use working example approach - blend bone matrices FIRST
+	mat4 skinMatrix = mat4(0.0);
+	float totalWeight = 0.0;
+	
+	// Calculate weighted bone matrix (like working example)
 	for (int i = 0; i < 4; i++) {
 		if (boneIds[i] >= 0 && boneWeights[i] > 0.0) {
-			mat4 boneTransform = boneMatrices[boneIds[i]];
-			skinnedPosition += boneTransform * vec4(position, 1.0) * boneWeights[i];
-			skinnedNormal += mat3(boneTransform) * normal * boneWeights[i];
+			int boneIndex = boneIds[i] + push.boneMatrixOffset;
+			skinMatrix += boneWeights[i] * boneMatrices[boneIndex];
+			totalWeight += boneWeights[i];
 		}
 	}
 	
-	// If no valid bones, use original vertex data
-	if (skinnedPosition.w == 0.0) {
-		skinnedPosition = vec4(position, 1.0);
-		skinnedNormal = normal;
+	vec4 worldPosition;
+	vec3 worldNormal;
+	
+	if (totalWeight > 0.0) {
+		// Apply blended bone matrix to vertex ONCE
+		vec4 skinnedLocalPos = skinMatrix * vec4(pos, 1.0);
+		vec3 skinnedLocalNormal = mat3(skinMatrix) * norm;
+		
+		// Apply model matrix to skinned vertex (world transform)
+		worldPosition = push.modelMatrix * skinnedLocalPos;
+		worldNormal = mat3(push.normalMatrix) * skinnedLocalNormal;
+	} else {
+		// No bone influences - use original vertex with model matrix
+		worldPosition = push.modelMatrix * vec4(pos, 1.0);
+		worldNormal = mat3(push.normalMatrix) * norm;
 	}
 	
-	// Transform to world space
-	vec4 positionWorld = push.modelMatrix * skinnedPosition;
-	gl_Position = ubo.projection * ubo.view * positionWorld;
+	// Final projection
+	gl_Position = ubo.projection * ubo.view * worldPosition;
 
 	// Output interpolated data
-	f_fragNormalWorld = normalize(mat3(push.normalMatrix) * skinnedNormal);
-	f_fragPosWorld    = positionWorld.xyz;
-	f_fragColor		  = v_fragColor;
-	f_fragTexCoord    = v_fragTexCoord;
+	f_fragNormalWorld = normalize(worldNormal);
+	f_fragPosWorld    = worldPosition.xyz;
+	f_fragColor		  = color;
+	f_fragTexCoord    = texCoord;
 } 

@@ -54,7 +54,7 @@
     {
       "name": "ANIMATED",
       "id": 4,
-      "vertexShader": "shaders/transformed_shader.vert.spv",
+      "vertexShader": "shaders/animated_shader.vert.spv",
       "fragmentShader": "shaders/simple_shader.frag.spv",
       "rasterization": {
         "polygonMode": "FILL",

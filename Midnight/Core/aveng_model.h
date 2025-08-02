@@ -60,6 +60,7 @@ namespace aveng {
 		
 		void bind(VkCommandBuffer commandBuffer);
 		void draw(VkCommandBuffer commandBuffer);
+		void drawInstanced(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
 	
 	private:
 

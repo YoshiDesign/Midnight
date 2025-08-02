@@ -21,13 +21,6 @@ public:
     float getClipTicksPerSecond();
 
     void setClipName(std::string name);
-    
-    // Calculate local pose matrix for a specific bone at given time
-    glm::mat4 getBoneTransformation(const std::string& boneName, float animationTime);
-    
-    // Get all bone transformations for current animation time
-    void getBoneTransformations(float animationTime, std::vector<glm::mat4>& transformations, 
-                               const std::vector<std::shared_ptr<AssimpBone>>& boneList);
 
 private:
     std::string mClipName;
@@ -35,9 +28,6 @@ private:
     float mClipTicksPerSecond = 0.0f;
 
     std::vector<std::shared_ptr<AssimpAnimChannel>> mAnimChannels{};
-    
-    // Helper to find channel by target node name
-    std::shared_ptr<AssimpAnimChannel> findChannel(const std::string& nodeName);
 };
 
 } // namespace aveng

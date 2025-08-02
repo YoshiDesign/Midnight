@@ -18,6 +18,19 @@ class AvengDescriptorPool;
 class GFXPipeline;
 class PipelineConfigManager;
 
+// 🔧 FIXED: Persistent layout tracking to eliminate data flow inconsistencies
+struct InstanceLayout {
+    uint32_t vertexOffset;     // Where this instance starts in global vertex buffer
+    uint32_t vertexCount;      // How many vertices this instance has  
+    uint32_t indexOffset;      // Where this instance's indices start in global index buffer
+    uint32_t indexCount;       // How many indices this instance has
+    uint32_t boneOffset;       // Where this instance's bone matrices start
+    uint32_t boneCount;        // How many bone matrices this instance has
+    
+    // Debug information
+    std::string debugName;     // For debugging - instance/model name
+};
+
 /**
  * Dedicated animation rendering system that handles:
  * - Animation data upload to GPU buffers
@@ -87,6 +100,10 @@ private:
     uint32_t lastInstanceCount = 0;
     
     bool initialized = false;
+    bool staticDataUploaded = false; // PERFORMANCE: Track if mesh data uploaded once
+    
+    // 🔧 FIXED: Persistent layout tracking to fix data flow inconsistencies
+    std::vector<InstanceLayout> persistentInstanceLayouts;  // Tracks where each instance's data lives in global buffers
 };
 
 } // namespace aveng 

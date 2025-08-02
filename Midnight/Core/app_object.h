@@ -22,10 +22,10 @@ namespace aveng {
 		}
 
 		AvengAppObject(id_t objId, int texture_id) : id{ objId }, texture_id{ texture_id } {}
-		AvengAppObject(const AvengAppObject&) = delete;
-		AvengAppObject& operator=(const AvengAppObject&) = delete;
-		AvengAppObject(AvengAppObject&&) = default;
-		AvengAppObject& operator=(AvengAppObject&&) = default;
+		AvengAppObject(const AvengAppObject&) = delete;				// Copy
+		AvengAppObject& operator=(const AvengAppObject&) = delete;	// Copy Assignment 
+		AvengAppObject(AvengAppObject&&) = default;					// Move
+		AvengAppObject& operator=(AvengAppObject&&) = default;		// Move Assignment
 
 		id_t getId() const { return id; }
 		std::shared_ptr<AvengModel> model{};

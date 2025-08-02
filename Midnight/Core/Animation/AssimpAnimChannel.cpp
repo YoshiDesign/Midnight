@@ -1,11 +1,19 @@
 #include "AssimpAnimChannel.h"
 #include "Tools.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <chrono>
 
 namespace aveng {
 
 void AssimpAnimChannel::loadChannelData(aiNodeAnim* nodeAnim) {
     mTargetNodeName = nodeAnim->mNodeName.C_Str();
+    
+    // Load pre/post animation behavior (like reference implementation)
+    mPreState = nodeAnim->mPreState;
+    mPostState = nodeAnim->mPostState;
+    
+    Logger::log(2, "AssimpAnimChannel: Loading '%s' with preState %u, postState %u\n", 
+               mTargetNodeName.c_str(), mPreState, mPostState);
     
     // Load all keyframes and combine position, rotation, scale data
     unsigned int maxKeys = std::max({nodeAnim->mNumPositionKeys, 
@@ -46,6 +54,20 @@ void AssimpAnimChannel::loadChannelData(aiNodeAnim* nodeAnim) {
         
         mKeyFrames.push_back(keyFrame);
     }
+    
+    // Precalculate inverse time differences for performance (like reference implementation)
+    mInverseTimeDiffs.reserve(mKeyFrames.size() - 1);
+    for (size_t i = 0; i < mKeyFrames.size() - 1; ++i) {
+        float timeDiff = static_cast<float>(mKeyFrames[i + 1].timeStamp - mKeyFrames[i].timeStamp);
+        if (timeDiff > 0.0f) {
+            mInverseTimeDiffs.push_back(1.0f / timeDiff);
+        } else {
+            mInverseTimeDiffs.push_back(0.0f); // Avoid division by zero
+        }
+    }
+    
+    // Optimize memory layout for better cache performance
+    optimizeMemoryLayout();
 }
 
 std::string AssimpAnimChannel::getTargetNodeName() {
@@ -73,60 +95,135 @@ glm::mat4 AssimpAnimChannel::getTransformationMatrix(float animationTime) {
 }
 
 glm::vec3 AssimpAnimChannel::getInterpolatedPosition(float animationTime) {
-    if (mKeyFrames.size() == 1 || animationTime <= mKeyFrames[0].timeStamp) {
+    if (mKeyFrames.empty()) {
+        return glm::vec3(0.0f); // No keyframes
+    }
+    
+    if (mKeyFrames.size() == 1) {
         return mKeyFrames[0].position;
     }
     
-    if (animationTime >= mKeyFrames.back().timeStamp) {
-        return mKeyFrames.back().position;
+    // Handle time before first keyframe (pre-animation behavior)
+    if (animationTime < static_cast<float>(mKeyFrames[0].timeStamp)) {
+        switch (static_cast<AnimBehavior>(mPreState)) {
+            case AnimBehavior::DEFAULT:
+                return glm::vec3(0.0f); // Don't change vertex position
+            case AnimBehavior::CONSTANT:
+                return mKeyFrames[0].position; // Use first keyframe value
+            default:
+                Logger::log(1, "AssimpAnimChannel: preState %u not implemented for position\n", mPreState);
+                return mKeyFrames[0].position;
+        }
     }
     
-    // Find the two keyframes to interpolate between
-    for (size_t i = 0; i < mKeyFrames.size() - 1; ++i) {
-        if (animationTime >= mKeyFrames[i].timeStamp && animationTime <= mKeyFrames[i + 1].timeStamp) {
-            float factor = getScaleFactor(mKeyFrames[i].timeStamp, mKeyFrames[i + 1].timeStamp, animationTime);
-            return glm::mix(mKeyFrames[i].position, mKeyFrames[i + 1].position, factor);
+    // Handle time after last keyframe (post-animation behavior)
+    if (animationTime >= static_cast<float>(mKeyFrames.back().timeStamp)) {
+        switch (static_cast<AnimBehavior>(mPostState)) {
+            case AnimBehavior::DEFAULT:
+                return glm::vec3(0.0f); // Don't change vertex position
+            case AnimBehavior::CONSTANT:
+                return mKeyFrames.back().position; // Use last keyframe value
+            default:
+                Logger::log(1, "AssimpAnimChannel: postState %u not implemented for position\n", mPostState);
+                return mKeyFrames.back().position;
         }
+    }
+    
+    // Normal interpolation between keyframes
+    int index = findKeyFrameIndex(animationTime);
+    if (index >= 0 && index < static_cast<int>(mKeyFrames.size()) - 1) {
+        float factor = getOptimizedScaleFactor(index, animationTime);
+        return glm::mix(mKeyFrames[index].position, mKeyFrames[index + 1].position, factor);
     }
     
     return mKeyFrames[0].position; // Fallback
 }
 
 glm::quat AssimpAnimChannel::getInterpolatedRotation(float animationTime) {
-    if (mKeyFrames.size() == 1 || animationTime <= mKeyFrames[0].timeStamp) {
+    if (mKeyFrames.empty()) {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion (no rotation)
+    }
+    
+    if (mKeyFrames.size() == 1) {
         return mKeyFrames[0].rotation;
     }
     
-    if (animationTime >= mKeyFrames.back().timeStamp) {
-        return mKeyFrames.back().rotation;
+    // Handle time before first keyframe (pre-animation behavior)
+    if (animationTime < static_cast<float>(mKeyFrames[0].timeStamp)) {
+        switch (static_cast<AnimBehavior>(mPreState)) {
+            case AnimBehavior::DEFAULT:
+                return glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion (no rotation)
+            case AnimBehavior::CONSTANT:
+                return mKeyFrames[0].rotation; // Use first keyframe value
+            default:
+                Logger::log(1, "AssimpAnimChannel: preState %u not implemented for rotation\n", mPreState);
+                return mKeyFrames[0].rotation;
+        }
     }
     
-    // Find the two keyframes to interpolate between
-    for (size_t i = 0; i < mKeyFrames.size() - 1; ++i) {
-        if (animationTime >= mKeyFrames[i].timeStamp && animationTime <= mKeyFrames[i + 1].timeStamp) {
-            float factor = getScaleFactor(mKeyFrames[i].timeStamp, mKeyFrames[i + 1].timeStamp, animationTime);
-            return glm::slerp(mKeyFrames[i].rotation, mKeyFrames[i + 1].rotation, factor);
+    // Handle time after last keyframe (post-animation behavior)
+    if (animationTime >= static_cast<float>(mKeyFrames.back().timeStamp)) {
+        switch (static_cast<AnimBehavior>(mPostState)) {
+            case AnimBehavior::DEFAULT:
+                return glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion (no rotation)
+            case AnimBehavior::CONSTANT:
+                return mKeyFrames.back().rotation; // Use last keyframe value
+            default:
+                Logger::log(1, "AssimpAnimChannel: postState %u not implemented for rotation\n", mPostState);
+                return mKeyFrames.back().rotation;
         }
+    }
+    
+    // Normal interpolation between keyframes
+    int index = findKeyFrameIndex(animationTime);
+    if (index >= 0 && index < static_cast<int>(mKeyFrames.size()) - 1) {
+        float factor = getOptimizedScaleFactor(index, animationTime);
+        return glm::slerp(mKeyFrames[index].rotation, mKeyFrames[index + 1].rotation, factor);
     }
     
     return mKeyFrames[0].rotation; // Fallback
 }
 
 glm::vec3 AssimpAnimChannel::getInterpolatedScale(float animationTime) {
-    if (mKeyFrames.size() == 1 || animationTime <= mKeyFrames[0].timeStamp) {
+    if (mKeyFrames.empty()) {
+        return glm::vec3(1.0f); // Identity scale (no scaling)
+    }
+    
+    if (mKeyFrames.size() == 1) {
         return mKeyFrames[0].scale;
     }
     
-    if (animationTime >= mKeyFrames.back().timeStamp) {
-        return mKeyFrames.back().scale;
+    // Handle time before first keyframe (pre-animation behavior)
+    if (animationTime < static_cast<float>(mKeyFrames[0].timeStamp)) {
+        switch (static_cast<AnimBehavior>(mPreState)) {
+            case AnimBehavior::DEFAULT:
+                return glm::vec3(1.0f); // Identity scale (no scaling)
+            case AnimBehavior::CONSTANT:
+                return mKeyFrames[0].scale; // Use first keyframe value
+            default:
+                Logger::log(1, "AssimpAnimChannel: preState %u not implemented for scale\n", mPreState);
+                return mKeyFrames[0].scale;
+        }
     }
     
-    // Find the two keyframes to interpolate between
-    for (size_t i = 0; i < mKeyFrames.size() - 1; ++i) {
-        if (animationTime >= mKeyFrames[i].timeStamp && animationTime <= mKeyFrames[i + 1].timeStamp) {
-            float factor = getScaleFactor(mKeyFrames[i].timeStamp, mKeyFrames[i + 1].timeStamp, animationTime);
-            return glm::mix(mKeyFrames[i].scale, mKeyFrames[i + 1].scale, factor);
+    // Handle time after last keyframe (post-animation behavior)
+    if (animationTime >= static_cast<float>(mKeyFrames.back().timeStamp)) {
+        switch (static_cast<AnimBehavior>(mPostState)) {
+            case AnimBehavior::DEFAULT:
+                return glm::vec3(1.0f); // Identity scale (no scaling)
+            case AnimBehavior::CONSTANT:
+                return mKeyFrames.back().scale; // Use last keyframe value
+            default:
+                Logger::log(1, "AssimpAnimChannel: postState %u not implemented for scale\n", mPostState);
+                return mKeyFrames.back().scale;
         }
+    }
+    
+    // Normal interpolation between keyframes
+    int index = findKeyFrameIndex(animationTime);
+    if (index >= 0 && index < static_cast<int>(mKeyFrames.size()) - 1) {
+        float factor = getOptimizedScaleFactor(index, animationTime);
+        return glm::mix(mKeyFrames[index].scale, mKeyFrames[index + 1].scale, factor);
     }
     
     return mKeyFrames[0].scale; // Fallback
@@ -136,6 +233,68 @@ float AssimpAnimChannel::getScaleFactor(float lastTimeStamp, float nextTimeStamp
     float midWayLength = animationTime - lastTimeStamp;
     float framesDiff = nextTimeStamp - lastTimeStamp;
     return midWayLength / framesDiff;
+}
+
+float AssimpAnimChannel::getOptimizedScaleFactor(int keyFrameIndex, float animationTime) {
+    // Use precalculated inverse time difference to avoid division (like reference implementation)
+    if (keyFrameIndex >= 0 && keyFrameIndex < static_cast<int>(mInverseTimeDiffs.size())) {
+        return (animationTime - static_cast<float>(mKeyFrames[keyFrameIndex].timeStamp)) * mInverseTimeDiffs[keyFrameIndex];
+    }
+    // Fallback to regular calculation if out of bounds
+    return getScaleFactor(static_cast<float>(mKeyFrames[keyFrameIndex].timeStamp), 
+                         static_cast<float>(mKeyFrames[keyFrameIndex + 1].timeStamp), 
+                         animationTime);
+}
+
+int AssimpAnimChannel::findKeyFrameIndex(float animationTime) {
+    // Performance tracking for debugging
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Use binary search to find the keyframe pair (O(log n))
+    auto compareTime = [](const AnimationKeyFrame& keyFrame, float time) {
+        return keyFrame.timeStamp < time;
+    };
+    
+    auto it = std::lower_bound(mKeyFrames.begin(), mKeyFrames.end(), animationTime, compareTime);
+    
+    // Calculate index and ensure it's valid
+    int index = static_cast<int>(std::distance(mKeyFrames.begin(), it)) - 1;
+    
+    // Update performance metrics
+    auto endTime = std::chrono::high_resolution_clock::now();
+    float searchTime = std::chrono::duration<float, std::micro>(endTime - startTime).count();
+    mInterpolationCallCount++;
+    mTotalSearchTime += searchTime;
+    
+    return std::max(index, 0);
+}
+
+void AssimpAnimChannel::optimizeMemoryLayout() {
+    // Shrink containers to fit exact size (reduce memory footprint)
+    mKeyFrames.shrink_to_fit();
+    mInverseTimeDiffs.shrink_to_fit();
+    
+    // Sort keyframes by timestamp to ensure optimal cache locality
+    // (This should already be sorted from Assimp, but ensure it)
+    if (!mKeyFrames.empty()) {
+        std::sort(mKeyFrames.begin(), mKeyFrames.end(), 
+                 [](const AnimationKeyFrame& a, const AnimationKeyFrame& b) {
+                     return a.timeStamp < b.timeStamp;
+                 });
+    }
+    
+    Logger::log(2, "AssimpAnimChannel: Memory optimized for '%s' - %zu keyframes, %zu time diffs\n",
+               mTargetNodeName.c_str(), mKeyFrames.size(), mInverseTimeDiffs.size());
+}
+
+void AssimpAnimChannel::resetPerformanceMetrics() {
+    mInterpolationCallCount = 0;
+    mTotalSearchTime = 0.0f;
+}
+
+void AssimpAnimChannel::getPerformanceMetrics(size_t& interpolationCalls, float& averageSearchTime) const {
+    interpolationCalls = mInterpolationCallCount;
+    averageSearchTime = (mInterpolationCallCount > 0) ? (mTotalSearchTime / mInterpolationCallCount) : 0.0f;
 }
 
 } // namespace aveng 

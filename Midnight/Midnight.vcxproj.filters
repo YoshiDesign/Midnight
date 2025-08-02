@@ -1115,9 +1115,6 @@
     <ClInclude Include="Utils\window_callbacks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\SystemContext.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Core\UUID.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1185,9 +1182,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\Animation\ModelAndInstanceData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\PlaceholderBuffers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\Animation\Tools.h">

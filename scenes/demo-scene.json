@@ -4,7 +4,6 @@
     "objects": [
       {
         "path": "3D/ship.obj",
-        "qty": 4,
         "data": [
           {
             "pos": { "x": 25, "y": -10, "z": -5 },
@@ -30,7 +29,6 @@
       },
       {
         "path": "3D/sandbox-2.obj",
-        "qty": 1,
         "data": [
           { "pos": { "x": 0, "y": 0, "z": 0 }, "tex": 0, "name": "the world" }
         ]
@@ -43,7 +41,6 @@
     "objects": [
       {
         "path": "3D/ship.obj",
-        "qty": 1,
         "data": [
           { "pos": { "x": 0, "y": 0, "z": 0 }, "tex": 0, "name": "single ship" }
         ]

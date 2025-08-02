@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cassert>
+#include <chrono>
 
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/ComputePipeline.h"
@@ -101,9 +102,10 @@ void AnimationRenderingSystem::createAnimationBuffers(int maxFramesInFlight)
         instanceAnimationBuffers[i]->map();
 
         // Animated vertex SSBO (sized for large models like animTVGuy - 100k vertices)
+        // FIXED: Added VK_BUFFER_USAGE_VERTEX_BUFFER_BIT for direct vertex rendering
         animatedVertexBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
             sizeof(AnimatedVertex) * 100000, 1,  // Large enough for stress test models
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VMA_MEMORY_USAGE_AUTO,
             16, // minOffsetAlignment
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
@@ -205,11 +207,21 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
     std::vector<AnimatedVertex> allVertices;
     std::vector<uint32_t> allIndices;
 
+    // FIXED: Always rebuild layout metadata (not just first frame)
+    std::vector<InstanceLayout> currentFrameLayouts;
     uint32_t currentBoneOffset = 0;
     uint32_t currentVertexOffset = 0;
+    uint32_t currentIndexOffset = 0;
 
     for (size_t i = 0; i < instances.size(); ++i) {
         auto& instance = instances[i];
+        
+        // FIXED: Create layout metadata for this instance
+        InstanceLayout layout{};
+        layout.vertexOffset = currentVertexOffset;
+        layout.indexOffset = currentIndexOffset;
+        layout.boneOffset = currentBoneOffset;
+        layout.debugName = "Instance_" + std::to_string(i);  // Simple debug name
         
         // Create instance animation data
         InstanceAnimationData instData{};
@@ -221,26 +233,49 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
         // Get bone matrices from instance
         const auto& boneMatrices = instance->getBoneTransformMatrices();
         instData.boneCount = static_cast<uint32_t>(boneMatrices.size());
+        layout.boneCount = instData.boneCount;
         currentBoneOffset += instData.boneCount;
 
-        // Add bone matrices to global buffer
+        // DEBUG: Check first bone matrix for corruption
+        if (i == 0 && !boneMatrices.empty()) {
+            const auto& firstBone = boneMatrices[0];
+            /*std::cout << " DEBUG: First bone matrix for instance " << i << ":" << std::endl;
+            std::cout << "  [" << firstBone[0][0] << ", " << firstBone[0][1] << ", " << firstBone[0][2] << ", " << firstBone[0][3] << "]" << std::endl;
+            std::cout << "  [" << firstBone[1][0] << ", " << firstBone[1][1] << ", " << firstBone[1][2] << ", " << firstBone[1][3] << "]" << std::endl;
+            std::cout << "  [" << firstBone[2][0] << ", " << firstBone[2][1] << ", " << firstBone[2][2] << ", " << firstBone[2][3] << "]" << std::endl;
+            std::cout << "  [" << firstBone[3][0] << ", " << firstBone[3][1] << ", " << firstBone[3][2] << ", " << firstBone[3][3] << "]" << std::endl;*/
+        }
+
+        // Add bone matrices to global buffer (ALWAYS needed for animation)
         allBoneMatrices.insert(allBoneMatrices.end(), boneMatrices.begin(), boneMatrices.end());
 
-        // Get vertex data from model meshes
+        // FIXED: ALWAYS collect vertex/index data and layout metadata (not just first frame)
         const auto& meshes = instance->getModel()->getModelMeshes();
+        uint32_t instanceVertexCount = 0;
+        uint32_t instanceIndexCount = 0;
+        
         for (const auto& mesh : meshes) {
             // Add all vertices from this mesh
             allVertices.insert(allVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
+            instanceVertexCount += static_cast<uint32_t>(mesh.vertices.size());
             
-            // Add all indices from this mesh (offset by current vertex offset)
+            // FIXED: Add indices with proper offset (no double offsetting in rendering)
             const auto& meshIndices = mesh.indices;
             for (uint32_t index : meshIndices) {
-                allIndices.push_back(index + currentVertexOffset);
+                allIndices.push_back(index + currentVertexOffset);  // Pre-offset for global vertex buffer
             }
+            instanceIndexCount += static_cast<uint32_t>(meshIndices.size());
             
             currentVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
         }
-
+        
+        // Complete layout metadata for this instance
+        layout.vertexCount = instanceVertexCount;
+        layout.indexCount = instanceIndexCount;
+        currentIndexOffset += instanceIndexCount;
+        
+        // Store layout and instance data
+        currentFrameLayouts.push_back(layout);
         instanceData.push_back(instData);
     }
 
@@ -251,6 +286,9 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
         instanceAnimationBuffers[currentFrameIndex]->flush();
     }
 
+    // 🔧 FIXED: Store persistent layout metadata (always update)
+    persistentInstanceLayouts = std::move(currentFrameLayouts);
+    
     // Upload bone matrices
     if (!allBoneMatrices.empty()) {
         boneMatrixBuffers[currentFrameIndex]->writeToBuffer(allBoneMatrices.data(),
@@ -258,34 +296,136 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
         boneMatrixBuffers[currentFrameIndex]->flush();
     }
 
-    // Upload animated vertices
-    if (!allVertices.empty()) {
-        // Verify buffer is large enough (should be with our 100k vertex allocation)
-        uint32_t requiredVertexBufferSize = sizeof(AnimatedVertex) * allVertices.size();
-        if (animatedVertexBuffers[currentFrameIndex]->getBufferSize() < requiredVertexBufferSize) {
-            std::cerr << "ERROR: Animated vertex buffer too small! Required: " << requiredVertexBufferSize 
-                      << ", Available: " << animatedVertexBuffers[currentFrameIndex]->getBufferSize() << std::endl;
-            return; // Fail gracefully instead of crashing
+    // 🔧 FIXED: Upload mesh data based on actual changes, not arbitrary flag
+    // Upload if we have new vertex/index data OR if not previously uploaded
+    if (!allVertices.empty() && (!staticDataUploaded || allVertices.size() != lastVertexCount)) {
+        std::cout << " PERFORMANCE: Uploading mesh data (" 
+                  << allVertices.size() << " vertices, " << allIndices.size() << " indices)" << std::endl;
+        
+        // 🔧 FIXED: Debug layout metadata for validation
+        std::cout << "LAYOUT METADATA DEBUG:" << std::endl;
+        for (size_t i = 0; i < persistentInstanceLayouts.size(); ++i) {
+            const auto& layout = persistentInstanceLayouts[i];
+            std::cout << "  " << layout.debugName << ": vertices[" << layout.vertexOffset 
+                      << "-" << (layout.vertexOffset + layout.vertexCount - 1) << "] "
+                      << "indices[" << layout.indexOffset << "-" << (layout.indexOffset + layout.indexCount - 1) << "] "
+                      << "bones[" << layout.boneOffset << "-" << (layout.boneOffset + layout.boneCount - 1) << "]" << std::endl;
         }
         
-        animatedVertexBuffers[currentFrameIndex]->writeToBuffer(allVertices.data(),
-            sizeof(AnimatedVertex) * allVertices.size());
-        animatedVertexBuffers[currentFrameIndex]->flush();
-    }
-
-    // Upload animated indices
-    if (!allIndices.empty()) {
-        // Verify buffer is large enough (should be with our 350k index allocation)
-        uint32_t requiredIndexBufferSize = sizeof(uint32_t) * allIndices.size();
-        if (animatedIndexBuffers[currentFrameIndex]->getBufferSize() < requiredIndexBufferSize) {
-            std::cerr << "ERROR: Animated index buffer too small! Required: " << requiredIndexBufferSize 
-                      << ", Available: " << animatedIndexBuffers[currentFrameIndex]->getBufferSize() << std::endl;
-            return; // Fail gracefully instead of crashing
+        // DEBUG: Extensive vertex collection analysis
+        std::cout << "EXTENSIVE DEBUG ANALYSIS:" << std::endl;
+        std::cout << "==================================" << std::endl;
+        
+        // Per-instance breakdown
+        uint32_t totalVerticesExpected = 0;
+        uint32_t totalIndicesExpected = 0;
+        for (size_t i = 0; i < instances.size(); ++i) {
+            const auto& meshes = instances[i]->getModel()->getModelMeshes();
+            uint32_t instanceVertices = 0;
+            uint32_t instanceIndices = 0;
+            
+            std::cout << "Instance " << i << " mesh breakdown:" << std::endl;
+            for (size_t m = 0; m < meshes.size(); ++m) {
+                instanceVertices += static_cast<uint32_t>(meshes[m].vertices.size());
+                instanceIndices += static_cast<uint32_t>(meshes[m].indices.size());
+                std::cout << "  Mesh " << m << ": " << meshes[m].vertices.size() << " vertices, " 
+                          << meshes[m].indices.size() << " indices" << std::endl;
+            }
+            
+            std::cout << "Instance " << i << " totals: " << instanceVertices << " vertices, " 
+                      << instanceIndices << " indices" << std::endl;
+            totalVerticesExpected += instanceVertices;
+            totalIndicesExpected += instanceIndices;
         }
         
-        animatedIndexBuffers[currentFrameIndex]->writeToBuffer(allIndices.data(),
-            sizeof(uint32_t) * allIndices.size());
-        animatedIndexBuffers[currentFrameIndex]->flush();
+        std::cout << "EXPECTED TOTALS: " << totalVerticesExpected << " vertices, " << totalIndicesExpected << " indices" << std::endl;
+        std::cout << "COLLECTED TOTALS: " << allVertices.size() << " vertices, " << allIndices.size() << " indices" << std::endl;
+        
+        if (totalVerticesExpected != allVertices.size()) {
+            std::cout << "VERTEX COUNT MISMATCH!" << std::endl;
+        }
+        if (totalIndicesExpected != allIndices.size()) {
+            std::cout << " INDEX COUNT MISMATCH!" << std::endl;
+        }
+        
+        // Sample vertex data analysis
+        std::cout << "\n SAMPLE VERTEX DATA:" << std::endl;
+        for (size_t i = 0; i < std::min(size_t(3), allVertices.size()); ++i) {
+            const auto& v = allVertices[i];
+            std::cout << "  Vertex " << i << ":" << std::endl;
+            std::cout << "    Position: (" << v.position.x << ", " << v.position.y << ", " << v.position.z << ")" << std::endl;
+            std::cout << "    Normal: (" << v.normal.x << ", " << v.normal.y << ", " << v.normal.z << ")" << std::endl;
+            std::cout << "    TexCoord: (" << v.position.w << ", " << v.color.w << ") [packed in .w components]" << std::endl;
+            std::cout << "    BoneIds: (" << v.boneIds.x << ", " << v.boneIds.y << ", " << v.boneIds.z << ", " << v.boneIds.w << ")" << std::endl;
+            std::cout << "    BoneWeights: (" << v.boneWeights.x << ", " << v.boneWeights.y << ", " << v.boneWeights.z << ", " << v.boneWeights.w << ")" << std::endl;
+            
+            // Validate bone data
+            float totalWeight = v.boneWeights.x + v.boneWeights.y + v.boneWeights.z + v.boneWeights.w;
+            std::cout << "    Weight Sum: " << totalWeight << std::endl;
+            if (totalWeight > 1.1f || totalWeight < 0.9f) {
+                std::cout << "    WARNING: Bone weights don't sum to ~1.0!" << std::endl;
+            }
+        }
+        
+        // Sample index data
+        std::cout << "\n SAMPLE INDEX DATA:" << std::endl;
+        std::cout << "First 15 indices: ";
+        for (size_t i = 0; i < std::min(size_t(15), allIndices.size()); ++i) {
+            std::cout << allIndices[i] << " ";
+        }
+        std::cout << std::endl;
+        
+        // 🔧 STEP 5: Validate indices point to valid vertices (catch double-offsetting bugs)
+        std::cout << "INDEX VALIDATION:" << std::endl;
+        uint32_t invalidIndices = 0;
+        uint32_t maxValidIndex = allVertices.size() - 1;
+        for (size_t i = 0; i < std::min(size_t(20), allIndices.size()); ++i) {  // Check first 20 indices
+            if (allIndices[i] > maxValidIndex) {
+                std::cout << "  Index " << i << " = " << allIndices[i] << " (max valid: " << maxValidIndex << ")" << std::endl;
+                invalidIndices++;
+            } else if (i < 10) {  // Show first 10 valid indices for reference
+                std::cout << "  Index " << i << " = " << allIndices[i] << " (valid)" << std::endl;
+            }
+        }
+        if (invalidIndices > 0) {
+            std::cerr << "ERROR: Found " << invalidIndices << " invalid indices! This indicates offset calculation bugs." << std::endl;
+        } else {
+            std::cout << "All checked indices are valid!" << std::endl;
+        }
+        
+        // Upload vertices to ALL frames (since we use different buffers per frame)
+        for (int frame = 0; frame < animatedVertexBuffers.size(); ++frame) {
+            // Verify buffer is large enough
+            uint32_t requiredVertexBufferSize = sizeof(AnimatedVertex) * allVertices.size();
+            if (animatedVertexBuffers[frame]->getBufferSize() < requiredVertexBufferSize) {
+                std::cerr << "ERROR: Animated vertex buffer too small! Required: " << requiredVertexBufferSize 
+                          << ", Available: " << animatedVertexBuffers[frame]->getBufferSize() << std::endl;
+                return;
+            }
+            
+            animatedVertexBuffers[frame]->writeToBuffer(allVertices.data(),
+                sizeof(AnimatedVertex) * allVertices.size());
+            animatedVertexBuffers[frame]->flush();
+        }
+        
+        // Upload indices to ALL frames  
+        for (int frame = 0; frame < animatedIndexBuffers.size(); ++frame) {
+            // Verify buffer is large enough
+            uint32_t requiredIndexBufferSize = sizeof(uint32_t) * allIndices.size();
+            if (animatedIndexBuffers[frame]->getBufferSize() < requiredIndexBufferSize) {
+                std::cerr << "ERROR: Animated index buffer too small! Required: " << requiredIndexBufferSize 
+                          << ", Available: " << animatedIndexBuffers[frame]->getBufferSize() << std::endl;
+                return;
+            }
+            
+            animatedIndexBuffers[frame]->writeToBuffer(allIndices.data(),
+                sizeof(uint32_t) * allIndices.size());
+            animatedIndexBuffers[frame]->flush();
+        }
+        
+        staticDataUploaded = true;
+        lastVertexCount = static_cast<uint32_t>(allVertices.size());  // Track for upload condition
+        std::cout << "PERFORMANCE: Mesh data uploaded successfully!" << std::endl;
     }
 
     //std::cout << "AnimationRenderingSystem: Data uploaded - " << instanceData.size() << " instances, " 
@@ -309,7 +449,11 @@ void AnimationRenderingSystem::dispatchAnimationCompute(VkCommandBuffer commandB
         return; // Fail gracefully instead of crashing
     }
 
-    //std::cout << "AnimationRenderingSystem: Dispatching compute for " << vertexCount << " vertices" << std::endl;
+    // PERFORMANCE: Time compute shader dispatch
+    static int dispatchCount = 0;
+    static float totalDispatchTime = 0.0f;
+    
+    auto dispatchStartTime = std::chrono::high_resolution_clock::now();
     
     // Bind compute pipeline
     animationComputePipeline->bind(commandBuffer);
@@ -335,7 +479,24 @@ void AnimationRenderingSystem::dispatchAnimationCompute(VkCommandBuffer commandB
         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
         0, 1, &barrier, 0, nullptr, 0, nullptr);
     
-    std::cout << "AnimationRenderingSystem: Compute dispatched - " << dispatchX << " workgroups" << std::endl;
+    auto dispatchEndTime = std::chrono::high_resolution_clock::now();
+    auto dispatchDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(dispatchEndTime - dispatchStartTime).count();
+    
+    totalDispatchTime += dispatchDuration;
+    dispatchCount++;
+    
+    // Report every 60 dispatches (~1 second at 60fps)
+    if (dispatchCount >= 60) {
+        float avgDispatchTime = totalDispatchTime / dispatchCount;
+        std::cout << " COMPUTE SHADER PERFORMANCE (60 dispatches avg):" << std::endl;
+        std::cout << "  Compute dispatch: " << avgDispatchTime << " ms/frame" << std::endl;
+        std::cout << "  Vertices processed: " << vertexCount << " per dispatch" << std::endl;
+        std::cout << "  Workgroups: " << dispatchX << " per dispatch" << std::endl;
+        
+        // Reset counters
+        dispatchCount = 0;
+        totalDispatchTime = 0.0f;
+    }
 }
 
 void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffer, 
@@ -345,6 +506,12 @@ void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffe
                                                    int currentObjectMode, int currentFrameIndex)
 {
     if (instances.empty()) return;
+    
+    // PERFORMANCE: Time animation rendering
+    static int renderCount = 0;
+    static float totalRenderTime = 0.0f;
+    
+    auto renderStartTime = std::chrono::high_resolution_clock::now();
 
     // Use dedicated animated pipeline (ID 4) that handles AnimatedVertex with bone data
     GFXPipeline* activePipeline = nullptr;
@@ -377,56 +544,80 @@ void AnimationRenderingSystem::renderAnimatedModels(VkCommandBuffer commandBuffe
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
         3, 1, &animationDescriptorSets[currentFrameIndex], 0, nullptr);
 
-    std::cout << "AnimationRenderingSystem: Rendering " << instances.size() << " animated models" << std::endl;
-    
-    // Bind the vertex and index buffers once (they contain data for all instances)
-    VkBuffer vertexBuffers[] = { transformedVertexBuffers[currentFrameIndex]->getBuffer() };
+    // DEBUG: Bind INPUT animated vertex buffers instead of transformed output
+    // This tests if the raw geometry data is valid
+    VkBuffer vertexBuffers[] = { animatedVertexBuffers[currentFrameIndex]->getBuffer() };
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, animatedIndexBuffers[currentFrameIndex]->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
     
-    // Track global offsets across all instances
-    uint32_t globalVertexOffset = 0;
-    uint32_t globalIndexOffset = 0;
     
-    // Render each animated instance
-    for (const auto& instance : instances) {
+    
+    // Use persistent layout metadata instead of recalculating offsets
+    if (persistentInstanceLayouts.size() != instances.size()) {
+        std::cerr << "ERROR: Layout metadata size mismatch! Expected " << instances.size() 
+                  << " layouts, got " << persistentInstanceLayouts.size() << std::endl;
+        return;
+    }
+    
+    // Render each animated instance using stored layout metadata
+    for (size_t instanceIndex = 0; instanceIndex < instances.size(); ++instanceIndex) {
+        const auto& instance = instances[instanceIndex];
         if (!instance || !instance->getModel()) continue;
+        
+        // Get layout metadata for this instance (no recalculation!)
+        const auto& layout = persistentInstanceLayouts[instanceIndex];
         
         // Get model data
         const auto& meshes = instance->getModel()->getModelMeshes();
         glm::mat4 modelMatrix = instance->getInstanceRootMatrix();
         glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
         
-        // Push constants
+        //  Use stored layout metadata - no offset recalculation!
+        std::cout << "LAYOUT-BASED RENDERING: " << layout.debugName 
+                  << "vertices[" << layout.vertexOffset << "+" << layout.vertexCount 
+                  << "] indices[" << layout.indexOffset << "+" << layout.indexCount
+                  << "] bones[" << layout.boneOffset << "+" << layout.boneCount << "]" << std::endl;
+        
         struct PushConstantData {
             glm::mat4 modelMatrix;
             glm::mat4 normalMatrix;
-        } pushData{ modelMatrix, normalMatrix };
+            int32_t boneMatrixOffset;  // Offset into bone matrices buffer
+        } pushData{ modelMatrix, normalMatrix, static_cast<int32_t>(layout.boneOffset) };  // 🔧 Use layout bone offset
 
         vkCmdPushConstants(commandBuffer, pipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            VK_SHADER_STAGE_VERTEX_BIT,  // Only vertex stage uses push constants
             0, sizeof(PushConstantData), &pushData);
 
-        std::cout << "  Rendering instance at global vertex offset " << globalVertexOffset 
-                  << ", index offset " << globalIndexOffset << std::endl;
-
-        // Render each mesh of this instance using the correct global offsets
-        for (const auto& mesh : meshes) {
-            if (!mesh.indices.empty()) {
-                // Use indexed drawing for efficiency
-                uint32_t indexCount = static_cast<uint32_t>(mesh.indices.size());
-                vkCmdDrawIndexed(commandBuffer, indexCount, 1, globalIndexOffset, globalVertexOffset, 0);
-                globalIndexOffset += indexCount;
-            } else {
-                // Fallback to non-indexed drawing if no indices
-                vkCmdDraw(commandBuffer, static_cast<uint32_t>(mesh.vertices.size()), 1, globalVertexOffset, 0);
-            }
-            
-            globalVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
+        // Render this entire instance in one draw call (no per-mesh iteration)
+        // Since indices are pre-offset during collection, we use NO vertex offset in draw call
+        if (layout.indexCount > 0) {
+            // Use indexed drawing - indices already point to correct vertices in global buffer
+            vkCmdDrawIndexed(commandBuffer, layout.indexCount, 1, layout.indexOffset, 0, 0);  // ✅ NO vertex offset!
+        } else {
+            // Fallback to non-indexed drawing if no indices
+            std::cout << "DIRECT DRAW: " << layout.vertexCount << " vertices starting at " << layout.vertexOffset << std::endl;
+            vkCmdDraw(commandBuffer, layout.vertexCount, 1, layout.vertexOffset, 0);
         }
+
+    }
+    
+    auto renderEndTime = std::chrono::high_resolution_clock::now();
+    auto renderDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(renderEndTime - renderStartTime).count();
+    
+    totalRenderTime += renderDuration;
+    renderCount++;
+    
+    // Report every 60 renders (~1 second at 60fps)
+    if (renderCount >= 60) {
+        float avgRenderTime = totalRenderTime / renderCount;
+        std::cout << " ANIMATION RENDERING PERFORMANCE (60 renders avg):" << std::endl;
+        std::cout << "  Animation rendering: " << avgRenderTime << " ms/frame" << std::endl;
+        std::cout << "  Instances rendered: " << instances.size() << " per frame" << std::endl;
         
-        std::cout << "  Finished instance with " << meshes.size() << " meshes" << std::endl;
+        // Reset counters
+        renderCount = 0;
+        totalRenderTime = 0.0f;
     }
 }
 

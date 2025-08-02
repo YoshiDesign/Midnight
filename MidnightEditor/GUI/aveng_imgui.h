@@ -10,8 +10,6 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
-#include "Utils/SystemContext.h"
-
 // std
 #include <stdexcept>
 
@@ -26,7 +24,7 @@ namespace aveng {
 	class AvengImgui {
 	public:
 
-		AvengImgui(EngineDevice& device, SystemContext& context );
+		AvengImgui(RenderData& _renderData, GameData& _gameData);
 		void init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount);
 		~AvengImgui();
 
@@ -38,9 +36,10 @@ namespace aveng {
 		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 	private:
-		EngineDevice& device;
+		// EngineDevice& device;
 		VkDescriptorPool descriptorPool;
-		SystemContext& context;
+		RenderData& renderData;
+		GameData& gameData;
 
 	};
-}  // namespace lve
+} 

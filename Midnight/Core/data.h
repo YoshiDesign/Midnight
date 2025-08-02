@@ -4,7 +4,10 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+#include <memory>
 #include <vulkan/vulkan.h>  // For VkVertexInputAttributeDescription
+#include "AMD/vk_mem_alloc.h"
+#include "CoreVK/EngineDevice.h"
 
 namespace aveng {
 	const int RIGHT = -1;
@@ -52,11 +55,58 @@ namespace aveng {
 
 	};
 
-	/* data format to be uploaded to compute shader */
-	struct NodeTransformData {
+	// Pipeline management enums
+	enum class ObjectRenderMode {
+		STANDARD = 0,
+		WIREFRAME = 1,
+		DISTORTED = 2,
+		// Add more as needed
+	};
+
+	enum class PostProcessMode {
+		NONE = 0,
+		TOXIC_CLOUD = 1,
+		NIGHT_VISION = 2,
+		CHROMATIC_ABERRATION = 3,
+		// Add more effects
+	};
+
+	// Data structures moved from ObjectRenderSystem
+	struct LightsUbo {
+		static constexpr int MAX_LIGHTS = 100;
+		uint32_t numLights{ 0 };
+		alignas(16) glm::vec4 lightPositions[MAX_LIGHTS];  // w component is radius
+		alignas(16) glm::vec4 lightColors[MAX_LIGHTS];     // w component is intensity
+	};
+
+	struct GlobalUbo {
+		glm::mat4 projection{ 1.f };
+		glm::mat4 view{ 1.f };
+		glm::vec4 ambientLightColor{ 0.f, 0.f, 1.f, .14f };
+		glm::vec3 lightPosition{ 5.0f, -20.0f, 2.8f };
+		alignas(16) glm::vec4 lightColor{ 1.f, 1.f, 1.f, 1.f };
+		alignas(16) int renderMode{ 0 };  // 0 = STANDARD, 1 = WIREFRAME, 2 = DISTORTED
+		alignas(16) float time{ 0.0f };   // For animated effects
+	};
+
+	struct ObjectUniformData {
+		alignas(16) int texIndex;
+	};
+
+	// Instance data for instanced rendering - per object instance
+	struct InstanceData {
+		alignas(16) glm::mat4 modelMatrix;
+		alignas(16) glm::mat4 normalMatrix;
+		alignas(16) int textureIndex;
+		alignas(16) int padding[3]; // Ensure 16-byte alignment
+	};
+
+	/* data format to be uploaded to compute shader - optimized for cache performance */
+	struct alignas(64) NodeTransformData {
 		glm::vec4 translation = glm::vec4(0.0f);
+		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion  
 		glm::vec4 scale = glm::vec4(1.0f);
-		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion
+		glm::vec4 padding = glm::vec4(0.0f); // Pad to 64 bytes for cache line alignment
 	};
 
 	struct RenderData {
@@ -73,12 +123,17 @@ namespace aveng {
 		int rdMoveRight   = 0;
 		int rdMoveUp	  = 0;
 
+		/* Device Data */
+		EngineDevice* engineDevice = nullptr;
+
 		glm::vec3 rdCameraView = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdCameraPos  = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdCameraRot  = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdPlayerPos  = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdPlayerRot  = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdForwardDir = glm::vec3(0.f,0.f,0.f);
+
+		int rdNumPointLights = 0;
 
 		// Animation system debug data
 		int rdLoadedModels = 0;
@@ -92,21 +147,20 @@ namespace aveng {
 	};
 
 	// Animation vertex structure with bone weights. Is definitely used
+	// FIXED: All vec4 layout eliminates padding issues - perfect 16-byte alignment
 	struct AnimatedVertex {
-		glm::vec3 position{};
-		glm::vec3 color{};
-		glm::vec3 normal{};
-		glm::vec2 texCoord{};
+		glm::vec4 position{};     // position.xyz + texCoord.x in .w
+		glm::vec4 color{};        // color.xyz + texCoord.y in .w
+		glm::vec4 normal{};       // normal.xyz + unused .w (could store tangent.x, etc.)
 		
-		// Skeletal animation data - up to 4 bone influences per vertex
-		alignas(16) glm::ivec4 boneIds{-1, -1, -1, -1};
-		alignas(16) glm::vec4 boneWeights{0.0f, 0.0f, 0.0f, 0.0f};
+		// Skeletal animation data - naturally 16-byte aligned, no alignas needed!
+		glm::ivec4 boneIds{-1, -1, -1, -1};
+		glm::vec4 boneWeights{0.0f, 0.0f, 0.0f, 0.0f};
 		
 		bool operator==(const AnimatedVertex& other) const {
 			return position == other.position && 
 			       color == other.color && 
 			       normal == other.normal && 
-			       texCoord == other.texCoord &&
 			       boneIds == other.boneIds &&
 			       boneWeights == other.boneWeights;
 		}
@@ -156,8 +210,12 @@ namespace aveng {
 
 	struct VkTextureData {
 		std::string texturePath{};
-		// Placeholder for actual Vulkan texture data
-		bool isLoaded = false;
+		VkImage image = VK_NULL_HANDLE;
+		VkImageView imageView = VK_NULL_HANDLE;
+		VkSampler sampler = VK_NULL_HANDLE;
+		VmaAllocation imageAlloc = nullptr;
+
+		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	};
 
 	struct VkVertexBufferData {

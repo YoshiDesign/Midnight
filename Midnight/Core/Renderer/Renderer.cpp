@@ -13,21 +13,58 @@
 
 namespace aveng {
 
-	Renderer::Renderer(AvengWindow& window, EngineDevice& device) 
-		: aveng_window{ window }, engineDevice{ device }, pointLightSystem{ engineDevice }
+	// Push constants - now properly handled
+	struct PushConstantData {
+		glm::mat4 modelMatrix;
+		glm::mat4 normalMatrix;
+		int32_t boneMatrixOffset;  // For compatibility with animation system (unused here)
+	};
+
+	Renderer::Renderer(AvengWindow& window, GameData& _gameData) : aveng_window{ window }, gameData{_gameData}
 	{
+
+		// Raw ptr access to engineDevice - This is a feature
+		renderData.engineDevice = &engineDevice;
+
 		recreateSwapChain();
 		createCommandBuffers();
-		
-		// PERFORMANCE: AnimationRenderingSystem will be initialized on first use
-		// This avoids 33MB+ GPU memory allocation when animation is disabled
-		// animationSystem = std::make_unique<AnimationRenderingSystem>(engineDevice);
+
+		sceneLoader.load(default_scene_file, engineDevice);
+
+		// TODO - if (!scenes) throw error
+
+		//// Delegate to renderer for all engine-specific setup
+		//int numObjects = static_cast<int>(sceneLoader.getObjectCount());
+		//if (numObjects == 0) numObjects = 1; // Prevent crash with empty scenes
+
+		// Initialize ImageSystem with scene textures
+		const auto& sceneTextures = sceneLoader.getSceneTextures();
+		std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
+		initializeImageSystem(sceneTextures);
+
+		setupDescriptors();
+
+
+		// Initialize PointLightSystem now that descriptor layouts are created
+		initializePointLightSystem();
+
+		//animationSystem = std::make_unique<AnimationRenderingSystem>(engineDevice);
+
+		editor.init(window, aveng_swapchain.get());
+
 	}
 
 	Renderer::~Renderer()
 	{
+		std::cout << "Destroying Renderer..." << std::endl;
+		//renderBatches.clear();
 		freeCommandBuffers();
 		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
+	}
+
+	void Renderer::loadScenes(const char* filepath)
+	{
+
 	}
 
 	/*
@@ -37,6 +74,11 @@ namespace aveng {
 	 */
 	void Renderer::recreateSwapChain()
 	{
+
+		/**
+		* TODO - Re-initialize the Editor's swapchain too
+		*/
+
 		// Get current window size
 		auto extent = aveng_window.getExtent();
 
@@ -102,7 +144,7 @@ namespace aveng {
 	}
 
 	// Return a command buffer for the current frame index
-	VkCommandBuffer Renderer::beginFrame() 
+	void Renderer::beginFrame()
 	{
 		assert(!isFrameStarted && "Can't call beginFrame while already in progress.");
 
@@ -112,7 +154,7 @@ namespace aveng {
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
 			recreateSwapChain();
-			return nullptr;
+			return;
 		}
 		// This could potentially occur during window resize events
 		if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -122,7 +164,7 @@ namespace aveng {
 
 		isFrameStarted = true;
 
-		auto commandBuffer = getCurrentCommandBuffer();
+		commandBuffer = getCurrentCommandBuffer();
 
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -132,7 +174,13 @@ namespace aveng {
 			throw std::runtime_error("Command Buffer failed to begin recording.");
 		}
 
-		return commandBuffer;
+		/**
+		 * Next Step, begin the render pass
+		 */
+
+		// Clear Color for now
+		glm::vec3 clear_color = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
+		beginSwapChainRenderPass(commandBuffer, clear_color);
 
 	}
 
@@ -140,11 +188,16 @@ namespace aveng {
 	void  Renderer::endFrame()
 	{
 		assert(isFrameStarted && "Can't call endFrame while frame is not in progress.");
-		auto commandBuffer = getCurrentCommandBuffer();
+
+		
+		commandBuffer = getCurrentCommandBuffer();
+		endSwapChainRenderPass(commandBuffer);
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to record command buffer.");
 		}
+
+
 		// Submit to graphics queue while handling cpu and gpu sync, executing the command buffers
 		auto result = aveng_swapchain->submitCommandBuffers(&commandBuffer, &currentImageIndex);
 
@@ -245,14 +298,14 @@ namespace aveng {
 		std::cout << "Pipeline will be created with texture array size: " << currentTextureCount << std::endl;
 	}
 
-	void Renderer::setupDescriptors(int numObjects)
+	void Renderer::setupDescriptors()
 	{
 		if (!imageSystem) {
 			throw std::runtime_error("ImageSystem must be initialized before setting up descriptors (call initializeImageSystem first)");
 		}
-		
-		num_objects = numObjects;
+
 		auto imageInfo = imageSystem->descriptorInfoForAllImages();
+		int numObjects = sceneLoader.getObjectCount();
 
 		// Create Descriptor Pools using dynamic texture count
 		descriptorPool = AvengDescriptorPool::Builder(engineDevice)
@@ -299,7 +352,7 @@ namespace aveng {
 
 		for (int i = 0; i < u_ObjBuffers.size(); i++) {
 			u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				calculateDynamicUBOStride(), num_objects,
+				calculateDynamicUBOStride(), numObjects, // HARDCODED - Dynamic UBO size
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
 				calculateDynamicUBOStride(), // minOffsetAlignment
@@ -336,10 +389,10 @@ namespace aveng {
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
 			
-		// Initialize animation rendering system only if it exists
-		if (animationSystem) {
-			animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
-		}
+		//// Initialize animation rendering system only if it exists
+		//if (animationSystem) {
+		//	animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
+		//}
 
 		// Write descriptor sets
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
@@ -383,42 +436,68 @@ namespace aveng {
 		std::cout << "PointLightSystem initialized" << std::endl;
 	}
 
-	void Renderer::updateFrameData(const GlobalUbo& globalData, const LightsUbo& lightsData)
+	void Renderer::updateFrameData(const glm::mat4& projection, const glm::mat4& view)
 	{
+
+		// Prepare frame data
+		u_GlobalData.projection = projection;
+		u_GlobalData.view = view;
+		u_GlobalData.renderMode = static_cast<int>(getObjectRenderMode());
+
 		// Update global uniform buffer
-		u_GlobalBuffers[currentFrameIndex]->writeToBuffer(&globalData);
+		u_GlobalBuffers[currentFrameIndex]->writeToBuffer(&u_GlobalData);
 		u_GlobalBuffers[currentFrameIndex]->flush();
 
 		// Update lights uniform buffer
-		u_LightsBuffers[currentFrameIndex]->writeToBuffer(&lightsData);
+		u_LightsBuffers[currentFrameIndex]->writeToBuffer(&u_LightsData);
 		u_LightsBuffers[currentFrameIndex]->flush();
 	}
 
 	void Renderer::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
 	{
 		// Delegate to animation system (only if it exists)
-		if (animationSystem) {
-			animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
-		}
+		//if (animationSystem) {
+		//	animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
+		//}
 	}
 
 	void Renderer::dispatchAnimationCompute(uint32_t vertexCount)
 	{
 		// Delegate to animation system (only if it exists)
-		if (animationSystem) {
-			animationSystem->dispatchAnimationCompute(getCurrentCommandBuffer(), vertexCount, 
-													 pipelineLayout, currentFrameIndex);
-		}
+		//if (animationSystem) {
+		//	animationSystem->dispatchAnimationCompute(getCurrentCommandBuffer(), vertexCount, 
+		//											 pipelineLayout, currentFrameIndex);
+		//}
 	}
 
 	void Renderer::renderAnimatedModels(const std::vector<std::shared_ptr<AssimpInstance>>& instances)
 	{
-		// Delegate to animation system (only if it exists)
-		if (animationSystem) {
-			animationSystem->renderAnimatedModels(getCurrentCommandBuffer(), instances, pipelineLayout,
-												 pipelineManager.get(), static_cast<int>(currentObjectMode), 
-												 currentFrameIndex);
+
+		// DEBUG: Completely disable compute shader to test raw geometry
+		/*
+		if (!animatedInstances.empty()) {
+			// Calculate total vertices for compute dispatch
+			uint32_t totalVertices = 0;
+			for (const auto& instance : animatedInstances) {
+				const auto& meshes = instance->getModel()->getModelMeshes();
+				for (const auto& mesh : meshes) {
+					totalVertices += static_cast<uint32_t>(mesh.vertices.size());
+				}
+			}
+
+			if (totalVertices > 0) {
+				// Dispatch compute shader outside render pass
+				renderer.dispatchAnimationCompute(totalVertices);
+			}
 		}
+		*/
+
+		//// Delegate to animation system (only if it exists)
+		//if (animationSystem) {
+		//	animationSystem->renderAnimatedModels(getCurrentCommandBuffer(), instances, pipelineLayout,
+		//										 pipelineManager.get(), static_cast<int>(currentObjectMode), 
+		//										 currentFrameIndex);
+		//}
 	}
 
 	void Renderer::renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
@@ -476,14 +555,10 @@ namespace aveng {
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 				1, 1, &objectDescriptorSets[currentFrameIndex], 1, &dynamicOffset);
 
-			// Push constants - now properly handled
-			struct PushConstantData {
-				glm::mat4 modelMatrix;
-				glm::mat4 normalMatrix;
-			} pushData{ modelMatrix, normalMatrix };
+			PushConstantData pushData{ modelMatrix, normalMatrix, 0 };
 
 			vkCmdPushConstants(commandBuffer, pipelineLayout,
-				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				VK_SHADER_STAGE_VERTEX_BIT,  // Only vertex stage uses push constants
 				0, sizeof(PushConstantData), &pushData);
 
 			// Bind and draw model
@@ -492,202 +567,221 @@ namespace aveng {
 		}
 	}
 
-	void Renderer::renderLights(int numLights)
+	void Renderer::renderLights()
 	{
 		pointLightSystem.render(globalDescriptorSets[currentFrameIndex], 
-			lightsDescriptorSets[currentFrameIndex], getCurrentCommandBuffer(), numLights);
+			lightsDescriptorSets[currentFrameIndex], getCurrentCommandBuffer(), u_LightsData.numLights);
+	}
+
+	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
+	{
+		if (u_LightsData.numLights >= LightsUbo::MAX_LIGHTS) {
+			std::cout << "Warning: Maximum number of lights (" << LightsUbo::MAX_LIGHTS << ") reached. Cannot add more lights." << std::endl;
+			return;
+		}
+
+		u_LightsData.lightPositions[u_LightsData.numLights] = glm::vec4(position, radius);
+		u_LightsData.lightColors[u_LightsData.numLights] = glm::vec4(color, intensity);
+		u_LightsData.numLights++;
+
+		renderData.rdNumPointLights++;
+	}
+
+	void Renderer::clearLights()
+	{
+		renderData.rdNumPointLights = 0;
+		u_LightsData.numLights = 0;
+		// Zero out the light arrays for clean state
+		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));
+		memset(u_LightsData.lightColors, 0, sizeof(u_LightsData.lightColors));
 	}
 
 	void Renderer::renderObjectsInstanced(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
 	{
-		if (!instancedRenderingEnabled || objectData.empty()) {
-			// Fallback to traditional rendering
-			renderObjects(objectData);
-			return;
-		}
 
-		//std::cout << "=== Instanced Rendering ===" << std::endl;
-		//std::cout << "Processing " << objectData.size() << " objects for instancing" << std::endl;
-
-		auto commandBuffer = getCurrentCommandBuffer();
-
-		// Clear existing batches for this frame
-		for (auto& [model, batch] : renderBatches) {
-			batch->instances.clear();
-		}
-
-		// Group objects by model
-		for (const auto& [objUniform, modelMatrix, normalMatrix, model] : objectData) {
-			// Create batch if it doesn't exist
-			if (renderBatches.find(model) == renderBatches.end()) {
-				renderBatches[model] = std::make_unique<RenderBatch>(model);
-			}
-
-			// Add instance data to the batch
-			InstanceData instanceData{};
-			instanceData.modelMatrix = modelMatrix;
-			instanceData.normalMatrix = normalMatrix;
-			instanceData.textureIndex = objUniform.texIndex;
-
-			renderBatches[model]->instances.push_back(instanceData);
-		}
-
-		// Bind pipeline based on current render mode
-		GFXPipeline* activePipeline = nullptr;
-		
-		if (pipelineManager) {
-			activePipeline = pipelineManager->getPipeline(static_cast<int>(currentObjectMode));
-			if (activePipeline) {
-				activePipeline->bind(commandBuffer);
-			}
-		}
-		
-		if (!activePipeline) {
-			std::cerr << "WARNING: No pipeline found for instanced mode " << static_cast<int>(currentObjectMode) << std::endl;
-			renderObjects(objectData); // Fallback
-			return;
-		}
-
-		// Bind global descriptor set (set 0)
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
-
-		// Bind lights descriptor set (set 2)
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
-
-		// Render each batch
-		uint32_t totalInstancesRendered = 0;
-		uint32_t batchesRendered = 0;
-		
-		for (auto& [model, batch] : renderBatches) {
-			if (batch->instances.empty()) continue;
-
-			uint32_t instanceCount = static_cast<uint32_t>(batch->instances.size());
-			// std::cout << "Rendering batch: " << instanceCount << " instances of model " << model << std::endl;
-
-			// Update instance buffer for this batch
-			updateInstanceBuffer(*batch);
-
-			// For now, use push constants for the first instance (we'll optimize this later)
-			if (!batch->instances.empty()) {
-				struct PushConstantData {
-					glm::mat4 modelMatrix;
-					glm::mat4 normalMatrix;
-				} pushData{ 
-					batch->instances[0].modelMatrix,
-					batch->instances[0].normalMatrix 
-				};
-
-				vkCmdPushConstants(commandBuffer, pipelineLayout,
-					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-					0, sizeof(PushConstantData), &pushData);
-			}
-
-			// Bind object descriptor set (set 1) - use first instance's texture
-			if (!batch->instances.empty()) {
-				ObjectUniformData objUniform{ batch->instances[0].textureIndex };
-				u_ObjBuffers[currentFrameIndex]->writeToIndex(&objUniform, 0);
-				u_ObjBuffers[currentFrameIndex]->flushIndex(0);
-				auto descriptorInfo = u_ObjBuffers[currentFrameIndex]->descriptorInfoForIndex(0);
-				uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset);
-
-				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-					1, 1, &objectDescriptorSets[currentFrameIndex], 1, &dynamicOffset);
-			}
-
-			// Bind model vertex and index buffers
-			model->bind(commandBuffer);
-
-			// TODO: Bind instance buffer as additional vertex buffer
-			// For now, render multiple instances using traditional draw calls
-			// This gives us the batching benefit while we work on shader updates
-			for (uint32_t i = 0; i < instanceCount; ++i) {
-				// Update push constants for each instance
-				struct PushConstantData {
-					glm::mat4 modelMatrix;
-					glm::mat4 normalMatrix;
-				} pushData{ 
-					batch->instances[i].modelMatrix,
-					batch->instances[i].normalMatrix 
-				};
-
-				vkCmdPushConstants(commandBuffer, pipelineLayout,
-					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-					0, sizeof(PushConstantData), &pushData);
-
-				// Draw single instance
-				model->draw(commandBuffer);
-			}
-
-			totalInstancesRendered += instanceCount;
-			batchesRendered++;
-		}
-
-		/*std::cout << "Instanced rendering complete: " << batchesRendered << " batches, " 
-		          << totalInstancesRendered << " total instances" << std::endl;*/
-		
-#if _DEBUG
 		/**
-		* ToDo - This is not implemented properly. You'll likely want to count the number of instances of an object BEFORE any of this function's code executes.
+		* Pro Tip: structured bindings won't hurt performance as long as your lvalue is const auto&
+		* E.g.
+		*	for(const auto& [objUniform, modelMatrix, normalMatrix, model] : objectData) ...
 		*/
-		// Performance analysis
-		float efficiency = (float)totalInstancesRendered / (float)batchesRendered;
-		//if (efficiency > 2.0f) {
-		//	std::cout << "Instancing is BENEFICIAL! Avg " << efficiency << " instances per batch" << std::endl;
-		//}
-		//else if (efficiency > 1.0f) {
-		//	std::cout << "Instancing provides MINOR benefit. Avg " << efficiency << " instances per batch" << std::endl;
-		//}
-		if (efficiency < 1.0f) {
-			std::cout << "Instancing provides NO benefit (efficiency: " << efficiency << ")" << std::endl;
-			std::cout << "Auto-switching to traditional rendering for better performance" << std::endl;
 
-			// Automatically disable instancing for inefficient scenes
-			static int inefficientFrameCount = 0;
-			inefficientFrameCount++;
-			if (inefficientFrameCount >= 5) {
-				std::cout << "Automatically disabling instanced rendering - scene not suitable" << std::endl;
-				instancedRenderingEnabled = false;
-			}
-		}
-		else {
-			instancedRenderingEnabled = true;
-		}
-#endif
+//		if (!instancedRenderingEnabled || objectData.empty()) {
+//			// Fallback to traditional rendering
+//			renderObjects(objectData);
+//			return;
+//		}
+//
+//		auto commandBuffer = getCurrentCommandBuffer();
+//
+//		// Clear existing batches for this frame
+//		for (auto& [model, batch] : renderBatches) {
+//			batch->instances.clear();
+//		}
+//
+//		// Group objects by model
+//		for (const auto& [objUniform, modelMatrix, normalMatrix, model] : objectData) {
+//			// Create batch if it doesn't exist
+//			if (renderBatches.find(model) == renderBatches.end()) {
+//				renderBatches[model] = std::make_unique<RenderBatch>(model);
+//			}
+//
+//			// Add instance data to the batch
+//			InstanceData instanceData{};
+//			instanceData.modelMatrix = modelMatrix;
+//			instanceData.normalMatrix = normalMatrix;
+//			instanceData.textureIndex = objUniform.texIndex;
+//
+//			renderBatches[model]->instances.push_back(instanceData);
+//		}
+//
+//		// Bind pipeline based on current render mode
+//		GFXPipeline* activePipeline = nullptr;
+//		
+//		if (pipelineManager) {
+//			activePipeline = pipelineManager->getPipeline(static_cast<int>(currentObjectMode));
+//			if (activePipeline) {
+//				activePipeline->bind(commandBuffer);
+//			}
+//		}
+//		
+//		if (!activePipeline) {
+//			std::cerr << "WARNING: No pipeline found for instanced mode " << static_cast<int>(currentObjectMode) << std::endl;
+//			renderObjects(objectData); // Fallback
+//			return;
+//		}
+//
+//		// Bind global descriptor set (set 0)
+//		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+//			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
+//
+//		// Bind lights descriptor set (set 2)
+//		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+//			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
+//
+//		// Render each batch with GLOBAL index tracking
+//		uint32_t totalInstancesRendered = 0;
+//		uint32_t batchesRendered = 0;
+//		uint32_t globalInstanceIndex = 0;  // Track global index across ALL batches
+//		
+//		for (auto& [model, batch] : renderBatches) {
+//			if (batch->instances.empty()) continue;
+//
+//			uint32_t instanceCount = static_cast<uint32_t>(batch->instances.size());
+//			
+//			//for (uint32_t j = 0; j < instanceCount; ++j) {
+//			//	std::cout << batch->instances[j].textureIndex << " ";
+//			//}
+//
+//			// Update instance buffer for this batch
+//			updateInstanceBuffer(*batch);
+//
+//			// Bind model vertex and index buffers
+//			model->bind(commandBuffer);
+//
+//			/**
+//			* TODO - Plenty of things to do here.
+//			* 1. The Model class should really be aware of how many instances of itself there are, managing adds/removes at runtime. Instead we're counting them here
+//			* 2. 
+//			*/
+//
+//			// Render each instance with correct texture binding using GLOBAL index
+//			for (uint32_t i = 0; i < instanceCount; ++i) {
+//				// Update object buffer with correct texture for this instance
+//				ObjectUniformData objUniform{ batch->instances[i].textureIndex };
+//				
+//				// Use globalInstanceIndex instead of local i to prevent buffer overwrites
+//				u_ObjBuffers[currentFrameIndex]->writeToIndex(&objUniform, globalInstanceIndex + i);
+//				u_ObjBuffers[currentFrameIndex]->flushIndex(globalInstanceIndex + i); // TODO - Does this need to be flushed?
+//				auto descriptorInfo = u_ObjBuffers[currentFrameIndex]->descriptorInfoForIndex(globalInstanceIndex + i);
+//				uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset);
+//
+//				// Bind object descriptor set (set 1) with correct texture for this instance
+//				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+//					1, 1, &objectDescriptorSets[currentFrameIndex], 1, &dynamicOffset);
+//
+//				// Update push constants for each instance
+//				PushConstantData pushData{ 
+//					batch->instances[i].modelMatrix,
+//					batch->instances[i].normalMatrix,
+//					0
+//				};
+//
+//				vkCmdPushConstants(commandBuffer, pipelineLayout,
+//					VK_SHADER_STAGE_VERTEX_BIT,  // Only vertex stage uses push constants
+//					0, sizeof(PushConstantData), &pushData);
+//
+//			}
+//			// Draw single instance with correct texture
+//			model->drawInstanced(commandBuffer, instanceCount, globalInstanceIndex);
+//			// Advance global index for next batch
+//			globalInstanceIndex += instanceCount;
+//			totalInstancesRendered += instanceCount;
+//			batchesRendered++;
+//		}
+//
+//#if _DEBUG
+//		/**
+//		* ToDo - This is not implemented properly. You'll likely want to count the number of instances of an object BEFORE any of this function's code executes.
+//		*/
+//		// Performance analysis
+//		float efficiency = (float)totalInstancesRendered / (float)batchesRendered;
+//		//if (efficiency > 2.0f) {
+//		//	std::cout << "Instancing is BENEFICIAL! Avg " << efficiency << " instances per batch" << std::endl;
+//		//}
+//		//else if (efficiency > 1.0f) {
+//		//	std::cout << "Instancing provides MINOR benefit. Avg " << efficiency << " instances per batch" << std::endl;
+//		//}
+//		if (efficiency < 1.0f) {
+//			std::cout << "Instancing provides NO benefit (efficiency: " << efficiency << ")" << std::endl;
+//			std::cout << "Auto-switching to traditional rendering for better performance" << std::endl;
+//
+//			// Automatically disable instancing for inefficient scenes
+//			static int inefficientFrameCount = 0;
+//			inefficientFrameCount++;
+//			if (inefficientFrameCount >= 5) {
+//				std::cout << "Automatically disabling instanced rendering - scene not suitable" << std::endl;
+//				instancedRenderingEnabled = false;
+//			}
+//		}
+//		else {
+//			instancedRenderingEnabled = true;
+//		}
+//#endif
 	}
 
-	void Renderer::updateInstanceBuffer(RenderBatch& batch)
-	{
-		if (batch.instances.empty()) return;
+	//void Renderer::updateInstanceBuffer(RenderBatch& batch)
+	//{
+	//	if (batch.instances.empty()) return;
 
-		uint32_t instanceCount = static_cast<uint32_t>(batch.instances.size());
-		
-		// Create or resize instance buffer if needed
-		if (!batch.instanceBuffer || 
-		    batch.instanceBuffer->getInstanceCount() < instanceCount) {
-			
-			std::cout << "Creating instance buffer for " << instanceCount << " instances" << std::endl;
-			
-			// Create new instance buffer with VMA
-			batch.instanceBuffer = std::make_unique<AvengBuffer>(
-				engineDevice,
-				sizeof(InstanceData),
-				instanceCount,
-				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
-			);
-			
-			batch.instanceBuffer->map();
-		}
+	//	uint32_t instanceCount = static_cast<uint32_t>(batch.instances.size());
+	//	
+	//	// Create or resize instance buffer if needed
+	//	if (!batch.instanceBuffer || 
+	//	    batch.instanceBuffer->getInstanceCount() < instanceCount) {
+	//		
+	//		std::cout << "Creating instance buffer for " << instanceCount << " instances" << std::endl;
+	//		
+	//		// Create new instance buffer with VMA
+	//		batch.instanceBuffer = std::make_unique<AvengBuffer>(
+	//			engineDevice,
+	//			sizeof(InstanceData),
+	//			instanceCount,
+	//			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	//			VMA_MEMORY_USAGE_AUTO,
+	//			1, // minOffsetAlignment
+	//			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
+	//		);
+	//		
+	//		batch.instanceBuffer->map();
+	//	}
 
-		// Update instance buffer with current instance data
-		batch.instanceBuffer->writeToBuffer(batch.instances.data(), 
-			sizeof(InstanceData) * instanceCount);
-		batch.instanceBuffer->flush();
-	}
+	//	// Update instance buffer with current instance data
+	//	batch.instanceBuffer->writeToBuffer(batch.instances.data(), 
+	//		sizeof(InstanceData) * instanceCount);
+
+	//	// TODO - Does this need to be flushed?
+	//	batch.instanceBuffer->flush();
+	//}
 
 	void Renderer::createPipelineLayout()
 	{
@@ -697,21 +791,21 @@ namespace aveng {
 
 		// Create descriptor set layouts array using stored layouts
 		// Size depends on whether animation system is enabled
-		size_t descriptorSetCount = animationSystem ? 4 : 3;
+		size_t descriptorSetCount = /* animationSystem ? 4 : */ 3;
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(descriptorSetCount);
 		descriptorSetLayouts[0] = globalDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[1] = objDescriptorSetLayout->getDescriptorSetLayout();
 		descriptorSetLayouts[2] = lightsDescriptorSetLayout->getDescriptorSetLayout();
 		
-		if (animationSystem) {
-			descriptorSetLayouts[3] = animationSystem->getAnimationDescriptorSetLayout();  // Animation system descriptor set
-		}
+		//if (animationSystem) {
+		//	descriptorSetLayouts[3] = animationSystem->getAnimationDescriptorSetLayout();  // Animation system descriptor set
+		//}
 
-		// Push constant range
+		// Push constant range - unified structure for all pipelines
 		VkPushConstantRange pushConstantRange{};
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;  // Only vertex shaders use push constants
 		pushConstantRange.offset = 0;
-		pushConstantRange.size = sizeof(glm::mat4) * 2; // modelMatrix + normalMatrix
+		pushConstantRange.size = 132; // Unified: 2 mat4 + int32_t = 132 bytes (within 128-byte limit)
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -725,9 +819,9 @@ namespace aveng {
 		}
 		
 		// Create animation compute pipeline now that we have the pipeline layout (if animation system exists)
-		if (animationSystem) {
+	/*	if (animationSystem) {
 			animationSystem->createAnimationComputePipeline(pipelineLayout);
-		}
+		}*/
 	}
 
 	void Renderer::createPipelines()
@@ -756,34 +850,34 @@ namespace aveng {
 				//createObjectPipelines();  // Hardcoded array
 			}
 			
-			createPostProcessPipelines();  // Post-processing pipelines (placeholder)
+			//createPostProcessPipelines();  // Post-processing pipelines (placeholder)
 			pipelineCreated = true;
 			std::cout << "Pipeline initialization complete" << std::endl;
 		}
 	}
 
 	
-	void Renderer::createPostProcessPipelines()
-	{
-		std::cout << "Creating post-processing pipelines..." << std::endl;
+	//void Renderer::createPostProcessPipelines()
+	//{
+	//	std::cout << "Creating post-processing pipelines..." << std::endl;
 
-		// For now, create placeholder - full post-processing setup would require:
-		// 1. Offscreen render targets
-		// 2. Full-screen quad rendering
-		// 3. Screen-space effect shaders
+	//	// For now, create placeholder - full post-processing setup would require:
+	//	// 1. Offscreen render targets
+	//	// 2. Full-screen quad rendering
+	//	// 3. Screen-space effect shaders
 
-		// Resize pipeline vector to match enum size  
-		postProcessPipelines.resize(static_cast<size_t>(PostProcessMode::CHROMATIC_ABERRATION) + 1);
+	//	// Resize pipeline vector to match enum size  
+	//	//postProcessPipelines.resize(static_cast<size_t>(PostProcessMode::CHROMATIC_ABERRATION) + 1);
 
-		// TODO: Implement full post-processing system
-		// This would include:
-		// - Creating offscreen framebuffers
-		// - Post-process specific pipeline layouts
-		// - Full-screen quad geometry generation
-		// - Screen-space effect shaders (toxic_cloud.frag, night_vision.frag, etc.)
+	//	// TODO: Implement full post-processing system
+	//	// This would include:
+	//	// - Creating offscreen framebuffers
+	//	// - Post-process specific pipeline layouts
+	//	// - Full-screen quad geometry generation
+	//	// - Screen-space effect shaders (toxic_cloud.frag, night_vision.frag, etc.)
 
-		std::cout << "Post-processing system placeholder created (full implementation needed)" << std::endl;
-	}
+	//	std::cout << "Post-processing system placeholder created (full implementation needed)" << std::endl;
+	//}
 
 	bool Renderer::reloadPipelineConfig(const std::string& configPath)
 	{
@@ -820,6 +914,214 @@ namespace aveng {
 		size_t objectSize = sizeof(ObjectUniformData);
 		size_t minAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
 		return ((objectSize + minAlignment - 1) / minAlignment) * minAlignment;
+	}
+
+
+	//void Renderer::testAnimationSystem()
+	//{
+	//	std::cout << "\n===ANIMATION DEBUG: ANIMATED CUBE TEST (CPU ANIMATION) ===" << std::endl;
+	//	std::cout << "Testing with animated model: 3D/animTVGuy.glb" << std::endl;
+
+	//	// FIRST: Test coordinate system theory by comparing both loading systems
+	//	std::cout << "\n=== ASSIMP vs TINY_OBJ_LOADER COMPARISON ===\n";
+	//	std::cout << "Loading ship.obj with both systems...\n\n";
+
+	//	// Load with TinyObjectLoader (working system)
+	//	std::cout << "--- TINY_OBJ_LOADER OUTPUT ---\n";
+	//	try {
+	//		aveng::AvengModel::Builder builder;
+	//		builder.loadModel("3D/animTVGuy.glb");
+
+	//		std::cout << "TinyObjLoader: " << builder.vertices.size() << " vertices, "
+	//			<< builder.indices.size() << " indices\n";
+
+	//		// Print first 3 vertices for comparison
+	//		for (size_t i = 0; i < std::min(size_t(3), builder.vertices.size()); ++i) {
+	//			const auto& v = builder.vertices[i];
+	//			std::cout << "TinyObj Vertex " << i << ":\n";
+	//			std::cout << "  Position: (" << v.position.x << ", " << v.position.y << ", " << v.position.z << ")\n";
+	//			std::cout << "  Normal:   (" << v.normal.x << ", " << v.normal.y << ", " << v.normal.z << ")\n";
+	//		}
+
+	//	}
+	//	catch (const std::exception& e) {
+	//		std::cout << "TinyObjLoader failed: " << e.what() << "\n";
+	//	}
+
+	//	std::cout << "\n--- ASSIMP OUTPUT (Coordinate conversion DISABLED) ---\n";
+	//	// The Assimp output will come from the debugVertexData() function
+	//	std::cout << "=== COMPARISON COMPLETE ===\n";
+
+	//	// PERFORMANCE: Time the entire operation
+	//	auto totalStartTime = std::chrono::high_resolution_clock::now();
+
+	//	// Set up render data for tracking
+	//	RenderData renderData{};
+
+	//	// PERFORMANCE: Time the model loading
+	//	auto loadStartTime = std::chrono::high_resolution_clock::now();
+
+	//	// Load the animated model
+	//	bool loadSuccess = animationManager.loadModel("3D/animTVGuy.glb", renderData);
+	//	bool loadSuccess2 = animationManager.loadModel("3D/tv-man.obj", renderData);
+
+	//	auto loadEndTime = std::chrono::high_resolution_clock::now();
+	//	auto loadDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(loadEndTime - loadStartTime).count();
+	//	std::cout << "Model loading took: " << loadDuration << " ms" << std::endl;
+
+	//	if (!loadSuccess || !loadSuccess2) {
+	//		std::cout << "Failed to load .glb" << std::endl;
+	//		return;
+	//	}
+
+	//	// Get the loaded model for inspection
+	//	auto model = animationManager.getModel("3D/animTVGuy.glb");
+	//	auto model2 = animationManager.getModel("3D/tv-man.obj");
+	//	if (!model || !model2) {
+	//		std::cout << "Could not retrieve loaded model" << std::endl;
+	//		return;
+	//	}
+
+	//	// Display model information
+	//	std::cout << "\nMODEL INFORMATION:" << std::endl;
+	//	std::cout << "  Model filename: " << model->getModelFileName() << std::endl;
+	//	std::cout << "  Triangle count: " << model->getTriangleCount() << std::endl;
+	//	std::cout << "  Has animations: " << (model->hasAnimations() ? "YES" : "NO") << std::endl;
+
+	//	// Display mesh information
+	//	const auto& meshes = model->getModelMeshes();
+	//	std::cout << "  Mesh count: " << meshes.size() << std::endl;
+	//	for (size_t i = 0; i < meshes.size(); ++i) {
+	//		std::cout << "    Mesh " << i << ": " << meshes[i].vertices.size() << " vertices, "
+	//			<< meshes[i].indices.size() << " indices" << std::endl;
+	//		std::cout << "      Has animation data: " << (meshes[i].hasAnimationData ? "YES" : "NO") << std::endl;
+	//	}
+
+	//	// Display bone information
+	//	const auto& bones = model->getBoneList();
+	//	std::cout << "  Bone count: " << bones.size() << std::endl;
+	//	for (size_t i = 0; i < bones.size() && i < 10; ++i) { // Show first 10 bones
+	//		std::cout << "    Bone " << i << ": " << bones[i]->getBoneName() << " (ID: " << bones[i]->getBoneId() << ")" << std::endl;
+	//	}
+	//	if (bones.size() > 10) {
+	//		std::cout << "    ... and " << (bones.size() - 10) << " more bones" << std::endl;
+	//	}
+
+	//	// Display node hierarchy information
+	//	const auto& nodes = model->getNodeList();
+	//	std::cout << "  Node count: " << nodes.size() << std::endl;
+	//	for (size_t i = 0; i < nodes.size() && i < 5; ++i) { // Show first 5 nodes
+	//		std::cout << "    Node " << i << ": " << nodes[i]->getNodeName() << " (Parent: " << nodes[i]->getParentNodeName() << ")" << std::endl;
+	//	}
+	//	if (nodes.size() > 5) {
+	//		std::cout << "    ... and " << (nodes.size() - 5) << " more nodes" << std::endl;
+	//	}
+
+	//	// Display animation information
+	//	const auto& animations = model->getAnimClips();
+	//	const auto& animations2 = model2->getAnimClips();
+	//	std::cout << "  Animation count: " << animations.size() << std::endl;
+
+	//	// Test instance creation
+	//	std::cout << "\nTESTING INSTANCE CREATION:" << std::endl;
+
+	//	auto instanceStartTime = std::chrono::high_resolution_clock::now();
+	//	auto instance1 = animationManager.createInstance("3D/animTVGuy.glb", glm::vec3(-35, 0, 0));
+	//	auto instanceEndTime = std::chrono::high_resolution_clock::now();
+
+	//	auto instanceGlb = animationManager.createInstance("3D/tv-man.obj", glm::vec3(-30, 0, 0));
+
+	//	auto instanceDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(instanceEndTime - instanceStartTime).count();
+	//	std::cout << "Instance creation took: " << instanceDuration << " ms" << std::endl;
+
+	//	if (instance1 && instanceGlb) {
+	//		std::cout << "Successfully created 1 animated cube instance!" << std::endl;
+
+	//		// Test animation switching if animations are available
+	//		if (!animations2.empty()) {
+	//			std::cout << "\nTESTING ANIMATION CONTROL:" << std::endl;
+	//			if (animations2.size() > 0) {
+	//				instanceGlb->setAnimationByIndex(0);
+	//				std::cout << "  Instance 1: Set to animation 0 (\"" << animations2[0]->getClipName() << "\")" << std::endl;
+	//			}
+	//		}
+	//	}
+	//	else {
+	//		std::cout << "Failed to create instances" << std::endl;
+	//	}
+
+	//	// Display final debug information
+	//	animationManager.resetRenderDataAnimationTotals(renderData);
+	//	std::cout << "\nFINAL DEBUG STATS:" << std::endl;
+	//	std::cout << "  Loaded models: " << renderData.rdLoadedModels << std::endl;
+	//	std::cout << "  Animated models: " << renderData.rdAnimatedModels << std::endl;
+	//	std::cout << "  Total bones: " << renderData.rdTotalBones << std::endl;
+	//	std::cout << "  Total nodes: " << renderData.rdTotalNodes << std::endl;
+	//	std::cout << "  Total animation clips: " << renderData.rdTotalAnimationClips << std::endl;
+	//	std::cout << "  Active instances: " << renderData.rdActiveInstances << std::endl;
+
+	//	// PERFORMANCE: Calculate total time
+	//	auto totalEndTime = std::chrono::high_resolution_clock::now();
+	//	auto totalDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(totalEndTime - totalStartTime).count();
+
+	//	std::cout << "\n PERFORMANCE SUMMARY:" << std::endl;
+	//	std::cout << "  Initial animation system setup: " << totalDuration << " ms" << std::endl;
+	//	std::cout << "  Note: DEBUG - Testing ANIMATED CUBE with REFERENCE NODE-BASED algorithm" << std::endl;
+
+	//	std::cout << "\nAnimation system test completed!" << std::endl;
+	//	std::cout << "=== END ANIMATION TEST ===\n" << std::endl;
+	//}
+
+	//void Renderer::updateAnimationSystem(float frameTime)
+	//{
+	//	// PERFORMANCE: Time animation updates (called every frame)
+	//	static int frameCounter = 0;
+	//	static float totalAnimTime = 0.0f;
+	//	static float totalRendererTime = 0.0f;
+
+	//	auto animStartTime = std::chrono::high_resolution_clock::now();
+
+	//	// Update animation time
+	//	animationManager.updateAnimations(frameTime);
+
+	//	auto animEndTime = std::chrono::high_resolution_clock::now();
+	//	auto animDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(animEndTime - animStartTime).count();
+
+	//	auto rendererStartTime = std::chrono::high_resolution_clock::now();
+
+	//	// Get instances and pass to renderer with frame time
+	//	const auto& instances = animationManager.getInstances();
+	//	if (!instances.empty()) {
+	//		updateAnimationData(instances, frameTime);
+	//	}
+
+	//	auto rendererEndTime = std::chrono::high_resolution_clock::now();
+	//	auto rendererDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(rendererEndTime - rendererStartTime).count();
+
+	//	// Accumulate timing data
+	//	totalAnimTime += animDuration;
+	//	totalRendererTime += rendererDuration;
+	//	frameCounter++;
+
+	//	// Report every 120 frames (~2 seconds at 60fps)
+	//	if (frameCounter >= 120) {
+	//		float avgAnimTime = totalAnimTime / frameCounter;
+	//		float avgRendererTime = totalRendererTime / frameCounter;
+	//		std::cout << "DEBUG CUBE GEOMETRY PERFORMANCE (120 frames avg):" << std::endl;
+	//		std::cout << "  Animation updates: " << avgAnimTime << " ms/frame" << std::endl;
+	//		std::cout << "  Renderer updates: " << avgRendererTime << " ms/frame" << std::endl;
+	//		std::cout << "  Total per frame: " << (avgAnimTime + avgRendererTime) << " ms/frame" << std::endl;
+
+	//		// Reset counters
+	//		frameCounter = 0;
+	//		totalAnimTime = 0.0f;
+	//		totalRendererTime = 0.0f;
+	//	}
+	//}
+
+	void Renderer::renderEditor() {
+		auto commandBuffer = getCurrentCommandBuffer();
+		editor.render(commandBuffer);
 	}
 
 } // NS
