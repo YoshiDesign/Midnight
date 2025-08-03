@@ -27,6 +27,7 @@ namespace aveng {
 
 	// Debug info for GUI, also contains player state data ...oops
 	struct GameData {
+		int			numPointLights = 0;
 		int			num_objs;
 		float		dt;
 		int			cur_pipe;
@@ -133,8 +134,6 @@ namespace aveng {
 		glm::vec3 rdPlayerRot  = glm::vec3(0.f,0.f,0.f);
 		glm::vec3 rdForwardDir = glm::vec3(0.f,0.f,0.f);
 
-		int rdNumPointLights = 0;
-
 		// Animation system debug data
 		int rdLoadedModels = 0;
 		int rdAnimatedModels = 0;
@@ -154,15 +153,15 @@ namespace aveng {
 		glm::vec4 normal{};       // normal.xyz + unused .w (could store tangent.x, etc.)
 		
 		// Skeletal animation data - naturally 16-byte aligned, no alignas needed!
-		glm::ivec4 boneIds{-1, -1, -1, -1};
-		glm::vec4 boneWeights{0.0f, 0.0f, 0.0f, 0.0f};
+		glm::uvec4 boneNumber = glm::uvec4(0);
+		glm::vec4 boneWeight = glm::vec4(0.0f);
 		
 		bool operator==(const AnimatedVertex& other) const {
 			return position == other.position && 
 			       color == other.color && 
 			       normal == other.normal && 
-			       boneIds == other.boneIds &&
-			       boneWeights == other.boneWeights;
+				   boneNumber == other.boneNumber &&
+				   boneWeight == other.boneWeight;
 		}
 	};
 

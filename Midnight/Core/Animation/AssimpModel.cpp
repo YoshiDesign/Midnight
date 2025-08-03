@@ -20,18 +20,20 @@ bool AssimpModel::loadModel(RenderData &renderData, std::string modelFilename, u
         aiProcess_CalcTangentSpace |
         aiProcess_Triangulate |
         aiProcess_JoinIdenticalVertices |
-        aiProcess_SortByPType |
-        aiProcess_LimitBoneWeights |        // 🔧 CRITICAL: Limit to 4 bones per vertex
-        aiProcess_GenSmoothNormals |        // 🔧 Generate normals if missing  
-        aiProcess_FixInfacingNormals |      // 🔧 Fix inverted normals
-        aiProcess_FlipUVs |                 // 🔧 ESSENTIAL: Flip V for Vulkan
-        aiProcess_ValidateDataStructure |   // 🔧 Validate mesh integrity
-        aiProcess_ImproveCacheLocality | extraImportFlags
+        aiProcess_GenNormals |
+        aiProcess_FlipUVs |                 //  ESSENTIAL: Flip V for Vulkan
+        aiProcess_ValidateDataStructure |   // Validate mesh integrity
+        extraImportFlags
+        // aiProcess_SortByPType |
+        // aiProcess_LimitBoneWeights |        // CRITICAL: Limit to 4 bones per vertex
+        // aiProcess_GenSmoothNormals |        //  Generate normals if missing  
+        // aiProcess_FixInfacingNormals |      //  Fix inverted normals
+        // aiProcess_ImproveCacheLocality 
         //aiProcess_Triangulate | 
         //aiProcess_ValidateDataStructure | 
         //aiProcess_FlipUVs |                    // Flip UVs for Vulkan
         //aiProcess_LimitBoneWeights |           // Limit to 4 bones per vertex
-        // REMOVED: aiProcess_GenNormal
+        
         );
 
     if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -50,12 +52,12 @@ bool AssimpModel::loadModel(RenderData &renderData, std::string modelFilename, u
 
     // Count vertices and faces
     for (unsigned int i = 0; i < numMeshes; ++i) {
-        unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
-        unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
+        //unsigned int numVertices = 
+        //unsigned int numFaces = 
 
-        mVertexCount += numVertices;
-        mTriangleCount += numFaces;
-        Logger::log(1, "%s: mesh %i contains %i vertices and %i faces\n", __FUNCTION__, i, numVertices, numFaces);
+        mVertexCount += scene->mMeshes[i]->mNumVertices;
+        mTriangleCount += scene->mMeshes[i]->mNumFaces;
+        // Logger::log(1, "%s: mesh %i contains %i vertices and %i faces\n", __FUNCTION__, i, numVertices, numFaces);
     }
     Logger::log(1, "AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
 
@@ -185,20 +187,20 @@ void AssimpModel::processNode(RenderData &renderData, std::shared_ptr<AssimpNode
 
             AssimpMesh mesh;
             if (mesh.processMesh(renderData, modelMesh, scene)) {
+
                 mModelMeshes.emplace_back(mesh.getMesh());
 
                 // Collect bones, avoiding duplicates
                 std::vector<std::shared_ptr<AssimpBone>> meshBones = mesh.getBoneList();
+
                 for (const auto& bone : meshBones) {
                     // Check if bone already exists by name (not ID, since IDs might conflict)
                     auto iter = std::find_if(mBoneList.begin(), mBoneList.end(), 
                         [bone](std::shared_ptr<AssimpBone>& existingBone) { 
-                            return bone->getBoneName() == existingBone->getBoneName(); 
+                            return bone->getBoneId() == existingBone->getBoneId();
                         });
                     if (iter == mBoneList.end()) {
-                        // Reassign bone ID to maintain consistent indexing
-                        auto newBone = std::make_shared<AssimpBone>(mBoneList.size(), bone->getBoneName(), bone->getOffsetMatrix());
-                        mBoneList.emplace_back(newBone);
+                        mBoneList.emplace_back(bone);
                     }
                 }
             }

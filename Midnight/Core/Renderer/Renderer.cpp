@@ -9,7 +9,7 @@
 #include "../Animation/AnimationRenderingSystem.h"
 
 #define LOG(a) std::cout<<a<<std::endl;
-#define DESTROY_UNIFORM_BUFFERS 1
+#define DESTROY_UNIFORM_BUFFERS 1	// Unused as far as I can tell
 
 namespace aveng {
 
@@ -584,12 +584,13 @@ namespace aveng {
 		u_LightsData.lightColors[u_LightsData.numLights] = glm::vec4(color, intensity);
 		u_LightsData.numLights++;
 
-		renderData.rdNumPointLights++;
+		gameData.numPointLights++;
+		
 	}
 
 	void Renderer::clearLights()
 	{
-		renderData.rdNumPointLights = 0;
+		gameData.numPointLights = 0;
 		u_LightsData.numLights = 0;
 		// Zero out the light arrays for clean state
 		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));

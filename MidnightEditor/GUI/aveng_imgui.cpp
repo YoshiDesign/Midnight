@@ -124,6 +124,8 @@ namespace aveng {
             ImGui::Text(
                 "Objects: %d", gameData.num_objs);
             ImGui::Text(
+                "Point Lights: %d", gameData.numPointLights);
+            ImGui::Text(
                 "Flight Mode: %d", gameData.fly_mode);
             ImGui::Text(
                 "Camera View:\t\t(%.03lf, %.03lf, %.03lf)", gameData.cameraView.x, gameData.cameraView.y, gameData.cameraView.z);

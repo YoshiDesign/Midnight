@@ -22,30 +22,25 @@ bool AssimpMesh::processMesh(RenderData &renderData, aiMesh* mesh, const aiScene
     // Process vertices
     for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
         AnimatedVertex vertex{};
-        
-        //  FIXED: All vec4 layout - position.xyz + texCoord.x in .w
-        if (mesh->mVertices) {
-            // glm::vec3 pos = Tools::convertAiToGLM(mesh->mVertices[i], false);  // DISABLE CONVERSION
-            vertex.position = glm::vec4(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z, 0.0f);  // texCoord.x will be set below
-        }
-        
+
+        // glm::vec3 pos = Tools::convertAiToGLM(mesh->mVertices[i], false);  // DISABLE CONVERSION
+        vertex.position = glm::vec4(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z, 0.0f);  // texCoord.x will be set below
+
         //  FIXED: Normal.xyz + unused .w
-        if (mesh->mNormals) {
+        if (mesh->HasNormals()) {
             // glm::vec3 norm = Tools::convertAiToGLM(mesh->mNormals[i], false);     // DISABLE CONVERSION
             vertex.normal = glm::vec4(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z, 0.0f);  // texCoord.y will be set below
         }
         
-        //  FIXED: Texture coordinates packed into position.w and color.w
-        if (mesh->mTextureCoords[0]) {
+        //  FIXED: Texture coordinates packed into position.w and normal.w
+        if (mesh->HasTextureCoords(0)) {
             vertex.position.w = mesh->mTextureCoords[0][i].x;  // texCoord.x → position.w
             vertex.normal.w = mesh->mTextureCoords[0][i].y;
-            // texCoord.y will be stored in color.w below
         }
         
         //  FIXED: Default color.xyz + texCoord.y in .w
         glm::vec3 defaultColor = glm::vec3(1.0f, 1.0f, 1.0f);
-        float texCoordY = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][i].y : 0.0f;
-        vertex.color = glm::vec4(defaultColor.x, defaultColor.y, defaultColor.z, 1.f);
+        vertex.color = glm::vec4(defaultColor, 1.f);
         
         mMesh.vertices.emplace_back(vertex);
     }
@@ -59,7 +54,7 @@ bool AssimpMesh::processMesh(RenderData &renderData, aiMesh* mesh, const aiScene
     }
     
     // Process bone weights
-    if (mesh->mNumBones > 0) {
+    if (mesh->HasBones() > 0) {
         mMesh.hasAnimationData = true;
         processBoneWeights(mesh);
         Logger::log(1, "AssimpMesh: Processed %d bones for mesh '%s'\n", mesh->mNumBones, mMeshName.c_str());
@@ -99,7 +94,7 @@ void AssimpMesh::validateMeshData() {
     Logger::log(1, "Position bounds: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f)\n",
                 minPos.x, minPos.y, minPos.z, maxPos.x, maxPos.y, maxPos.z);
     if (invalidPositions > 0) {
-        Logger::log(0, "⚠️  Found %d vertices with invalid positions!\n", invalidPositions);
+        Logger::log(0, "Error: Found %d vertices with invalid positions!\n", invalidPositions);
     }
     
     // 2. Normal validation
@@ -112,8 +107,8 @@ void AssimpMesh::validateMeshData() {
         }
     }
     
-    if (invalidNormals > 0) Logger::log(0, "⚠️  Found %d invalid normals!\n", invalidNormals);
-    if (zeroNormals > 0) Logger::log(1, "📋 Found %d zero-length normals\n", zeroNormals);
+    if (invalidNormals > 0) Logger::log(0, "Error: Found %d invalid normals!\n", invalidNormals);
+    if (zeroNormals > 0) Logger::log(1, "Error: Found %d zero-length normals\n", zeroNormals);
     
     // 3. UV coordinate validation (now packed in position.w and color.w)
     int invalidUVs = 0;
@@ -122,15 +117,15 @@ void AssimpMesh::validateMeshData() {
             invalidUVs++;
         }
     }
-    if (invalidUVs > 0) Logger::log(0, "⚠️  Found %d invalid UV coordinates!\n", invalidUVs);
+    if (invalidUVs > 0) Logger::log(0, "Error: Found %d invalid UV coordinates!\n", invalidUVs);
     
     // 4. Bone weight validation (for animated meshes)
     if (mMesh.hasAnimationData) {
         int invalidWeights = 0, unboundVertices = 0, exceededBoneLimit = 0;
         
         for (const auto& vertex : mMesh.vertices) {
-            float totalWeight = vertex.boneWeights.x + vertex.boneWeights.y + 
-                              vertex.boneWeights.z + vertex.boneWeights.w;
+            float totalWeight = vertex.boneWeight.x + vertex.boneWeight.y + 
+                              vertex.boneWeight.z + vertex.boneWeight.w;
             
             // Check weight normalization
             if (abs(totalWeight - 1.0f) > 0.01f && totalWeight > 0.0f) {
@@ -144,7 +139,7 @@ void AssimpMesh::validateMeshData() {
             
             // Check for invalid bone indices
             for (int i = 0; i < 4; ++i) {
-                if (vertex.boneIds[i] >= static_cast<int>(mBoneList.size()) && vertex.boneIds[i] != -1) {
+                if (vertex.boneNumber[i] >= static_cast<int>(mBoneList.size()) && vertex.boneNumber[i] != -1) {
                     exceededBoneLimit++;
                     break;
                 }
@@ -193,9 +188,9 @@ void AssimpMesh::debugVertexData() {
         Logger::log(1, "  Color:    (%.6f, %.6f, %.6f)\n", v.color.x, v.color.y, v.color.z);
         if (mMesh.hasAnimationData) {
             Logger::log(1, "  BoneIds:  (%d, %d, %d, %d)\n", 
-                        v.boneIds.x, v.boneIds.y, v.boneIds.z, v.boneIds.w);
+                        v.boneNumber.x, v.boneNumber.y, v.boneNumber.z, v.boneNumber.w);
             Logger::log(1, "  Weights:  (%.6f, %.6f, %.6f, %.6f)\n", 
-                        v.boneWeights.x, v.boneWeights.y, v.boneWeights.z, v.boneWeights.w);
+                        v.boneWeight.x, v.boneWeight.y, v.boneWeight.z, v.boneWeight.w);
         }
     }
     
@@ -230,26 +225,31 @@ void AssimpMesh::debugVertexData() {
 
 void AssimpMesh::processBoneWeights(aiMesh* mesh) {
     // Initialize all bone data to defaults
-    for (auto& vertex : mMesh.vertices) {
-        vertex.boneIds = glm::ivec4(-1, -1, -1, -1);
-        vertex.boneWeights = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-    }
+    //for (auto& vertex : mMesh.vertices) {
+    //    vertex.boneNumber = glm::ivec4(-1, -1, -1, -1);
+    //    vertex.boneWeight = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+    //}
     
     // Process each bone
     for (unsigned int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex) {
+
         aiBone* bone = mesh->mBones[boneIndex];
         std::string boneName = bone->mName.C_Str();
-        
+        unsigned int numWeights = bone->mNumWeights;
+
+        Logger::log(1, "%s: --- bone nr. %i has name %s, contains %i weights\n", __FUNCTION__, boneIndex, boneName.c_str(), numWeights);
+
         // Create bone object
         glm::mat4 offsetMatrix = Tools::convertAiToGLM(bone->mOffsetMatrix);
-        auto assimpBone = std::make_shared<AssimpBone>(boneIndex, boneName, offsetMatrix);
-        mBoneList.push_back(assimpBone);
+        std::shared_ptr<AssimpBone> newBone = std::make_shared<AssimpBone>(boneIndex, boneName, offsetMatrix);
+        mBoneList.push_back(newBone);
         
         // Apply bone weights to vertices
         for (unsigned int weightIndex = 0; weightIndex < bone->mNumWeights; ++weightIndex) {
+
             const aiVertexWeight& weight = bone->mWeights[weightIndex];
             unsigned int vertexId = weight.mVertexId;
-            float weightValue = weight.mWeight;
+            float vertexWeight = weight.mWeight;
             
             if (vertexId >= mMesh.vertices.size()) {
                 Logger::log(0, "AssimpMesh: Vertex ID %d out of range for mesh '%s'\n", vertexId, mMeshName.c_str());
@@ -257,24 +257,30 @@ void AssimpMesh::processBoneWeights(aiMesh* mesh) {
             }
             
             // Find an empty slot in the vertex's bone data
-            AnimatedVertex& vertex = mMesh.vertices[vertexId];
+            // AnimatedVertex& vertex = mMesh.vertices[vertexId];
+
+            glm::uvec4 currentIds = mMesh.vertices.at(vertexId).boneNumber;
+            glm::vec4 currentWeights = mMesh.vertices.at(vertexId).boneWeight;
+
             for (int i = 0; i < 4; ++i) {
-                if (vertex.boneIds[i] == -1) {
-                    vertex.boneIds[i] = boneIndex;
-                    vertex.boneWeights[i] = weightValue;
+                if (currentWeights[i] == 0.0f) {
+                    currentIds[i] = boneIndex;
+                    currentWeights[i] = vertexWeight;
                     break;
                 }
             }
+            mMesh.vertices.at(vertexId).boneNumber = currentIds;
+            mMesh.vertices.at(vertexId).boneWeight = currentWeights;
         }
     }
     
     // Normalize bone weights for each vertex
-    for (auto& vertex : mMesh.vertices) {
-        float totalWeight = vertex.boneWeights.x + vertex.boneWeights.y + vertex.boneWeights.z + vertex.boneWeights.w;
-        if (totalWeight > 0.0f) {
-            vertex.boneWeights /= totalWeight;
-        }
-    }
+    //for (auto& vertex : mMesh.vertices) {
+    //    float totalWeight = vertex.boneWeights.x + vertex.boneWeights.y + vertex.boneWeights.z + vertex.boneWeights.w;
+    //    if (totalWeight > 0.0f) {
+    //        vertex.boneWeights /= totalWeight;
+    //    }
+    //}
 }
 
 std::string AssimpMesh::getMeshName() {

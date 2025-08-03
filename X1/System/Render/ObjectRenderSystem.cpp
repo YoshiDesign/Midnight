@@ -22,7 +22,7 @@ namespace aveng {
 		// Note: ImageSystem should be initialized first in loadGame() before calling this
 
 		// Lights, temporary placement
-		for (int i = 1; i < 4; i++) {
+		for (int i = 1; i <= 4; i++) {
 			for (int j = 1; j < 5; j++) {
 
 				renderer.addLight(
@@ -33,11 +33,17 @@ namespace aveng {
 				);
 
 			}
+
+			renderer.addLight(
+				glm::vec3((i * 25.f), -25.f, -5.f),  // position
+				glm::vec3(.75f, 0.9f, 1.0f),    // turquoise color
+				0.75f,							// intensity
+				0.5f                            // radius
+			);
+
 		}
 		
 	}
-
-
 
 	void ObjectRenderSystem::render(float frameTime)
 	{
