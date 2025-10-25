@@ -33,13 +33,13 @@ namespace aveng {
 	
 
 	// Batch data for grouping instances by model
-	//struct RenderBatch {
-	//	AvengModel* model;
-	//	std::vector<InstanceData> instances;
-	//	std::unique_ptr<AvengBuffer> instanceBuffer;
-	//	
-	//	RenderBatch(AvengModel* m) : model(m) {}
-	//};
+	struct RenderBatch {
+		AvengModel* model;
+		std::vector<InstanceData> instances;
+		std::unique_ptr<AvengBuffer> instanceBuffer;
+		
+		RenderBatch(AvengModel* m) : model(m) {}
+	};
 
 	class Renderer {
 
@@ -102,7 +102,7 @@ namespace aveng {
 		void renderAnimatedModels(const std::vector<std::shared_ptr<class AssimpInstance>>& instances);
 		void renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
 		void renderObjectsInstanced(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData);
-		// void updateInstanceBuffer(RenderBatch& batch);
+		void updateInstanceBuffer(RenderBatch& batch);
 		const std::vector<AvengAppObject>& getAppObjects() const { return sceneLoader.getAppObjects(); };
 		void renderLights();
 		int getLightCount() const { return u_LightsData.numLights; }
@@ -223,7 +223,7 @@ namespace aveng {
 		std::unique_ptr<AvengDescriptorSetLayout> postProcessDescriptorSetLayout;
 
 		// Instanced rendering data - TODO - Why is a pointer the key? RenderBatch even includes a pointer to AvengModel. wtf?
-		// std::unordered_map<AvengModel*, std::unique_ptr<RenderBatch>> renderBatches;
+		std::unordered_map<AvengModel*, std::unique_ptr<RenderBatch>> renderBatches;
 		bool instancedRenderingEnabled = true; // Toggle for A/B testing
 		uint32_t maxInstancesPerBatch = 1000;  // Reasonable default
 

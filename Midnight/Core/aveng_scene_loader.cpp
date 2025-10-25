@@ -80,9 +80,9 @@ namespace aveng {
                                            " is out of range. Scene has " + std::to_string(scene.textures.size()) + " textures.");
                 }
                 
-                auto object = AvengAppObject::createAppObject(instance.textureId);
+                AvengAppObject object = AvengAppObject::createAppObject(instance.textureId);
                 
-                // Use shared model from cache for instanced rendering
+                // Use shared model from cache for instanced rendering. Relies on model's pathname for lookup
                 object.model = getOrCreateModel(objectData.path, engineDevice);
                 
                 // Set position
@@ -181,6 +181,7 @@ namespace aveng {
         auto it = modelCache.find(modelPath);
         if (it != modelCache.end()) {
             std::cout << "Using cached model for: " << modelPath << std::endl;
+            modelCountCache[modelPath]++;
             return it->second;
         }
         
@@ -188,10 +189,11 @@ namespace aveng {
         std::cout << "Loading new model: " << modelPath << std::endl;
         auto model = AvengModel::createModelFromFile(engineDevice, modelPath);
 
-        // TODO - Bad code smells
+        // TODO - Bad code smells, maybe - shared_ptr
         auto sharedModel = std::shared_ptr<AvengModel>(model.release());
 
         modelCache[modelPath] = sharedModel;
+        modelCountCache[modelPath] = 1;
         
         return sharedModel;
     }

@@ -8,12 +8,16 @@
 #include <vulkan/vulkan.h>  // For VkVertexInputAttributeDescription
 #include "AMD/vk_mem_alloc.h"
 #include "CoreVK/EngineDevice.h"
+//#include <unordered_map>
+//#include "aveng_model.h"
 
 namespace aveng {
 	const int RIGHT = -1;
 	const int LEFT = 1;
 	const int PI = 3.14159265f; // 3589793238462643383279502884197969399375105820974944592 check yo'self
 	const float viewRadius{ .5f };	// Radius of the invisible sphere for which our viewer is at the origin
+
+	//std::unordered_map < std::string , AvengModel > models_in_scene;
 
 	// Used by Components System
 	enum types {

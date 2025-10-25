@@ -85,22 +85,28 @@ namespace aveng {
         // Set vertex input layout based on pipeline type
         if (def.name == "ANIMATED") {
             // DEBUG: Manually create AnimatedVertex layout for raw geometry testing
-            config.bindingDescriptions.resize(1);
-            config.bindingDescriptions[0].binding = 0;
-            config.bindingDescriptions[0].stride = sizeof(AnimatedVertex);
-            config.bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-            
-            config.attributeDescriptions.clear();
-            // 🔧 FIXED: All vec4 layout - perfect alignment, no padding
-            config.attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, position)});   // vec4: pos.xyz + texCoord.x
-            config.attributeDescriptions.push_back({1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, color)});      // vec4: color.xyz + texCoord.y
-            config.attributeDescriptions.push_back({2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, normal)});     // vec4: normal.xyz + unused.w
-            // Location 3 removed - texCoord now packed in position.w and color.w
-            config.attributeDescriptions.push_back({4, 0, VK_FORMAT_R32G32B32A32_SINT, offsetof(AnimatedVertex, boneIds)});      // ivec4: unchanged
-            config.attributeDescriptions.push_back({5, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, boneWeights)});  // vec4: unchanged
-            
-            std::cout << "Pipeline '" << def.name << "': Using AnimatedVertex layout (" 
-                      << config.attributeDescriptions.size() << " attributes) - DEBUG MODE" << std::endl;
+            //config.bindingDescriptions.resize(1);
+            //config.bindingDescriptions[0].binding = 0;
+            //config.bindingDescriptions[0].stride = sizeof(AnimatedVertex);
+            //config.bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+            //
+            //config.attributeDescriptions.clear();
+            //// FIXED: All vec4 layout - perfect alignment, no padding
+            //config.attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, position)});   // vec4: pos.xyz + texCoord.x
+            //config.attributeDescriptions.push_back({1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, color)});      // vec4: color.xyz + texCoord.y
+            //config.attributeDescriptions.push_back({2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, normal)});     // vec4: normal.xyz + unused.w
+            //// Location 3 removed - texCoord now packed in position.w and color.w
+            //config.attributeDescriptions.push_back({4, 0, VK_FORMAT_R32G32B32A32_SINT, offsetof(AnimatedVertex, boneIds)});      // ivec4: unchanged
+            //config.attributeDescriptions.push_back({5, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(AnimatedVertex, boneWeights)});  // vec4: unchanged
+            //
+            //std::cout << "Pipeline '" << def.name << "': Using AnimatedVertex layout (" 
+            //          << config.attributeDescriptions.size() << " attributes) - DEBUG MODE" << std::endl;
+        } else if (def.name.find("INSTANCED") != std::string::npos) {
+            // Use instanced vertex layout for instanced rendering
+            config.bindingDescriptions = AvengModel::getInstancedBindingDescriptions();
+            config.attributeDescriptions = AvengModel::getInstancedAttributeDescriptions();
+            std::cout << "Pipeline '" << def.name << "': Using Instanced layout (" 
+                      << config.attributeDescriptions.size() << " attributes)" << std::endl;
         } else {
             // Use AvengModel::Vertex layout for static models  
             config.bindingDescriptions = AvengModel::Vertex::getBindingDescriptions();

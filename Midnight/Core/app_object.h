@@ -18,6 +18,7 @@ namespace aveng {
 		static AvengAppObject createAppObject(int texture_id)
 		{
 			static id_t currentId = 0;
+			std::cout << "Creating object... \nID: " << currentId << "\nTexID: "<< texture_id << std::endl;
 			return AvengAppObject{ currentId++, texture_id };
 		}
 

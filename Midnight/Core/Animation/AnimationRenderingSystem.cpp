@@ -184,249 +184,249 @@ void AnimationRenderingSystem::updateAnimationData(const std::vector<std::shared
 {
     if (instances.empty()) return;
 
-    lastInstanceCount = static_cast<uint32_t>(instances.size());
-    lastVertexCount = calculateTotalVertices(instances);
+    //lastInstanceCount = static_cast<uint32_t>(instances.size());
+    //lastVertexCount = calculateTotalVertices(instances);
 
-    //std::cout << "AnimationRenderingSystem: Updating data for " << lastInstanceCount 
-    //          << " instances (" << lastVertexCount << " vertices)" << std::endl;
+    ////std::cout << "AnimationRenderingSystem: Updating data for " << lastInstanceCount 
+    ////          << " instances (" << lastVertexCount << " vertices)" << std::endl;
 
-    // Prepare animation UBO data
-    AnimationUbo animUBO{};
-    animUBO.computeData.deltaTime = deltaTime;
-    animUBO.computeData.totalInstances = lastInstanceCount;
-    animUBO.computeData.maxBonesPerInstance = 128;
-    animUBO.computeData.verticesPerInstance = lastVertexCount;
+    //// Prepare animation UBO data
+    //AnimationUbo animUBO{};
+    //animUBO.computeData.deltaTime = deltaTime;
+    //animUBO.computeData.totalInstances = lastInstanceCount;
+    //animUBO.computeData.maxBonesPerInstance = 128;
+    //animUBO.computeData.verticesPerInstance = lastVertexCount;
 
-    // Update animation UBO
-    u_AnimationBuffers[currentFrameIndex]->writeToBuffer(&animUBO);
-    u_AnimationBuffers[currentFrameIndex]->flush();
+    //// Update animation UBO
+    //u_AnimationBuffers[currentFrameIndex]->writeToBuffer(&animUBO);
+    //u_AnimationBuffers[currentFrameIndex]->flush();
 
-    // Process each instance
-    std::vector<InstanceAnimationData> instanceData;
-    std::vector<glm::mat4> allBoneMatrices;
-    std::vector<AnimatedVertex> allVertices;
-    std::vector<uint32_t> allIndices;
+    //// Process each instance
+    //std::vector<InstanceAnimationData> instanceData;
+    //std::vector<glm::mat4> allBoneMatrices;
+    //std::vector<AnimatedVertex> allVertices;
+    //std::vector<uint32_t> allIndices;
 
-    // FIXED: Always rebuild layout metadata (not just first frame)
-    std::vector<InstanceLayout> currentFrameLayouts;
-    uint32_t currentBoneOffset = 0;
-    uint32_t currentVertexOffset = 0;
-    uint32_t currentIndexOffset = 0;
+    //// FIXED: Always rebuild layout metadata (not just first frame)
+    //std::vector<InstanceLayout> currentFrameLayouts;
+    //uint32_t currentBoneOffset = 0;
+    //uint32_t currentVertexOffset = 0;
+    //uint32_t currentIndexOffset = 0;
 
-    for (size_t i = 0; i < instances.size(); ++i) {
-        auto& instance = instances[i];
-        
-        // FIXED: Create layout metadata for this instance
-        InstanceLayout layout{};
-        layout.vertexOffset = currentVertexOffset;
-        layout.indexOffset = currentIndexOffset;
-        layout.boneOffset = currentBoneOffset;
-        layout.debugName = "Instance_" + std::to_string(i);  // Simple debug name
-        
-        // Create instance animation data
-        InstanceAnimationData instData{};
-        instData.modelMatrix = instance->getInstanceRootMatrix();
-        instData.animationTime = instance->getInstanceSettings().isAnimPlayTimePos;
-        instData.animationClipIndex = instance->getInstanceSettings().isAnimClipNr;
-        instData.boneMatrixOffset = currentBoneOffset;
+    //for (size_t i = 0; i < instances.size(); ++i) {
+    //    auto& instance = instances[i];
+    //    
+    //    // FIXED: Create layout metadata for this instance
+    //    InstanceLayout layout{};
+    //    layout.vertexOffset = currentVertexOffset;
+    //    layout.indexOffset = currentIndexOffset;
+    //    layout.boneOffset = currentBoneOffset;
+    //    layout.debugName = "Instance_" + std::to_string(i);  // Simple debug name
+    //    
+    //    // Create instance animation data
+    //    InstanceAnimationData instData{};
+    //    instData.modelMatrix = instance->getInstanceRootMatrix();
+    //    instData.animationTime = instance->getInstanceSettings().isAnimPlayTimePos;
+    //    instData.animationClipIndex = instance->getInstanceSettings().isAnimClipNr;
+    //    instData.boneMatrixOffset = currentBoneOffset;
 
-        // Get bone matrices from instance
-        const auto& boneMatrices = instance->getBoneTransformMatrices();
-        instData.boneCount = static_cast<uint32_t>(boneMatrices.size());
-        layout.boneCount = instData.boneCount;
-        currentBoneOffset += instData.boneCount;
+    //    // Get bone matrices from instance
+    //    const auto& boneMatrices = instance->getBoneTransformMatrices();
+    //    instData.boneCount = static_cast<uint32_t>(boneMatrices.size());
+    //    layout.boneCount = instData.boneCount;
+    //    currentBoneOffset += instData.boneCount;
 
-        // DEBUG: Check first bone matrix for corruption
-        if (i == 0 && !boneMatrices.empty()) {
-            const auto& firstBone = boneMatrices[0];
-            /*std::cout << " DEBUG: First bone matrix for instance " << i << ":" << std::endl;
-            std::cout << "  [" << firstBone[0][0] << ", " << firstBone[0][1] << ", " << firstBone[0][2] << ", " << firstBone[0][3] << "]" << std::endl;
-            std::cout << "  [" << firstBone[1][0] << ", " << firstBone[1][1] << ", " << firstBone[1][2] << ", " << firstBone[1][3] << "]" << std::endl;
-            std::cout << "  [" << firstBone[2][0] << ", " << firstBone[2][1] << ", " << firstBone[2][2] << ", " << firstBone[2][3] << "]" << std::endl;
-            std::cout << "  [" << firstBone[3][0] << ", " << firstBone[3][1] << ", " << firstBone[3][2] << ", " << firstBone[3][3] << "]" << std::endl;*/
-        }
+    //    // DEBUG: Check first bone matrix for corruption
+    //    if (i == 0 && !boneMatrices.empty()) {
+    //        const auto& firstBone = boneMatrices[0];
+    //        /*std::cout << " DEBUG: First bone matrix for instance " << i << ":" << std::endl;
+    //        std::cout << "  [" << firstBone[0][0] << ", " << firstBone[0][1] << ", " << firstBone[0][2] << ", " << firstBone[0][3] << "]" << std::endl;
+    //        std::cout << "  [" << firstBone[1][0] << ", " << firstBone[1][1] << ", " << firstBone[1][2] << ", " << firstBone[1][3] << "]" << std::endl;
+    //        std::cout << "  [" << firstBone[2][0] << ", " << firstBone[2][1] << ", " << firstBone[2][2] << ", " << firstBone[2][3] << "]" << std::endl;
+    //        std::cout << "  [" << firstBone[3][0] << ", " << firstBone[3][1] << ", " << firstBone[3][2] << ", " << firstBone[3][3] << "]" << std::endl;*/
+    //    }
 
-        // Add bone matrices to global buffer (ALWAYS needed for animation)
-        allBoneMatrices.insert(allBoneMatrices.end(), boneMatrices.begin(), boneMatrices.end());
+    //    // Add bone matrices to global buffer (ALWAYS needed for animation)
+    //    allBoneMatrices.insert(allBoneMatrices.end(), boneMatrices.begin(), boneMatrices.end());
 
-        // FIXED: ALWAYS collect vertex/index data and layout metadata (not just first frame)
-        const auto& meshes = instance->getModel()->getModelMeshes();
-        uint32_t instanceVertexCount = 0;
-        uint32_t instanceIndexCount = 0;
-        
-        for (const auto& mesh : meshes) {
-            // Add all vertices from this mesh
-            allVertices.insert(allVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
-            instanceVertexCount += static_cast<uint32_t>(mesh.vertices.size());
-            
-            // FIXED: Add indices with proper offset (no double offsetting in rendering)
-            const auto& meshIndices = mesh.indices;
-            for (uint32_t index : meshIndices) {
-                allIndices.push_back(index + currentVertexOffset);  // Pre-offset for global vertex buffer
-            }
-            instanceIndexCount += static_cast<uint32_t>(meshIndices.size());
-            
-            currentVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
-        }
-        
-        // Complete layout metadata for this instance
-        layout.vertexCount = instanceVertexCount;
-        layout.indexCount = instanceIndexCount;
-        currentIndexOffset += instanceIndexCount;
-        
-        // Store layout and instance data
-        currentFrameLayouts.push_back(layout);
-        instanceData.push_back(instData);
-    }
+    //    // FIXED: ALWAYS collect vertex/index data and layout metadata (not just first frame)
+    //    const auto& meshes = instance->getModel()->getModelMeshes();
+    //    uint32_t instanceVertexCount = 0;
+    //    uint32_t instanceIndexCount = 0;
+    //    
+    //    for (const auto& mesh : meshes) {
+    //        // Add all vertices from this mesh
+    //        allVertices.insert(allVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
+    //        instanceVertexCount += static_cast<uint32_t>(mesh.vertices.size());
+    //        
+    //        // FIXED: Add indices with proper offset (no double offsetting in rendering)
+    //        const auto& meshIndices = mesh.indices;
+    //        for (uint32_t index : meshIndices) {
+    //            allIndices.push_back(index + currentVertexOffset);  // Pre-offset for global vertex buffer
+    //        }
+    //        instanceIndexCount += static_cast<uint32_t>(meshIndices.size());
+    //        
+    //        currentVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
+    //    }
+    //    
+    //    // Complete layout metadata for this instance
+    //    layout.vertexCount = instanceVertexCount;
+    //    layout.indexCount = instanceIndexCount;
+    //    currentIndexOffset += instanceIndexCount;
+    //    
+    //    // Store layout and instance data
+    //    currentFrameLayouts.push_back(layout);
+    //    instanceData.push_back(instData);
+    //}
 
-    // Upload instance animation data
-    if (!instanceData.empty()) {
-        instanceAnimationBuffers[currentFrameIndex]->writeToBuffer(instanceData.data(), 
-            sizeof(InstanceAnimationData) * instanceData.size());
-        instanceAnimationBuffers[currentFrameIndex]->flush();
-    }
+    //// Upload instance animation data
+    //if (!instanceData.empty()) {
+    //    instanceAnimationBuffers[currentFrameIndex]->writeToBuffer(instanceData.data(), 
+    //        sizeof(InstanceAnimationData) * instanceData.size());
+    //    instanceAnimationBuffers[currentFrameIndex]->flush();
+    //}
 
-    // 🔧 FIXED: Store persistent layout metadata (always update)
-    persistentInstanceLayouts = std::move(currentFrameLayouts);
-    
-    // Upload bone matrices
-    if (!allBoneMatrices.empty()) {
-        boneMatrixBuffers[currentFrameIndex]->writeToBuffer(allBoneMatrices.data(),
-            sizeof(glm::mat4) * allBoneMatrices.size());
-        boneMatrixBuffers[currentFrameIndex]->flush();
-    }
+    //// 🔧 FIXED: Store persistent layout metadata (always update)
+    //persistentInstanceLayouts = std::move(currentFrameLayouts);
+    //
+    //// Upload bone matrices
+    //if (!allBoneMatrices.empty()) {
+    //    boneMatrixBuffers[currentFrameIndex]->writeToBuffer(allBoneMatrices.data(),
+    //        sizeof(glm::mat4) * allBoneMatrices.size());
+    //    boneMatrixBuffers[currentFrameIndex]->flush();
+    //}
 
-    // 🔧 FIXED: Upload mesh data based on actual changes, not arbitrary flag
-    // Upload if we have new vertex/index data OR if not previously uploaded
-    if (!allVertices.empty() && (!staticDataUploaded || allVertices.size() != lastVertexCount)) {
-        std::cout << " PERFORMANCE: Uploading mesh data (" 
-                  << allVertices.size() << " vertices, " << allIndices.size() << " indices)" << std::endl;
-        
-        // 🔧 FIXED: Debug layout metadata for validation
-        std::cout << "LAYOUT METADATA DEBUG:" << std::endl;
-        for (size_t i = 0; i < persistentInstanceLayouts.size(); ++i) {
-            const auto& layout = persistentInstanceLayouts[i];
-            std::cout << "  " << layout.debugName << ": vertices[" << layout.vertexOffset 
-                      << "-" << (layout.vertexOffset + layout.vertexCount - 1) << "] "
-                      << "indices[" << layout.indexOffset << "-" << (layout.indexOffset + layout.indexCount - 1) << "] "
-                      << "bones[" << layout.boneOffset << "-" << (layout.boneOffset + layout.boneCount - 1) << "]" << std::endl;
-        }
-        
-        // DEBUG: Extensive vertex collection analysis
-        std::cout << "EXTENSIVE DEBUG ANALYSIS:" << std::endl;
-        std::cout << "==================================" << std::endl;
-        
-        // Per-instance breakdown
-        uint32_t totalVerticesExpected = 0;
-        uint32_t totalIndicesExpected = 0;
-        for (size_t i = 0; i < instances.size(); ++i) {
-            const auto& meshes = instances[i]->getModel()->getModelMeshes();
-            uint32_t instanceVertices = 0;
-            uint32_t instanceIndices = 0;
-            
-            std::cout << "Instance " << i << " mesh breakdown:" << std::endl;
-            for (size_t m = 0; m < meshes.size(); ++m) {
-                instanceVertices += static_cast<uint32_t>(meshes[m].vertices.size());
-                instanceIndices += static_cast<uint32_t>(meshes[m].indices.size());
-                std::cout << "  Mesh " << m << ": " << meshes[m].vertices.size() << " vertices, " 
-                          << meshes[m].indices.size() << " indices" << std::endl;
-            }
-            
-            std::cout << "Instance " << i << " totals: " << instanceVertices << " vertices, " 
-                      << instanceIndices << " indices" << std::endl;
-            totalVerticesExpected += instanceVertices;
-            totalIndicesExpected += instanceIndices;
-        }
-        
-        std::cout << "EXPECTED TOTALS: " << totalVerticesExpected << " vertices, " << totalIndicesExpected << " indices" << std::endl;
-        std::cout << "COLLECTED TOTALS: " << allVertices.size() << " vertices, " << allIndices.size() << " indices" << std::endl;
-        
-        if (totalVerticesExpected != allVertices.size()) {
-            std::cout << "VERTEX COUNT MISMATCH!" << std::endl;
-        }
-        if (totalIndicesExpected != allIndices.size()) {
-            std::cout << " INDEX COUNT MISMATCH!" << std::endl;
-        }
-        
-        // Sample vertex data analysis
-        std::cout << "\n SAMPLE VERTEX DATA:" << std::endl;
-        for (size_t i = 0; i < std::min(size_t(3), allVertices.size()); ++i) {
-            const auto& v = allVertices[i];
-            std::cout << "  Vertex " << i << ":" << std::endl;
-            std::cout << "    Position: (" << v.position.x << ", " << v.position.y << ", " << v.position.z << ")" << std::endl;
-            std::cout << "    Normal: (" << v.normal.x << ", " << v.normal.y << ", " << v.normal.z << ")" << std::endl;
-            std::cout << "    TexCoord: (" << v.position.w << ", " << v.color.w << ") [packed in .w components]" << std::endl;
-            std::cout << "    BoneIds: (" << v.boneIds.x << ", " << v.boneIds.y << ", " << v.boneIds.z << ", " << v.boneIds.w << ")" << std::endl;
-            std::cout << "    BoneWeights: (" << v.boneWeights.x << ", " << v.boneWeights.y << ", " << v.boneWeights.z << ", " << v.boneWeights.w << ")" << std::endl;
-            
-            // Validate bone data
-            float totalWeight = v.boneWeights.x + v.boneWeights.y + v.boneWeights.z + v.boneWeights.w;
-            std::cout << "    Weight Sum: " << totalWeight << std::endl;
-            if (totalWeight > 1.1f || totalWeight < 0.9f) {
-                std::cout << "    WARNING: Bone weights don't sum to ~1.0!" << std::endl;
-            }
-        }
-        
-        // Sample index data
-        std::cout << "\n SAMPLE INDEX DATA:" << std::endl;
-        std::cout << "First 15 indices: ";
-        for (size_t i = 0; i < std::min(size_t(15), allIndices.size()); ++i) {
-            std::cout << allIndices[i] << " ";
-        }
-        std::cout << std::endl;
-        
-        // 🔧 STEP 5: Validate indices point to valid vertices (catch double-offsetting bugs)
-        std::cout << "INDEX VALIDATION:" << std::endl;
-        uint32_t invalidIndices = 0;
-        uint32_t maxValidIndex = allVertices.size() - 1;
-        for (size_t i = 0; i < std::min(size_t(20), allIndices.size()); ++i) {  // Check first 20 indices
-            if (allIndices[i] > maxValidIndex) {
-                std::cout << "  Index " << i << " = " << allIndices[i] << " (max valid: " << maxValidIndex << ")" << std::endl;
-                invalidIndices++;
-            } else if (i < 10) {  // Show first 10 valid indices for reference
-                std::cout << "  Index " << i << " = " << allIndices[i] << " (valid)" << std::endl;
-            }
-        }
-        if (invalidIndices > 0) {
-            std::cerr << "ERROR: Found " << invalidIndices << " invalid indices! This indicates offset calculation bugs." << std::endl;
-        } else {
-            std::cout << "All checked indices are valid!" << std::endl;
-        }
-        
-        // Upload vertices to ALL frames (since we use different buffers per frame)
-        for (int frame = 0; frame < animatedVertexBuffers.size(); ++frame) {
-            // Verify buffer is large enough
-            uint32_t requiredVertexBufferSize = sizeof(AnimatedVertex) * allVertices.size();
-            if (animatedVertexBuffers[frame]->getBufferSize() < requiredVertexBufferSize) {
-                std::cerr << "ERROR: Animated vertex buffer too small! Required: " << requiredVertexBufferSize 
-                          << ", Available: " << animatedVertexBuffers[frame]->getBufferSize() << std::endl;
-                return;
-            }
-            
-            animatedVertexBuffers[frame]->writeToBuffer(allVertices.data(),
-                sizeof(AnimatedVertex) * allVertices.size());
-            animatedVertexBuffers[frame]->flush();
-        }
-        
-        // Upload indices to ALL frames  
-        for (int frame = 0; frame < animatedIndexBuffers.size(); ++frame) {
-            // Verify buffer is large enough
-            uint32_t requiredIndexBufferSize = sizeof(uint32_t) * allIndices.size();
-            if (animatedIndexBuffers[frame]->getBufferSize() < requiredIndexBufferSize) {
-                std::cerr << "ERROR: Animated index buffer too small! Required: " << requiredIndexBufferSize 
-                          << ", Available: " << animatedIndexBuffers[frame]->getBufferSize() << std::endl;
-                return;
-            }
-            
-            animatedIndexBuffers[frame]->writeToBuffer(allIndices.data(),
-                sizeof(uint32_t) * allIndices.size());
-            animatedIndexBuffers[frame]->flush();
-        }
-        
-        staticDataUploaded = true;
-        lastVertexCount = static_cast<uint32_t>(allVertices.size());  // Track for upload condition
-        std::cout << "PERFORMANCE: Mesh data uploaded successfully!" << std::endl;
-    }
+    //// 🔧 FIXED: Upload mesh data based on actual changes, not arbitrary flag
+    //// Upload if we have new vertex/index data OR if not previously uploaded
+    //if (!allVertices.empty() && (!staticDataUploaded || allVertices.size() != lastVertexCount)) {
+    //    std::cout << " PERFORMANCE: Uploading mesh data (" 
+    //              << allVertices.size() << " vertices, " << allIndices.size() << " indices)" << std::endl;
+    //    
+    //    // 🔧 FIXED: Debug layout metadata for validation
+    //    std::cout << "LAYOUT METADATA DEBUG:" << std::endl;
+    //    for (size_t i = 0; i < persistentInstanceLayouts.size(); ++i) {
+    //        const auto& layout = persistentInstanceLayouts[i];
+    //        std::cout << "  " << layout.debugName << ": vertices[" << layout.vertexOffset 
+    //                  << "-" << (layout.vertexOffset + layout.vertexCount - 1) << "] "
+    //                  << "indices[" << layout.indexOffset << "-" << (layout.indexOffset + layout.indexCount - 1) << "] "
+    //                  << "bones[" << layout.boneOffset << "-" << (layout.boneOffset + layout.boneCount - 1) << "]" << std::endl;
+    //    }
+    //    
+    //    // DEBUG: Extensive vertex collection analysis
+    //    std::cout << "EXTENSIVE DEBUG ANALYSIS:" << std::endl;
+    //    std::cout << "==================================" << std::endl;
+    //    
+    //    // Per-instance breakdown
+    //    uint32_t totalVerticesExpected = 0;
+    //    uint32_t totalIndicesExpected = 0;
+    //    for (size_t i = 0; i < instances.size(); ++i) {
+    //        const auto& meshes = instances[i]->getModel()->getModelMeshes();
+    //        uint32_t instanceVertices = 0;
+    //        uint32_t instanceIndices = 0;
+    //        
+    //        std::cout << "Instance " << i << " mesh breakdown:" << std::endl;
+    //        for (size_t m = 0; m < meshes.size(); ++m) {
+    //            instanceVertices += static_cast<uint32_t>(meshes[m].vertices.size());
+    //            instanceIndices += static_cast<uint32_t>(meshes[m].indices.size());
+    //            std::cout << "  Mesh " << m << ": " << meshes[m].vertices.size() << " vertices, " 
+    //                      << meshes[m].indices.size() << " indices" << std::endl;
+    //        }
+    //        
+    //        std::cout << "Instance " << i << " totals: " << instanceVertices << " vertices, " 
+    //                  << instanceIndices << " indices" << std::endl;
+    //        totalVerticesExpected += instanceVertices;
+    //        totalIndicesExpected += instanceIndices;
+    //    }
+    //    
+    //    std::cout << "EXPECTED TOTALS: " << totalVerticesExpected << " vertices, " << totalIndicesExpected << " indices" << std::endl;
+    //    std::cout << "COLLECTED TOTALS: " << allVertices.size() << " vertices, " << allIndices.size() << " indices" << std::endl;
+    //    
+    //    if (totalVerticesExpected != allVertices.size()) {
+    //        std::cout << "VERTEX COUNT MISMATCH!" << std::endl;
+    //    }
+    //    if (totalIndicesExpected != allIndices.size()) {
+    //        std::cout << " INDEX COUNT MISMATCH!" << std::endl;
+    //    }
+    //    
+    //    // Sample vertex data analysis
+    //    std::cout << "\n SAMPLE VERTEX DATA:" << std::endl;
+    //    for (size_t i = 0; i < std::min(size_t(3), allVertices.size()); ++i) {
+    //        const auto& v = allVertices[i];
+    //        std::cout << "  Vertex " << i << ":" << std::endl;
+    //        std::cout << "    Position: (" << v.position.x << ", " << v.position.y << ", " << v.position.z << ")" << std::endl;
+    //        std::cout << "    Normal: (" << v.normal.x << ", " << v.normal.y << ", " << v.normal.z << ")" << std::endl;
+    //        std::cout << "    TexCoord: (" << v.position.w << ", " << v.color.w << ") [packed in .w components]" << std::endl;
+    //        std::cout << "    BoneIds: (" << v.boneIds.x << ", " << v.boneIds.y << ", " << v.boneIds.z << ", " << v.boneIds.w << ")" << std::endl;
+    //        std::cout << "    BoneWeights: (" << v.boneWeights.x << ", " << v.boneWeights.y << ", " << v.boneWeights.z << ", " << v.boneWeights.w << ")" << std::endl;
+    //        
+    //        // Validate bone data
+    //        float totalWeight = v.boneWeights.x + v.boneWeights.y + v.boneWeights.z + v.boneWeights.w;
+    //        std::cout << "    Weight Sum: " << totalWeight << std::endl;
+    //        if (totalWeight > 1.1f || totalWeight < 0.9f) {
+    //            std::cout << "    WARNING: Bone weights don't sum to ~1.0!" << std::endl;
+    //        }
+    //    }
+    //    
+    //    // Sample index data
+    //    std::cout << "\n SAMPLE INDEX DATA:" << std::endl;
+    //    std::cout << "First 15 indices: ";
+    //    for (size_t i = 0; i < std::min(size_t(15), allIndices.size()); ++i) {
+    //        std::cout << allIndices[i] << " ";
+    //    }
+    //    std::cout << std::endl;
+    //    
+    //    // STEP 5: Validate indices point to valid vertices (catch double-offsetting bugs)
+    //    std::cout << "INDEX VALIDATION:" << std::endl;
+    //    uint32_t invalidIndices = 0;
+    //    uint32_t maxValidIndex = allVertices.size() - 1;
+    //    for (size_t i = 0; i < std::min(size_t(20), allIndices.size()); ++i) {  // Check first 20 indices
+    //        if (allIndices[i] > maxValidIndex) {
+    //            std::cout << "  Index " << i << " = " << allIndices[i] << " (max valid: " << maxValidIndex << ")" << std::endl;
+    //            invalidIndices++;
+    //        } else if (i < 10) {  // Show first 10 valid indices for reference
+    //            std::cout << "  Index " << i << " = " << allIndices[i] << " (valid)" << std::endl;
+    //        }
+    //    }
+    //    if (invalidIndices > 0) {
+    //        std::cerr << "ERROR: Found " << invalidIndices << " invalid indices! This indicates offset calculation bugs." << std::endl;
+    //    } else {
+    //        std::cout << "All checked indices are valid!" << std::endl;
+    //    }
+    //    
+    //    // Upload vertices to ALL frames (since we use different buffers per frame)
+    //    for (int frame = 0; frame < animatedVertexBuffers.size(); ++frame) {
+    //        // Verify buffer is large enough
+    //        uint32_t requiredVertexBufferSize = sizeof(AnimatedVertex) * allVertices.size();
+    //        if (animatedVertexBuffers[frame]->getBufferSize() < requiredVertexBufferSize) {
+    //            std::cerr << "ERROR: Animated vertex buffer too small! Required: " << requiredVertexBufferSize 
+    //                      << ", Available: " << animatedVertexBuffers[frame]->getBufferSize() << std::endl;
+    //            return;
+    //        }
+    //        
+    //        animatedVertexBuffers[frame]->writeToBuffer(allVertices.data(),
+    //            sizeof(AnimatedVertex) * allVertices.size());
+    //        animatedVertexBuffers[frame]->flush();
+    //    }
+    //    
+    //    // Upload indices to ALL frames  
+    //    for (int frame = 0; frame < animatedIndexBuffers.size(); ++frame) {
+    //        // Verify buffer is large enough
+    //        uint32_t requiredIndexBufferSize = sizeof(uint32_t) * allIndices.size();
+    //        if (animatedIndexBuffers[frame]->getBufferSize() < requiredIndexBufferSize) {
+    //            std::cerr << "ERROR: Animated index buffer too small! Required: " << requiredIndexBufferSize 
+    //                      << ", Available: " << animatedIndexBuffers[frame]->getBufferSize() << std::endl;
+    //            return;
+    //        }
+    //        
+    //        animatedIndexBuffers[frame]->writeToBuffer(allIndices.data(),
+    //            sizeof(uint32_t) * allIndices.size());
+    //        animatedIndexBuffers[frame]->flush();
+    //    }
+    //    
+    //    staticDataUploaded = true;
+    //    lastVertexCount = static_cast<uint32_t>(allVertices.size());  // Track for upload condition
+    //    std::cout << "PERFORMANCE: Mesh data uploaded successfully!" << std::endl;
+    //}
 
     //std::cout << "AnimationRenderingSystem: Data uploaded - " << instanceData.size() << " instances, " 
     //          << allBoneMatrices.size() << " bone matrices, " 

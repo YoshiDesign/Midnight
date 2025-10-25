@@ -49,19 +49,26 @@ namespace aveng {
 		};
 
 		//AvengModel(EngineDevice& device, const AvengModel::Builder& builder);
-		AvengModel(EngineDevice& device, std::vector<AvengModel::Vertex> vertices, std::vector<uint32_t> indices);
+		AvengModel(EngineDevice& device, std::vector<AvengModel::Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath);
 		~AvengModel();
 
 		AvengModel(const AvengModel&) = delete;
 		AvengModel& operator=(const AvengModel&) = delete;
 
 		static std::unique_ptr<AvengModel> createModelFromFile(EngineDevice& device, const std::string& filepath);
-		static std::unique_ptr<AvengModel> drawTriangle(EngineDevice& device, glm::vec3 pos);
+		static std::unique_ptr<AvengModel> drawTriangle(EngineDevice& device, glm::vec3 pos, const std::string& filepath);
 		
 		void bind(VkCommandBuffer commandBuffer);
+		void bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer);
 		void draw(VkCommandBuffer commandBuffer);
 		void drawInstanced(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
+		
+		// Static methods for instance rendering setup
+		static std::vector<VkVertexInputBindingDescription> getInstancedBindingDescriptions();
+		static std::vector<VkVertexInputAttributeDescription> getInstancedAttributeDescriptions();
 	
+		std::string path; 
+
 	private:
 
 		void createVertexBuffers(const std::vector<Vertex>& vertices);

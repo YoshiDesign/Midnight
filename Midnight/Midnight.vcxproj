@@ -198,7 +198,6 @@
     <ClCompile Include="Utils\window_callbacks.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="avpch.h" />
     <ClInclude Include="CoreVK\AvengImageSystem.h" />
     <ClInclude Include="CoreVK\aveng_buffer.h" />
     <ClInclude Include="CoreVK\aveng_descriptors.h" />

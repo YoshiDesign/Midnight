@@ -123,7 +123,7 @@ namespace aveng {
 		// Load our image
 		int texWidth, texHeight, texChannels;
 		stbi_uc* pixels = stbi_load(filepath, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-		VkDeviceSize imageSize = texWidth * texHeight * 4;
+		VkDeviceSize imageSize = texWidth * texHeight * 4; // 4 - 1 for each channel rgba
 
 		// Take the number of available mip lvls +1 for level 0
 		uint32_t mipLevel = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
@@ -298,6 +298,7 @@ namespace aveng {
 			blit.srcSubresource.mipLevel = i - 1;
 			blit.srcSubresource.baseArrayLayer = 0;
 			blit.srcSubresource.layerCount = 1;
+
 			blit.dstOffsets[0] = { 0, 0, 0 };
 			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
 			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -358,6 +359,9 @@ namespace aveng {
 		
 	}
 
+	/*
+	 * Deprecated
+	 */
 	void ImageSystem::createTextureImage(const char* filepath, size_t i)
 	{
 		VkImage image;
@@ -428,7 +432,7 @@ namespace aveng {
 			imageInfo,
 			VMA_MEMORY_USAGE_GPU_ONLY, // GPU-only memory for optimal performance
 			image,
-			allocation
+			allocation // reference
 		);
 
 		// Track our VMA allocations
@@ -441,6 +445,9 @@ namespace aveng {
 
 	}
 
+	/*
+	 * Deprecated
+	 */
 	void ImageSystem::generateMipmaps(VkImage _image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t _mipLevels)
 	{
 		// Check if image format supports linear blitting
@@ -449,7 +456,7 @@ namespace aveng {
 
 		if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) 
 		{
-			// Continue without MipMapping. This means less optimization.
+			// Continue without MipMapping
 			std::cout << "This image does not support linear blitting" << std::endl;
 			transitionImageLayout(_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _mipLevels);
 			/*throw std::runtime_error("texture image format does not support linear blitting!");*/
@@ -491,6 +498,7 @@ namespace aveng {
 			blit.srcSubresource.mipLevel = i - 1;
 			blit.srcSubresource.baseArrayLayer = 0;
 			blit.srcSubresource.layerCount = 1;
+
 			blit.dstOffsets[0] = { 0, 0, 0 };
 			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
 			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;

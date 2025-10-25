@@ -67,6 +67,57 @@
       "specialization": {
         "textureArraySize": true
       }
+    },
+    {
+      "name": "STANDARD_INSTANCED",
+      "id": 10,
+      "vertexShader": "shaders/simple_shader_instanced.vert.spv",
+      "fragmentShader": "shaders/simple_shader_instanced.frag.spv",
+      "rasterization": {
+        "polygonMode": "FILL",
+        "cullMode": "BACK",
+        "frontFace": "COUNTER_CLOCKWISE"
+      },
+      "blending": {
+        "enabled": false
+      },
+      "specialization": {
+        "textureArraySize": true
+      }
+    },
+    {
+      "name": "WIREFRAME_INSTANCED",
+      "id": 11,
+      "vertexShader": "shaders/simple_shader_instanced.vert.spv",
+      "fragmentShader": "shaders/simple_shader_instanced.frag.spv",
+      "rasterization": {
+        "polygonMode": "LINE",
+        "cullMode": "NONE",
+        "frontFace": "COUNTER_CLOCKWISE"
+      },
+      "blending": {
+        "enabled": false
+      },
+      "specialization": {
+        "textureArraySize": true
+      }
+    },
+    {
+      "name": "DISTORTED_INSTANCED",
+      "id": 12,
+      "vertexShader": "shaders/simple_shader_instanced.vert.spv",
+      "fragmentShader": "shaders/simple_shader_instanced.frag.spv",
+      "rasterization": {
+        "polygonMode": "FILL",
+        "cullMode": "BACK",
+        "frontFace": "COUNTER_CLOCKWISE"
+      },
+      "blending": {
+        "enabled": false
+      },
+      "specialization": {
+        "textureArraySize": true
+      }
     }
   ]
 }

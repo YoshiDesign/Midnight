@@ -47,7 +47,9 @@ namespace aveng {
          * Get the current scene's app objects for rendering
          */
         const std::vector<AvengAppObject>& getAppObjects() const { return currentSceneObjects_v; }
-        // AvengAppObject::Map&
+        
+        const std::unordered_map<std::string, int> getModelCountCache() const { return modelCountCache; }\
+            std::unordered_map<std::string, std::shared_ptr<AvengModel>> getModelCache() const { return modelCache; }
         
         /**
          * Get current scene info
@@ -83,5 +85,6 @@ namespace aveng {
         
         // Model cache - shared models by file path
         std::unordered_map<std::string, std::shared_ptr<AvengModel>> modelCache;
+        std::unordered_map<std::string, int> modelCountCache;
     };
 }

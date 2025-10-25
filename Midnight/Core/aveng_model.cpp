@@ -9,6 +9,7 @@
 #include <tiny_obj_loader/tiny_obj_loader.h>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
+#include "data.h"
 
 namespace std {
 
@@ -42,12 +43,14 @@ namespace aveng {
 	//	createIndexBuffers(builder.indices);
 	//}
 
-	AvengModel::AvengModel(EngineDevice& device, std::vector<AvengModel::Vertex> vertices, std::vector<uint32_t> indices)
+	AvengModel::AvengModel(EngineDevice& device, std::vector<AvengModel::Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath)
 		: engineDevice{ device }
 	{
 		std::cout << "Instantiating Model..." << std::endl;
 		createVertexBuffers(vertices); // The vertex shader takes input from a vertex buffer from `layout(location = n) in vec3 vertexAttribute`. The vertexAttribute is defined by the vertex Buffer
 		createIndexBuffers(indices);
+
+		path = filepath;
 		
 		// Verify VMA allocation for model buffers
 		std::cout << "  Model VMA Verification:" << std::endl;
@@ -65,10 +68,10 @@ namespace aveng {
 	{
 		Builder builder{};
 		builder.loadModel(filepath);
-		return std::make_unique<AvengModel>(device, builder.vertices, builder.indices);
+		return std::make_unique<AvengModel>(device, builder.vertices, builder.indices, filepath);
 	}
 
-	std::unique_ptr<AvengModel> AvengModel::drawTriangle(EngineDevice& device, glm::vec3 pos)
+	std::unique_ptr<AvengModel> AvengModel::drawTriangle(EngineDevice& device, glm::vec3 pos, const std::string& filepath)
 	{
 		std::vector<AvengModel::Vertex> vertices { // vector
 			{ { pos.x, pos.y, pos.z }, {1.0f, 1.0f, 1.0f }, {1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } },
@@ -77,7 +80,7 @@ namespace aveng {
 		};
 
 		std::vector<uint32_t> indices = { 0,1,2 };
-		return std::make_unique<AvengModel>(device, vertices, indices);
+		return std::make_unique<AvengModel>(device, vertices, indices, filepath);
 	}
 
 	/*
@@ -167,7 +170,6 @@ namespace aveng {
 
 	}
 
-
 	void AvengModel::draw(VkCommandBuffer commandBuffer) 
 	{
 		if (hasIndexBuffer) 
@@ -201,6 +203,24 @@ namespace aveng {
 			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32); // This index type can store up to 2^32 vertices
 		}
 
+	}
+
+	void AvengModel::bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer)
+	{
+		// Bind vertex buffer at binding 0
+		VkBuffer buffers[] = { vertexBuffer->getBuffer() };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffers, offsets);
+
+		// Bind instance buffer at binding 1
+		VkBuffer instanceBuffers[] = { instanceBuffer };
+		VkDeviceSize instanceOffsets[] = { 0 };
+		vkCmdBindVertexBuffers(commandBuffer, 1, 1, instanceBuffers, instanceOffsets);
+
+		if (hasIndexBuffer) 
+		{
+			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		}
 	}
 
 	/*
@@ -249,6 +269,78 @@ namespace aveng {
 
 		return attributeDescriptions;
 
+	}
+
+	/*
+	* @function AvengModel::getInstancedBindingDescriptions
+	* Returns binding descriptions for instanced rendering
+	* Binding 0: Per-vertex data (position, color, normal, texCoord)
+	* Binding 1: Per-instance data (modelMatrix, normalMatrix, textureIndex)
+	*/
+	std::vector<VkVertexInputBindingDescription> AvengModel::getInstancedBindingDescriptions()
+	{
+		std::vector<VkVertexInputBindingDescription> bindingDescriptions(2);
+		
+		// Binding 0: Vertex data (per-vertex rate)
+		bindingDescriptions[0].binding = 0;
+		bindingDescriptions[0].stride = sizeof(Vertex);
+		bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		
+		// Binding 1: Instance data (per-instance rate)
+		bindingDescriptions[1].binding = 1;
+		bindingDescriptions[1].stride = sizeof(InstanceData);
+		bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+		
+		return bindingDescriptions;
+	}
+
+	/*
+	* @function AvengModel::getInstancedAttributeDescriptions
+	* Returns attribute descriptions for instanced rendering
+	* Locations 0-3: Per-vertex attributes
+	* Locations 4-11: Per-instance attributes (mat4 takes 4 locations each)
+	* Location 12: textureIndex
+	*/
+	std::vector<VkVertexInputAttributeDescription> AvengModel::getInstancedAttributeDescriptions()
+	{
+		std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
+
+		// Per-vertex attributes from binding 0
+		attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position) });
+		attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color) });
+		attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) });
+		attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, texCoord) });
+
+		// Per-instance attributes from binding 1
+		// Instance modelMatrix (mat4 = 4 vec4s, so 4 locations: 4, 5, 6, 7)
+		for (uint32_t i = 0; i < 4; i++) {
+			attributeDescriptions.push_back({
+				4 + i,                                          // location
+				1,                                              // binding
+				VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
+				static_cast<uint32_t>(offsetof(InstanceData, modelMatrix) + sizeof(glm::vec4) * i)
+			});
+		}
+
+		// Instance normalMatrix (mat4 = 4 vec4s, so 4 locations: 8, 9, 10, 11)
+		for (uint32_t i = 0; i < 4; i++) {
+			attributeDescriptions.push_back({
+				8 + i,                                          // location
+				1,                                              // binding
+				VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
+				static_cast<uint32_t>(offsetof(InstanceData, normalMatrix) + sizeof(glm::vec4) * i)
+			});
+		}
+
+		// Instance textureIndex (location 12)
+		attributeDescriptions.push_back({
+			12,                                             // location
+			1,                                              // binding
+			VK_FORMAT_R32_SINT,                            // format (int)
+			static_cast<uint32_t>(offsetof(InstanceData, textureIndex))
+		});
+
+		return attributeDescriptions;
 	}
 
 	/*

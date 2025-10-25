@@ -86,7 +86,7 @@ namespace aveng {
         // Choose your weapon (GPU), or multiple of them (super advanced)
         pickPhysicalDevice();
 
-        // Determine thefeatures of our GPU we will be utilizing
+        // Determine the features of our GPU we will be utilizing
         createLogicalDevice();
 
         // Initialize VMA allocator
@@ -136,9 +136,9 @@ namespace aveng {
 
         VkApplicationInfo appInfo = {};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Avenge - Zero";
+        appInfo.pApplicationName = "First Midnight";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "Avenge";
+        appInfo.pEngineName = "Midnight";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -189,7 +189,7 @@ namespace aveng {
         vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
         if (deviceCount == 0) 
         {
-            throw std::runtime_error("failed to find GPUs with Vulkan support!");
+            throw std::runtime_error("failed to find GPUs with Vulkan support");
         }
 
         std::cout << "Device count: " << deviceCount << std::endl;
@@ -241,12 +241,23 @@ namespace aveng {
         */
         QueueFamilyIndices indices = findQueueFamilies(_physicalDevice);
 
+        /**
+        * From ChatGuy:
+        *   std::set already deduplicates queue families, so if one family supports multiple capabilities 
+            (e.g., graphics + compute + present), you’ll only create one VkDeviceQueueCreateInfo for that family. 
+            That’s correct. What you might be missing is: if you want multiple queues from the same family 
+            (e.g., one you use as “graphics” and another you use as “compute”), you must set 
+            queueCount > 1 for that family and provide enough priorities.
+
+            Homework: Research discrete queue priorities for device-dependent relative priorities
+         */
+
         // For config
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily, indices.presentFamily};
+        std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily, indices.presentFamily, indices.computeFamily};
 
         // Configure the CreateInfo for each Queue, adding each to our vector
-        float queuePriority = 1.0f;
+        float queuePriority = 1.0f; // 0.0 to 1.0 or nullptr (default)
         for (uint32_t queueFamily : uniqueQueueFamilies) 
         {
             // Create a new config
@@ -294,6 +305,7 @@ namespace aveng {
         // Get a queue handle for each queue family
         vkGetDeviceQueue(_device, indices.graphicsFamily, 0, &_graphicsQueue);
         vkGetDeviceQueue(_device, indices.presentFamily, 0, &_presentQueue);
+        vkGetDeviceQueue(_device, indices.computeFamily, 0, &_computeQueue);
     }
 
     void EngineDevice::createCommandPool() {
@@ -524,7 +536,7 @@ namespace aveng {
     {
 
         uint32_t extensionCount;
-        // Enumerate our devices extension properties
+        // Enumerate our device's extension properties
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
@@ -564,15 +576,22 @@ namespace aveng {
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-        // By locating a queue for graphics and presentation we can ensure that our device is suitable
+        // By locating a queue for graphics, compute and presentation we can ensure that our device is suitable for our needs
         int i = 0;
         for (const auto &queueFamily : queueFamilies) {
 
-            // Find a graphics queue. We need at least 1 queue family that supports VK_QUEUE_GRAPHICS_BIT
+            // Find a graphics queue. We need at least 1 queue family that supports VK_QUEUE_GRAPHICS_BIT...
             if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) 
             {
                 indices.graphicsFamily = i;
                 indices.graphicsFamilyHasValue = true;
+            }
+            
+            // ...and VK_QUEUE_COMPUTE_BIT
+            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
+            {
+                indices.computeFamily = i;
+                indices.computeFamilyHasValue = true;
             }
 
             //  Look for a queue family that has the capability of presenting to our window surface
@@ -653,6 +672,12 @@ namespace aveng {
         throw std::runtime_error("failed to find supported format!");
     }
 
+    /*
+     * DEPRECATED: VMA does this for us. Only necessary if we're performing manual allocation.
+     * Note: This returns the first applicable memory type for our needs.
+     * This assumes we have no particular need to specify any memory type
+     * apart from the fact that it just works for our resource binding.
+     */
     uint32_t EngineDevice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) 
     {
         VkPhysicalDeviceMemoryProperties memProperties;
@@ -661,8 +686,8 @@ namespace aveng {
         for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) 
         {
             if (
-                (typeFilter & (1 << i)) &&
-                (memProperties.memoryTypes[i].propertyFlags & properties) == properties
+                (typeFilter & (1 << i)) && // Bit is available
+                (memProperties.memoryTypes[i].propertyFlags & properties) == properties // Bit is a match
             ) {
                 return i;
             }
@@ -744,7 +769,7 @@ namespace aveng {
         if (vmaCreateBuffer(_allocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create buffer with VMA!");
         }
-#if !NDEBUG
+#if _DEBUG
         checkBufferCoherence(allocation);
 #endif
     }
@@ -760,6 +785,7 @@ namespace aveng {
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandPool = _commandPool;
         allocInfo.commandBufferCount = 1;
+        allocInfo.pNext = nullptr;
 
         VkCommandBuffer commandBuffer;
         vkAllocateCommandBuffers(_device, &allocInfo, &commandBuffer);
@@ -842,6 +868,7 @@ namespace aveng {
     }
 
     /*
+    * DEPRECATED
     * Reserve memory based on provided property(ies)
     */
     void EngineDevice::createImageWithInfo(
@@ -995,11 +1022,11 @@ namespace aveng {
         VkMemoryPropertyFlags _flags = memProperties.memoryTypes[info.memoryType].propertyFlags;
 
         if (_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) {
-            // No need to flush
+            // No need to flush cache
             std::cout << "NO NEED TO FLUSH" << std::endl;
         }
         else {
-            // Must flush
+            // Must flush cache
             std::cout << "MUST FLUSH" << std::endl;
         }
     }
