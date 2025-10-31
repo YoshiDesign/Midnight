@@ -6,6 +6,7 @@
 #include "System/Peripheral/KeyboardController.h"
 #include "CoreVK/EngineDevice.h"
 #include "Core/data.h"
+#include "CoreVK/VkRenderData.h"
 #include "avpch.h"
 
 namespace aveng {
@@ -62,6 +63,7 @@ namespace aveng {
 		AvengCamera aveng_camera;
 		AvengWindow& window;
 		KeyboardController keyboardController{ viewerObject, game_data };
+		VkRenderData renderData;
 		
 		// Engine renderer (now owns all Vulkan resources)
 		Renderer renderer{ window, game_data };

@@ -9,9 +9,8 @@ using json = nlohmann::json;
 
 namespace aveng {
 
-    AvengSceneLoader::AvengSceneLoader() = default;
-
-    AvengSceneLoader::~AvengSceneLoader() = default;
+    AvengSceneLoader::AvengSceneLoader(VkRenderData _renderData) : renderData{ _renderData } {}
+    AvengSceneLoader::~AvengSceneLoader() {}
 
     void AvengSceneLoader::load(const char* filepath, EngineDevice& engineDevice, const std::string& defaultSceneId) {
         std::ifstream file(filepath);
@@ -176,24 +175,24 @@ namespace aveng {
         }
     }
 
-    std::shared_ptr<AvengModel> AvengSceneLoader::getOrCreateModel(const std::string& modelPath, EngineDevice& engineDevice) {
+    std::shared_ptr<AvengModel> AvengSceneLoader::getOrCreateModel(const std::string& filepath, EngineDevice& engineDevice) {
         // Check if model is already cached
-        auto it = modelCache.find(modelPath);
+        auto it = modelCache.find(filepath);
         if (it != modelCache.end()) {
-            std::cout << "Using cached model for: " << modelPath << std::endl;
-            modelCountCache[modelPath]++;
+            std::cout << "Using cached model for: " << filepath << std::endl;
+            modelCountCache[filepath]++;
             return it->second;
         }
         
         // Create new model and cache it
-        std::cout << "Loading new model: " << modelPath << std::endl;
-        auto model = AvengModel::createModelFromFile(engineDevice, modelPath);
+        std::cout << "Loading new model: " << filepath << std::endl;
+        auto model = AvengModel::createModelFromFile(engineDevice, renderData, filepath);
 
         // TODO - Bad code smells, maybe - shared_ptr
         auto sharedModel = std::shared_ptr<AvengModel>(model.release());
 
-        modelCache[modelPath] = sharedModel;
-        modelCountCache[modelPath] = 1;
+        modelCache[filepath] = sharedModel;
+        modelCountCache[filepath] = 1;  // TMP: : this was just for debugging
         
         return sharedModel;
     }

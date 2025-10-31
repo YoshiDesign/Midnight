@@ -7,8 +7,11 @@
 #include "../../vendor/stb/stb_image.h"
 
 /*
-*	This class is not responsible for rendering. Here we are creating our VkImageSamplers and ImageViews
-*	Along with ImageDescriptors, TextureSamplers and the like. This enables the Sampler in our frag shader
+* This class is not responsible for rendering. Here we are creating our VkImageSamplers and ImageViews
+* Along with ImageDescriptorInfo, TextureSamplers and the like. This enables the Sampler in our frag shader
+* 
+* A word on ImageDescriptors: This class only creates the VkDescriptorImageInfo structs. You'll still need
+* to manually write those descriptors using the AvengDescriptorSetWriter
 * 
 * From the Vulkan Tutorial:
 	All of the helper functions that submit commands so far have been set up to execute synchronously 

@@ -95,14 +95,6 @@ namespace aveng {
         return *this;
     }
 
-    AvengDescriptorPool::Builder& AvengDescriptorPool::Builder::setPoolFlags(VkDescriptorPoolCreateFlags flags) 
-    {
-        // See: VkDescriptorPoolCreateFlagBits - This is where we can specify things like updating after binding
-        // Pro Tip: Descriptor pools don't guarantee thread safety
-        poolFlags = flags;
-        return *this;
-    }
-
     AvengDescriptorPool::Builder& AvengDescriptorPool::Builder::setMaxSets(uint32_t count) 
     {
         // Sync'd to SwapChain::MAX_FRAMES_IN_FLIGHT
@@ -146,6 +138,7 @@ namespace aveng {
         vkDestroyDescriptorPool(engineDevice.device(), descriptorPool, nullptr);
     }
 
+    // If using the avengDescriptorPool from VkRenderData, you'll want to copy this to where you're using the pool.
     bool AvengDescriptorPool::allocateDescriptors(const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet& descriptor) const 
     {
 

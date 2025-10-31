@@ -22,20 +22,36 @@ namespace aveng {
 		// Note: ImageSystem should be initialized first in loadGame() before calling this
 
 		// Lights, temporary placement
-		for (int i = 1; i <= 4; i++) {
-			for (int j = 1; j < 5; j++) {
+		for (int i = 0; i <= 4; i++) {
+			for (int j = 0; j < 5; j++) {
 
 				renderer.addLight(
-					glm::vec3(-100 + i * -10.f, -2.f, 33 + j * 4.0f),  // position
+					glm::vec3(i * 4.f, -50.f, j * -4.0f),  // position
 					glm::vec3(1.f, 0.0f, 0.0f),    // red color
-					0.75f,
-					i * j * 0.1f                           // slightly larger radius
+					0.75f,						   // intensity
+					i * 0.15f + 0.3f                 // radius
 				);
+
+
+				renderer.addLight(
+					glm::vec3(30 + (i * 4.f), -50.f, 30 + (j * -4.0f)),  // position
+					glm::vec3(0.8f, 0.9f, 0.8f),    // turquoise color
+					0.75f,						   // intensity
+					i * 0.15f + 0.3f                 // radius
+				);
+
+				renderer.addLight(
+					glm::vec3(-30 + (i * 4.f), -50.f, 30 + (j * -4.0f)),  // position
+					glm::vec3(1.f, 0.0f, 1.0f),    // Purple color
+					0.75f,						   // intensity
+					i * 0.15f + 0.3f                 // radius
+				);
+
 
 			}
 
 			renderer.addLight(
-				glm::vec3((i * 25.f), -25.f, -5.f),  // position
+				glm::vec3(-(i * 25.f), -25.f, -5.f),  // position
 				glm::vec3(.75f, 0.9f, 1.0f),    // turquoise color
 				0.75f,							// intensity
 				0.5f                            // radius
@@ -69,7 +85,7 @@ namespace aveng {
 			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
 
 			/**
-			* TODO : You could be collecting render batches here instead of loopiong through objectData again during instanced rendering
+			* TODO : You could be collecting render batches here instead of looping through objectData again during instanced rendering
 			* Think Renderer::createRenderBatches(...)
 			*/
 
@@ -81,7 +97,11 @@ namespace aveng {
 			firstFrame = false;
 		}
 		
-		// Render regular objects (standard pipeline) -- BINDS DESCRIPTORS
+		/*
+			NOTE: renderer.renderObjectsInstanced uses the pipelineManager to select/bind the gfxpipeline
+				  Whereas renderer.renderLights punts to the pointLightSystem which handles gfxpipeline binding on its own
+		*/
+		// Render regular objects (standard pipeline) -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
 		renderer.renderObjectsInstanced(objectData);
 		// renderer.renderObjects(objectData);
 
@@ -90,7 +110,7 @@ namespace aveng {
 		//	renderer.renderAnimatedModels(animatedInstances);
 		//}
 
-		// Render lights -- BINDS DESCRIPTORS
+		// Render lights -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
 		renderer.renderLights();
 	
 #ifdef ENABLE_EDITOR
@@ -143,7 +163,7 @@ namespace aveng {
 				std::cout << "Entering toxic cloud - switching to distorted rendering!" << std::endl;
 				renderer.setObjectRenderMode(ObjectRenderMode::DISTORTED);
 				// Temporarily disable post-processing until system is complete
-				renderer.setPostProcessMode(PostProcessMode::TOXIC_CLOUD);
+				// renderer.setPostProcessMode(PostProcessMode::TOXIC_CLOUD);
 
 				// Example: Print available pipelines for debugging
 				auto pipelines = renderer.getAvailablePipelines();

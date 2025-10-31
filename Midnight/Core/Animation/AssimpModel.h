@@ -27,23 +27,23 @@ public:
     std::string getModelFileName();
     std::string getModelFileNamePath();
 
-    bool hasAnimations();
-    const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
+    //bool hasAnimations();
+    //const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
 
-    const std::vector<std::shared_ptr<AssimpNode>>& getNodeList();
-    const std::unordered_map<std::string, std::shared_ptr<AssimpNode>>& getNodeMap();
+    //const std::vector<std::shared_ptr<AssimpNode>>& getNodeList();
+    //const std::unordered_map<std::string, std::shared_ptr<AssimpNode>>& getNodeMap();
 
-    const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
-    const std::vector<VkMesh>& getModelMeshes();
+    //const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
+    //const std::vector<VkMesh>& getModelMeshes();
 
-    VkShaderStorageBufferData& getBoneMatrixOffsetBuffer();
-    VkShaderStorageBufferData& getBoneParentBuffer();
+    //VkShaderStorageBufferData& getBoneMatrixOffsetBuffer();
+    //VkShaderStorageBufferData& getBoneParentBuffer();
 
     void cleanup(RenderData &renderData);
 
 private:
     void processNode(RenderData &renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory);
-    bool createDescriptorSet(RenderData &renderData);
+    //bool createDescriptorSet(RenderData &renderData);
 
     unsigned int mTriangleCount = 0;
     unsigned int mVertexCount = 0;

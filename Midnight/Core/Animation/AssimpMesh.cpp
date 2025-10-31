@@ -1,5 +1,4 @@
 #include "AssimpMesh.h"
-#include "Logger.h"
 #include "Tools.h"
 #include <climits>
 #include <cmath>

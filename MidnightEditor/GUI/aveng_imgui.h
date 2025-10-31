@@ -24,7 +24,7 @@ namespace aveng {
 	class AvengImgui {
 	public:
 
-		AvengImgui(RenderData& _renderData, GameData& _gameData);
+		AvengImgui(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice);
 		void init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount);
 		~AvengImgui();
 
@@ -38,8 +38,9 @@ namespace aveng {
 	private:
 		// EngineDevice& device;
 		VkDescriptorPool descriptorPool;
-		RenderData& renderData;
+		VkRenderData& renderData;
 		GameData& gameData;
+		EngineDevice& engineDevice;
 
 	};
 } 

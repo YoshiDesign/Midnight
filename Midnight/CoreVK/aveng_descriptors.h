@@ -83,7 +83,6 @@ namespace aveng {
             Builder(EngineDevice& device);
 
             Builder& addPoolSize(VkDescriptorType descriptorType, uint32_t count);
-            Builder& setPoolFlags(VkDescriptorPoolCreateFlags flags);
             Builder& setMaxSets(uint32_t count);
             std::unique_ptr<AvengDescriptorPool> build() const;
 
@@ -105,11 +104,10 @@ namespace aveng {
         AvengDescriptorPool(const AvengDescriptorPool&) = delete;
         AvengDescriptorPool& operator=(const AvengDescriptorPool&) = delete;
 
-        bool allocateDescriptors(
-            const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet& descriptor) const;
-
+        bool allocateDescriptors(const VkDescriptorSetLayout descriptorSetLayout, VkDescriptorSet& descriptor) const;
         void freeDescriptors(std::vector<VkDescriptorSet>& descriptors) const;
 
+        VkDescriptorPool& getPool() { return descriptorPool; }
         void resetPool();
 
     private:

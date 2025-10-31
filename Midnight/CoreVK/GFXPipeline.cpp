@@ -5,7 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
-
+#include "Core/data.h"
 namespace aveng {
 
 	// Ctor
@@ -213,8 +213,8 @@ namespace aveng {
 		configInfo.rasterizationInfo.rasterizerDiscardEnable	= VK_FALSE;	// Cuts off the rest of the pipeline
 		configInfo.rasterizationInfo.polygonMode				= VK_POLYGON_MODE_FILL;	// Draw corners only? edges only? fill it in?
 		configInfo.rasterizationInfo.lineWidth					= 1.0f;
-		configInfo.rasterizationInfo.cullMode					= VK_CULL_MODE_NONE;			// Culling options
-		configInfo.rasterizationInfo.frontFace					= VK_FRONT_FACE_CLOCKWISE;
+		configInfo.rasterizationInfo.cullMode					= VK_CULL_MODE_BACK_BIT;			// Culling options
+		configInfo.rasterizationInfo.frontFace					= VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		configInfo.rasterizationInfo.depthBiasEnable			= VK_FALSE;
 		configInfo.rasterizationInfo.depthBiasConstantFactor	= 0.0f;  // Optional
 		configInfo.rasterizationInfo.depthBiasClamp				= 0.0f;           // Optional
@@ -271,8 +271,9 @@ namespace aveng {
 			static_cast<uint32_t>(configInfo.dynamicStateEnables.size());
 		configInfo.dynamicStateInfo.flags = 0;
 
-		configInfo.bindingDescriptions = AvengModel::Vertex::getBindingDescriptions();
-		configInfo.attributeDescriptions = AvengModel::Vertex::getAttributeDescriptions();
+		// PipelineConfigManager will handle this
+		//configInfo.bindingDescriptions = Vertex::getBindingDescriptions();
+		//configInfo.attributeDescriptions = Vertex::getAttributeDescriptions();
 		
 	}
 

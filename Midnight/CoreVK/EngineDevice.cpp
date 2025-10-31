@@ -68,7 +68,7 @@ namespace aveng {
      * Class Functions
      */
     // Default Constructor - Initialize Vulkan
-    EngineDevice::EngineDevice(AvengWindow& window) : aveng_window{ window }
+    EngineDevice::EngineDevice(AvengWindow& window, VkRenderData& _renderData) : aveng_window{ window }, renderData{_renderData}
     {
 
         // Create the Vulkan instance
@@ -101,7 +101,7 @@ namespace aveng {
         }
 
         // For command buffer allocation
-        createCommandPool();
+        createCommandPools();
 
     }
 
@@ -109,7 +109,8 @@ namespace aveng {
     EngineDevice::~EngineDevice() 
     {
         std::cout << "Destroying EngineDevice." << std::endl;
-        vkDestroyCommandPool(_device, _commandPool, nullptr);
+        vkDestroyCommandPool(_device, _commandPoolGraphics, nullptr);
+        vkDestroyCommandPool(_device, _commandPoolCompute, nullptr);
         
         // Destroy VMA allocator before destroying device
         vmaDestroyAllocator(_allocator);
@@ -308,21 +309,35 @@ namespace aveng {
         vkGetDeviceQueue(_device, indices.computeFamily, 0, &_computeQueue);
     }
 
-    void EngineDevice::createCommandPool() {
+    void EngineDevice::createCommandPools() {
 
         // Locate a Queue Family based on our definition of which queue we'd like (Graphics and Present, here)
         QueueFamilyIndices queueFamilyIndices = findPhysicalQueueFamilies();
 
+        // Graphics Pool
         VkCommandPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
         poolInfo.flags =
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPool) != VK_SUCCESS) 
+        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPoolGraphics) != VK_SUCCESS) 
         {
             throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
         }
+
+        // Compute Pool
+        VkCommandPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.queueFamilyIndex = renderData.rdHasDedicatedComputeQueue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
+        poolInfo.flags =
+            VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPoolGraphics) != VK_SUCCESS)
+        {
+            throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
+        }
+
     }
 
     /**
@@ -590,6 +605,7 @@ namespace aveng {
             // ...and VK_QUEUE_COMPUTE_BIT
             if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
             {
+                renderData.rdHasDedicatedComputeQueue = true;
                 indices.computeFamily = i;
                 indices.computeFamilyHasValue = true;
             }
@@ -783,7 +799,7 @@ namespace aveng {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = _commandPool;
+        allocInfo.commandPool = _commandPoolGraphics;
         allocInfo.commandBufferCount = 1;
         allocInfo.pNext = nullptr;
 
@@ -817,7 +833,7 @@ namespace aveng {
         vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
         vkQueueWaitIdle(_graphicsQueue);
 
-        vkFreeCommandBuffers(_device, _commandPool, 1, &commandBuffer);
+        vkFreeCommandBuffers(_device, _commandPoolGraphics, 1, &commandBuffer);
     }
 
     void EngineDevice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) 

@@ -18,8 +18,25 @@
       }
     },
     {
-      "name": "WIREFRAME",
+      "name": "V2_PRIMARY",
       "id": 1,
+      "vertexShader": "shaders/simple_v2_instanced.vert.spv",
+      "fragmentShader": "shaders/simple_v2_instanced.frag.spv",
+      "rasterization": {
+        "polygonMode": "FILL",
+        "cullMode": "BACK",
+        "frontFace": "COUNTER_CLOCKWISE"
+      },
+      "blending": {
+        "enabled": false
+      },
+      "specialization": {
+        "textureArraySize": true
+      }
+    },
+    {
+      "name": "WIREFRAME",
+      "id": 2,
       "vertexShader": "shaders/simple_shader.vert.spv",
       "fragmentShader": "shaders/simple_shader.frag.spv",
       "rasterization": {
@@ -36,7 +53,7 @@
     },
     {
       "name": "DISTORTED",
-      "id": 2,
+      "id": 3,
       "vertexShader": "shaders/simple_shader.vert.spv",
       "fragmentShader": "shaders/simple_shader.frag.spv",
       "rasterization": {

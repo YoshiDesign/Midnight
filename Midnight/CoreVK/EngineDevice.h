@@ -4,6 +4,7 @@
 #include "AMD/vk_mem_alloc.h"
 #include <string>
 #include <vector>
+#include "CoreVK/VkRenderData.h"
 
 namespace aveng {
 
@@ -32,7 +33,8 @@ namespace aveng {
         VkDebugUtilsMessengerEXT debugMessenger;
 
         VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
-        VkCommandPool   _commandPool;
+        VkCommandPool   _commandPoolGraphics;
+        VkCommandPool   _commandPoolCompute;
         VkDevice        _device;
         VkSurfaceKHR    _surface;
         VkQueue         _graphicsQueue;
@@ -50,7 +52,7 @@ namespace aveng {
           const bool enableValidationLayers = false;
 #endif
 
-        EngineDevice(AvengWindow& window);
+        EngineDevice(AvengWindow& window, VkRenderData& _renderData);
         ~EngineDevice();
 
         // Not copyable or movable
@@ -62,7 +64,9 @@ namespace aveng {
         // Getters
         VkInstance instance()                   { return _instance; }
         VkPhysicalDevice physicalDevice()       { return _physicalDevice; }
-        VkCommandPool commandPool()             { return _commandPool; }
+        VkCommandPool commandPoolGraphics()     { return _commandPoolGraphics; }
+        VkCommandPool commandPoolCompute()      { return _commandPoolCompute; }
+
         VkDevice device()                       { return _device; }
         VkSurfaceKHR surface()                  { return _surface; }
         VkQueue graphicsQueue()                 { return _graphicsQueue; }
@@ -136,7 +140,9 @@ namespace aveng {
         void createSurface();
         void pickPhysicalDevice();
         void createLogicalDevice();
-        void createCommandPool();
+        void createCommandPools();
+
+        VkRenderData& renderData;
 
         // helper functions
         bool isDiscreteDeviceSuitable(VkPhysicalDevice device);

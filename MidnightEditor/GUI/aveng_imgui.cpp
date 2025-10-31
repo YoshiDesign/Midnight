@@ -8,7 +8,9 @@
 
 namespace aveng {
 
-    AvengImgui::AvengImgui(RenderData& _renderData, GameData& _gameData) : renderData{ _renderData }, gameData{_gameData} {}
+    AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice) 
+        : renderData{ _renderData }, gameData{ _gameData }, engineDevice{_engineDevice} 
+    {}
 
     // Initialize the vulkan and glfw imgui implementations
     void AvengImgui::init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount)
@@ -34,7 +36,7 @@ namespace aveng {
         pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
         pool_info.pPoolSizes = pool_sizes;
 
-        if (vkCreateDescriptorPool(renderData.engineDevice->device(), &pool_info, nullptr, &descriptorPool) != VK_SUCCESS)
+        if (vkCreateDescriptorPool(engineDevice.device(), &pool_info, nullptr, &descriptorPool) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to set up descriptor pool for imgui");
         }
@@ -55,11 +57,11 @@ namespace aveng {
         // Initialize imgui for vulkan
         ImGui_ImplGlfw_InitForVulkan(window.getGLFWwindow(), true);
         ImGui_ImplVulkan_InitInfo init_info = {};
-        init_info.Instance = renderData.engineDevice->instance();
-        init_info.PhysicalDevice = renderData.engineDevice->physicalDevice();
-        init_info.Device = renderData.engineDevice->device();
-        init_info.QueueFamily = renderData.engineDevice->getGraphicsQueueFamily();
-        init_info.Queue = renderData.engineDevice->graphicsQueue();
+        init_info.Instance = engineDevice.instance();
+        init_info.PhysicalDevice = engineDevice.physicalDevice();
+        init_info.Device = engineDevice.device();
+        init_info.QueueFamily = engineDevice.getGraphicsQueueFamily();
+        init_info.Queue = engineDevice.graphicsQueue();
 
         // pipeline cache is a potential future optimization, ignoring for now
         init_info.PipelineCache = VK_NULL_HANDLE;
@@ -73,16 +75,16 @@ namespace aveng {
 
         // upload fonts, this is done by recording and submitting a one time use command buffer
         // which can be done easily by using some existing helper functions on the EngineDevice object
-        auto commandBuffer = renderData.engineDevice->beginSingleTimeCommands();
+        auto commandBuffer = engineDevice.beginSingleTimeCommands();
         ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-        renderData.engineDevice->endSingleTimeCommands(commandBuffer);
+        engineDevice.endSingleTimeCommands(commandBuffer);
 
         // Cleanup the font object
         ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
     AvengImgui::~AvengImgui() {
-        vkDestroyDescriptorPool(renderData.engineDevice->device(), descriptorPool, nullptr);
+        vkDestroyDescriptorPool(engineDevice.device(), descriptorPool, nullptr);
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -112,7 +114,7 @@ namespace aveng {
 
         {
             ImGui::Begin("Engine Info");
-            ImGui::Text("Video Device:\t %s", renderData.engineDevice->properties.deviceName);
+            ImGui::Text("Video Device:\t %s", engineDevice.properties.deviceName);
             ImGui::End();
         }
 

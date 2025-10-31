@@ -3,38 +3,108 @@
     "title": "Demo Scene with Ships",
     "objects": [
       {
-        "path": "3D/ship.obj",
+        "path": "3D/shipnew.obj",
         "data": [
           {
-            "pos": { "x": 25, "y": -10, "z": -5 },
-            "tex": 1,
-            "name": "player 1 ship"
-          },
-          {
-            "pos": { "x": 55, "y": -10, "z": -5 },
-            "tex": 1,
-            "name": "player 2 ship"
-          },
-          {
-            "pos": { "x": 25, "y": -20, "z": -5 },
+            "pos": {
+              "x": 25,
+              "y": -20,
+              "z": -5
+            },
             "tex": 1,
             "name": "player 3 ship"
-          },
-          {
-            "pos": { "x": 55, "y": -20, "z": -5 },
-            "tex": 1,
-            "name": "player 4 ship"
           }
         ]
       },
       {
-        "path": "3D/sandbox-2.obj",
+        "path": "3D/vol1-edit.obj",
         "data": [
-          { "pos": { "x": 0, "y": 0, "z": 0 }, "tex": 0, "name": "the world" }
+          {
+            "pos": {
+              "x": 0,
+              "y": 0,
+              "z": -10
+            },
+            "tex": 0,
+            "name": "the world"
+          },
+          {
+            "pos": {
+              "x": 60,
+              "y": 0,
+              "z": -10
+            },
+            "tex": 0,
+            "name": "the world"
+          },
+          {
+            "pos": {
+              "x": 0,
+              "y": 0,
+              "z": 50
+            },
+            "tex": 0,
+            "name": "the world"
+          },
+          {
+            "pos": {
+              "x": 50,
+              "y": 0,
+              "z": 100
+            },
+            "tex": 0,
+            "name": "the world"
+          }
+        ]
+      },
+      {
+        "path": "3D/vol2-edit.obj",
+        "data": [
+          {
+            "pos": {
+              "x": 50,
+              "y": 0,
+              "z": 50
+            },
+            "tex": 0,
+            "name": "the world"
+          },
+          {
+            "pos": {
+              "x": -50,
+              "y": 0,
+              "z": -10
+            },
+            "tex": 0,
+            "name": "the world"
+          }
+        ]
+      },
+      {
+        "path": "3D/vol3-edit.obj",
+        "data": [
+          {
+            "pos": {
+              "x": -100,
+              "y": 0,
+              "z": -10
+            },
+            "tex": 0,
+            "name": "the world"
+          },
+          {
+            "pos": {
+              "x": 85,
+              "y": 0,
+              "z": 50
+            },
+            "tex": 0,
+            "name": "the world"
+          }
         ]
       }
     ],
-    "textures": ["BW-Grid.png", "HolyShip.png", "BYgrid.png", "theme2.png"]
+    "textures": [ "BW-Grid.png", "HolyShip.png", "BYgrid.png", "theme2.png", "gothic-alien.png" ]
   },
   "scene-id-2": {
     "title": "Minimal Test Scene",

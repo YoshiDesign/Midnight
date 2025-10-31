@@ -24,7 +24,7 @@ namespace aveng {
 	{
 
 		// Raw ptr access to engineDevice - This is a feature
-		renderData.engineDevice = &engineDevice;
+		// renderData.engineDevice = &engineDevice;
 
 		recreateSwapChain();
 		createCommandBuffers();
@@ -42,7 +42,7 @@ namespace aveng {
 		std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
 		initializeImageSystem(sceneTextures);
 
-		// Initialize our descriptors, pools and bindings
+		// Initialize our descriptor sets, map buffers to device memory.
 		setupDescriptors();
 
 		// Create pipelines now that descriptor layouts are ready
@@ -118,16 +118,29 @@ namespace aveng {
 	void Renderer::createCommandBuffers() {
 
 		// Resize our vector of command buffers to match the max number of images the swapchain will allow in flight
-		commandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdCommandBuffersGraphics.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdCommandBuffersCompute.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		VkCommandBufferAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		// Command buffer memory is allocated from a command pool
-		allocInfo.commandPool = engineDevice.commandPool();
-		allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
+		allocInfo.commandPool = engineDevice.commandPoolGraphics();
+		allocInfo.commandBufferCount = static_cast<uint32_t>(renderData.rdCommandBuffersGraphics.size());
 
-		if (vkAllocateCommandBuffers(engineDevice.device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+		if (vkAllocateCommandBuffers(engineDevice.device(), &allocInfo, renderData.rdCommandBuffersGraphics.data()) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to allocate command buffers.");
+		}
+
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		// Command buffer memory is allocated from a command pool
+		allocInfo.commandPool = renderData.rdHasDedicatedComputeQueue ? engineDevice.commandPoolCompute() : engineDevice.commandPoolGraphics();
+		allocInfo.commandBufferCount = static_cast<uint32_t>(renderData.rdCommandBuffersCompute.size());
+
+		if (vkAllocateCommandBuffers(engineDevice.device(), &allocInfo, renderData.rdCommandBuffersCompute.data()) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to allocate command buffers.");
 		}
@@ -138,12 +151,20 @@ namespace aveng {
 	{
 		vkFreeCommandBuffers(
 			engineDevice.device(),
-			engineDevice.commandPool(),
-			static_cast<uint32_t>(commandBuffers.size()),
-			commandBuffers.data()
+			engineDevice.commandPoolGraphics(),
+			static_cast<uint32_t>(renderData.rdCommandBuffersGraphics.size()),
+			renderData.rdCommandBuffersGraphics.data()
 		);
 
-		commandBuffers.clear();
+		vkFreeCommandBuffers(
+			engineDevice.device(),
+			engineDevice.commandPoolCompute(),
+			static_cast<uint32_t>(renderData.rdCommandBuffersCompute.size()),
+			renderData.rdCommandBuffersCompute.data()
+		);
+
+		renderData.rdCommandBuffersGraphics.clear();
+		renderData.rdCommandBuffersCompute.clear();
 	}
 
 	// Return a command buffer for the current frame index
@@ -167,12 +188,12 @@ namespace aveng {
 
 		isFrameStarted = true;
 
-		commandBuffer = getCurrentCommandBuffer();
+		renderData.rdCommandBufferGraphics = getCurrentCommandBufferGraphics();
 
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+		if (vkBeginCommandBuffer(renderData.rdCommandBufferGraphics, &beginInfo) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Command Buffer failed to begin recording.");
 		}
@@ -183,7 +204,7 @@ namespace aveng {
 
 		// Clear Color for now
 		glm::vec3 clear_color = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
-		beginSwapChainRenderPass(commandBuffer, clear_color);
+		beginSwapChainRenderPass(renderData.rdCommandBufferGraphics, clear_color);
 
 	}
 
@@ -193,16 +214,16 @@ namespace aveng {
 		assert(isFrameStarted && "Can't call endFrame while frame is not in progress.");
 
 		
-		commandBuffer = getCurrentCommandBuffer();
-		endSwapChainRenderPass(commandBuffer);
-		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+		renderData.rdCommandBufferGraphics = getCurrentCommandBufferGraphics();
+		endSwapChainRenderPass(renderData.rdCommandBufferGraphics);
+		if (vkEndCommandBuffer(renderData.rdCommandBufferGraphics) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to record command buffer.");
 		}
 
 
 		// Submit to graphics queue while handling cpu and gpu sync, executing the command buffers
-		auto result = aveng_swapchain->submitCommandBuffers(&commandBuffer, &currentImageIndex);
+		auto result = aveng_swapchain->submitCommandBuffers(&renderData.rdCommandBufferGraphics, &currentImageIndex);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || aveng_window.wasWindowResized())
 		{
@@ -225,12 +246,12 @@ namespace aveng {
 	}
 
 
-	void  Renderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer, glm::vec3 rgb)
+	void  Renderer::beginSwapChainRenderPass(VkCommandBuffer _commandBufferGraphics, glm::vec3 rgb)
 	{
 	
 		assert(isFrameStarted && "Can't call beginSwapChain if frame is not in progress.");
 		assert(
-			commandBuffer == getCurrentCommandBuffer() && 
+			_commandBufferGraphics == getCurrentCommandBufferGraphics() && 
 			"Can't begin render pass on command buffer from a different frame");
 
 
@@ -259,7 +280,7 @@ namespace aveng {
 		// VK_SUBPASS_CONTENTS_INLINE signals that subsequent renderpass commands come directly from the primary command buffer.
 		// No secondary buffers are currently being utilized.
 		// For this reason we cannot Mix both Inline command buffers AND secondary command buffers in our render pass execution.
-		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(_commandBufferGraphics, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		// Configure the viewport and scissor
 		VkViewport viewport{};
@@ -270,18 +291,18 @@ namespace aveng {
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		VkRect2D scissor{ {0, 0}, aveng_swapchain->getSwapChainExtent() };
-		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+		vkCmdSetViewport(_commandBufferGraphics, 0, 1, &viewport);
+		vkCmdSetScissor(_commandBufferGraphics, 0, 1, &scissor);
 
 	}
 
-	void  Renderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer)
+	void  Renderer::endSwapChainRenderPass(VkCommandBuffer _commandBufferGraphics)
 	{
 		assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
 		assert(
-			commandBuffer == getCurrentCommandBuffer() &&
+			_commandBufferGraphics == getCurrentCommandBufferGraphics() &&
 			"Can't end render pass on command buffer from a different frame");
-		vkCmdEndRenderPass(commandBuffer);
+		vkCmdEndRenderPass(_commandBufferGraphics);
 	}
 
 	void Renderer::initializeImageSystem(const std::vector<std::string>& texturePaths)
@@ -307,17 +328,19 @@ namespace aveng {
 			throw std::runtime_error("ImageSystem must be initialized before setting up descriptors (call initializeImageSystem first)");
 		}
 
-		auto imageInfo = imageSystem->descriptorInfoForAllImages();
 		int numObjects = sceneLoader.getObjectCount();
 
 		// Create Descriptor Pools using dynamic texture count
 		descriptorPool = AvengDescriptorPool::Builder(engineDevice)
-			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 5)  // Increased for animation descriptor sets
-			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 3)
+			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 100)  // Increased for animation descriptor sets
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 10)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * currentTextureCount)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 5)  // NEW: For animation SSBOs
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT * 10)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 10)  // NEW: For animation SSBOs
 			.build();
+
+		// So we can access our pool where other descriptors are required
+		renderData.avengDescriptorPool = descriptorPool->getPool();
 
 		// Resize buffer vectors
 		u_GlobalBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
@@ -333,6 +356,17 @@ namespace aveng {
 		// VMA_MEMORY_USAGE_AUTO: Let VMA choose optimal memory type
 		// VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT: CPU will write to this buffer frequently  
 		// VMA_ALLOCATION_CREATE_MAPPED_BIT: Keep buffer persistently mapped for performance
+
+		// New TODO:
+		// UBOs : 
+		//		avengBasicUboBuffer, 
+		//		avengAnimUboBuffer
+		// Ssbos: 
+		//		basicSsbo0: 1 update per frame 
+		//		skinningSsbo1, 
+		//		skinningSsbo2
+		// Image Sampler
+
 		for (int i = 0; i < u_GlobalBuffers.size(); i++) {
 			u_GlobalBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				sizeof(GlobalUbo), 1,
@@ -363,6 +397,11 @@ namespace aveng {
 			u_ObjBuffers[i]->map();
 		}
 
+		/*
+			Note to self: These buffers are guaranteed to be mapped to a location in device memory
+						  with enough space allocated to support their resources.
+		*/
+
 		// Verify VMA allocation is working
 		//std::cout << "[Info]  VMA Buffer Allocation Verification:" << std::endl;
 		//std::cout << "[Info]  Global Buffer [0] using VMA: " << (u_GlobalBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
@@ -375,29 +414,65 @@ namespace aveng {
 			std::cout << "[WARNING] High memory pressure detected!" << std::endl;
 		}
 
-		// Create Descriptor Set Layouts (stored as members for reuse)
-		globalDescriptorSetLayout =
+		avengTextureDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
 			.build();
 
-		objDescriptorSetLayout =
+		avengDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
 			.build();
 
-		lightsDescriptorSetLayout =
+		avengSkinningDescriptorSetLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
+			.addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
+			.build();
+
+		computeTransformDescriptorLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.build();
+
+		computeMatrixMultDescriptorLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.build();
+
+		computeMatPerModelDescriptorSetLayout =
+			AvengDescriptorSetLayout::Builder(engineDevice)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.build();
+
+		avengBasicLightingDescriptorSetLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
 			.build();
-			
+
+		// Punt these to the renderData. This is an architectural workaround due to AvengDescriptorSetLayout not being easily available
+		renderData.rdAvengTextureDescriptorLayout = avengTextureDescriptorSetLayout->getDescriptorSetLayout();
+		renderData.rdAvengDescriptorLayout = avengDescriptorSetLayout->getDescriptorSetLayout();
+		renderData.rdAvengSkinningDescriptorLayout = avengSkinningDescriptorSetLayout->getDescriptorSetLayout();
+		renderData.rdAvengComputeTransformDescriptorLayout = computeTransformDescriptorLayout->getDescriptorSetLayout();
+		renderData.rdAvengComputeMatrixMultDescriptorLayout = computeMatrixMultDescriptorLayout->getDescriptorSetLayout();
+		renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout = computeMatPerModelDescriptorSetLayout->getDescriptorSetLayout();
+		renderData.rdAvengBasicLightingDescriptorLayout = avengBasicLightingDescriptorSetLayout->getDescriptorSetLayout();
+
 		//// Initialize animation rendering system only if it exists
 		//if (animationSystem) {
 		//	animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
 		//}
 
-		// Write descriptor sets
+		// Why auto?
+		auto imageInfo = imageSystem->descriptorInfoForAllImages();
+
+		// Write the descriptor sets that are ready to go
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 			auto globalBufferInfo = u_GlobalBuffers[i]->descriptorInfo(sizeof(GlobalUbo), 0);
 			AvengDescriptorSetWriter(*globalDescriptorSetLayout, *descriptorPool)
@@ -420,7 +495,7 @@ namespace aveng {
 
 	void Renderer::initializePointLightSystem()
 	{
-		if (!globalDescriptorSetLayout || !lightsDescriptorSetLayout) {
+		if (!lightsDescriptorSetLayout) {
 			throw std::runtime_error("Descriptor set layouts must be created before initializing PointLightSystem (call setupDescriptors first)");
 		}
 
@@ -453,13 +528,13 @@ namespace aveng {
 		u_LightsBuffers[currentFrameIndex]->flush();
 	}
 
-	void Renderer::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
-	{
-		// Delegate to animation system (only if it exists)
-		//if (animationSystem) {
-		//	animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
-		//}
-	}
+	//void Renderer::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
+	//{
+	//	// Delegate to animation system (only if it exists)
+	//	//if (animationSystem) {
+	//	//	animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
+	//	//}
+	//}
 
 	void Renderer::dispatchAnimationCompute(uint32_t vertexCount)
 	{
@@ -502,7 +577,7 @@ namespace aveng {
 
 	void Renderer::renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
 	{
-		auto commandBuffer = getCurrentCommandBuffer();
+		auto commandBufferGfx = getCurrentCommandBufferGraphics();
 
 		// Bind pipeline based on current render mode
 		//GFXPipeline* activePipeline = nullptr;
@@ -513,7 +588,7 @@ namespace aveng {
 			//if (activePipeline) {
 			//	activePipeline->bind(commandBuffer);
 			//}
-			pipelineManager->getPipeline(static_cast<int>(currentObjectMode))->bind(commandBuffer);
+			pipelineManager->getPipeline(static_cast<int>(currentObjectMode))->bind(commandBufferGfx);
 		//}
 		
 		//if (!activePipeline) {
@@ -535,11 +610,11 @@ namespace aveng {
 		//}
 
 		// Bind global descriptor set (set 0)
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
 
 		// Bind lights descriptor set (set 2)
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
 
 		// Render each object
@@ -553,25 +628,28 @@ namespace aveng {
 			uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset);
 
 			// Bind object descriptor set (set 1)
-			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+			vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 				1, 1, &objectDescriptorSets[currentFrameIndex], 1, &dynamicOffset);
 
 			PushConstantData pushData{ modelMatrix, normalMatrix, 0 };
 
-			vkCmdPushConstants(commandBuffer, pipelineLayout,
+			vkCmdPushConstants(commandBufferGfx, pipelineLayout,
 				VK_SHADER_STAGE_VERTEX_BIT,  // Only vertex stage uses push constants
 				0, sizeof(PushConstantData), &pushData);
 
 			// Bind and draw model
-			model->bind(commandBuffer);
-			model->draw(commandBuffer);
+			model->bind(commandBufferGfx);
+			model->draw(commandBufferGfx);
 		}
 	}
 
 	void Renderer::renderLights()
 	{
-		pointLightSystem.render(globalDescriptorSets[currentFrameIndex], 
-			lightsDescriptorSets[currentFrameIndex], getCurrentCommandBuffer(), u_LightsData.numLights);
+		pointLightSystem.render(
+			globalDescriptorSets[currentFrameIndex], 
+			lightsDescriptorSets[currentFrameIndex], 
+			getCurrentCommandBufferGraphics(), 
+			u_LightsData.numLights);
 	}
 
 	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
@@ -606,13 +684,13 @@ namespace aveng {
 		//	for(const auto& [objUniform, modelMatrix, normalMatrix, model] : objectData) ...
 		//
 
-		if (!instancedRenderingEnabled || objectData.empty()) {
+		if (!instancedRenderingEnabled || objectData.empty()) { // Strange that we're considering empty object data at all
 			// Fallback to traditional rendering
 			renderObjects(objectData);
 			return;
 		}
 
-		auto commandBuffer = getCurrentCommandBuffer();
+		auto commandBufferGfx = getCurrentCommandBufferGraphics();
 
 		//const std::unordered_map modelCountCache = sceneLoader.getModelCountCache();
 		//const std::unordered_map modelCache = sceneLoader.getModelCache();
@@ -646,9 +724,9 @@ namespace aveng {
 		
 		if (pipelineManager) {
 			int instancedPipelineId = static_cast<int>(currentObjectMode) + 10;  // Convert to instanced pipeline ID
-			activePipeline = pipelineManager->getPipeline(instancedPipelineId);
+			activePipeline = pipelineManager->getPipeline(instancedPipelineId);  // This is benign AI logic. Just build a method that chooses based on constants
 			if (activePipeline) {
-				activePipeline->bind(commandBuffer);
+				activePipeline->bind(commandBufferGfx);
 			}
 		}
 		
@@ -661,11 +739,11 @@ namespace aveng {
 		}
 
 		// Bind global descriptor set (set 0)
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
 
 		// Bind lights descriptor set (set 2)
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
 
 		// Render each batch
@@ -683,22 +761,23 @@ namespace aveng {
 			// Update instance buffer for this batch
 			updateInstanceBuffer(*batch);
 
+			/*
+			 * TODO - Reintroduce Push Constants
+			 */
+
 			// Bind model vertex buffers AND instance buffer
 			// The instance buffer contains modelMatrix, normalMatrix, and textureIndex for each instance
-			model->bindInstanced(commandBuffer, batch->instanceBuffer->getBuffer());
+			model->bindInstanced(commandBufferGfx, batch->instanceBuffer->getBuffer());
 
 			// Draw all instances in a single draw call
 			// The shader will use gl_InstanceIndex to fetch the correct instance data from the instance buffer
-			model->drawInstanced(commandBuffer, instanceCount, 0);
+			model->drawInstanced(commandBufferGfx, instanceCount, 0);
 
 			totalInstancesRendered += instanceCount;
 			batchesRendered++;
 		}
 
 #if _DEBUG
-		///**
-		//* ToDo - This is not implemented properly. You'll likely want to count the number of instances of an object BEFORE any of this function's code executes.
-		//*/
 		//// Performance analysis
 		//float efficiency = (float)totalInstancesRendered / (float)batchesRendered;
 		//if (efficiency > 2.0f) {
@@ -760,7 +839,14 @@ namespace aveng {
 
 	void Renderer::createPipelineLayout()
 	{
-		if (!globalDescriptorSetLayout || !objDescriptorSetLayout || !lightsDescriptorSetLayout) {
+		if (! lightsDescriptorSetLayout ||
+			! textureDescriptorSetLayout ||
+			! avengDescriptorSetLayout ||
+			! avengAnimDescriptorSetLayout ||
+			! computeTransformDescriptorSetLayout ||
+			! computeMatGlobalDescriptorSetLayout ||
+			! computeMatInstanceDescriptorSetLayout
+		) {
 			throw std::runtime_error("Descriptor set layouts must be created before pipeline layout (call setupDescriptors first)");
 		}
 
@@ -780,7 +866,7 @@ namespace aveng {
 		VkPushConstantRange pushConstantRange{};
 		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;  // Only vertex shaders use push constants
 		pushConstantRange.offset = 0;
-		pushConstantRange.size = 132; // Unified: 2 mat4 + int32_t = 132 bytes (within 128-byte limit) TODO - ???
+		pushConstantRange.size = 132; // Unified: 2 mat4 + int32_t = 132 bytes (within 128-byte limit)
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -891,212 +977,76 @@ namespace aveng {
 		return ((objectSize + minAlignment - 1) / minAlignment) * minAlignment;
 	}
 
-
-	//void Renderer::testAnimationSystem()
-	//{
-	//	std::cout << "\n===ANIMATION DEBUG: ANIMATED CUBE TEST (CPU ANIMATION) ===" << std::endl;
-	//	std::cout << "Testing with animated model: 3D/animTVGuy.glb" << std::endl;
-
-	//	// FIRST: Test coordinate system theory by comparing both loading systems
-	//	std::cout << "\n=== ASSIMP vs TINY_OBJ_LOADER COMPARISON ===\n";
-	//	std::cout << "Loading ship.obj with both systems...\n\n";
-
-	//	// Load with TinyObjectLoader (working system)
-	//	std::cout << "--- TINY_OBJ_LOADER OUTPUT ---\n";
-	//	try {
-	//		aveng::AvengModel::Builder builder;
-	//		builder.loadModel("3D/animTVGuy.glb");
-
-	//		std::cout << "TinyObjLoader: " << builder.vertices.size() << " vertices, "
-	//			<< builder.indices.size() << " indices\n";
-
-	//		// Print first 3 vertices for comparison
-	//		for (size_t i = 0; i < std::min(size_t(3), builder.vertices.size()); ++i) {
-	//			const auto& v = builder.vertices[i];
-	//			std::cout << "TinyObj Vertex " << i << ":\n";
-	//			std::cout << "  Position: (" << v.position.x << ", " << v.position.y << ", " << v.position.z << ")\n";
-	//			std::cout << "  Normal:   (" << v.normal.x << ", " << v.normal.y << ", " << v.normal.z << ")\n";
-	//		}
-
-	//	}
-	//	catch (const std::exception& e) {
-	//		std::cout << "TinyObjLoader failed: " << e.what() << "\n";
-	//	}
-
-	//	std::cout << "\n--- ASSIMP OUTPUT (Coordinate conversion DISABLED) ---\n";
-	//	// The Assimp output will come from the debugVertexData() function
-	//	std::cout << "=== COMPARISON COMPLETE ===\n";
-
-	//	// PERFORMANCE: Time the entire operation
-	//	auto totalStartTime = std::chrono::high_resolution_clock::now();
-
-	//	// Set up render data for tracking
-	//	RenderData renderData{};
-
-	//	// PERFORMANCE: Time the model loading
-	//	auto loadStartTime = std::chrono::high_resolution_clock::now();
-
-	//	// Load the animated model
-	//	bool loadSuccess = animationManager.loadModel("3D/animTVGuy.glb", renderData);
-	//	bool loadSuccess2 = animationManager.loadModel("3D/tv-man.obj", renderData);
-
-	//	auto loadEndTime = std::chrono::high_resolution_clock::now();
-	//	auto loadDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(loadEndTime - loadStartTime).count();
-	//	std::cout << "Model loading took: " << loadDuration << " ms" << std::endl;
-
-	//	if (!loadSuccess || !loadSuccess2) {
-	//		std::cout << "Failed to load .glb" << std::endl;
-	//		return;
-	//	}
-
-	//	// Get the loaded model for inspection
-	//	auto model = animationManager.getModel("3D/animTVGuy.glb");
-	//	auto model2 = animationManager.getModel("3D/tv-man.obj");
-	//	if (!model || !model2) {
-	//		std::cout << "Could not retrieve loaded model" << std::endl;
-	//		return;
-	//	}
-
-	//	// Display model information
-	//	std::cout << "\nMODEL INFORMATION:" << std::endl;
-	//	std::cout << "  Model filename: " << model->getModelFileName() << std::endl;
-	//	std::cout << "  Triangle count: " << model->getTriangleCount() << std::endl;
-	//	std::cout << "  Has animations: " << (model->hasAnimations() ? "YES" : "NO") << std::endl;
-
-	//	// Display mesh information
-	//	const auto& meshes = model->getModelMeshes();
-	//	std::cout << "  Mesh count: " << meshes.size() << std::endl;
-	//	for (size_t i = 0; i < meshes.size(); ++i) {
-	//		std::cout << "    Mesh " << i << ": " << meshes[i].vertices.size() << " vertices, "
-	//			<< meshes[i].indices.size() << " indices" << std::endl;
-	//		std::cout << "      Has animation data: " << (meshes[i].hasAnimationData ? "YES" : "NO") << std::endl;
-	//	}
-
-	//	// Display bone information
-	//	const auto& bones = model->getBoneList();
-	//	std::cout << "  Bone count: " << bones.size() << std::endl;
-	//	for (size_t i = 0; i < bones.size() && i < 10; ++i) { // Show first 10 bones
-	//		std::cout << "    Bone " << i << ": " << bones[i]->getBoneName() << " (ID: " << bones[i]->getBoneId() << ")" << std::endl;
-	//	}
-	//	if (bones.size() > 10) {
-	//		std::cout << "    ... and " << (bones.size() - 10) << " more bones" << std::endl;
-	//	}
-
-	//	// Display node hierarchy information
-	//	const auto& nodes = model->getNodeList();
-	//	std::cout << "  Node count: " << nodes.size() << std::endl;
-	//	for (size_t i = 0; i < nodes.size() && i < 5; ++i) { // Show first 5 nodes
-	//		std::cout << "    Node " << i << ": " << nodes[i]->getNodeName() << " (Parent: " << nodes[i]->getParentNodeName() << ")" << std::endl;
-	//	}
-	//	if (nodes.size() > 5) {
-	//		std::cout << "    ... and " << (nodes.size() - 5) << " more nodes" << std::endl;
-	//	}
-
-	//	// Display animation information
-	//	const auto& animations = model->getAnimClips();
-	//	const auto& animations2 = model2->getAnimClips();
-	//	std::cout << "  Animation count: " << animations.size() << std::endl;
-
-	//	// Test instance creation
-	//	std::cout << "\nTESTING INSTANCE CREATION:" << std::endl;
-
-	//	auto instanceStartTime = std::chrono::high_resolution_clock::now();
-	//	auto instance1 = animationManager.createInstance("3D/animTVGuy.glb", glm::vec3(-35, 0, 0));
-	//	auto instanceEndTime = std::chrono::high_resolution_clock::now();
-
-	//	auto instanceGlb = animationManager.createInstance("3D/tv-man.obj", glm::vec3(-30, 0, 0));
-
-	//	auto instanceDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(instanceEndTime - instanceStartTime).count();
-	//	std::cout << "Instance creation took: " << instanceDuration << " ms" << std::endl;
-
-	//	if (instance1 && instanceGlb) {
-	//		std::cout << "Successfully created 1 animated cube instance!" << std::endl;
-
-	//		// Test animation switching if animations are available
-	//		if (!animations2.empty()) {
-	//			std::cout << "\nTESTING ANIMATION CONTROL:" << std::endl;
-	//			if (animations2.size() > 0) {
-	//				instanceGlb->setAnimationByIndex(0);
-	//				std::cout << "  Instance 1: Set to animation 0 (\"" << animations2[0]->getClipName() << "\")" << std::endl;
-	//			}
-	//		}
-	//	}
-	//	else {
-	//		std::cout << "Failed to create instances" << std::endl;
-	//	}
-
-	//	// Display final debug information
-	//	animationManager.resetRenderDataAnimationTotals(renderData);
-	//	std::cout << "\nFINAL DEBUG STATS:" << std::endl;
-	//	std::cout << "  Loaded models: " << renderData.rdLoadedModels << std::endl;
-	//	std::cout << "  Animated models: " << renderData.rdAnimatedModels << std::endl;
-	//	std::cout << "  Total bones: " << renderData.rdTotalBones << std::endl;
-	//	std::cout << "  Total nodes: " << renderData.rdTotalNodes << std::endl;
-	//	std::cout << "  Total animation clips: " << renderData.rdTotalAnimationClips << std::endl;
-	//	std::cout << "  Active instances: " << renderData.rdActiveInstances << std::endl;
-
-	//	// PERFORMANCE: Calculate total time
-	//	auto totalEndTime = std::chrono::high_resolution_clock::now();
-	//	auto totalDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(totalEndTime - totalStartTime).count();
-
-	//	std::cout << "\n PERFORMANCE SUMMARY:" << std::endl;
-	//	std::cout << "  Initial animation system setup: " << totalDuration << " ms" << std::endl;
-	//	std::cout << "  Note: DEBUG - Testing ANIMATED CUBE with REFERENCE NODE-BASED algorithm" << std::endl;
-
-	//	std::cout << "\nAnimation system test completed!" << std::endl;
-	//	std::cout << "=== END ANIMATION TEST ===\n" << std::endl;
-	//}
-
-	//void Renderer::updateAnimationSystem(float frameTime)
-	//{
-	//	// PERFORMANCE: Time animation updates (called every frame)
-	//	static int frameCounter = 0;
-	//	static float totalAnimTime = 0.0f;
-	//	static float totalRendererTime = 0.0f;
-
-	//	auto animStartTime = std::chrono::high_resolution_clock::now();
-
-	//	// Update animation time
-	//	animationManager.updateAnimations(frameTime);
-
-	//	auto animEndTime = std::chrono::high_resolution_clock::now();
-	//	auto animDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(animEndTime - animStartTime).count();
-
-	//	auto rendererStartTime = std::chrono::high_resolution_clock::now();
-
-	//	// Get instances and pass to renderer with frame time
-	//	const auto& instances = animationManager.getInstances();
-	//	if (!instances.empty()) {
-	//		updateAnimationData(instances, frameTime);
-	//	}
-
-	//	auto rendererEndTime = std::chrono::high_resolution_clock::now();
-	//	auto rendererDuration = std::chrono::duration<float, std::chrono::milliseconds::period>(rendererEndTime - rendererStartTime).count();
-
-	//	// Accumulate timing data
-	//	totalAnimTime += animDuration;
-	//	totalRendererTime += rendererDuration;
-	//	frameCounter++;
-
-	//	// Report every 120 frames (~2 seconds at 60fps)
-	//	if (frameCounter >= 120) {
-	//		float avgAnimTime = totalAnimTime / frameCounter;
-	//		float avgRendererTime = totalRendererTime / frameCounter;
-	//		std::cout << "DEBUG CUBE GEOMETRY PERFORMANCE (120 frames avg):" << std::endl;
-	//		std::cout << "  Animation updates: " << avgAnimTime << " ms/frame" << std::endl;
-	//		std::cout << "  Renderer updates: " << avgRendererTime << " ms/frame" << std::endl;
-	//		std::cout << "  Total per frame: " << (avgAnimTime + avgRendererTime) << " ms/frame" << std::endl;
-
-	//		// Reset counters
-	//		frameCounter = 0;
-	//		totalAnimTime = 0.0f;
-	//		totalRendererTime = 0.0f;
-	//	}
-	//}
-
 	void Renderer::renderEditor() {
-		auto commandBuffer = getCurrentCommandBuffer();
-		editor.render(commandBuffer);
+		auto commandBufferGfx = getCurrentCommandBufferGraphics();
+		editor.render(commandBufferGfx);
+	}
+
+	void Renderer::runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset) {
+		uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
+
+		/* node transformation */
+		vkCmdBindPipeline(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderData.rdAssimpComputeTransformPipeline);
+		vkCmdBindDescriptorSets(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderData.rdAssimpComputeTransformaPipelineLayout, 0, 1, &renderData.rdAssimpComputeTransformDescriptorSet, 0, 0);
+
+		mUploadToUBOTimer.start();
+		mComputeModelData.pkModelOffset = modelOffset;
+		vkCmdPushConstants(renderData.rdComputeCommandBuffer, renderData.rdAssimpComputeTransformaPipelineLayout,
+			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
+		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+		vkCmdDispatch(renderData.rdComputeCommandBuffer, numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
+
+		/* memroy barrier between the compute shaders
+		 * wait for TRS buffer to be written  */
+		VkBufferMemoryBarrier trsBufferBarrier{};
+		trsBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		trsBufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		trsBufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		trsBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		trsBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		trsBufferBarrier.buffer = mShaderTRSMatrixBuffer.buffer;
+		trsBufferBarrier.offset = 0;
+		trsBufferBarrier.size = VK_WHOLE_SIZE;
+
+		vkCmdPipelineBarrier(renderData.rdComputeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1,
+			&trsBufferBarrier, 0, nullptr);
+
+		/* matrix multiplication */
+		vkCmdBindPipeline(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderData.rdAssimpComputeMatrixMultPipeline);
+
+		VkDescriptorSet& modelDescriptorSet = model->getMatrixMultDescriptorSet();
+		std::vector<VkDescriptorSet> computeSets = { renderData.rdAssimpComputeMatrixMultDescriptorSet, modelDescriptorSet };
+		vkCmdBindDescriptorSets(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderData.rdAssimpComputeMatrixMultPipelineLayout, 0, static_cast<uint32_t>(computeSets.size()), computeSets.data(), 0, 0);
+
+		mUploadToUBOTimer.start();
+		mComputeModelData.pkModelOffset = modelOffset;
+		vkCmdPushConstants(renderData.rdComputeCommandBuffer, renderData.rdAssimpComputeMatrixMultPipelineLayout,
+			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
+		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+		vkCmdDispatch(renderData.rdComputeCommandBuffer, numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
+
+		/* memroy barrier after compute shader
+		 * wait for bone matrix buffer to be written  */
+		VkBufferMemoryBarrier boneMatrixBufferBarrier{};
+		boneMatrixBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		boneMatrixBufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		boneMatrixBufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		boneMatrixBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		boneMatrixBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		boneMatrixBufferBarrier.buffer = mShaderBoneMatrixBuffer.buffer;
+		boneMatrixBufferBarrier.offset = 0;
+		boneMatrixBufferBarrier.size = VK_WHOLE_SIZE;
+
+		vkCmdPipelineBarrier(renderData.rdComputeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1,
+			&boneMatrixBufferBarrier, 0, nullptr);
 	}
 
 } // NS

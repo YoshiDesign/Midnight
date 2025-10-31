@@ -97,16 +97,18 @@ namespace aveng {
         alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
         bufferSize = alignmentSize * instanceCount;
 
-        if (usageFlags == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
 
-            std::cout << "Creating VMA Uniform Buffer\n"
-                << "instanceSize\t" << instanceSize
-                << "\ninstanceCount\t" << instanceCount
-                << "\nMinimumOffsetAlignment\t" << minOffsetAlignment
-                << "\nAlignmentSize\t" << alignmentSize 
-                << "\nMemoryUsage\t" << memoryUsage
-                << std::endl;
-
+        switch (usageFlags)
+        {
+        case VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT: std::cout << "Creating VMA Uniform Buffer\n" << std::endl;
+        case VK_BUFFER_USAGE_STORAGE_BUFFER_BIT: std::cout << "Creating VMA Storage Buffer\n" << std::endl;
+        default:
+            std::cout << "Instance Size:\t" << instanceSize
+                << "Instance Count:\t" << instanceCount
+                << "Alignment Size:\t" << alignmentSize
+                << "Buffer Size:\t" << bufferSize
+            << std::endl;
+            break;
         }
 
         // Call to engineDevice - VMA allocation
@@ -141,6 +143,7 @@ namespace aveng {
         assert(buffer && (memory || vmaAllocation) && "Called map on buffer before create");
         
         if (usingVMA) {
+            std::cout << "Mapping with VMA Allocator" << std::endl;
             return vmaMapMemory(engineDevice.allocator(), vmaAllocation, &mapped);
         } else {
             return vkMapMemory(engineDevice.device(), memory, offset, size, 0, &mapped);
@@ -250,7 +253,7 @@ namespace aveng {
         return VkDescriptorBufferInfo {
             buffer,
             offset,
-            range
+            range // VK_WHOLE_SIZE, typically?
         };
     }
 

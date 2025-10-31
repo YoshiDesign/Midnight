@@ -67,6 +67,8 @@ namespace aveng {
         
         void createPipelineFromDefinition(const PipelineDefinition& def, VkRenderPass renderPass, 
                                         VkPipelineLayout pipelineLayout, uint32_t textureArraySize);
+
+        void createComputePipeline();
     };
 
 } 

@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include "app_object.h"
+#include "../CoreVK/VkRenderData.h"
 #include "../CoreVK/EngineDevice.h"
 #include "nlohmann/json.hpp"
 
@@ -31,6 +32,7 @@ namespace aveng {
     class AvengSceneLoader {
     public:
         AvengSceneLoader();
+        AvengSceneLoader(VkRenderData renderData);
         ~AvengSceneLoader();
 
         /**
@@ -70,6 +72,8 @@ namespace aveng {
     private:
         void createObjectsFromScene(const SceneData& scene, EngineDevice& engineDevice);
         void clearCurrentScene();
+
+        VkRenderData& renderData;
         
         // JSON parsing
         void parseSceneData(const nlohmann::json& jsonData);
