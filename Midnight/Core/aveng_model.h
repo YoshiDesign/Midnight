@@ -64,7 +64,8 @@ namespace aveng {
 		void bind(VkCommandBuffer commandBuffer);
 		void bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer);
 		void draw(VkCommandBuffer commandBuffer);
-		void drawInstanced(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
+		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount);
+		void drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
 		
 		// Static methods for instance rendering setup
 		static std::vector<VkVertexInputBindingDescription> getInstancedBindingDescriptions();

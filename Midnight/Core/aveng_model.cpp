@@ -182,7 +182,7 @@ namespace aveng {
 		}
 	}
 
-	void AvengModel::drawInstanced(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance)
+	void AvengModel::drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance)
 	{
 		if (hasIndexBuffer)
 		{
@@ -190,6 +190,51 @@ namespace aveng {
 		}
 		else {
 			vkCmdDraw(commandBuffer, vertexCount, instanceCount, 0, firstInstance);
+		}
+	}
+
+	void AvengModel::drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount) {
+		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
+			VkMesh& mesh = mModelMeshes.at(i);
+
+			// find diffuse texture by name
+			VkTextureData diffuseTex{};
+			auto diffuseTexName = mesh.textures.find(aiTextureType_DIFFUSE);
+			if (diffuseTexName != mesh.textures.end()) {
+				auto diffuseTexture = mTextures.find(diffuseTexName->second);
+				if (diffuseTexture != mTextures.end()) {
+					diffuseTex = diffuseTexture->second;
+				}
+			}
+
+			/* switch between animated and non-animated pipeline layout */
+			VkPipelineLayout renderLayout;
+			if (hasAnimations()) {
+				renderLayout = renderData.rdAssimpSkinningPipelineLayout;
+			}
+			else {
+				renderLayout = renderData.rdAssimpPipelineLayout;
+			}
+
+			if (diffuseTex.image != VK_NULL_HANDLE) {
+				vkCmdBindDescriptorSets(renderData.rdCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					renderLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
+			}
+			else {
+				if (mesh.usesPBRColors) {
+					vkCmdBindDescriptorSets(renderData.rdCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						renderLayout, 0, 1, &mWhiteTexture.descriptorSet, 0, nullptr);
+				}
+				else {
+					vkCmdBindDescriptorSets(renderData.rdCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						renderLayout, 0, 1, &mPlaceholderTexture.descriptorSet, 0, nullptr);
+				}
+			}
+
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(renderData.rdCommandBuffer, 0, 1, &mVertexBuffers.at(i).buffer, &offset);
+			vkCmdBindIndexBuffer(renderData.rdCommandBuffer, mIndexBuffers.at(i).buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(renderData.rdCommandBuffer, static_cast<uint32_t>(mesh.indices.size()), instanceCount, 0, 0, 0);
 		}
 	}
 

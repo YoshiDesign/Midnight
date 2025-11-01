@@ -24,6 +24,13 @@
 [](0) Vertex count for gameData
 [](0) Other gameData things. Might help you wrap your head around what needs to go where
 
+
+# Notes
+ - Vertex attributes are in the pipeline creation
+ - Instances populate the NodeTransform
+
+
+
 10/30/25 - 
 	1. Added Compute Shader Pipeline
 	2. Added Another Command Pool for Compute Commands
