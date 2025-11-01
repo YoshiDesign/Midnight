@@ -59,17 +59,6 @@ namespace aveng {
         alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
         bufferSize = alignmentSize * instanceCount;
 
-        if (usageFlags == VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
-
-            std::cout << "Creating Legacy Uniform Buffer\n"
-                << "instanceSize\t" << instanceSize
-                << "\ninstanceCount\t" << instanceCount
-                << "\nMinimumOffsetAlignment\t" << minOffsetAlignment
-                << "\nAlignmentSize\t" << alignmentSize 
-                << std::endl;
-
-        }
-
         // Call to engineDevice - traditional allocation
         device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory);
     }
@@ -96,7 +85,6 @@ namespace aveng {
 
         alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
         bufferSize = alignmentSize * instanceCount;
-
 
         switch (usageFlags)
         {

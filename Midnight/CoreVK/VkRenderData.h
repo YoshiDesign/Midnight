@@ -12,7 +12,10 @@
 #include <GLFW/glfw3.h>
 
 #include <assimp/material.h>
-#include "CoreVK/EngineDevice.h"
+
+#include "CoreVK/aveng_descriptors.h"
+#include "CoreVK/aveng_buffer.h"
+
 namespace aveng {
 
 	// Data structures moved from ObjectRenderSystem
@@ -35,14 +38,6 @@ namespace aveng {
 
 	struct ObjectUniformData {
 		alignas(16) int texIndex;
-	};
-
-	/* data format to be uploaded to compute shader - optimized for cache performance */
-	struct alignas(64) NodeTransformData {
-		glm::vec4 translation = glm::vec4(0.0f);
-		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion  
-		glm::vec4 scale = glm::vec4(1.0f);
-		glm::vec4 padding = glm::vec4(0.0f); // Pad to 64 bytes for cache line alignment
 	};
 
 	struct Vertex {
@@ -207,6 +202,21 @@ namespace aveng {
 		bool usesPBRColors = false;
 	};
 
+	/* data format to be uploaded to compute shader */
+	//struct NodeTransformData {
+	//	glm::vec4 translation = glm::vec4(0.0f);
+	//	glm::vec4 scale = glm::vec4(1.0f);
+	//	glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion
+	//};
+
+	/* data format to be uploaded to compute shader - optimized for cache performance */
+	struct alignas(64) NodeTransformData {
+		glm::vec4 translation = glm::vec4(0.0f);
+		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion  
+		glm::vec4 scale = glm::vec4(1.0f);
+		glm::vec4 padding = glm::vec4(0.0f); // Pad to 64 bytes for cache line alignment
+	};
+
 	struct VkUploadMatrices {
 		glm::mat4 viewMatrix{};
 		glm::mat4 projectionMatrix{};
@@ -274,6 +284,9 @@ namespace aveng {
 
 		//VkRenderPass rdRenderpass = VK_NULL_HANDLE;
 
+		/*
+		* Pipeline
+		*/
 		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengSkinningPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeTransformaPipelineLayout = VK_NULL_HANDLE;
@@ -284,11 +297,17 @@ namespace aveng {
 		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
 
+		/**
+		* Commands
+		*/
 		VkCommandPool rdCommandPool = VK_NULL_HANDLE;
 		VkCommandPool rdComputeCommandPool = VK_NULL_HANDLE;
 		VkCommandBuffer rdCommandBuffer = VK_NULL_HANDLE;
 		VkCommandBuffer rdComputeCommandBuffer = VK_NULL_HANDLE;
 
+		/**
+		* Sync
+		*/
 		VkSemaphore rdPresentSemaphore = VK_NULL_HANDLE;
 		VkSemaphore rdRenderSemaphore = VK_NULL_HANDLE;
 		VkSemaphore rdGraphicSemaphore = VK_NULL_HANDLE;
@@ -296,20 +315,30 @@ namespace aveng {
 		VkFence rdRenderFence = VK_NULL_HANDLE;
 		VkFence rdComputeFence = VK_NULL_HANDLE;
 
-		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengSkinningDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengBasicLightingDescriptorLayout = VK_NULL_HANDLE;
+		/*
+		* Descriptors
+		*/
+		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
+
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengBasicDescriptorLayout = nullptr;
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengAnimationDescriptorLayout = nullptr;
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengTextureDescriptorLayout = nullptr; // Basic, no animations
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeTransformDescriptorLayout = nullptr;
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeMatrixMultDescriptorLayout = nullptr;
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeMatrixMultPerModelDescriptorLayout = nullptr;
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengBasicLightingDescriptorLayout = nullptr;
+
+		std::vector<VkDescriptorSet> rdAvengDescriptorSets;
+		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;
+		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;
+		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;
+		std::vector<VkDescriptorSet> basicLightingDescriptorSets;
+		std::vector<VkDescriptorSet> textureDescriptorSets;
 
 		VkDescriptorSet rdAvengDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSet rdAvengSkinningDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSet rdAvengComputeTransformDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSet rdAvengComputeMatrixMultDescriptorSet = VK_NULL_HANDLE;
-
-		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
 
 		//VkDescriptorPool rdImguiDescriptorPool = VK_NULL_HANDLE;
 	};

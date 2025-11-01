@@ -4,7 +4,6 @@
 #include "AMD/vk_mem_alloc.h"
 #include <string>
 #include <vector>
-#include "CoreVK/VkRenderData.h"
 
 namespace aveng {
 
@@ -31,6 +30,7 @@ namespace aveng {
 
         // This tells Vulkan about the callback funtion for our validation layer debug
         VkDebugUtilsMessengerEXT debugMessenger;
+        bool mHasDedicatedComputeQueue = false;
 
         VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
         VkCommandPool   _commandPoolGraphics;
@@ -52,7 +52,7 @@ namespace aveng {
           const bool enableValidationLayers = false;
 #endif
 
-        EngineDevice(AvengWindow& window, VkRenderData& _renderData);
+        EngineDevice(AvengWindow& window);
         ~EngineDevice();
 
         // Not copyable or movable
@@ -78,6 +78,7 @@ namespace aveng {
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
         QueueFamilyIndices findPhysicalQueueFamilies(){ return findQueueFamilies(_physicalDevice); };
         uint32_t getGraphicsQueueFamily() { return findPhysicalQueueFamilies().graphicsFamily; }
+        bool hasDedicatedComputeQueue() { return mHasDedicatedComputeQueue; }
         VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
         // Buffer Helper Functions
@@ -142,8 +143,6 @@ namespace aveng {
         void createLogicalDevice();
         void createCommandPools();
 
-        VkRenderData& renderData;
-
         // helper functions
         bool isDiscreteDeviceSuitable(VkPhysicalDevice device);
         bool isAnyDeviceSuitable(VkPhysicalDevice device);
@@ -158,7 +157,6 @@ namespace aveng {
         /*
             Extensions
         */
-
         // Validation layer to be enabled
         const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
         // Extensions to be enabled

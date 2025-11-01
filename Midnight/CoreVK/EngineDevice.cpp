@@ -68,7 +68,7 @@ namespace aveng {
      * Class Functions
      */
     // Default Constructor - Initialize Vulkan
-    EngineDevice::EngineDevice(AvengWindow& window, VkRenderData& _renderData) : aveng_window{ window }, renderData{_renderData}
+    EngineDevice::EngineDevice(AvengWindow& window) : aveng_window{ window }
     {
 
         // Create the Vulkan instance
@@ -329,7 +329,7 @@ namespace aveng {
         // Compute Pool
         VkCommandPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.queueFamilyIndex = renderData.rdHasDedicatedComputeQueue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
+        poolInfo.queueFamilyIndex = mHasDedicatedComputeQueue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
         poolInfo.flags =
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
@@ -605,7 +605,7 @@ namespace aveng {
             // ...and VK_QUEUE_COMPUTE_BIT
             if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
             {
-                renderData.rdHasDedicatedComputeQueue = true;
+                mHasDedicatedComputeQueue = true;
                 indices.computeFamily = i;
                 indices.computeFamilyHasValue = true;
             }

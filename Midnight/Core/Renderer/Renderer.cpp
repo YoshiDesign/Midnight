@@ -342,71 +342,107 @@ namespace aveng {
 		// So we can access our pool where other descriptors are required
 		renderData.avengDescriptorPool = descriptorPool->getPool();
 
-		// Resize buffer vectors
-		u_GlobalBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		u_ObjBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		u_LightsBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		// Define buffer vec's
+		mPerspectiveViewMatrixUBOBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		mShaderModelRootMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		mShaderBoneMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		mBoneParentMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		mNodeTransformBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		mTrsMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		mLightDataBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// Note: Textures are stored in the imageSystem's imageViews
 
-		// Resize descriptor set vectors
-		globalDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		objectDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		lightsDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		// Define descriptor set vec's
+		renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(2, VK_NULL_HANDLE);
+		renderData.rdAvengAnimationDescriptorSets = std::vector<VkDescriptorSet>(2, VK_NULL_HANDLE);
+		renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(2, VK_NULL_HANDLE);
+		renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(2, VK_NULL_HANDLE);
 
 		// Create Buffers using VMA
 		// VMA_MEMORY_USAGE_AUTO: Let VMA choose optimal memory type
 		// VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT: CPU will write to this buffer frequently  
 		// VMA_ALLOCATION_CREATE_MAPPED_BIT: Keep buffer persistently mapped for performance
 
-		// New TODO:
-		// UBOs : 
-		//		avengBasicUboBuffer, 
-		//		avengAnimUboBuffer
-		// Ssbos: 
-		//		basicSsbo0: 1 update per frame 
-		//		skinningSsbo1, 
-		//		skinningSsbo2
-		// Image Sampler
-
-		for (int i = 0; i < u_GlobalBuffers.size(); i++) {
-			u_GlobalBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(GlobalUbo), 1,
-				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			u_GlobalBuffers[i]->map();
-		}
-
-		for (int i = 0; i < u_LightsBuffers.size(); i++) {
-			u_LightsBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+		for (int i = 0; i < mPerspectiveViewMatrixUBOBuffers.size(); i++) {
+			mPerspectiveViewMatrixUBOBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				sizeof(LightsUbo), 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
 				1, // minOffsetAlignment
 				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			u_LightsBuffers[i]->map();
+			mPerspectiveViewMatrixUBOBuffers[i]->map();
 		}
 
-		for (int i = 0; i < u_ObjBuffers.size(); i++) {
-			u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				calculateDynamicUBOStride(), numObjects, // HARDCODED - Dynamic UBO size
-				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		for (int i = 0; i < mShaderModelRootMatrixBuffers.size(); i++) {
+			mShaderModelRootMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
-				calculateDynamicUBOStride(), // minOffsetAlignment
+				1, // minOffsetAlignment
 				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			u_ObjBuffers[i]->map();
+			mShaderModelRootMatrixBuffers[i]->map();
 		}
 
-		/*
-			Note to self: These buffers are guaranteed to be mapped to a location in device memory
-						  with enough space allocated to support their resources.
-		*/
+		for (int i = 0; i < mShaderBoneMatrixBuffers.size(); i++) {
+			mShaderBoneMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mShaderBoneMatrixBuffers[i]->map();
+		}
 
-		// Verify VMA allocation is working
-		//std::cout << "[Info]  VMA Buffer Allocation Verification:" << std::endl;
-		//std::cout << "[Info]  Global Buffer [0] using VMA: " << (u_GlobalBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
-		//std::cout << "[Info]  Lights Buffer [0] using VMA: " << (u_LightsBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
-		//std::cout << "[Info]  Object Buffer [0] using VMA: " << (u_ObjBuffers[0]->isUsingVMA() ? "YES" : "NO") << std::endl;
+		for (int i = 0; i < mBoneParentMatrixBuffers.size(); i++) {
+			mBoneParentMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mBoneParentMatrixBuffers[i]->map();
+		}
+
+		for (int i = 0; i < mNodeTransformBuffers.size(); i++) {
+			mNodeTransformBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mNodeTransformBuffers[i]->map();
+		}
+
+		for (int i = 0; i < mTrsMatrixBuffers.size(); i++) {
+			mTrsMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mTrsMatrixBuffers[i]->map();
+		}
+
+		for (int i = 0; i < mLightDataBuffers.size(); i++) {
+			mLightDataBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mLightDataBuffers[i]->map();
+		}
+
+		// A Spare for a Dynamic UBO Buffer
+		//for (int i = 0; i < u_ObjBuffers.size(); i++) {
+		//	u_ObjBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+		//		calculateDynamicUBOStride(), numObjects, // HARDCODED - Dynamic UBO size
+		//		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		//		VMA_MEMORY_USAGE_AUTO,
+		//		calculateDynamicUBOStride(), // minOffsetAlignment
+		//		VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+		//	u_ObjBuffers[i]->map();
+		//}
 
 		// Check memory budget after buffer creation
 		engineDevice.printMemoryStats();
@@ -414,55 +450,52 @@ namespace aveng {
 			std::cout << "[WARNING] High memory pressure detected!" << std::endl;
 		}
 
-		avengTextureDescriptorSetLayout =
+		/* imageViews */
+		renderData.rdAvengTextureDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount) // Image Views
 			.build();
 
-		avengDescriptorSetLayout =
+		/* non-animated shader */
+		renderData.rdAvengBasicDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Perspective/View Matrix UBO
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Model Root Matrix SSBO (worldPos) Can this be a Dynamic UBO for perf increase??
 			.build();
 
-		avengSkinningDescriptorSetLayout =
+		/* animated shader */
+		renderData.rdAvengAnimationDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
-			.addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Perspective/View Matrix UBO
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Bone Matrix SSBO
+			.addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Model Root Matrix SSBO (worldPos) Can this be a Dynamic UBO for perf increase??
 			.build();
 
-		computeTransformDescriptorLayout =
+		/* compute transformation shader */
+		renderData.rdAvengComputeTransformDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Node Transform SSBO
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // TRS Matrix SSBO
 			.build();
 
-		computeMatrixMultDescriptorLayout =
+		/* compute matrix multiplication shader, global data */
+		renderData.rdAvengComputeMatrixMultDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // TRS Matrix SSBO
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Node Matrix SSBO
 			.build();
 
-		computeMatPerModelDescriptorSetLayout =
+		/* compute matrix multiplication shader, per-model data */
+		renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
-			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Bone Parent SSBO
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Bone Matrix Offset SSBO
 			.build();
 
-		avengBasicLightingDescriptorSetLayout =
+		renderData.rdAvengBasicLightingDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1)
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1) // Light Data UBO
 			.build();
-
-		// Punt these to the renderData. This is an architectural workaround due to AvengDescriptorSetLayout not being easily available
-		renderData.rdAvengTextureDescriptorLayout = avengTextureDescriptorSetLayout->getDescriptorSetLayout();
-		renderData.rdAvengDescriptorLayout = avengDescriptorSetLayout->getDescriptorSetLayout();
-		renderData.rdAvengSkinningDescriptorLayout = avengSkinningDescriptorSetLayout->getDescriptorSetLayout();
-		renderData.rdAvengComputeTransformDescriptorLayout = computeTransformDescriptorLayout->getDescriptorSetLayout();
-		renderData.rdAvengComputeMatrixMultDescriptorLayout = computeMatrixMultDescriptorLayout->getDescriptorSetLayout();
-		renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout = computeMatPerModelDescriptorSetLayout->getDescriptorSetLayout();
-		renderData.rdAvengBasicLightingDescriptorLayout = avengBasicLightingDescriptorSetLayout->getDescriptorSetLayout();
 
 		//// Initialize animation rendering system only if it exists
 		//if (animationSystem) {
@@ -474,28 +507,50 @@ namespace aveng {
 
 		// Write the descriptor sets that are ready to go
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			auto globalBufferInfo = u_GlobalBuffers[i]->descriptorInfo(sizeof(GlobalUbo), 0);
-			AvengDescriptorSetWriter(*globalDescriptorSetLayout, *descriptorPool)
-				.writeBuffer(0, &globalBufferInfo)
+			
+			AvengDescriptorSetWriter(*renderData.rdAvengTextureDescriptorLayout, *descriptorPool)
 				.writeImage(1, imageInfo.data(), imageInfo.size())
-				.build(globalDescriptorSets[i]);
+				.build(renderData.textureDescriptorSets[i]);
 
-			auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
-			AvengDescriptorSetWriter(*objDescriptorSetLayout, *descriptorPool)
-				.writeBuffer(0, &objBufferInfo)
-				.build(objectDescriptorSets[i]);
+			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof( ... ), 0);
+			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof( ... ), 0);
+			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof( ... ), 0);
+			auto nodeTransformInfo = mNodeTransformBuffers[i]->descriptorInfo(sizeof( ... ), 0);
+			auto trsMatrixinfo = mTrsMatrixBuffers[i]->descriptorInfo(sizeof( ... ), 0);
 
-			auto lightsBufferInfo = u_LightsBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
-			AvengDescriptorSetWriter(*lightsDescriptorSetLayout, *descriptorPool)
+			// Basic Shader
+			AvengDescriptorSetWriter(*renderData.rdAvengBasicDescriptorLayout, *descriptorPool)
+				.writeBuffer(0, &perspectiveViewBufferInfo)
+				.writeBuffer(1, &modelRootBufferInfo)
+				.build(renderData.rdAvengDescriptorSets[i]);
+
+			// Animation Shader
+			AvengDescriptorSetWriter(*renderData.rdAvengAnimationDescriptorLayout, *descriptorPool)
+				.writeBuffer(0, &perspectiveViewBufferInfo)
+				.writeBuffer(1, &shaderBoneMatrixInfo)
+				.writeBuffer(2, &modelRootBufferInfo)
+				.build(renderData.rdAvengAnimationDescriptorSets[i]);
+
+			// Node Compute
+			AvengDescriptorSetWriter(*renderData.rdAvengComputeTransformDescriptorLayout, *descriptorPool)
+				.writeBuffer(0, &nodeTransformInfo)
+				.writeBuffer(1, &trsMatrixinfo)
+				.build(renderData.rdAvengDescriptorSets[i]);
+
+			auto lightsBufferInfo = mLightDataBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
+			AvengDescriptorSetWriter(*renderData.rdAvengBasicLightingDescriptorLayout, *descriptorPool)
 				.writeBuffer(0, &lightsBufferInfo)
-				.build(lightsDescriptorSets[i]);
+				.build(renderData.basicLightingDescriptorSets[i]);
+
+			// Reference for if we decide to use a dynamic UBO
+			// auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
 		}
 	
 	}
 
 	void Renderer::initializePointLightSystem()
 	{
-		if (!lightsDescriptorSetLayout) {
+		if (!renderData.rdAvengBasicLightingDescriptorLayout) {
 			throw std::runtime_error("Descriptor set layouts must be created before initializing PointLightSystem (call setupDescriptors first)");
 		}
 
@@ -504,8 +559,8 @@ namespace aveng {
 		// Initialize point light system using existing descriptor set layouts
 		pointLightSystem.initialize(
 			getSwapChainRenderPass(),
-			globalDescriptorSetLayout->getDescriptorSetLayout(),
-			lightsDescriptorSetLayout->getDescriptorSetLayout()
+			renderData.rdAvengBasicDescriptorLayout->getDescriptorSetLayout(),
+			renderData.rdAvengBasicLightingDescriptorLayout->getDescriptorSetLayout()
 		);
 
 		std::cout << "PointLightSystem initialized" << std::endl;
@@ -591,24 +646,6 @@ namespace aveng {
 			pipelineManager->getPipeline(static_cast<int>(currentObjectMode))->bind(commandBufferGfx);
 		//}
 		
-		//if (!activePipeline) {
-		//	std::cerr << "WARNING: No pipeline found for mode " << static_cast<int>(currentObjectMode) 
-		//	         << ". Check PipelineConfig.json or add missing pipeline definition." << std::endl;
-		//	
-		//	// DEPRECATED FALLBACKS (should not be reached in production)
-		//	if (static_cast<size_t>(currentObjectMode) < objectPipelines.size() && objectPipelines[static_cast<size_t>(currentObjectMode)]) {
-		//		std::cerr << "Using deprecated hardcoded pipeline fallback" << std::endl;
-		//		objectPipelines[static_cast<size_t>(currentObjectMode)]->bind(commandBuffer);
-		//	}
-		//	else if (gfxPipeline) {
-		//		std::cerr << "Using legacy gfxPipeline fallback - this should be removed!" << std::endl;
-		//		gfxPipeline->bind(commandBuffer);
-		//	}
-		//	else {
-		//		throw std::runtime_error("No pipelines available - system misconfigured!");
-		//	}
-		//}
-
 		// Bind global descriptor set (set 0)
 		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);

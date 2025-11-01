@@ -31,8 +31,7 @@ namespace aveng {
 
     class AvengSceneLoader {
     public:
-        AvengSceneLoader();
-        AvengSceneLoader(VkRenderData renderData);
+        AvengSceneLoader(VkRenderData& renderData);
         ~AvengSceneLoader();
 
         /**
@@ -50,7 +49,7 @@ namespace aveng {
          */
         const std::vector<AvengAppObject>& getAppObjects() const { return currentSceneObjects_v; }
         
-        const std::unordered_map<std::string, int> getModelCountCache() const { return modelCountCache; }\
+        const std::unordered_map<std::string, int> getModelCountCache() const { return modelCountCache; }
             std::unordered_map<std::string, std::shared_ptr<AvengModel>> getModelCache() const { return modelCache; }
         
         /**

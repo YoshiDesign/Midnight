@@ -192,9 +192,17 @@
     <ClCompile Include="Core\aveng_model.cpp" />
     <ClCompile Include="Core\aveng_scene_loader.cpp" />
     <ClCompile Include="Core\aveng_window.cpp" />
+    <ClCompile Include="Core\Modeling\AssimpAnimChannel.cpp" />
+    <ClCompile Include="Core\Modeling\AssimpAnimClip.cpp" />
+    <ClCompile Include="Core\Modeling\AssimpBone.cpp" />
+    <ClCompile Include="Core\Modeling\AssimpInstance.cpp" />
+    <ClCompile Include="Core\Modeling\AssimpMesh.cpp" />
+    <ClCompile Include="Core\Modeling\AssimpNode.cpp" />
+    <ClCompile Include="Core\Modeling\ModelManager.cpp" />
     <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp" />
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
+    <ClCompile Include="Utils\Timer.cpp" />
     <ClCompile Include="Utils\window_callbacks.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -206,6 +214,7 @@
     <ClInclude Include="CoreVK\GFXPipeline.h" />
     <ClInclude Include="CoreVK\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
+    <ClInclude Include="CoreVK\VkRenderData.h" />
     <ClInclude Include="Core\Animation\AnimationManager.h" />
     <ClInclude Include="Core\Animation\AnimationRenderingSystem.h" />
     <ClInclude Include="Core\Animation\AssimpAnimChannel.h" />
@@ -226,6 +235,16 @@
     <ClInclude Include="Core\aveng_scene_loader.h" />
     <ClInclude Include="Core\aveng_window.h" />
     <ClInclude Include="Core\data.h" />
+    <ClInclude Include="Core\Modeling\AssimpAnimChannel.h" />
+    <ClInclude Include="Core\Modeling\AssimpAnimClip.h" />
+    <ClInclude Include="Core\Modeling\AssimpBone.h" />
+    <ClInclude Include="Core\Modeling\AssimpInstance.h" />
+    <ClInclude Include="Core\Modeling\AssimpMesh.h" />
+    <ClInclude Include="Core\Modeling\AssimpNode.h" />
+    <ClInclude Include="Core\Modeling\InstanceSettings.h" />
+    <ClInclude Include="Core\Modeling\ModelAndInstanceData.h" />
+    <ClInclude Include="Core\Modeling\ModelManager.h" />
+    <ClInclude Include="Core\Modeling\Tools.h" />
     <ClInclude Include="Core\Renderer\PipelineConfigManager.h" />
     <ClInclude Include="Core\Renderer\Renderer.h" />
     <ClInclude Include="Core\Renderer\TextureStreamingManager.h" />
@@ -250,7 +269,7 @@
     <ClInclude Include="stb\stb_truetype.h" />
     <ClInclude Include="stb\stb_voxel_render.h" />
     <ClInclude Include="Utils\aveng_utils.h" />
-    <ClInclude Include="Utils\RenderData.h" />
+    <ClInclude Include="Utils\Timer.h" />
     <ClInclude Include="Utils\window_callbacks.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />
     <ClInclude Include="vendor\GLFW\glfw3native.h" />

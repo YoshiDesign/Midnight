@@ -9,7 +9,7 @@ using json = nlohmann::json;
 
 namespace aveng {
 
-    AvengSceneLoader::AvengSceneLoader(VkRenderData _renderData) : renderData{ _renderData } {}
+    AvengSceneLoader::AvengSceneLoader(VkRenderData& _renderData) : renderData{ _renderData } {}
     AvengSceneLoader::~AvengSceneLoader() {}
 
     void AvengSceneLoader::load(const char* filepath, EngineDevice& engineDevice, const std::string& defaultSceneId) {

@@ -57,6 +57,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shaders", "shaders", "{02EA
 		shaders\simple_shader.vert.spv = shaders\simple_shader.vert.spv
 		shaders\simple_shader_instanced.frag = shaders\simple_shader_instanced.frag
 		shaders\simple_shader_instanced.vert = shaders\simple_shader_instanced.vert
+		shaders\simple_v2_instanced.frag = shaders\simple_v2_instanced.frag
+		shaders\simple_v2_instanced.vert = shaders\simple_v2_instanced.vert
 		shaders\skeletal_animation.comp = shaders\skeletal_animation.comp
 		shaders\skeletal_animation.comp.spv = shaders\skeletal_animation.comp.spv
 	EndProjectSection

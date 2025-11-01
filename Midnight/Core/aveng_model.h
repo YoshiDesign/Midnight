@@ -109,6 +109,7 @@ namespace aveng {
 		glm::mat4 mRootTransformMatrix = glm::mat4(1.0f);
 
 		VkDescriptorSet mMatrixMultPerModelDescriptorSet = VK_NULL_HANDLE;
+		VkDescriptorSetLayout mComputeMatrixMultPerModelDescriptorSetLayout;
 
 		// NEW
 		std::unique_ptr<AvengBuffer> vertexBuffer;

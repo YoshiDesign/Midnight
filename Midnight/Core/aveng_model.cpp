@@ -639,12 +639,16 @@ namespace aveng {
 	}
 
 	bool AvengModel::createDescriptorSet(VkRenderData& renderData) {
+
+		// NOTE: It could be more memory efficient to use a shared ptr
+		mComputeMatrixMultPerModelDescriptorSetLayout = renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout->getDescriptorSetLayout();
+
 		/* matrix multiplication, per-model data */
 		VkDescriptorSetAllocateInfo computeMatrixMultPerModelDescriptorAllocateInfo{};
 		computeMatrixMultPerModelDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		computeMatrixMultPerModelDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
 		computeMatrixMultPerModelDescriptorAllocateInfo.descriptorSetCount = 1;
-		computeMatrixMultPerModelDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout;
+		computeMatrixMultPerModelDescriptorAllocateInfo.pSetLayouts = &mComputeMatrixMultPerModelDescriptorSetLayout;
 
 		VkResult result = vkAllocateDescriptorSets(engineDevice.device(), &computeMatrixMultPerModelDescriptorAllocateInfo,
 			&mMatrixMultPerModelDescriptorSet);
