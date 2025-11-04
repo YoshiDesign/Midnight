@@ -173,6 +173,7 @@
     <ClCompile Include="CoreVK\AvengImageSystem.cpp" />
     <ClCompile Include="CoreVK\aveng_buffer.cpp" />
     <ClCompile Include="CoreVK\aveng_descriptors.cpp" />
+    <ClCompile Include="CoreVK\CommandBuffers.cpp" />
     <ClCompile Include="CoreVK\ComputePipeline.cpp" />
     <ClCompile Include="CoreVK\EngineDevice.cpp" />
     <ClCompile Include="CoreVK\GFXPipeline.cpp" />
@@ -209,6 +210,7 @@
     <ClInclude Include="CoreVK\AvengImageSystem.h" />
     <ClInclude Include="CoreVK\aveng_buffer.h" />
     <ClInclude Include="CoreVK\aveng_descriptors.h" />
+    <ClInclude Include="CoreVK\CommandBuffers.h" />
     <ClInclude Include="CoreVK\ComputePipeline.h" />
     <ClInclude Include="CoreVK\EngineDevice.h" />
     <ClInclude Include="CoreVK\GFXPipeline.h" />

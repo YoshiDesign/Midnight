@@ -68,7 +68,7 @@ namespace aveng {
 
     VkResult SwapChain::acquireNextImage(uint32_t* imageIndex) {
 
-        // CPU/GPU sync
+        // CPU/GPU sync -- Oddly enough this fence isn't being used in the new v2 implementation
         vkWaitForFences(
             device.device(),
             1,

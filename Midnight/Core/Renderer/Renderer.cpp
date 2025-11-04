@@ -5,8 +5,6 @@
 #include <array>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
-#include "../Animation/AssimpInstance.h"
-#include "../Animation/AnimationRenderingSystem.h"
 
 #define LOG(a) std::cout<<a<<std::endl;
 #define DESTROY_UNIFORM_BUFFERS 1	// Unused as far as I can tell
@@ -23,23 +21,21 @@ namespace aveng {
 	Renderer::Renderer(AvengWindow& window, GameData& _gameData) : aveng_window{ window }, gameData{_gameData}
 	{
 
-		// Raw ptr access to engineDevice - This is a feature
-		// renderData.engineDevice = &engineDevice;
-
 		recreateSwapChain();
+
 		createCommandBuffers();
+
+		// Initialize PointLightSystem now that descriptor layouts are created
+		initializePointLightSystem();
+
+		editor.init(window, aveng_swapchain.get());
 
 		sceneLoader.load(default_scene_file, engineDevice);
 
-		// TODO - if (!scenes) throw error
-
-		//// Delegate to renderer for all engine-specific setup
-		//int numObjects = static_cast<int>(sceneLoader.getObjectCount());
-		//if (numObjects == 0) numObjects = 1; // Prevent crash with empty scenes
-
-		// Initialize ImageSystem with scene textures
 		const auto& sceneTextures = sceneLoader.getSceneTextures();
 		std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
+
+		// Initialize ImageSystem with scene textures
 		initializeImageSystem(sceneTextures);
 
 		// Initialize our descriptor sets, map buffers to device memory.
@@ -48,19 +44,11 @@ namespace aveng {
 		// Create pipelines now that descriptor layouts are ready
 		createPipelines();
 
-		// Initialize PointLightSystem now that descriptor layouts are created
-		initializePointLightSystem();
-
-		//animationSystem = std::make_unique<AnimationRenderingSystem>(engineDevice);
-
-		editor.init(window, aveng_swapchain.get());
-
 	}
 
 	Renderer::~Renderer()
 	{
 		std::cout << "Destroying Renderer..." << std::endl;
-		renderBatches.clear();
 		freeCommandBuffers();
 		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
 	}
@@ -117,33 +105,13 @@ namespace aveng {
 
 	void Renderer::createCommandBuffers() {
 
-		// Resize our vector of command buffers to match the max number of images the swapchain will allow in flight
+		// Resize our vector of command buffers to match the max number of images the swapchain will allow in 
 		renderData.rdCommandBuffersGraphics.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdCommandBuffersCompute.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
-		VkCommandBufferAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		// Command buffer memory is allocated from a command pool
-		allocInfo.commandPool = engineDevice.commandPoolGraphics();
-		allocInfo.commandBufferCount = static_cast<uint32_t>(renderData.rdCommandBuffersGraphics.size());
-
-		if (vkAllocateCommandBuffers(engineDevice.device(), &allocInfo, renderData.rdCommandBuffersGraphics.data()) != VK_SUCCESS)
-		{
-			throw std::runtime_error("Failed to allocate command buffers.");
-		}
-
-		VkCommandBufferAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		// Command buffer memory is allocated from a command pool
-		allocInfo.commandPool = renderData.rdHasDedicatedComputeQueue ? engineDevice.commandPoolCompute() : engineDevice.commandPoolGraphics();
-		allocInfo.commandBufferCount = static_cast<uint32_t>(renderData.rdCommandBuffersCompute.size());
-
-		if (vkAllocateCommandBuffers(engineDevice.device(), &allocInfo, renderData.rdCommandBuffersCompute.data()) != VK_SUCCESS)
-		{
-			throw std::runtime_error("Failed to allocate command buffers.");
-		}
+		// Note: This accepts a vector of buffers
+		CommandBuffer::init(engineDevice, renderData.rdCommandBuffersGraphics);
+		CommandBuffer::init(engineDevice, renderData.rdCommandBuffersCompute);
 
 	}
 
@@ -204,6 +172,8 @@ namespace aveng {
 
 		// Clear Color for now
 		glm::vec3 clear_color = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
+
+		// This might be better off happening AFTER a certain block of the draw() method
 		beginSwapChainRenderPass(renderData.rdCommandBufferGraphics, clear_color);
 
 	}
@@ -342,13 +312,12 @@ namespace aveng {
 		// So we can access our pool where other descriptors are required
 		renderData.avengDescriptorPool = descriptorPool->getPool();
 
-		// Define buffer vec's
+		// Define buffer vec's that are managed by the Renderer
 		mPerspectiveViewMatrixUBOBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		mShaderModelRootMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		mShaderBoneMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		mBoneParentMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		mNodeTransformBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		mTrsMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		mShaderBoneMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		mLightDataBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// Note: Textures are stored in the imageSystem's imageViews
 
@@ -363,9 +332,12 @@ namespace aveng {
 		// VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT: CPU will write to this buffer frequently  
 		// VMA_ALLOCATION_CREATE_MAPPED_BIT: Keep buffer persistently mapped for performance
 
+		size_t bufferSize = 1024; // TODO?
+
+		// Renderer::draw
 		for (int i = 0; i < mPerspectiveViewMatrixUBOBuffers.size(); i++) {
 			mPerspectiveViewMatrixUBOBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(LightsUbo), 1,
+				bufferSize, 1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
 				1, // minOffsetAlignment
@@ -373,39 +345,10 @@ namespace aveng {
 			mPerspectiveViewMatrixUBOBuffers[i]->map();
 		}
 
-		for (int i = 0; i < mShaderModelRootMatrixBuffers.size(); i++) {
-			mShaderModelRootMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(LightsUbo), 1,
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			mShaderModelRootMatrixBuffers[i]->map();
-		}
-
-		for (int i = 0; i < mShaderBoneMatrixBuffers.size(); i++) {
-			mShaderBoneMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(LightsUbo), 1,
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			mShaderBoneMatrixBuffers[i]->map();
-		}
-
-		for (int i = 0; i < mBoneParentMatrixBuffers.size(); i++) {
-			mBoneParentMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(LightsUbo), 1,
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-			mBoneParentMatrixBuffers[i]->map();
-		}
-
+		// Renderer::draw
 		for (int i = 0; i < mNodeTransformBuffers.size(); i++) {
 			mNodeTransformBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(LightsUbo), 1,
+				sizeof(NodeTransformData), 1,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
 				1, // minOffsetAlignment
@@ -413,9 +356,20 @@ namespace aveng {
 			mNodeTransformBuffers[i]->map();
 		}
 
+		// Renderer::draw
+		for (int i = 0; i < mShaderModelRootMatrixBuffers.size(); i++) {
+			mShaderModelRootMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				bufferSize, 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mShaderModelRootMatrixBuffers[i]->map();
+		}
+
 		for (int i = 0; i < mTrsMatrixBuffers.size(); i++) {
 			mTrsMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(LightsUbo), 1,
+				bufferSize, 1,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
 				1, // minOffsetAlignment
@@ -423,6 +377,17 @@ namespace aveng {
 			mTrsMatrixBuffers[i]->map();
 		}
 
+		for (int i = 0; i < mShaderBoneMatrixBuffers.size(); i++) {
+			mShaderBoneMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				bufferSize, 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mShaderBoneMatrixBuffers[i]->map();
+		}
+
+		// Renderer::draw but could move to the light system
 		for (int i = 0; i < mLightDataBuffers.size(); i++) {
 			mLightDataBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
 				sizeof(LightsUbo), 1,
@@ -449,6 +414,15 @@ namespace aveng {
 		if (engineDevice.isMemoryPressureHigh()) {
 			std::cout << "[WARNING] High memory pressure detected!" << std::endl;
 		}
+
+		/**
+		* Note: We can define all of the descriptor set layouts here, but when binding them,
+		* we do it from the location that's ultimately responsible for their data.
+		* 
+		* For example, every model needs to write
+		* 
+		* Therefore, below are the descriptor set layouts used engine-wide
+		*/
 
 		/* imageViews */
 		renderData.rdAvengTextureDescriptorLayout =
@@ -488,8 +462,8 @@ namespace aveng {
 		/* compute matrix multiplication shader, per-model data */
 		renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Bone Parent SSBO
-			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Bone Matrix Offset SSBO
+			.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Bone Parent SSBO		 -- mShaderBoneParentBuffer.buffer
+			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1) // Bone Matrix Offset SSBO -- mShaderBoneMatrixOffsetBuffer.buffer
 			.build();
 
 		renderData.rdAvengBasicLightingDescriptorLayout =
@@ -502,49 +476,9 @@ namespace aveng {
 		//	animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
 		//}
 
-		// Why auto?
-		auto imageInfo = imageSystem->descriptorInfoForAllImages();
-
-		// Write the descriptor sets that are ready to go
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			
-			AvengDescriptorSetWriter(*renderData.rdAvengTextureDescriptorLayout, *descriptorPool)
-				.writeImage(1, imageInfo.data(), imageInfo.size())
-				.build(renderData.textureDescriptorSets[i]);
-
-			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof( ... ), 0);
-			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof( ... ), 0);
-			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof( ... ), 0);
-			auto nodeTransformInfo = mNodeTransformBuffers[i]->descriptorInfo(sizeof( ... ), 0);
-			auto trsMatrixinfo = mTrsMatrixBuffers[i]->descriptorInfo(sizeof( ... ), 0);
-
-			// Basic Shader
-			AvengDescriptorSetWriter(*renderData.rdAvengBasicDescriptorLayout, *descriptorPool)
-				.writeBuffer(0, &perspectiveViewBufferInfo)
-				.writeBuffer(1, &modelRootBufferInfo)
-				.build(renderData.rdAvengDescriptorSets[i]);
-
-			// Animation Shader
-			AvengDescriptorSetWriter(*renderData.rdAvengAnimationDescriptorLayout, *descriptorPool)
-				.writeBuffer(0, &perspectiveViewBufferInfo)
-				.writeBuffer(1, &shaderBoneMatrixInfo)
-				.writeBuffer(2, &modelRootBufferInfo)
-				.build(renderData.rdAvengAnimationDescriptorSets[i]);
-
-			// Node Compute
-			AvengDescriptorSetWriter(*renderData.rdAvengComputeTransformDescriptorLayout, *descriptorPool)
-				.writeBuffer(0, &nodeTransformInfo)
-				.writeBuffer(1, &trsMatrixinfo)
-				.build(renderData.rdAvengDescriptorSets[i]);
-
-			auto lightsBufferInfo = mLightDataBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
-			AvengDescriptorSetWriter(*renderData.rdAvengBasicLightingDescriptorLayout, *descriptorPool)
-				.writeBuffer(0, &lightsBufferInfo)
-				.build(renderData.basicLightingDescriptorSets[i]);
-
-			// Reference for if we decide to use a dynamic UBO
-			// auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
-		}
+		updateDescriptorSets();
+		updateComputeDescriptorSets();
+		updateLightingDescriptorSets();
 	
 	}
 
@@ -566,127 +500,13 @@ namespace aveng {
 		std::cout << "PointLightSystem initialized" << std::endl;
 	}
 
-	void Renderer::updateFrameData(const glm::mat4& projection, const glm::mat4& view)
-	{
-
-		// Prepare frame data
-		u_GlobalData.projection = projection;
-		u_GlobalData.view = view;
-		u_GlobalData.renderMode = static_cast<int>(getObjectRenderMode());
-
-		// Update global uniform buffer
-		u_GlobalBuffers[currentFrameIndex]->writeToBuffer(&u_GlobalData);
-		u_GlobalBuffers[currentFrameIndex]->flush();
-
-		// Update lights uniform buffer
-		u_LightsBuffers[currentFrameIndex]->writeToBuffer(&u_LightsData);
-		u_LightsBuffers[currentFrameIndex]->flush();
-	}
-
-	//void Renderer::updateAnimationData(const std::vector<std::shared_ptr<AssimpInstance>>& instances, float deltaTime)
-	//{
-	//	// Delegate to animation system (only if it exists)
-	//	//if (animationSystem) {
-	//	//	animationSystem->updateAnimationData(instances, deltaTime, currentFrameIndex);
-	//	//}
-	//}
-
-	void Renderer::dispatchAnimationCompute(uint32_t vertexCount)
-	{
-		// Delegate to animation system (only if it exists)
-		//if (animationSystem) {
-		//	animationSystem->dispatchAnimationCompute(getCurrentCommandBuffer(), vertexCount, 
-		//											 pipelineLayout, currentFrameIndex);
-		//}
-	}
-
-	void Renderer::renderAnimatedModels(const std::vector<std::shared_ptr<AssimpInstance>>& instances)
-	{
-
-		// DEBUG: Completely disable compute shader to test raw geometry
-		/*
-		if (!animatedInstances.empty()) {
-			// Calculate total vertices for compute dispatch
-			uint32_t totalVertices = 0;
-			for (const auto& instance : animatedInstances) {
-				const auto& meshes = instance->getModel()->getModelMeshes();
-				for (const auto& mesh : meshes) {
-					totalVertices += static_cast<uint32_t>(mesh.vertices.size());
-				}
-			}
-
-			if (totalVertices > 0) {
-				// Dispatch compute shader outside render pass
-				renderer.dispatchAnimationCompute(totalVertices);
-			}
-		}
-		*/
-
-		//// Delegate to animation system (only if it exists)
-		//if (animationSystem) {
-		//	animationSystem->renderAnimatedModels(getCurrentCommandBuffer(), instances, pipelineLayout,
-		//										 pipelineManager.get(), static_cast<int>(currentObjectMode), 
-		//										 currentFrameIndex);
-		//}
-	}
-
-	void Renderer::renderObjects(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
-	{
-		auto commandBufferGfx = getCurrentCommandBufferGraphics();
-
-		// Bind pipeline based on current render mode
-		//GFXPipeline* activePipeline = nullptr;
-		
-		// PRIMARY: Use JSON-configured pipeline manager
-		//if (pipelineManager) {
-			//activePipeline = pipelineManager->getPipeline(static_cast<int>(currentObjectMode));
-			//if (activePipeline) {
-			//	activePipeline->bind(commandBuffer);
-			//}
-			pipelineManager->getPipeline(static_cast<int>(currentObjectMode))->bind(commandBufferGfx);
-		//}
-		
-		// Bind global descriptor set (set 0)
-		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
-
-		// Bind lights descriptor set (set 2)
-		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
-
-		// Render each object
-		for (size_t i = 0; i < objectData.size(); ++i) {
-			const auto& [objUniform, modelMatrix, normalMatrix, model] = objectData[i];
-
-			// Update object buffer
-			u_ObjBuffers[currentFrameIndex]->writeToIndex(&objUniform, i);
-			u_ObjBuffers[currentFrameIndex]->flushIndex(i);
-			auto descriptorInfo = u_ObjBuffers[currentFrameIndex]->descriptorInfoForIndex(i);
-			uint32_t dynamicOffset = static_cast<uint32_t>(descriptorInfo.offset);
-
-			// Bind object descriptor set (set 1)
-			vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-				1, 1, &objectDescriptorSets[currentFrameIndex], 1, &dynamicOffset);
-
-			PushConstantData pushData{ modelMatrix, normalMatrix, 0 };
-
-			vkCmdPushConstants(commandBufferGfx, pipelineLayout,
-				VK_SHADER_STAGE_VERTEX_BIT,  // Only vertex stage uses push constants
-				0, sizeof(PushConstantData), &pushData);
-
-			// Bind and draw model
-			model->bind(commandBufferGfx);
-			model->draw(commandBufferGfx);
-		}
-	}
-
 	void Renderer::renderLights()
 	{
-		pointLightSystem.render(
-			globalDescriptorSets[currentFrameIndex], 
-			lightsDescriptorSets[currentFrameIndex], 
-			getCurrentCommandBufferGraphics(), 
-			u_LightsData.numLights);
+		//pointLightSystem.render(
+		//	//globalDescriptorSets[currentFrameIndex], 
+		//	//lightsDescriptorSets[currentFrameIndex], 
+		//	getCurrentCommandBufferGraphics(), 
+		//	u_LightsData.numLights);
 	}
 
 	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
@@ -711,215 +531,6 @@ namespace aveng {
 		// Zero out the light arrays for clean state
 		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));
 		memset(u_LightsData.lightColors, 0, sizeof(u_LightsData.lightColors));
-	}
-
-	void Renderer::renderObjectsInstanced(const std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>>& objectData)
-	{
-
-		// Pro Tip: structured bindings won't hurt performance as long as your lvalue is const auto&
-		// E.g.
-		//	for(const auto& [objUniform, modelMatrix, normalMatrix, model] : objectData) ...
-		//
-
-		if (!instancedRenderingEnabled || objectData.empty()) { // Strange that we're considering empty object data at all
-			// Fallback to traditional rendering
-			renderObjects(objectData);
-			return;
-		}
-
-		auto commandBufferGfx = getCurrentCommandBufferGraphics();
-
-		//const std::unordered_map modelCountCache = sceneLoader.getModelCountCache();
-		//const std::unordered_map modelCache = sceneLoader.getModelCache();
-
-		// Clear existing batches for this frame
-		for (auto& [model, batch] : renderBatches) {
-			batch->instances.clear();
-		}
-
-		// Group objects by model
-		for (const auto& [objUniform, modelMatrix, normalMatrix, model] : objectData) {
-			// Create batch if it doesn't exist
-			if (renderBatches.find(model) == renderBatches.end()) {
-				renderBatches[model] = std::make_unique<RenderBatch>(model);
-			}
-
-			// Add instance data to the batch
-			InstanceData instanceData{};
-			instanceData.modelMatrix = modelMatrix;
-			instanceData.normalMatrix = normalMatrix;
-			instanceData.textureIndex = objUniform.texIndex;
-
-			//std::cout << "Adding Instance Data for: " << model->path << std::endl;
-
-			renderBatches[model]->instances.push_back(instanceData);
-		}
-
-		// Bind pipeline based on current render mode
-		// Use instanced pipeline variants (IDs 10, 11, 12 for STANDARD, WIREFRAME, DISTORTED respectively)
-		GFXPipeline* activePipeline = nullptr;
-		
-		if (pipelineManager) {
-			int instancedPipelineId = static_cast<int>(currentObjectMode) + 10;  // Convert to instanced pipeline ID
-			activePipeline = pipelineManager->getPipeline(instancedPipelineId);  // This is benign AI logic. Just build a method that chooses based on constants
-			if (activePipeline) {
-				activePipeline->bind(commandBufferGfx);
-			}
-		}
-		
-		if (!activePipeline) {
-			std::cerr << "WARNING: No instanced pipeline found for mode " << static_cast<int>(currentObjectMode) 
-					  << " (instanced ID " << (static_cast<int>(currentObjectMode) + 10) << ")" << std::endl;
-			std::cerr << "Falling back to standard rendering" << std::endl;
-			renderObjects(objectData); // Fallback
-			return;
-		}
-
-		// Bind global descriptor set (set 0)
-		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			0, 1, &globalDescriptorSets[currentFrameIndex], 0, nullptr);
-
-		// Bind lights descriptor set (set 2)
-		vkCmdBindDescriptorSets(commandBufferGfx, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			2, 1, &lightsDescriptorSets[currentFrameIndex], 0, nullptr);
-
-		// Render each batch
-		uint32_t totalInstancesRendered = 0;
-		uint32_t batchesRendered = 0;
-		
-		for (auto& [model, batch] : renderBatches) {
-			if (batch->instances.empty()) continue;
-
-			//std::cout << "RenderBatch Model: " << model->path << std::endl;
-
-			uint32_t instanceCount = static_cast<uint32_t>(batch->instances.size());
-			//std::cout << "Instance COUNT: " << instanceCount << std::endl;
-
-			// Update instance buffer for this batch
-			updateInstanceBuffer(*batch);
-
-			/*
-			 * TODO - Reintroduce Push Constants
-			 */
-
-			// Bind model vertex buffers AND instance buffer
-			// The instance buffer contains modelMatrix, normalMatrix, and textureIndex for each instance
-			model->bindInstanced(commandBufferGfx, batch->instanceBuffer->getBuffer());
-
-			// Draw all instances in a single draw call
-			// The shader will use gl_InstanceIndex to fetch the correct instance data from the instance buffer
-			model->drawInstanced(commandBufferGfx, instanceCount, 0);
-
-			totalInstancesRendered += instanceCount;
-			batchesRendered++;
-		}
-
-#if _DEBUG
-		//// Performance analysis
-		//float efficiency = (float)totalInstancesRendered / (float)batchesRendered;
-		//if (efficiency > 2.0f) {
-		//	std::cout << "Instancing is BENEFICIAL! Avg " << efficiency << " instances per batch" << std::endl;
-		//}
-		//else if (efficiency > 1.0f) {
-		//	std::cout << "Instancing provides MINOR benefit. Avg " << efficiency << " instances per batch" << std::endl;
-		//}
-		//if (efficiency < 1.0f) {
-		//	std::cout << "Instancing provides NO benefit (efficiency: " << efficiency << ")" << std::endl;
-		//	std::cout << "Auto-switching to traditional rendering for better performance" << std::endl;
-
-		//	// Automatically disable instancing for inefficient scenes
-		//	static int inefficientFrameCount = 0;
-		//	inefficientFrameCount++;
-		//	if (inefficientFrameCount >= 5) {
-		//		std::cout << "Automatically disabling instanced rendering - scene not suitable" << std::endl;
-		//		instancedRenderingEnabled = false;
-		//	}
-		//}
-		//else {
-		//	instancedRenderingEnabled = true;
-		//}
-#endif
-	}
-
-	void Renderer::updateInstanceBuffer(RenderBatch& batch)
-	{
-		if (batch.instances.empty()) return;
-
-		uint32_t instanceCount = static_cast<uint32_t>(batch.instances.size());
-		
-		// Create or resize instance buffer if needed
-		if (!batch.instanceBuffer || 
-		    batch.instanceBuffer->getInstanceCount() < instanceCount) {
-			
-			std::cout << "Creating instance buffer for " << instanceCount << " instances" << std::endl;
-			
-			// Create new instance buffer with VMA
-			batch.instanceBuffer = std::make_unique<AvengBuffer>(
-				engineDevice,
-				sizeof(InstanceData),
-				instanceCount,
-				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
-			);
-			
-			batch.instanceBuffer->map();
-		}
-
-		// Update instance buffer with current instance data
-		batch.instanceBuffer->writeToBuffer(batch.instances.data(), sizeof(InstanceData) * instanceCount);
-
-		// TODO - Does this need to be flushed?
-		batch.instanceBuffer->flush();
-	}
-
-	void Renderer::createPipelineLayout()
-	{
-		if (! lightsDescriptorSetLayout ||
-			! textureDescriptorSetLayout ||
-			! avengDescriptorSetLayout ||
-			! avengAnimDescriptorSetLayout ||
-			! computeTransformDescriptorSetLayout ||
-			! computeMatGlobalDescriptorSetLayout ||
-			! computeMatInstanceDescriptorSetLayout
-		) {
-			throw std::runtime_error("Descriptor set layouts must be created before pipeline layout (call setupDescriptors first)");
-		}
-
-		// Create descriptor set layouts array using stored layouts
-		// Size depends on whether animation system is enabled
-		size_t descriptorSetCount = /* animationSystem ? 4 : */ 3;
-		std::vector<VkDescriptorSetLayout> descriptorSetLayouts(descriptorSetCount);
-		descriptorSetLayouts[0] = globalDescriptorSetLayout->getDescriptorSetLayout();
-		descriptorSetLayouts[1] = objDescriptorSetLayout->getDescriptorSetLayout();
-		descriptorSetLayouts[2] = lightsDescriptorSetLayout->getDescriptorSetLayout();
-		
-		//if (animationSystem) {
-		//	descriptorSetLayouts[3] = animationSystem->getAnimationDescriptorSetLayout();  // Animation system descriptor set
-		//}
-
-		// Push constant range - unified structure for all pipelines
-		VkPushConstantRange pushConstantRange{};
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;  // Only vertex shaders use push constants
-		pushConstantRange.offset = 0;
-		pushConstantRange.size = 132; // Unified: 2 mat4 + int32_t = 132 bytes (within 128-byte limit)
-
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetCount);
-		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
-		pipelineLayoutInfo.pushConstantRangeCount = 1;
-		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-
-		if (vkCreatePipelineLayout(engineDevice.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create pipeline layout!");
-		}
-		
-		// Create animation compute pipeline now that we have the pipeline layout (if animation system exists)
-	/*	if (animationSystem) {
-			animationSystem->createAnimationComputePipeline(pipelineLayout);
-		}*/
 	}
 
 	void Renderer::createPipelines()
@@ -953,29 +564,6 @@ namespace aveng {
 			std::cout << "Pipeline initialization complete" << std::endl;
 		}
 	}
-
-	
-	//void Renderer::createPostProcessPipelines()
-	//{
-	//	std::cout << "Creating post-processing pipelines..." << std::endl;
-
-	//	// For now, create placeholder - full post-processing setup would require:
-	//	// 1. Offscreen render targets
-	//	// 2. Full-screen quad rendering
-	//	// 3. Screen-space effect shaders
-
-	//	// Resize pipeline vector to match enum size  
-	//	//postProcessPipelines.resize(static_cast<size_t>(PostProcessMode::CHROMATIC_ABERRATION) + 1);
-
-	//	// TODO: Implement full post-processing system
-	//	// This would include:
-	//	// - Creating offscreen framebuffers
-	//	// - Post-process specific pipeline layouts
-	//	// - Full-screen quad geometry generation
-	//	// - Screen-space effect shaders (toxic_cloud.frag, night_vision.frag, etc.)
-
-	//	std::cout << "Post-processing system placeholder created (full implementation needed)" << std::endl;
-	//}
 
 	bool Renderer::reloadPipelineConfig(const std::string& configPath)
 	{
@@ -1024,13 +612,13 @@ namespace aveng {
 
 		/* node transformation */
 		vkCmdBindPipeline(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-			renderData.rdAssimpComputeTransformPipeline);
+			renderData.rdAvengComputeTransformPipeline);
 		vkCmdBindDescriptorSets(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-			renderData.rdAssimpComputeTransformaPipelineLayout, 0, 1, &renderData.rdAssimpComputeTransformDescriptorSet, 0, 0);
+			renderData.rdAvengComputeTransformaPipelineLayout, 0, 1, &renderData.rdAvengComputeTransformDescriptorSet, 0, 0);
 
 		mUploadToUBOTimer.start();
 		mComputeModelData.pkModelOffset = modelOffset;
-		vkCmdPushConstants(renderData.rdComputeCommandBuffer, renderData.rdAssimpComputeTransformaPipelineLayout,
+		vkCmdPushConstants(renderData.rdComputeCommandBuffer, renderData.rdAvengComputeTransformaPipelineLayout,
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
@@ -1054,16 +642,16 @@ namespace aveng {
 
 		/* matrix multiplication */
 		vkCmdBindPipeline(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-			renderData.rdAssimpComputeMatrixMultPipeline);
+			renderData.rdAvengComputeMatrixMultPipeline);
 
 		VkDescriptorSet& modelDescriptorSet = model->getMatrixMultDescriptorSet();
-		std::vector<VkDescriptorSet> computeSets = { renderData.rdAssimpComputeMatrixMultDescriptorSet, modelDescriptorSet };
+		std::vector<VkDescriptorSet> computeSets = { renderData.rdAvengComputeMatrixMultDescriptorSet, modelDescriptorSet };
 		vkCmdBindDescriptorSets(renderData.rdComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-			renderData.rdAssimpComputeMatrixMultPipelineLayout, 0, static_cast<uint32_t>(computeSets.size()), computeSets.data(), 0, 0);
+			renderData.rdAvengComputeMatrixMultPipelineLayout, 0, static_cast<uint32_t>(computeSets.size()), computeSets.data(), 0, 0);
 
 		mUploadToUBOTimer.start();
 		mComputeModelData.pkModelOffset = modelOffset;
-		vkCmdPushConstants(renderData.rdComputeCommandBuffer, renderData.rdAssimpComputeMatrixMultPipelineLayout,
+		vkCmdPushConstants(renderData.rdComputeCommandBuffer, renderData.rdAvengComputeMatrixMultPipelineLayout,
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
@@ -1084,6 +672,366 @@ namespace aveng {
 		vkCmdPipelineBarrier(renderData.rdComputeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1,
 			&boneMatrixBufferBarrier, 0, nullptr);
+	}
+
+	bool Renderer::draw(float deltaTime) {
+		/* no update on zero diff */
+		if (deltaTime == 0.0f) {
+			return true;
+		}
+
+		renderData.rdFrameTime = mFrameTimer.stop();
+		mFrameTimer.start();
+
+		/* reset timers and other values */
+		renderData.rdMatricesSize = 0;
+		renderData.rdUploadToUBOTime = 0.0f;
+		renderData.rdUploadToVBOTime = 0.0f;
+		renderData.rdMatrixGenerateTime = 0.0f;
+		renderData.rdUIGenerateTime = 0.0f;
+
+		/* wait for both fences before getting the new framebuffer image */
+		std::vector<VkFence> waitFences = { renderData.rdComputeFence, renderData.rdRenderFence };
+		VkResult result = vkWaitForFences(engineDevice.device(),
+			static_cast<uint32_t>(waitFences.size()), waitFences.data(), VK_TRUE, UINT64_MAX);
+		if (result != VK_SUCCESS) {
+			std::printf("%s error: waiting for fences failed (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		/* calculate the size of the node matrix buffer over all animated instances */
+		size_t boneMatrixBufferSize = 0;
+		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
+			size_t numberOfInstances = modelType.second.size();
+			std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
+
+				/* animated models */
+				if (model->hasAnimations() && !model->getBoneList().empty()) {
+					size_t numberOfBones = model->getBoneList().size();
+
+					/* buffer size must always be a multiple of "local_size_y" instances to avoid undefined behavior */
+					boneMatrixBufferSize += numberOfBones * ((numberOfInstances - 1) / 32 + 1) * 32;
+				}
+			}
+		}
+
+		/* clear and resize world pos matrices */
+		mWorldPosMatrices.clear();
+		mWorldPosMatrices.resize(mModelInstanceData.miAssimpInstances.size());
+		mNodeTransFormData.clear();
+		mNodeTransFormData.resize(boneMatrixBufferSize);
+
+		/* we need to track the presence of animated models */
+		bool animatedModelLoaded = false;
+		size_t instanceToStore = 0;
+		size_t animatedInstancesToStore = 0; // This will be the total number of bones across all model instances.
+
+		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) { //
+			size_t numberOfInstances = modelType.second.size(); // second is the vector of <shared_ptr> AssimpInstance
+			if (numberOfInstances > 0) {
+				std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+
+				/* animated models */
+				if (model->hasAnimations() && !model->getBoneList().empty()) {
+
+					// Collect the number of bones
+					size_t numberOfBones = model->getBoneList().size();
+					animatedModelLoaded = true; // designate
+
+					mMatrixGenerateTimer.start();
+
+					// For each instance
+					for (unsigned int i = 0; i < numberOfInstances; ++i) {
+						// Update its animation -- Q: why are we using at() instead of indexing?? Less efficient
+						modelType.second.at(i)->updateAnimation(deltaTime);
+						std::vector<NodeTransformData> instanceNodeTransform = modelType.second.at(i)->getNodeTransformData();
+
+						// Copy the NodeTransform Data to the vector of NodeTransform datas. I didn't know you can use arithmetic with iterator access patterns
+						// STORAGE BUFFER DATA - Packed with every instance's data
+						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + i * numberOfBones);
+
+						// STORAGE BUFFER DATA - Packed with every instance's data
+						mWorldPosMatrices.at(instanceToStore + i) = modelType.second.at(i)->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+					}
+
+					size_t trsMatrixSize = numberOfBones * numberOfInstances * sizeof(glm::mat4); // CPU miss
+
+					renderData.rdMatrixGenerateTime += mMatrixGenerateTimer.stop();
+					renderData.rdMatricesSize += trsMatrixSize;
+
+					instanceToStore += numberOfInstances;
+					animatedInstancesToStore += numberOfInstances * numberOfBones;
+				}
+				else {
+					/* non-animated models */
+					mMatrixGenerateTimer.start();
+
+					for (unsigned int i = 0; i < numberOfInstances; ++i) {
+						mWorldPosMatrices.at(instanceToStore + i) = modelType.second.at(i)->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+					}
+
+					renderData.rdMatrixGenerateTime += mMatrixGenerateTimer.stop();
+					renderData.rdMatricesSize += numberOfInstances * sizeof(glm::mat4);
+
+					instanceToStore += numberOfInstances;
+				}
+			}
+		}
+
+		/* we need to update descriptors after the upload if buffer size changed */
+		bool bufferResized = false;
+		mUploadToUBOTimer.start();
+
+		// Ship the SSBO data
+		bufferResized = ShaderStorageBuffer::uploadSsboData(renderData, engineDevice, mShaderNodeTransformBuffer, mNodeTransFormData);
+		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+		/* resize SSBO if needed */
+		bufferResized |= ShaderStorageBuffer::checkForResize(renderData, engineDevice, mShaderTRSMatrixBuffer, boneMatrixBufferSize * sizeof(glm::mat4));
+		bufferResized |= ShaderStorageBuffer::checkForResize(renderData, engineDevice, mShaderBoneMatrixBuffer, boneMatrixBufferSize * sizeof(glm::mat4));
+
+		// Note: this occurs if ANY buffer has a new size
+		if (bufferResized) {
+			updateDescriptorSets();
+			updateComputeDescriptorSets();
+		}
+
+		/* record compute commands */
+		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence);
+		if (result != VK_SUCCESS) {
+			std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		if (animatedModelLoaded) {
+			if (!CommandBuffer::reset(renderData.rdComputeCommandBuffer, 0)) {
+				::printf("%s error: failed to reset compute command buffer\n", __FUNCTION__);
+				return false;
+			}
+
+			if (!CommandBuffer::beginSingleShot(renderData.rdComputeCommandBuffer)) {
+				std::printf("%s error: failed to begin compute command buffer\n", __FUNCTION__);
+				return false;
+			}
+
+			uint32_t computeShaderModelOffset = 0;
+			for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
+				size_t numberOfInstances = modelType.second.size();
+				std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+				if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
+
+					/* compute shader for animated models only */
+					if (model->hasAnimations() && !model->getBoneList().empty()) {
+						size_t numberOfBones = model->getBoneList().size();
+
+						runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
+
+						computeShaderModelOffset += numberOfInstances * numberOfBones;
+					}
+				}
+			}
+
+			if (!CommandBuffer::end(renderData.rdComputeCommandBuffer)) {
+				std::printf("%s error: failed to end compute command buffer\n", __FUNCTION__);
+				return false;
+			}
+
+			/* submit compute commands */
+			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+			VkSubmitInfo computeSubmitInfo{};
+			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			computeSubmitInfo.commandBufferCount = 1;
+			computeSubmitInfo.pCommandBuffers = &renderData.rdComputeCommandBuffer;
+			computeSubmitInfo.signalSemaphoreCount = 1;
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore;
+			computeSubmitInfo.waitSemaphoreCount = 1;
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore;
+			computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+			result = vkQueueSubmit(renderData.rdComputeQueue, 1, &computeSubmitInfo, renderData.rdComputeFence);
+			if (result != VK_SUCCESS) {
+				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
+				return false;
+			};
+		}
+		else {
+			/* do an empty submit if we don't have animated models to satisfy fence and semaphor */
+			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+			VkSubmitInfo computeSubmitInfo{};
+			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			computeSubmitInfo.signalSemaphoreCount = 1;
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore;
+			computeSubmitInfo.waitSemaphoreCount = 1;
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore;
+			computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+			result = vkQueueSubmit(renderData.rdComputeQueue, 1, &computeSubmitInfo, renderData.rdComputeFence);
+			if (result != VK_SUCCESS) {
+				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
+				return false;
+			};
+		}
+
+		// handleMovementKeys();
+
+		/* we need to update descriptors after the upload if buffer size changed */
+		mUploadToUBOTimer.start();
+		UniformBuffer::uploadData(renderData, engineDevice, mPerspectiveViewMatrixUBO, mMatrices);
+		bufferResized = ShaderStorageBuffer::uploadSsboData(renderData, engineDevice, mShaderModelRootMatrixBuffer, mWorldPosMatrices);
+		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+		if (bufferResized) {
+			updateDescriptorSets();
+		}
+
+		/* start with graphics rendering */
+		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence);
+		if (result != VK_SUCCESS) {
+			std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		if (!CommandBuffer::reset(renderData.rdCommandBuffer, 0)) {
+			std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);
+			return false;
+		}
+
+		if (!CommandBuffer::beginSingleShot(renderData.rdCommandBuffer)) {
+			std::printf("%s error: failed to begin command buffer\n", __FUNCTION__);
+			return false;
+		}
+
+		/* draw the models */
+		uint32_t worldPosOffset = 0;
+		uint32_t skinMatOffset = 0;
+		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
+			size_t numberOfInstances = modelType.second.size();
+			std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+
+			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
+
+				/* animated models */
+				if (model->hasAnimations() && !model->getBoneList().empty()) {
+					uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
+
+					vkCmdBindPipeline(renderData.rdCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengSkinningPipeline);
+
+					vkCmdBindDescriptorSets(renderData.rdCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						renderData.rdAvengSkinningPipelineLayout, 1, 1, &renderData.rdAvengSkinningDescriptorSet, 0, nullptr);
+
+					mUploadToUBOTimer.start();
+					mModelData.pkModelStride = numberOfBones;
+					mModelData.pkWorldPosOffset = worldPosOffset;
+					mModelData.pkSkinMatOffset = skinMatOffset;
+					vkCmdPushConstants(renderData.rdCommandBuffer, renderData.rdAvengSkinningPipelineLayout,
+						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
+					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+					model->drawInstancedV2(renderData, numberOfInstances);
+
+					worldPosOffset += numberOfInstances;
+					skinMatOffset += numberOfInstances * numberOfBones;
+				}
+				else {
+					/* non-animated models */
+
+					vkCmdBindPipeline(renderData.rdCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengPipeline);
+
+					vkCmdBindDescriptorSets(renderData.rdCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						renderData.rdAvengPipelineLayout, 1, 1, &renderData.rdAvengDescriptorSet, 0, nullptr);
+
+					mUploadToUBOTimer.start();
+					mModelData.pkModelStride = 0;
+					mModelData.pkWorldPosOffset = worldPosOffset;
+					mModelData.pkSkinMatOffset = 0;
+					vkCmdPushConstants(renderData.rdCommandBuffer, renderData.rdAvengPipelineLayout,
+						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
+					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+					model->drawInstancedV2(renderData, numberOfInstances);
+
+					worldPosOffset += numberOfInstances;
+				}
+			}
+		}
+
+		// Is this necessary?
+		if (!CommandBuffer::end(renderData.rdCommandBuffer)) {
+			std::printf("%s error: failed to end command buffer\n", __FUNCTION__);
+			return false;
+		}
+
+		return true;
+	}
+
+	void Renderer::updateDescriptorSets() {
+		// Why auto - This can be removed to the ImageSystem class along with the descriptor writing
+		// This descriptor would need to be rewritten at runtime to load new textures during run
+		auto imageInfo = imageSystem->descriptorInfoForAllImages();
+
+		// Write the descriptor sets that are ready to go
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			AvengDescriptorSetWriter(*renderData.rdAvengTextureDescriptorLayout, *descriptorPool)
+				.writeImage(1, imageInfo.data(), imageInfo.size())
+				.build(renderData.textureDescriptorSets[i]);
+
+			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+
+			// Basic Shader
+			AvengDescriptorSetWriter(*renderData.rdAvengBasicDescriptorLayout, *descriptorPool)
+				.writeBuffer(0, &perspectiveViewBufferInfo)
+				.writeBuffer(1, &modelRootBufferInfo)
+				.build(renderData.rdAvengDescriptorSets[i]);
+
+			// Animation Shader
+			AvengDescriptorSetWriter(*renderData.rdAvengAnimationDescriptorLayout, *descriptorPool)
+				.writeBuffer(0, &perspectiveViewBufferInfo)
+				.writeBuffer(1, &shaderBoneMatrixInfo)
+				.writeBuffer(2, &modelRootBufferInfo)
+				.build(renderData.rdAvengAnimationDescriptorSets[i]);
+
+			// Reference if we decide to use a dynamic UBO
+			// auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
+		}
+	}
+
+	void Renderer::updateLightingDescriptorSets() {
+		auto lightsBufferInfo = mLightDataBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
+		AvengDescriptorSetWriter(*renderData.rdAvengBasicLightingDescriptorLayout, *descriptorPool)
+			.writeBuffer(0, &lightsBufferInfo)
+			.build(renderData.basicLightingDescriptorSets[i]);
+	}
+
+	void Renderer::updateComputeDescriptorSets() {
+
+		// Write the descriptor sets that are ready to go
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			auto nodeTransformInfo = mNodeTransformBuffers[i]->descriptorInfo(sizeof(NodeTransformData), 0);
+			auto trsMatrixinfo = mTrsMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+
+			// Node Compute
+			AvengDescriptorSetWriter(*renderData.rdAvengComputeTransformDescriptorLayout, *descriptorPool)
+				.writeBuffer(0, &nodeTransformInfo)
+				.writeBuffer(1, &trsMatrixinfo)
+				.build(renderData.rdAvengDescriptorSets[i]);
+
+			
+
+		}
+
+	}
+
+	void Renderer::updateFrameData(const glm::mat4& projection, const glm::mat4& view)
+	{
+		mMatrices.projectionMatrix = projection;
+		mMatrices.viewMatrix = view;
 	}
 
 } // NS

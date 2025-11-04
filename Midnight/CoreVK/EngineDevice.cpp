@@ -329,11 +329,11 @@ namespace aveng {
         // Compute Pool
         VkCommandPoolCreateInfo poolInfo = {};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.queueFamilyIndex = mHasDedicatedComputeQueue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
+        poolInfo.queueFamilyIndex = queueFamilyIndices.computeFamilyHasValue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
         poolInfo.flags =
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPoolGraphics) != VK_SUCCESS)
+        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPoolCompute) != VK_SUCCESS)
         {
             throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
         }
@@ -605,7 +605,6 @@ namespace aveng {
             // ...and VK_QUEUE_COMPUTE_BIT
             if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
             {
-                mHasDedicatedComputeQueue = true;
                 indices.computeFamily = i;
                 indices.computeFamilyHasValue = true;
             }
@@ -834,6 +833,28 @@ namespace aveng {
         vkQueueWaitIdle(_graphicsQueue);
 
         vkFreeCommandBuffers(_device, _commandPoolGraphics, 1, &commandBuffer);
+
+        // ^^ Old
+
+        //VkFence fence{};
+        //VkFenceCreateInfo fi{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+        //vkCreateFence(_device, &fi, nullptr, &fence);
+
+        //vkEndCommandBuffer(commandBuffer);
+
+        //VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+        //submitInfo.commandBufferCount = 1;
+        //submitInfo.pCommandBuffers = &commandBuffer;
+
+        //vkQueueSubmit(_graphicsQueue, 1, &submitInfo, fence);
+        //vkWaitForFences(_device, 1, &fence, VK_TRUE, UINT64_MAX);
+
+        //// Reuse instead of free:
+        //vkResetCommandBuffer(commandBuffer, 0);
+        //// or: vkResetCommandPool(_device, _commandPoolGraphics, 0);
+
+        //vkDestroyFence(_device, fence, nullptr);
+
     }
 
     void EngineDevice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) 

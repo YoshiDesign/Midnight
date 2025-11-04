@@ -58,6 +58,35 @@ namespace aveng {
         VkDeviceSize getAlignmentSize() const { return alignmentSize; }
         VkBufferUsageFlags getUsageFlags() const { return usageFlags; }
         VkDeviceSize getBufferSize() const { return bufferSize; }
+
+        template <typename T>
+        static bool uploadSsboData(AvengBuffer& Ssbo, std::vector<T> bufferData) {
+            if (bufferData.empty()) {
+                return false;
+            }
+
+            bool bufferResized = false;
+            size_t bufferSize = bufferData.size() * sizeof(T);
+            if (bufferSize > Ssbo.bufferSize) {
+                std::printf("%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, Ssbo.buffer, Ssbo.bufferSize, bufferSize);
+                // cleanup(renderData, SSBOData);
+                // init(renderData, SSBOData, bufferSize); // THIS IS THE STORAGE BUFFER'S INIT FUNCTION WE HAVEN'T IMPLEMENTED OUR FLAVOR OF THIS YET
+                bufferResized = true;
+            }
+
+            if (Ssbo.map() != VK_SUCCESS) {
+                std::printf("%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+                return false;
+            }
+
+            Ssbo.writeToBuffer();
+            Ssbo.unmap();
+            Ssbo.flush();
+
+            return bufferResized;
+        }
+
+        static bool checkForResize(AvengBuffer& Ssbo, size_t bufferSize);
         
         // New getters for VMA support
         bool isUsingVMA() const { return usingVMA; }
@@ -66,7 +95,7 @@ namespace aveng {
 
     private:
 
-        // Instances of a uniform block must be at an offset that is an integer multiple of the minimum uniform buffer offset alignment device-value
+        // Instances (objects within a) of a (probably just dynamic-) uniform block must be at an offset that is an integer multiple of the minimum uniform buffer offset alignment device-value
         // This function returns the smallest size in bites that satisfies this requirement
         // So if our uniform buffer is 19bytes, but our device's min uniform buffer offset is 16bytes, we'll need 32bytes.
         // Note that vertex and index buffer's don't have an alignment requirement like storage and uniform buffers do.

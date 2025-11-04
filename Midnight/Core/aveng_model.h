@@ -11,6 +11,7 @@
 #include "data.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/aveng_buffer.h"
+#include "CoreVK/aveng_descriptors.h"
 #include "Core/Modeling/AssimpNode.h"
 #include "Core/Modeling/AssimpMesh.h"
 #include "Core/Modeling/AssimpAnimClip.h"
@@ -57,6 +58,7 @@ namespace aveng {
 		VkDescriptorSet& getMatrixMultDescriptorSet();
 		glm::mat4 getRootTranformationMatrix();
 		bool hasAnimations();
+		unsigned int getTriangleCount();
 
 		static std::unique_ptr<AvengModel> createModelFromFile(EngineDevice& device, VkRenderData& renderData, const std::string& filepath);
 		static std::unique_ptr<AvengModel> drawTriangle(EngineDevice& device, glm::vec3 pos, const std::string& filepath);
@@ -94,6 +96,13 @@ namespace aveng {
 		std::shared_ptr<AssimpNode> mRootNode = nullptr;
 
 		std::vector<VkMesh> mModelMeshes{};
+		unsigned int mTriangleCount;
+
+		std::vector<std::unique_ptr<AvengBuffer>> mBoneParentMatrixBuffers;
+		std::vector<std::unique_ptr<AvengBuffer>> mShaderBoneMatrixOffsetBuffers;
+
+		VkShaderStorageBufferData mShaderBoneParentBuffer{};
+		VkShaderStorageBufferData mShaderBoneMatrixOffsetBuffer{};
 
 		/* a map to find the node by name */
 		std::unordered_map<std::string, std::shared_ptr<AssimpNode>> mNodeMap{};
@@ -104,8 +113,8 @@ namespace aveng {
 
 		std::vector<std::shared_ptr<AssimpAnimClip>> mAnimClips{};
 
-		VkShaderStorageBufferData mShaderBoneParentBuffer{};
-		VkShaderStorageBufferData mShaderBoneMatrixOffsetBuffer{};
+		//VkShaderStorageBufferData mShaderBoneParentBuffer{};
+		//VkShaderStorageBufferData mShaderBoneMatrixOffsetBuffer{};
 
 		glm::mat4 mRootTransformMatrix = glm::mat4(1.0f);
 

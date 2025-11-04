@@ -291,4 +291,22 @@ namespace aveng {
         return invalidate(alignmentSize, index * alignmentSize);
     }
 
+    bool AvengBuffer::checkForResize(AvengBuffer& Ssbo, size_t bufferSize) {
+        if (bufferSize > Ssbo.bufferSize) {
+            std::printf("%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, Ssbo.buffer, Ssbo.bufferSize, bufferSize);
+            //cleanup(renderData, SSBOData);
+            //init(renderData, SSBOData, bufferSize);
+            return true;
+        }
+        return false;
+    }
+
+    //void AvengBuffer::cleanup(VkRenderData& renderData, VkShaderStorageBufferData& SSBOData) {
+    //    VkResult result = vkQueueWaitIdle(renderData.rdGraphicsQueue);
+    //    if (result != VK_SUCCESS) {
+    //        Logger::log(1, "%s fatal error: could not wait for device idle (error: %i)\n", __FUNCTION__, result);
+    //    }
+    //    vmaDestroyBuffer(renderData.rdAllocator, SSBOData.buffer, SSBOData.bufferAlloc);
+    //}
+
 }  // namespace aveng

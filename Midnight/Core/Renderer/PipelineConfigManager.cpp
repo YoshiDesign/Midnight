@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include "../data.h"  // For TransformedVertex
 #include "../aveng_model.h"
+#include "CoreVK/VkRenderData.h"
 
 namespace aveng {
 

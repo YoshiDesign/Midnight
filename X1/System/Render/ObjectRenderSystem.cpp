@@ -74,35 +74,35 @@ namespace aveng {
 		// Update frame data in renderer
 		renderer.updateFrameData(aveng_camera.getProjection(), aveng_camera.getView());
 
-		// Prepare object data for rendering - TODO (Too many declarations!!!)
-		std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>> objectData;
-		for (const auto& obj : renderer.getAppObjects()) {
-			ObjectUniformData objUniform{ obj.get_texture() };		// Model's texture index
-			glm::mat4 modelMatrix = obj.transform._mat4();			// Local model matrix
-			glm::mat4 normalMatrix = obj.transform.normalMatrix();	// Local model normal matrix
-			AvengModel* model = obj.model.get();						// TODO: This is a shared ptr
-			//std::cout << "Object to render: " << model->path << std::endl;
-			objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
+		//// Prepare object data for rendering - TODO (Too many declarations!!!)
+		//std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>> objectData;
+		//for (const auto& obj : renderer.getAppObjects()) {
+		//	ObjectUniformData objUniform{ obj.get_texture() };		// Model's texture index
+		//	glm::mat4 modelMatrix = obj.transform._mat4();			// Local model matrix
+		//	glm::mat4 normalMatrix = obj.transform.normalMatrix();	// Local model normal matrix
+		//	AvengModel* model = obj.model.get();						// TODO: This is a shared ptr
+		//	//std::cout << "Object to render: " << model->path << std::endl;
+		//	objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
 
-			/**
-			* TODO : You could be collecting render batches here instead of looping through objectData again during instanced rendering
-			* Think Renderer::createRenderBatches(...)
-			*/
+		//	/**
+		//	* TODO : You could be collecting render batches here instead of looping through objectData again during instanced rendering
+		//	* Think Renderer::createRenderBatches(...)
+		//	*/
 
-		}
+		//}
 
-		if (firstFrame) {
-			std::cout << "First Frame!" << std::endl;
-			std::cout << "Objects this frame: " << objectData.size() << std::endl;
-			firstFrame = false;
-		}
-		
+		//if (firstFrame) {
+		//	std::cout << "First Frame!" << std::endl;
+		//	std::cout << "Objects this frame: " << objectData.size() << std::endl;
+		//	firstFrame = false;
+		//}
+		renderer.draw(frameTime);
 		/*
 			NOTE: renderer.renderObjectsInstanced uses the pipelineManager to select/bind the gfxpipeline
 				  Whereas renderer.renderLights punts to the pointLightSystem which handles gfxpipeline binding on its own
 		*/
 		// Render regular objects (standard pipeline) -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
-		renderer.renderObjectsInstanced(objectData);
+		//renderer.renderObjectsInstanced(objectData);
 		// renderer.renderObjects(objectData);
 
 		// STEP 1F: Enable animation rendering pipeline  
@@ -144,41 +144,6 @@ namespace aveng {
 		game_data.cameraRot = viewerObject.transform.rotation;
 		game_data.fly_mode = WindowCallbacks::flightMode;
 
-	}
-
-	void ObjectRenderSystem::updatePostProcessing(float frameTime)
-	{
-		// Example: Dynamic shader switching based on game state
-		// This is where you'd implement your toxic cloud detection logic
-		static bool inToxicCloud = false;
-		static float toxicTimer = 0.0f;
-		toxicTimer += frameTime;
-
-		// Toggle toxic cloud effect every 5 seconds for demo
-		if (toxicTimer > 5.0f) {
-			inToxicCloud = !inToxicCloud;
-			toxicTimer = 0.0f;
-
-			if (inToxicCloud) {
-				std::cout << "Entering toxic cloud - switching to distorted rendering!" << std::endl;
-				renderer.setObjectRenderMode(ObjectRenderMode::DISTORTED);
-				// Temporarily disable post-processing until system is complete
-				// renderer.setPostProcessMode(PostProcessMode::TOXIC_CLOUD);
-
-				// Example: Print available pipelines for debugging
-				auto pipelines = renderer.getAvailablePipelines();
-				std::cout << "Available pipelines: ";
-				for (const auto& name : pipelines) {
-					std::cout << name << " ";
-				}
-				std::cout << std::endl;
-			}
-			else {
-				std::cout << "Exiting toxic cloud - returning to normal rendering" << std::endl;
-				renderer.setObjectRenderMode(ObjectRenderMode::STANDARD);
-				// renderer.setPostProcessMode(PostProcessMode::NONE);
-			}
-		}
 	}
 
 	void ObjectRenderSystem::loadGame(const std::string& scenePath)

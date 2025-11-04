@@ -1,5 +1,7 @@
 #pragma once
 #include <functional>
+#include <type_traits>
+#include "CoreVK/VkRenderData.h"
 
 namespace aveng {
 
@@ -9,6 +11,17 @@ namespace aveng {
 		seed ^= std::hash<T>{}(v)+0x9e3779b9 + (seed << 6) + (seed >> 2);
 		(hashCombine(seed, rest), ...);
 	};
+
+	// Use this in dev to determine what can safely utilize low-lvl memory copy/update functions like memcpy, std::copy, etc.
+	template <typename T>
+	bool isTrivialToCopy(T thing)
+	{
+		static_assert(std::is_trivially_copyable_v<glm::vec4>, "glm::vec4 must be trivially copyable");
+		static_assert(std::is_trivially_copyable_v<NodeTransformData>, "NodeTransformData must be trivially copyable");
+		static_assert(alignof(NodeTransformData) % alignof(glm::vec4) == 0, "Alignment must be vec4-friendly");
+		static_assert(sizeof(NodeTransformData) == 3 * sizeof(glm::vec4), "Expect 48 bytes (std430-friendly)");
+		return true;
+	}
 
 
 

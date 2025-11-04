@@ -236,10 +236,6 @@ namespace aveng {
 
 		GLFWwindow* rdWindow = nullptr;
 
-		
-
-		bool rdHasDedicatedComputeQueue = false;
-
 		int rdWidth = 0;
 		int rdHeight = 0;
 
@@ -261,7 +257,6 @@ namespace aveng {
 		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
 		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
 
-
 		int rdMoveForward = 0;
 		int rdMoveRight = 0;
 		int rdMoveUp = 0;
@@ -276,7 +271,7 @@ namespace aveng {
 
 		//VkQueue rdGraphicsQueue = VK_NULL_HANDLE;
 		//VkQueue rdPresentQueue = VK_NULL_HANDLE;
-		//VkQueue rdComputeQueue = VK_NULL_HANDLE;
+		VkQueue rdComputeQueue = VK_NULL_HANDLE;
 
 		//VkImage rdDepthImage = VK_NULL_HANDLE;
 		//VkImageView rdDepthImageView = VK_NULL_HANDLE;

@@ -277,10 +277,10 @@ namespace aveng {
 		bindingDescriptions[0].stride = sizeof(VkVertex);
 		bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-		// Binding 1: Instance data (per-instance rate)
-		bindingDescriptions[1].binding = 1;
-		bindingDescriptions[1].stride = sizeof(VkInstanceData);
-		bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+		//// Binding 1: Instance data (per-instance rate)
+		//bindingDescriptions[1].binding = 1;
+		//bindingDescriptions[1].stride = sizeof(VkInstanceData);
+		//bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
 		return bindingDescriptions;
 	}
@@ -644,10 +644,30 @@ namespace aveng {
 		}
 
 		/* init all SSBOs */
-		ShaderStorageBuffer::init(renderData, mShaderBoneMatrixOffsetBuffer);
-		ShaderStorageBuffer::init(renderData, mShaderBoneParentBuffer);
+		for (int i = 0; i < mBoneParentMatrixBuffers.size(); i++) {
+			mBoneParentMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mBoneParentMatrixBuffers[i]->map();
+		}
 
-		ShaderStorageBuffer::uploadSsboData(renderData, mShaderBoneMatrixOffsetBuffer, boneOffsetMatricesList);
+		for (int i = 0; i < mShaderBoneMatrixOffsetBuffers.size(); i++) {
+			mShaderBoneMatrixOffsetBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
+				sizeof(LightsUbo), 1,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VMA_MEMORY_USAGE_AUTO,
+				1, // minOffsetAlignment
+				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+			mShaderBoneMatrixOffsetBuffers[i]->map();
+		}
+
+		//ShaderStorageBuffer::init(renderData, mShaderBoneMatrixOffsetBuffer);
+		//ShaderStorageBuffer::init(renderData, mShaderBoneParentBuffer);
+
+		AvengBuffer::uploadSsboData(mShaderBoneMatrixOffsetBuffers[0], boneOffsetMatricesList);
 		ShaderStorageBuffer::uploadSsboData(renderData, mShaderBoneParentBuffer, boneParentIndexList);
 
 		/* create descriptor set for per-model data */
@@ -702,6 +722,7 @@ namespace aveng {
 			return false;
 		}
 
+		// Note: We're not triple buffering
 		VkDescriptorBufferInfo parentNodeInfo{};
 		parentNodeInfo.buffer = mShaderBoneParentBuffer.buffer;
 		parentNodeInfo.offset = 0;
@@ -792,6 +813,10 @@ namespace aveng {
 
 	bool AvengModel::hasAnimations() {
 		return !mAnimClips.empty();
+	}
+
+	unsigned int AvengModel::getTriangleCount() {
+		return mTriangleCount;
 	}
 
 	VkShaderStorageBufferData& AvengModel::getBoneMatrixOffsetBuffer() {

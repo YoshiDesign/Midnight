@@ -5,6 +5,11 @@
 #include <string>
 #include <vector>
 
+/**
+* NOTE: This object-oriented architecture of ours comes with several limitations
+* DO NOT INCLUDE VkRenderData here or you'll cause a circular dependency.
+*/
+
 namespace aveng {
 
     struct SwapChainSupportDetails {
@@ -30,7 +35,6 @@ namespace aveng {
 
         // This tells Vulkan about the callback funtion for our validation layer debug
         VkDebugUtilsMessengerEXT debugMessenger;
-        bool mHasDedicatedComputeQueue = false;
 
         VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
         VkCommandPool   _commandPoolGraphics;
@@ -78,7 +82,6 @@ namespace aveng {
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
         QueueFamilyIndices findPhysicalQueueFamilies(){ return findQueueFamilies(_physicalDevice); };
         uint32_t getGraphicsQueueFamily() { return findPhysicalQueueFamilies().graphicsFamily; }
-        bool hasDedicatedComputeQueue() { return mHasDedicatedComputeQueue; }
         VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
         // Buffer Helper Functions

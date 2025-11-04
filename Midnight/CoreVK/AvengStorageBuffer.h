@@ -1,0 +1,51 @@
+#pragma once
+/* Vulkan shader storage buffer object */
+#pragma once
+
+#include <vector>
+#include <cstdint>
+#include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
+
+#include "CoreVK/VkRenderData.h"
+namespace aveng {
+    class ShaderStorageBuffer {
+    public:
+        /* set an arbitraty buffer size as default */
+        static bool init(VkRenderData& renderData, EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize = 1024);
+
+        template <typename T>
+        static bool uploadSsboData(VkRenderData& renderData, EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::vector<T> bufferData) {
+            if (bufferData.empty()) {
+                return false;
+            }
+
+            bool bufferResized = false;
+            size_t bufferSize = bufferData.size() * sizeof(T);
+            if (bufferSize > SSBOData.bufferSize) {
+                Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, bufferSize);
+                cleanup(renderData, engineDevice, SSBOData);
+                init(renderData, engineDevice, SSBOData, bufferSize);
+                bufferResized = true;
+            }
+
+            void* data;
+            VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
+            if (result != VK_SUCCESS) {
+                Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+                return false;
+            }
+            std::memcpy(data, bufferData.data(), bufferSize);
+            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+
+            return bufferResized;
+        }
+
+        static bool checkForResize(VkRenderData& renderData, EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData,
+            size_t bufferSize);
+
+        static void cleanup(VkRenderData& renderData, EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData);
+    };
+
+}
