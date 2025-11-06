@@ -1,123 +1,44 @@
+#include <vector>
 #include "ComputePipeline.h"
-
-#include <cassert>
-#include <iostream>
-#include <fstream>
-#include <stdexcept>
+#include "CoreVK/Shader.h"
+#include <cstdio>
 
 namespace aveng {
+    bool ComputePipeline::init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline, std::string computeShaderFilename) {
+        /* shader */
+        VkShaderModule computeModule = Shader::loadShader(engineDevice.device(), computeShaderFilename);
 
-    ComputePipeline::ComputePipeline(
-        EngineDevice& device,
-        const std::string& compFilepath,
-        const ComputePipelineConfig& config
-    ) : engDevice{ device }
-    {
-        createComputePipeline(compFilepath, config);
-    }
+        if (computeModule == VK_NULL_HANDLE) {
+            std::printf("%s error: could not load compute shader\n", __FUNCTION__);
+            Shader::cleanup(engineDevice.device(), computeModule);
+            return false;
+        }
+        VkPipelineShaderStageCreateInfo computeStageInfo{};
+        computeStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        computeStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        computeStageInfo.module = computeModule;
+        computeStageInfo.pName = "main";
 
-    ComputePipeline::~ComputePipeline()
-    {
-        vkDestroyShaderModule(engDevice.device(), compShaderModule, nullptr);
-        vkDestroyPipeline(engDevice.device(), computePipeline, nullptr);
-    }
+        VkComputePipelineCreateInfo pipelineCreateInfo{};
+        pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineCreateInfo.layout = pipelineLayout;
+        pipelineCreateInfo.stage = computeStageInfo;
 
-    void ComputePipeline::createComputePipeline(
-        const std::string& compFilepath,
-        const ComputePipelineConfig& configInfo
-    )
-    {
-        assert(
-            configInfo.pipelineLayout != VK_NULL_HANDLE &&
-            "Cannot create compute pipeline: no pipelineLayout provided in configInfo");
-
-        auto compCode = readFile(compFilepath);
-
-        std::cout << "Compute Shader: " << compCode.size() << " bytes" << std::endl;
-
-        // Create shader module
-        createShaderModule(compCode, &compShaderModule);
-
-        // Setup compute shader stage
-        VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
-        computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        computeShaderStageInfo.module = compShaderModule;
-        computeShaderStageInfo.pName = "main";
-        computeShaderStageInfo.flags = 0;
-        computeShaderStageInfo.pNext = nullptr;
-        computeShaderStageInfo.pSpecializationInfo = configInfo.computeSpecializationInfo;
-
-        // Create compute pipeline
-        VkComputePipelineCreateInfo pipelineInfo{};
-        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-        pipelineInfo.stage = computeShaderStageInfo;
-        pipelineInfo.layout = configInfo.pipelineLayout;
-        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-        pipelineInfo.basePipelineIndex = -1;
-        pipelineInfo.flags = 0;
-        pipelineInfo.pNext = nullptr;
-
-        if (vkCreateComputePipelines(engDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &computePipeline) != VK_SUCCESS)
-        {
-            throw std::runtime_error("Failed to create compute pipeline");
+        VkResult result = vkCreateComputePipelines(engineDevice.device(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: could not create compute pipeline (error: %i)\n", __FUNCTION__, result);
+            Shader::cleanup(engineDevice.device(), computeModule);
+            return false;
         }
 
-        std::cout << "Compute pipeline created successfully" << std::endl;
+        /* it is safe to destroy the shader modules after pipeline has been created */
+        Shader::cleanup(engineDevice.device(), computeModule);
+
+        return true;
     }
 
-    void ComputePipeline::bind(VkCommandBuffer commandBuffer)
-    {
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+
+    void ComputePipeline::cleanup(EngineDevice& engineDevice, VkPipeline& pipeline) {
+        vkDestroyPipeline(engineDevice.device(), pipeline, nullptr);
     }
-
-    /**
-     * Execute compute
-     */
-    void ComputePipeline::dispatch(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
-    {
-        vkCmdDispatch(commandBuffer, groupCountX, groupCountY, groupCountZ);
-    }
-
-    std::vector<char> ComputePipeline::readFile(const std::string& filepath)
-    {
-        std::ifstream file{ filepath, std::ios::ate | std::ios::binary };
-
-        if (!file.is_open())
-        {
-            throw std::runtime_error("Failed to open file: " + filepath);
-        }
-
-        size_t fileSize = static_cast<size_t>(file.tellg());
-        std::vector<char> buffer(fileSize);
-
-        file.seekg(0);
-        file.read(buffer.data(), fileSize);
-        file.close();
-
-        return buffer;
-    }
-
-    void ComputePipeline::createShaderModule(const std::vector<char>& code, VkShaderModule* shaderModule)
-    {
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-        if (vkCreateShaderModule(engDevice.device(), &createInfo, nullptr, shaderModule) != VK_SUCCESS)
-        {
-            throw std::runtime_error("Failed to create compute shader module");
-        }
-    }
-
-    void ComputePipeline::defaultComputePipelineConfig(ComputePipelineConfig& configInfo)
-    {
-        // Compute pipelines are much simpler than graphics pipelines
-        // Most configuration happens through the pipeline layout and descriptors
-        configInfo.computeSpecializationInfo = nullptr;
-        
-        // Note: pipelineLayout must be set by the caller based on their descriptor layouts
-    }
-
-} 
+}

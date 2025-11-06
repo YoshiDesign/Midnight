@@ -1,14 +1,8 @@
-#include <iostream>
 #include "AssimpMesh.h"
+
 #include "Tools.h"
 namespace aveng {
-    bool AssimpMesh::processMesh(
-        VkRenderData& renderData, 
-        aiMesh* mesh, 
-        const aiScene* scene
-        /*, std::string assetDirectory, */
-        /*std::unordered_map<std::string, VkTextureData>& textures*/) 
-    {
+    bool AssimpMesh::processMesh(VkRenderData& renderData, aiMesh* mesh, const aiScene* scene, std::string assetDirectory, std::unordered_map<std::string, VkTextureData>& textures) {
         mMeshName = mesh->mName.C_Str();
 
         mTriangleCount = mesh->mNumFaces;
@@ -52,22 +46,22 @@ namespace aveng {
                             texturesFound = true;;
 
                             /* skip already loaded textures */
-                  /*          if (textures.count(texName) > 0) {
+                            if (textures.count(texName) > 0) {
                                 std::printf("%s: texture '%s' already loaded, skipping\n", __FUNCTION__, texName.c_str());
                                 continue;
-                            }*/
+                            }
 
                             // do not try to load internal textures
                             if (!texName.empty() && texName.find("*") != 0) {
-                                // VkTextureData newTex{};
-                                //std::string texNameWithPath = assetDirectory + '/' + texName;
-                                //if (!Texture::loadTexture(renderData, newTex, texNameWithPath)) {
-                                //    std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
-                                //    Texture::cleanup(renderData, newTex);
-                                //    continue;
-                                //}
-                                std::cout << "Texture was not empty!!!" << std::endl;
-                                // textures.insert({ texName, newTex });
+                                VkTextureData newTex{};
+                                std::string texNameWithPath = assetDirectory + '/' + texName;
+                                if (!Texture::loadTexture(renderData, newTex, texNameWithPath)) {
+                                    std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
+                                    Texture::cleanup(renderData, newTex);
+                                    continue;
+                                }
+
+                                textures.insert({ texName, newTex });
                             }
                         }
                     }
@@ -111,7 +105,6 @@ namespace aveng {
                 vertex.normal = glm::vec4(0.0f);
             }
 
-            // We're hijacking the last indexes of position and normal to sneak in tex coords
             if (mesh->HasTextureCoords(0)) {
                 vertex.position.w = mesh->mTextureCoords[0][i].x;
                 vertex.normal.w = mesh->mTextureCoords[0][i].y;
@@ -192,5 +185,4 @@ namespace aveng {
     std::vector<std::shared_ptr<AssimpBone>> AssimpMesh::getBoneList() {
         return mBoneList;
     }
-
 }

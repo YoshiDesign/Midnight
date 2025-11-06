@@ -291,16 +291,6 @@ namespace aveng {
         return invalidate(alignmentSize, index * alignmentSize);
     }
 
-    bool AvengBuffer::checkForResize(AvengBuffer& Ssbo, size_t bufferSize) {
-        if (bufferSize > Ssbo.bufferSize) {
-            std::printf("%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, Ssbo.buffer, Ssbo.bufferSize, bufferSize);
-            //cleanup(renderData, SSBOData);
-            //init(renderData, SSBOData, bufferSize);
-            return true;
-        }
-        return false;
-    }
-
     //void AvengBuffer::cleanup(VkRenderData& renderData, VkShaderStorageBufferData& SSBOData) {
     //    VkResult result = vkQueueWaitIdle(renderData.rdGraphicsQueue);
     //    if (result != VK_SUCCESS) {

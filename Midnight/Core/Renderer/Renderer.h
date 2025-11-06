@@ -11,7 +11,6 @@
 #include "CoreVK/GFXPipeline.h"
 #include "CoreVK/swapchain.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
-#include "Core/Renderer/PipelineConfigManager.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/aveng_scene_loader.h"
 #include "Core/aveng_window.h"
@@ -21,6 +20,10 @@
 #include "Utils/Timer.h"
 #include "CoreVK/AvengStorageBuffer.h"
 #include "CoreVK/AvengUniformBuffer.h"
+#include "CoreVK/PipelineLayout.h"
+#include "CoreVK/SkinningPipeline.h"
+#include "CoreVK/ComputePipeline.h"
+#include "CoreVK/SyncObjects.h"
 
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
@@ -49,6 +52,8 @@ namespace aveng {
 		VkDevice getEngineDevice() { return engineDevice.device(); }
 		float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
 		bool isFrameInProgress() const { return isFrameStarted; }
+		bool createPipelineLayouts();
+		bool createPipelines();
 
 		// Just use the returned values directly if working in renderer.cpp
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
@@ -74,6 +79,8 @@ namespace aveng {
 		void updateDescriptorSets();
 		void updateComputeDescriptorSets();
 		void updateLightingDescriptorSets();
+
+		bool createSyncObjects();
 		
 		// Descriptor set accessors
 		//VkDescriptorSet getGlobalDescriptorSet(int frameIndex) const { return globalDescriptorSets[frameIndex]; }
@@ -112,6 +119,8 @@ namespace aveng {
 		bool reloadPipelineConfig(const std::string& configPath = "");
 		std::vector<std::string> getAvailablePipelines() const;
 
+		void cleanup();
+
 	private:
 		VkResult err;
 		GameData& gameData;
@@ -126,7 +135,6 @@ namespace aveng {
 		// Uniform buffer V1
 		LightsUbo u_LightsData{};
 
-
 		const char* default_scene_file = "scenes/demo-scene.json";
 
 		// Engine systems
@@ -134,7 +142,7 @@ namespace aveng {
 		EngineDevice engineDevice{ aveng_window };			// The Engine Service - Stack allocated
 		AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
-		std::unique_ptr<ImageSystem> imageSystem;			// Texture stuff
+		//std::unique_ptr<ImageSystem> imageSystem;			// Texture stuff
 		PointLightSystem pointLightSystem{ engineDevice };	// Light stuff
 		
 		// Dynamic texture array support
@@ -152,15 +160,15 @@ namespace aveng {
 		size_t calculateDynamicUBOStride() const;
 
 		// Main pipeline creation entry point
-		std::unique_ptr<PipelineConfigManager> pipelineManager = nullptr;
+		//std::unique_ptr<PipelineConfigManager> pipelineManager = nullptr;
 		VkPipelineLayout pipelineLayout{};
 		void createPipelineLayout();
-		void createPipelines();
 		bool pipelineCreated = false;
+
+		// NOTE: This could be problematic since we're indirectly using the rd command buffers
 		VkCommandBuffer commandBuffer;
 		VkCommandBuffer computeCommandBuffer;
 
-		
 		// Descriptors and Buffers
 		std::vector<std::unique_ptr<AvengBuffer>> mPerspectiveViewMatrixUBOBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mShaderModelRootMatrixBuffers;

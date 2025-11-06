@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -171,24 +171,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CoreVK\AvengImageSystem.cpp" />
+    <ClCompile Include="CoreVK\AvengUniformBuffer.cpp" />
     <ClCompile Include="CoreVK\aveng_buffer.cpp" />
     <ClCompile Include="CoreVK\aveng_descriptors.cpp" />
-    <ClCompile Include="CoreVK\CommandBuffers.cpp" />
     <ClCompile Include="CoreVK\ComputePipeline.cpp" />
     <ClCompile Include="CoreVK\EngineDevice.cpp" />
     <ClCompile Include="CoreVK\GFXPipeline.cpp" />
+    <ClCompile Include="CoreVK\IndexBuffer.cpp" />
+    <ClCompile Include="CoreVK\PipelineLayout.cpp" />
     <ClCompile Include="CoreVK\PointLightSystem.cpp" />
+    <ClCompile Include="CoreVK\Shader.cpp" />
+    <ClCompile Include="CoreVK\SkinningPipeline.cpp" />
     <ClCompile Include="CoreVK\swapchain.cpp" />
-    <ClCompile Include="Core\Animation\AnimationManager.cpp" />
-    <ClCompile Include="Core\Animation\AnimationRenderingSystem.cpp" />
-    <ClCompile Include="Core\Animation\AssimpAnimChannel.cpp" />
-    <ClCompile Include="Core\Animation\AssimpAnimClip.cpp" />
-    <ClCompile Include="Core\Animation\AssimpBone.cpp" />
-    <ClCompile Include="Core\Animation\AssimpInstance.cpp" />
-    <ClCompile Include="Core\Animation\AssimpMesh.cpp" />
-    <ClCompile Include="Core\Animation\AssimpModel.cpp" />
-    <ClCompile Include="Core\Animation\AssimpNode.cpp" />
-    <ClCompile Include="Core\Animation\Logger.cpp" />
+    <ClCompile Include="CoreVK\SyncObjects.cpp" />
+    <ClCompile Include="CoreVK\VertexBuffer.cpp" />
     <ClCompile Include="Core\app_object.cpp" />
     <ClCompile Include="Core\aveng_model.cpp" />
     <ClCompile Include="Core\aveng_scene_loader.cpp" />
@@ -199,37 +195,32 @@
     <ClCompile Include="Core\Modeling\AssimpInstance.cpp" />
     <ClCompile Include="Core\Modeling\AssimpMesh.cpp" />
     <ClCompile Include="Core\Modeling\AssimpNode.cpp" />
-    <ClCompile Include="Core\Modeling\ModelManager.cpp" />
+    <ClCompile Include="Core\Modeling\Tools.cpp" />
     <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp" />
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
+    <ClCompile Include="Core\Texture.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />
     <ClCompile Include="Utils\window_callbacks.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\AvengImageSystem.h" />
+    <ClInclude Include="CoreVK\AvengStorageBuffer.h" />
+    <ClInclude Include="CoreVK\AvengUniformBuffer.h" />
     <ClInclude Include="CoreVK\aveng_buffer.h" />
     <ClInclude Include="CoreVK\aveng_descriptors.h" />
-    <ClInclude Include="CoreVK\CommandBuffers.h" />
     <ClInclude Include="CoreVK\ComputePipeline.h" />
     <ClInclude Include="CoreVK\EngineDevice.h" />
     <ClInclude Include="CoreVK\GFXPipeline.h" />
+    <ClInclude Include="CoreVK\IndexBuffer.h" />
+    <ClInclude Include="CoreVK\PipelineLayout.h" />
+    <ClInclude Include="CoreVK\Shader.h" />
+    <ClInclude Include="CoreVK\SkinningPipeline.h" />
+    <ClInclude Include="CoreVK\SyncObjects.h" />
+    <ClInclude Include="CoreVK\VertexBuffer.h" />
     <ClInclude Include="CoreVK\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
     <ClInclude Include="CoreVK\VkRenderData.h" />
-    <ClInclude Include="Core\Animation\AnimationManager.h" />
-    <ClInclude Include="Core\Animation\AnimationRenderingSystem.h" />
-    <ClInclude Include="Core\Animation\AssimpAnimChannel.h" />
-    <ClInclude Include="Core\Animation\AssimpAnimClip.h" />
-    <ClInclude Include="Core\Animation\AssimpBone.h" />
-    <ClInclude Include="Core\Animation\AssimpInstance.h" />
-    <ClInclude Include="Core\Animation\AssimpMesh.h" />
-    <ClInclude Include="Core\Animation\AssimpModel.h" />
-    <ClInclude Include="Core\Animation\AssimpNode.h" />
-    <ClInclude Include="Core\Animation\InstanceSettings.h" />
-    <ClInclude Include="Core\Animation\Logger.h" />
-    <ClInclude Include="Core\Animation\ModelAndInstanceData.h" />
-    <ClInclude Include="Core\Animation\Tools.h" />
     <ClInclude Include="Core\app_object.h" />
     <ClInclude Include="Core\AvengComponent.h" />
     <ClInclude Include="Core\aveng_frame_content.h" />
@@ -245,11 +236,11 @@
     <ClInclude Include="Core\Modeling\AssimpNode.h" />
     <ClInclude Include="Core\Modeling\InstanceSettings.h" />
     <ClInclude Include="Core\Modeling\ModelAndInstanceData.h" />
-    <ClInclude Include="Core\Modeling\ModelManager.h" />
     <ClInclude Include="Core\Modeling\Tools.h" />
     <ClInclude Include="Core\Renderer\PipelineConfigManager.h" />
     <ClInclude Include="Core\Renderer\Renderer.h" />
     <ClInclude Include="Core\Renderer\TextureStreamingManager.h" />
+    <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\UUID.h" />
     <ClInclude Include="stb\stb_connected_components.h" />
     <ClInclude Include="stb\stb_c_lexer.h" />

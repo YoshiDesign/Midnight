@@ -53,7 +53,7 @@ namespace aveng {
 
 		bool loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags = 0);
 		bool createDescriptorSet(VkRenderData& renderData, std::vector<glm::mat4>& boneOffsetMatricesList, std::vector<int32_t>& boneParentIndexList);
-		void processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene/*, std::string assetDirectory*/);
+		void processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory);
 
 		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
@@ -69,10 +69,12 @@ namespace aveng {
 		static std::unique_ptr<AvengModel> drawTriangle(EngineDevice& device, glm::vec3 pos, const std::string& filepath);
 		
 		void bind(VkCommandBuffer commandBuffer);
-		void bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer);
+		void bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer); // DEPRECATED
 		void draw(VkCommandBuffer commandBuffer);
 		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex);
 		void drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
+
+		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames);
 		
 		// Static methods for instance rendering setup
 		static std::vector<VkVertexInputBindingDescription> getInstancedBindingDescriptions();
@@ -96,6 +98,11 @@ namespace aveng {
 
 		unsigned int mVertexCount; // Old
 		unsigned int mTriangleCount; // Old
+
+		// map textures to external or internal texture names
+		std::unordered_map<std::string, VkTextureData> mTextures{};
+		VkTextureData mPlaceholderTexture{};
+		VkTextureData mWhiteTexture{};
 
 		std::vector<VkMesh> mModelMeshes{};
 		std::vector<VkVertexBufferData> mVertexBuffers{};

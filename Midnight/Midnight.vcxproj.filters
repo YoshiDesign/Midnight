@@ -63,36 +63,6 @@
     <ClCompile Include="CoreVK\ComputePipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Animation\AnimationManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AssimpAnimChannel.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AssimpAnimClip.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AssimpBone.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AssimpInstance.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AssimpMesh.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AssimpModel.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AssimpNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\Logger.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Animation\AnimationRenderingSystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Modeling\AssimpNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -114,10 +84,31 @@
     <ClCompile Include="Utils\Timer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Modeling\ModelManager.cpp">
+    <ClCompile Include="CoreVK\AvengUniformBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CoreVK\CommandBuffers.cpp">
+    <ClCompile Include="CoreVK\IndexBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CoreVK\PipelineLayout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CoreVK\Shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CoreVK\SkinningPipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CoreVK\VertexBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Modeling\Tools.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CoreVK\SyncObjects.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1172,45 +1163,6 @@
     <ClInclude Include="CoreVK\ComputePipeline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Animation\AnimationManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AssimpAnimChannel.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AssimpAnimClip.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AssimpBone.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AssimpInstance.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AssimpMesh.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AssimpModel.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AssimpNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\InstanceSettings.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\Logger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\ModelAndInstanceData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\Tools.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Animation\AnimationRenderingSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Modeling\AssimpNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1244,10 +1196,31 @@
     <ClInclude Include="Utils\Timer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Modeling\ModelManager.h">
+    <ClInclude Include="CoreVK\AvengStorageBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreVK\CommandBuffers.h">
+    <ClInclude Include="CoreVK\AvengUniformBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\IndexBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\PipelineLayout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\Shader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\SkinningPipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\VertexBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\SyncObjects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

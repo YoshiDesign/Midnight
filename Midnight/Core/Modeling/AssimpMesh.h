@@ -5,20 +5,21 @@
 #include <vector>
 #include <unordered_map>
 #include <memory>
-
 #include <assimp/scene.h>
 
-#include "CoreVk/VkRenderData.h"
-#include "AssimpBone.h"
+#include "CoreVK/VkRenderData.h"
+#include "Core/Texture.h"
+#include "Core/Modeling/AssimpBone.h"
+
 namespace aveng {
     class AssimpMesh {
     public:
         bool processMesh(
             VkRenderData& renderData, 
             aiMesh* mesh, 
-            const aiScene* scene
-            /*, std::string assetDirectory,*/
-            /* std::unordered_map<std::string, VkTextureData>& textures*/);
+            const aiScene* scene,
+            std::string assetDirectory,
+            std::unordered_map<std::string, VkTextureData>& textures);
 
         std::string getMeshName();
         unsigned int getTriangleCount();

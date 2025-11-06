@@ -6,6 +6,7 @@
 #include <assimp/matrix4x4.h>
 #include <assimp/vector3.h>
 #include <assimp/quaternion.h>
+#include <cstring>
 
 namespace aveng {
 
@@ -16,6 +17,9 @@ namespace aveng {
      */
     class Tools {
     public:
+
+        static std::string getFilenameExt(std::string filename);
+        static std::string loadFileToString(std::string fileName);
         /**
          * Convert Assimp 4x4 matrix to GLM matrix
          * Handles coordinate system conversion

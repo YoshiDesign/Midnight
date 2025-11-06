@@ -21,7 +21,7 @@ public:
 
     void setRootTransformMatrix(glm::mat4 matrix);
 
-    void updateTRSMatrix();
+    void updateTRSMatrix(); // I think this is what the Compute pipeline is taking care of now
     glm::mat4 getTRSMatrix();
 
     std::string getNodeName();

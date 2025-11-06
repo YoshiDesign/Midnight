@@ -31,19 +31,30 @@ namespace aveng {
 
 		editor.init(window, aveng_swapchain.get());
 
-		sceneLoader.load(default_scene_file, engineDevice);
+		//sceneLoader.load(default_scene_file, engineDevice);
 
-		const auto& sceneTextures = sceneLoader.getSceneTextures();
-		std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
+		//const auto& sceneTextures = sceneLoader.getSceneTextures();
+		//std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
 
 		// Initialize ImageSystem with scene textures
-		initializeImageSystem(sceneTextures);
+		//initializeImageSystem(sceneTextures);
 
 		// Initialize our descriptor sets, map buffers to device memory.
 		setupDescriptors();
 
 		// Create pipelines now that descriptor layouts are ready
-		createPipelines();
+		// createPipelines();
+		if (!createPipelineLayouts()) {
+			std::cerr << "error [Renderer 1]!" << std::endl;
+		}
+
+		if (!createPipelines()) {
+			std::cerr << "error [Renderer 2]!" << std::endl;
+		}
+
+		if (!createSyncObjects()) {
+			std::cerr << "error [Renderer 3]!" << std::endl;
+		}
 
 	}
 
@@ -537,67 +548,91 @@ namespace aveng {
 		memset(u_LightsData.lightColors, 0, sizeof(u_LightsData.lightColors));
 	}
 
-	void Renderer::createPipelines()
-	{
-		if (!imageSystem) {
-			throw std::runtime_error("ImageSystem must be initialized before creating pipelines");
-		}
 
-		// Create pipelines now that we have the correct texture count
-		if (!pipelineCreated) {
-			createPipelineLayout();
-			
-			// PRIMARY: JSON-configured pipeline system
-			pipelineManager = std::make_unique<PipelineConfigManager>(engineDevice);
-			try {
-				std::cout << "Loading pipelines from JSON configuration..." << std::endl;
-				pipelineManager->loadPipelineConfig("Midnight/Core/Renderer/PipelineConfig.json");
-				pipelineManager->createPipelines(getSwapChainRenderPass(), pipelineLayout, currentTextureCount);
-				std::cout << "JSON pipeline system successfully initialized!" << std::endl;
-			} catch (const std::exception& e) {
-				std::cerr << "Failed to load pipeline config: " << e.what() << std::endl;
-				std::cerr << "Creating deprecated fallback pipelines..." << std::endl;
-				
-				// DEPRECATED: Create legacy pipelines as fallback
-				//createPipeline();         // Legacy gfxPipeline
-				//createObjectPipelines();  // Hardcoded array
-			}
-			
-			//createPostProcessPipelines();  // Post-processing pipelines (placeholder)
-			pipelineCreated = true;
-			std::cout << "Pipeline initialization complete" << std::endl;
-		}
-	}
+	bool Renderer::createPipelineLayouts() {
+		/* non-animated model */
+		std::vector<VkDescriptorSetLayout> layouts = {
+		  renderData.rdAvengTextureDescriptorLayout->getDescriptorSetLayout(),
+		  renderData.rdAvengBasicDescriptorLayout->getDescriptorSetLayout()};
 
-	bool Renderer::reloadPipelineConfig(const std::string& configPath)
-	{
-		if (!pipelineManager) {
-			std::cerr << "Pipeline manager not initialized" << std::endl;
+		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants) } };
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengPipelineLayout, layouts, pushConstants)) {
+			std::printf("%s error: could not init Assimp pipeline layout\n", __FUNCTION__);
 			return false;
 		}
 
-		try {
-			std::string path = configPath.empty() ? "Midnight/Core/Renderer/PipelineConfig.json" : configPath;
-			std::cout << "Reloading pipeline configuration from: " << path << std::endl;
-			
-			pipelineManager->loadPipelineConfig(path);
-			pipelineManager->createPipelines(getSwapChainRenderPass(), pipelineLayout, currentTextureCount);
-			
-			std::cout << "Pipeline configuration reloaded successfully!" << std::endl;
-			return true;
-		} catch (const std::exception& e) {
-			std::cerr << "Failed to reload pipeline config: " << e.what() << std::endl;
+		/* animated model, needs push constant */
+		std::vector<VkDescriptorSetLayout> skinningLayouts = {
+		  renderData.rdAvengTextureDescriptorLayout->getDescriptorSetLayout(),
+		  renderData.rdAvengAnimationDescriptorLayout->getDescriptorSetLayout() };
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengAnimationPipelineLayout, skinningLayouts, pushConstants)) {
+			std::printf("%s error: could not init Assimp Skinning pipeline layout\n", __FUNCTION__);
 			return false;
 		}
+
+		/* transform compute */
+		std::vector<VkPushConstantRange> computePushConstants = { { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkComputePushConstants) } };
+
+		std::vector<VkDescriptorSetLayout> transformLayouts = {
+		  renderData.rdAvengComputeTransformDescriptorLayout->getDescriptorSetLayout() };
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeTransformaPipelineLayout, transformLayouts, computePushConstants)) {
+			std::printf("%s error: could not init Assimp transform compute pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+
+		/* matrix mult compute */
+		std::vector<VkDescriptorSetLayout> matrixMultLayouts = {
+		  renderData.rdAvengComputeMatrixMultDescriptorLayout->getDescriptorSetLayout(),
+		  renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout->getDescriptorSetLayout() };
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout, matrixMultLayouts, computePushConstants)) {
+			std::printf("%s error: could not init Assimp matrix multiplication compute pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+
+		return true;
 	}
 
-	std::vector<std::string> Renderer::getAvailablePipelines() const
-	{
-		if (pipelineManager) {
-			return pipelineManager->getPipelineNames();
+	bool Renderer::createPipelines() {
+
+		VkRenderPass renderPass = aveng_swapchain->getRenderPass();
+
+		std::string vertexShaderFile = "shader/assimp.vert.spv";
+		std::string fragmentShaderFile = "shader/assimp.frag.spv";
+		if (!SkinningPipeline::init(engineDevice, renderPass, renderData.rdAvengPipelineLayout,
+			renderData.rdAvengPipeline, vertexShaderFile, fragmentShaderFile)) {
+			std::printf("%s error: could not init Assimp shader pipeline\n", __FUNCTION__);
+			return false;
 		}
-		return {};
+
+		vertexShaderFile = "shader/assimp_skinning.vert.spv";
+		fragmentShaderFile = "shader/assimp_skinning.frag.spv";
+		if (!SkinningPipeline::init(engineDevice, renderPass, renderData.rdAvengAnimationPipelineLayout,
+			renderData.rdAvengAnimationPipeline, vertexShaderFile, fragmentShaderFile)) {
+			std::printf("%s error: could not init Assimp Skinning shader pipeline\n", __FUNCTION__);
+			return false;
+		}
+
+		std::string computeShaderFile = "shader/assimp_instance_transform.comp.spv";
+		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeTransformaPipelineLayout,
+			renderData.rdAvengComputeTransformPipeline, computeShaderFile)) {
+			std::printf("%s error: could not init Assimp Transform compute shader pipeline\n", __FUNCTION__);
+			return false;
+		}
+
+		computeShaderFile = "shader/assimp_instance_matrix_mult.comp.spv";
+		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout,
+			renderData.rdAvengComputeMatrixMultPipeline, computeShaderFile)) {
+			std::printf("%s error: could not init Assimp Matrix Mult compute shader pipeline\n", __FUNCTION__);
+			return false;
+		}
+
+		return true;
 	}
+
 
 	size_t Renderer::calculateDynamicUBOStride() const
 	{
@@ -993,14 +1028,14 @@ namespace aveng {
 	void Renderer::updateDescriptorSets() {
 		// Why auto - This can be removed to the ImageSystem class along with the descriptor writing
 		// This descriptor would need to be rewritten at runtime to load new textures during run
-		auto imageInfo = imageSystem->descriptorInfoForAllImages();
+		//auto imageInfo = imageSystem->descriptorInfoForAllImages();
 
 		// Write the descriptor sets that are ready to go
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
-			AvengDescriptorSetWriter(*renderData.rdAvengTextureDescriptorLayout, *renderData.avengDescriptorPool)
-				.writeImage(1, imageInfo.data(), imageInfo.size())
-				.build(renderData.textureDescriptorSets[i]);
+			//AvengDescriptorSetWriter(*renderData.rdAvengTextureDescriptorLayout, *renderData.avengDescriptorPool)
+			//	.writeImage(1, imageInfo.data(), imageInfo.size())
+			//	.build(renderData.textureDescriptorSets[i]);
 
 			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
 			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
@@ -1053,6 +1088,70 @@ namespace aveng {
 	{
 		mMatrices.projectionMatrix = projection;
 		mMatrices.viewMatrix = view;
+	}
+
+	bool Renderer::createSyncObjects() {
+		if (!SyncObjects::init(engineDevice, renderData)) {
+			std::printf("%s error: could not create sync objects\n", __FUNCTION__);
+			return false;
+		}
+		return true;
+	}
+
+	void Renderer::cleanup() {
+		VkResult result = vkDeviceWaitIdle(engineDevice.device());
+		if (result != VK_SUCCESS) {
+			std::printf("%s fatal error: could not wait for device idle (error: %i)\n", __FUNCTION__, result);
+			return;
+		}
+
+		/* delete models to destroy Vulkan objects */
+		for (const auto& model : mModelInstanceData.miModelList) {
+			model->cleanup(engineDevice, renderData, aveng_swapchain->MAX_FRAMES_IN_FLIGHT);
+		}
+
+		for (const auto& model : mModelInstanceData.miPendingDeleteAvengModels) {
+			model->cleanup(engineDevice, renderData, aveng_swapchain->MAX_FRAMES_IN_FLIGHT);
+		}
+
+		// mUserInterface.cleanup(renderData);
+
+		SyncObjects::cleanup(engineDevice, renderData);
+
+		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengPipeline);
+		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengAnimationPipeline);
+		ComputePipeline::cleanup(engineDevice, renderData.rdAvengComputeTransformPipeline);
+		ComputePipeline::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipeline);
+
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengAnimationPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformaPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout);
+		
+
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpDescriptorSet);
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpSkinningDescriptorSet);
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpComputeTransformDescriptorSet);
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpComputeMatrixMultDescriptorSet);
+
+		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengDescriptorSets);
+		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengAnimationDescriptorSets);
+		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeTransformDescriptorSets);
+		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeMatrixMultDescriptorSets);
+
+		// TODO - Light Descriptor Cleanup, check texture descriptor cleanup, etc.
+
+		// These should be handled by the implicit destructor
+		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpSkinningDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpTextureDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpComputeTransformDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpComputeMatrixMultDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpComputeMatrixMultPerModelDescriptorLayout, nullptr);
+		// Ditto
+		//vkDestroyDescriptorPool(mRenderData.rdVkbDevice.device, mRenderData.rdDescriptorPool, nullptr);
+
+		std::printf("%s: Vulkan renderer destroyed\n", __FUNCTION__);
 	}
 
 } // NS

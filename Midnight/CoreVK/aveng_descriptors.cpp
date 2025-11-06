@@ -77,6 +77,7 @@ namespace aveng {
 
     AvengDescriptorSetLayout::~AvengDescriptorSetLayout() 
     {
+        std::cout << "Destroying Descriptor Set Layouts!" << std::endl;
         vkDestroyDescriptorSetLayout(engineDevice.device(), descriptorSetLayout, nullptr);
     }
 

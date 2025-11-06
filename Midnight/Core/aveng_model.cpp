@@ -251,6 +251,7 @@ namespace aveng {
 
 	}
 
+	// DEPRECATED
 	void AvengModel::bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer)
 	{
 		// Bind vertex buffer at binding 0
@@ -269,276 +270,276 @@ namespace aveng {
 		}
 	}
 
-	std::vector<VkVertexInputBindingDescription> AvengModel::getV2BindingDescriptions() {
-		std::vector<VkVertexInputBindingDescription> bindingDescriptions(2);
+	//std::vector<VkVertexInputBindingDescription> AvengModel::getV2BindingDescriptions() {
+	//	std::vector<VkVertexInputBindingDescription> bindingDescriptions(2);
 
-		// Binding 0: Vertex data (per-vertex rate)
-		bindingDescriptions[0].binding = 0;
-		bindingDescriptions[0].stride = sizeof(VkVertex);
-		bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	//	// Binding 0: Vertex data (per-vertex rate)
+	//	bindingDescriptions[0].binding = 0;
+	//	bindingDescriptions[0].stride = sizeof(VkVertex);
+	//	bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-		//// Binding 1: Instance data (per-instance rate)
-		//bindingDescriptions[1].binding = 1;
-		//bindingDescriptions[1].stride = sizeof(VkInstanceData);
-		//bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+	//	//// Binding 1: Instance data (per-instance rate)
+	//	//bindingDescriptions[1].binding = 1;
+	//	//bindingDescriptions[1].stride = sizeof(VkInstanceData);
+	//	//bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
-		return bindingDescriptions;
-	}
+	//	return bindingDescriptions;
+	//}
 
-	std::vector<VkVertexInputAttributeDescription> AvengModel::getV2AttributeDescriptions() {
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
+	//std::vector<VkVertexInputAttributeDescription> AvengModel::getV2AttributeDescriptions() {
+	//	std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
 
-		// Per-vertex attributes from binding 0
-		attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, position) });
-		attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, color) });
-		attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, normal) });
-		attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32B32_UINT, offsetof(VkVertex, boneNumber) });
-		attributeDescriptions.push_back({ 4, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, boneWeight) });
+	//	// Per-vertex attributes from binding 0
+	//	attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, position) });
+	//	attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, color) });
+	//	attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, normal) });
+	//	attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32B32_UINT, offsetof(VkVertex, boneNumber) });
+	//	attributeDescriptions.push_back({ 4, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkVertex, boneWeight) });
 
-		// Per-instance attributes from binding 1
-		// Instance modelMatrix (mat4 = 4 vec4s, so 4 locations: 5,6,7,8)
-		for (uint32_t i = 0; i < 4; i++) {
-			attributeDescriptions.push_back({
-				5 + i,                                          // location
-				1,                                              // binding
-				VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
-				static_cast<uint32_t>(offsetof(VkInstanceData, modelMatrix) + sizeof(glm::vec4) * i)
-				});
-		}
+	//	// Per-instance attributes from binding 1
+	//	// Instance modelMatrix (mat4 = 4 vec4s, so 4 locations: 5,6,7,8)
+	//	for (uint32_t i = 0; i < 4; i++) {
+	//		attributeDescriptions.push_back({
+	//			5 + i,                                          // location
+	//			1,                                              // binding
+	//			VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
+	//			static_cast<uint32_t>(offsetof(VkInstanceData, modelMatrix) + sizeof(glm::vec4) * i)
+	//			});
+	//	}
 
-		// Instance normalMatrix (mat4 = 4 vec4s, so 4 locations: 9,10,11,12)
-		for (uint32_t i = 0; i < 4; i++) {
-			attributeDescriptions.push_back({
-				8 + i,                                          // location
-				1,                                              // binding
-				VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
-				static_cast<uint32_t>(offsetof(VkInstanceData, normalMatrix) + sizeof(glm::vec4) * i)
-				});
-		}
+	//	// Instance normalMatrix (mat4 = 4 vec4s, so 4 locations: 9,10,11,12)
+	//	for (uint32_t i = 0; i < 4; i++) {
+	//		attributeDescriptions.push_back({
+	//			8 + i,                                          // location
+	//			1,                                              // binding
+	//			VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
+	//			static_cast<uint32_t>(offsetof(VkInstanceData, normalMatrix) + sizeof(glm::vec4) * i)
+	//			});
+	//	}
 
-		// Instance textureIndex (int = location 13)
-		attributeDescriptions.push_back({
-			11,                                             // location
-			1,                                              // binding
-			VK_FORMAT_R32_SINT,                            // format (int)
-			static_cast<uint32_t>(offsetof(VkInstanceData, textureIndex))
-			});
+	//	// Instance textureIndex (int = location 13)
+	//	attributeDescriptions.push_back({
+	//		11,                                             // location
+	//		1,                                              // binding
+	//		VK_FORMAT_R32_SINT,                            // format (int)
+	//		static_cast<uint32_t>(offsetof(VkInstanceData, textureIndex))
+	//		});
 
-		return attributeDescriptions;
-	}
-	/*
-	* @function AvengModel::Vertex::getBindingDescriptions
-	* 1 of 2 requirements for describing how Vulkan
-	* should pass data into the vertex shader
-	*/
-	std::vector<VkVertexInputBindingDescription> Vertex::getBindingDescriptions()
-	{
-		// This VkVertexInputBindingDescription corresponds to a single vertex buffer
-		// it will occupy the binding at index 0.
-		// The stride advances at sizeof(Vertex) bytes per vertex.
-		// There is only 1 for now.
-		/*
-		    uint32_t             binding;
-			uint32_t             stride;
-			VkVertexInputRate    inputRate;
-		*/
-		std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
-		bindingDescriptions[0].binding = 0;
-		bindingDescriptions[0].stride = sizeof(Vertex);
-		bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;		// Can be per vertex or per instance
-		return bindingDescriptions;
-	}
+	//	return attributeDescriptions;
+	//}
+	///*
+	//* @function AvengModel::Vertex::getBindingDescriptions
+	//* 1 of 2 requirements for describing how Vulkan
+	//* should pass data into the vertex shader
+	//*/
+	//std::vector<VkVertexInputBindingDescription> Vertex::getBindingDescriptions()
+	//{
+	//	// This VkVertexInputBindingDescription corresponds to a single vertex buffer
+	//	// it will occupy the binding at index 0.
+	//	// The stride advances at sizeof(Vertex) bytes per vertex.
+	//	// There is only 1 for now.
+	//	/*
+	//	    uint32_t             binding;
+	//		uint32_t             stride;
+	//		VkVertexInputRate    inputRate;
+	//	*/
+	//	std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
+	//	bindingDescriptions[0].binding = 0;
+	//	bindingDescriptions[0].stride = sizeof(Vertex);
+	//	bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;		// Can be per vertex or per instance
+	//	return bindingDescriptions;
+	//}
 
-	/*
-	* @function AvengModel::Vertex::getAttributeDescriptions
-	* 2 of 2 required functions for describing how Vulkan
-	* should pass data into the vertex shader
-	*/
-	std::vector<VkVertexInputAttributeDescription> Vertex::getAttributeDescriptions()
-	{
-		 /*
-			uint32_t    location;	-- This specifies the location as assigned in the vertex shader i.e. layout( location = 0 ) 
-			uint32_t    binding;	
-			VkFormat    format;		-- Datatype: 2 components each 32bit signed floats
-			uint32_t    offset;		-- type, membername. Calculates the byte offset of the position member from the Vertex struct
-		 */
-		// return { {0, 0, VK_FORMAT_R32G32_SFLOAT, 0} };
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
+	///*
+	//* @function AvengModel::Vertex::getAttributeDescriptions
+	//* 2 of 2 required functions for describing how Vulkan
+	//* should pass data into the vertex shader
+	//*/
+	//std::vector<VkVertexInputAttributeDescription> Vertex::getAttributeDescriptions()
+	//{
+	//	 /*
+	//		uint32_t    location;	-- This specifies the location as assigned in the vertex shader i.e. layout( location = 0 ) 
+	//		uint32_t    binding;	
+	//		VkFormat    format;		-- Datatype: 2 components each 32bit signed floats
+	//		uint32_t    offset;		-- type, membername. Calculates the byte offset of the position member from the Vertex struct
+	//	 */
+	//	// return { {0, 0, VK_FORMAT_R32G32_SFLOAT, 0} };
+	//	std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
 
-		attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position) });		// Vertex Positions
-		attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color) });			// Vertex colors
-		attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) });		// Defines a surface's normal (the non-culled side)
-		attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT,	offsetof(Vertex, texCoord) });		// Texture coordinates
+	//	attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position) });		// Vertex Positions
+	//	attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color) });			// Vertex colors
+	//	attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) });		// Defines a surface's normal (the non-culled side)
+	//	attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT,	offsetof(Vertex, texCoord) });		// Texture coordinates
 
-		return attributeDescriptions;
+	//	return attributeDescriptions;
 
-	}
+	//}
 
-	/*
-	* @function AvengModel::getInstancedBindingDescriptions
-	* Returns binding descriptions for instanced rendering
-	* Binding 0: Per-vertex data (position, color, normal, texCoord)
-	* Binding 1: Per-instance data (modelMatrix, normalMatrix, textureIndex)
-	*/
-	std::vector<VkVertexInputBindingDescription> AvengModel::getInstancedBindingDescriptions()
-	{
-		std::vector<VkVertexInputBindingDescription> bindingDescriptions(2);
-		
-		// Binding 0: Vertex data (per-vertex rate)
-		bindingDescriptions[0].binding = 0;
-		bindingDescriptions[0].stride = sizeof(Vertex);
-		bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		
-		// Binding 1: Instance data (per-instance rate)
-		bindingDescriptions[1].binding = 1;
-		bindingDescriptions[1].stride = sizeof(InstanceData);
-		bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-		
-		return bindingDescriptions;
-	}
+	///*
+	//* @function AvengModel::getInstancedBindingDescriptions
+	//* Returns binding descriptions for instanced rendering
+	//* Binding 0: Per-vertex data (position, color, normal, texCoord)
+	//* Binding 1: Per-instance data (modelMatrix, normalMatrix, textureIndex)
+	//*/
+	//std::vector<VkVertexInputBindingDescription> AvengModel::getInstancedBindingDescriptions()
+	//{
+	//	std::vector<VkVertexInputBindingDescription> bindingDescriptions(2);
+	//	
+	//	// Binding 0: Vertex data (per-vertex rate)
+	//	bindingDescriptions[0].binding = 0;
+	//	bindingDescriptions[0].stride = sizeof(Vertex);
+	//	bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	//	
+	//	// Binding 1: Instance data (per-instance rate)
+	//	bindingDescriptions[1].binding = 1;
+	//	bindingDescriptions[1].stride = sizeof(InstanceData);
+	//	bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+	//	
+	//	return bindingDescriptions;
+	//}
 
-	/*
-	* @function AvengModel::getInstancedAttributeDescriptions
-	* Returns attribute descriptions for instanced rendering
-	* Locations 0-3: Per-vertex attributes
-	* Locations 4-11: Per-instance attributes (mat4 takes 4 locations each)
-	* Location 12: textureIndex
-	*/
-	std::vector<VkVertexInputAttributeDescription> AvengModel::getInstancedAttributeDescriptions()
-	{
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
+	///*
+	//* @function AvengModel::getInstancedAttributeDescriptions
+	//* Returns attribute descriptions for instanced rendering
+	//* Locations 0-3: Per-vertex attributes
+	//* Locations 4-11: Per-instance attributes (mat4 takes 4 locations each)
+	//* Location 12: textureIndex
+	//*/
+	//std::vector<VkVertexInputAttributeDescription> AvengModel::getInstancedAttributeDescriptions()
+	//{
+	//	std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
 
-		// Per-vertex attributes from binding 0
-		attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position) });
-		attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color) });
-		attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) });
-		attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, texCoord) });
+	//	// Per-vertex attributes from binding 0
+	//	attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position) });
+	//	attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color) });
+	//	attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) });
+	//	attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, texCoord) });
 
-		// Per-instance attributes from binding 1
-		// Instance modelMatrix (mat4 = 4 vec4s, so 4 locations: 4, 5, 6, 7)
-		for (uint32_t i = 0; i < 4; i++) {
-			attributeDescriptions.push_back({
-				4 + i,                                          // location
-				1,                                              // binding
-				VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
-				static_cast<uint32_t>(offsetof(InstanceData, modelMatrix) + sizeof(glm::vec4) * i)
-			});
-		}
+	//	// Per-instance attributes from binding 1
+	//	// Instance modelMatrix (mat4 = 4 vec4s, so 4 locations: 4, 5, 6, 7)
+	//	for (uint32_t i = 0; i < 4; i++) {
+	//		attributeDescriptions.push_back({
+	//			4 + i,                                          // location
+	//			1,                                              // binding
+	//			VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
+	//			static_cast<uint32_t>(offsetof(InstanceData, modelMatrix) + sizeof(glm::vec4) * i)
+	//		});
+	//	}
 
-		// Instance normalMatrix (mat4 = 4 vec4s, so 4 locations: 8, 9, 10, 11)
-		for (uint32_t i = 0; i < 4; i++) {
-			attributeDescriptions.push_back({
-				8 + i,                                          // location
-				1,                                              // binding
-				VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
-				static_cast<uint32_t>(offsetof(InstanceData, normalMatrix) + sizeof(glm::vec4) * i)
-			});
-		}
+	//	// Instance normalMatrix (mat4 = 4 vec4s, so 4 locations: 8, 9, 10, 11)
+	//	for (uint32_t i = 0; i < 4; i++) {
+	//		attributeDescriptions.push_back({
+	//			8 + i,                                          // location
+	//			1,                                              // binding
+	//			VK_FORMAT_R32G32B32A32_SFLOAT,                 // format (vec4)
+	//			static_cast<uint32_t>(offsetof(InstanceData, normalMatrix) + sizeof(glm::vec4) * i)
+	//		});
+	//	}
 
-		// Instance textureIndex (int = location 12)
-		attributeDescriptions.push_back({
-			12,                                             // location
-			1,                                              // binding
-			VK_FORMAT_R32_SINT,                            // format (int)
-			static_cast<uint32_t>(offsetof(InstanceData, textureIndex))
-		});
+	//	// Instance textureIndex (int = location 12)
+	//	attributeDescriptions.push_back({
+	//		12,                                             // location
+	//		1,                                              // binding
+	//		VK_FORMAT_R32_SINT,                            // format (int)
+	//		static_cast<uint32_t>(offsetof(InstanceData, textureIndex))
+	//	});
 
-		return attributeDescriptions;
-	}
+	//	return attributeDescriptions;
+	//}
 
-	/*
-	* Note: tinyobjloader doesn't expose any animation data. This is for rendering static mesh's
-	*/
-	void AvengModel::Builder::loadModel(const std::string& filepath)
-	{
-		tinyobj::attrib_t attrib;				// This stores the position, color, normal and texture coord
-		std::vector<tinyobj::shape_t> shapes;	// Index values for each face element
-		std::vector<tinyobj::material_t> materials;
-		std::string warn, err;
+	///*
+	//* Note: tinyobjloader doesn't expose any animation data. This is for rendering static mesh's
+	//*/
+	//void AvengModel::Builder::loadModel(const std::string& filepath)
+	//{
+	//	tinyobj::attrib_t attrib;				// This stores the position, color, normal and texture coord
+	//	std::vector<tinyobj::shape_t> shapes;	// Index values for each face element
+	//	std::vector<tinyobj::material_t> materials;
+	//	std::string warn, err;
 
-		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filepath.c_str()))
-		{
-			std::cerr << "Warning: " << warn << "\nError: " << err << std::endl;
-			throw std::runtime_error(warn + err);
-		}
+	//	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filepath.c_str()))
+	//	{
+	//		std::cerr << "Warning: " << warn << "\nError: " << err << std::endl;
+	//		throw std::runtime_error(warn + err);
+	//	}
 
-		vertices.clear();
-		indices.clear();
+	//	vertices.clear();
+	//	indices.clear();
 
-		// Will track which vertices have been added to the Builder.vertices vector and store the position at which the vertex was originally added
-		std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+	//	// Will track which vertices have been added to the Builder.vertices vector and store the position at which the vertex was originally added
+	//	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
-		// For every face of our mesh
-		for (const auto& shape : shapes) 
-		{
-			// For every vertex of the face
-			for (const auto& index : shape.mesh.indices) 
-			{
-				Vertex vertex{};
-				if (index.vertex_index >= 0) 
-				{
-					vertex.position = {
-						attrib.vertices[3 * index.vertex_index + 0],
-						attrib.vertices[3 * index.vertex_index + 1],	// The index calculations are a common convention for indexing into a vector as though it were a 2d matrix
-						attrib.vertices[3 * index.vertex_index + 2],
-					};
+	//	// For every face of our mesh
+	//	for (const auto& shape : shapes) 
+	//	{
+	//		// For every vertex of the face
+	//		for (const auto& index : shape.mesh.indices) 
+	//		{
+	//			Vertex vertex{};
+	//			if (index.vertex_index >= 0) 
+	//			{
+	//				vertex.position = {
+	//					attrib.vertices[3 * index.vertex_index + 0],
+	//					attrib.vertices[3 * index.vertex_index + 1],	// The index calculations are a common convention for indexing into a vector as though it were a 2d matrix
+	//					attrib.vertices[3 * index.vertex_index + 2],
+	//				};
 
-					vertex.color = {
-						attrib.colors[3 * index.vertex_index + 0],
-						attrib.colors[3 * index.vertex_index + 1],
-						attrib.colors[3 * index.vertex_index + 2],
-					};
+	//				vertex.color = {
+	//					attrib.colors[3 * index.vertex_index + 0],
+	//					attrib.colors[3 * index.vertex_index + 1],
+	//					attrib.colors[3 * index.vertex_index + 2],
+	//				};
 
-				}
+	//			}
 
-				if (index.normal_index >= 0) 
-				{
+	//			if (index.normal_index >= 0) 
+	//			{
 
-					vertex.normal = {
-						attrib.normals[3 * index.normal_index + 0],
-						attrib.normals[3 * index.normal_index + 1],
-						attrib.normals[3 * index.normal_index + 2],
-					};
-				}
+	//				vertex.normal = {
+	//					attrib.normals[3 * index.normal_index + 0],
+	//					attrib.normals[3 * index.normal_index + 1],
+	//					attrib.normals[3 * index.normal_index + 2],
+	//				};
+	//			}
 
-				if (index.texcoord_index >= 0) 
-				{
-					
-					vertex.texCoord = {
-						attrib.texcoords[2 * index.texcoord_index + 0],
-						1.0 - attrib.texcoords[2 * index.texcoord_index + 1],
-					};
-				}
+	//			if (index.texcoord_index >= 0) 
+	//			{
+	//				
+	//				vertex.texCoord = {
+	//					attrib.texcoords[2 * index.texcoord_index + 0],
+	//					1.0 - attrib.texcoords[2 * index.texcoord_index + 1],
+	//				};
+	//			}
 
-				// If the vertex is new, we add it to the unique vertices map
-				if (uniqueVertices.count(vertex) == 0) 
-				{
-					// The vertex's position in the Builder.vertices vector is given by the vertices vector's current size
-					uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-					// Add it to the unique vertices map
-					vertices.push_back(vertex);
-				}
+	//			// If the vertex is new, we add it to the unique vertices map
+	//			if (uniqueVertices.count(vertex) == 0) 
+	//			{
+	//				// The vertex's position in the Builder.vertices vector is given by the vertices vector's current size
+	//				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+	//				// Add it to the unique vertices map
+	//				vertices.push_back(vertex);
+	//			}
 
-				// Add the position of the vertex to the Builder's indices vector
-				indices.push_back(uniqueVertices[vertex]);
+	//			// Add the position of the vertex to the Builder's indices vector
+	//			indices.push_back(uniqueVertices[vertex]);
 
-			}
-		}
+	//		}
+	//	}
 
-		//std::cout << filepath << " - Vertices: " << vertices.size() << std::endl;
-		//std::cout << filepath << " - Indices: " << indices.size() << std::endl;
-		
-		// Debug UV coordinate ranges
-		float minU = 1000.0f, maxU = -1000.0f, minV = 1000.0f, maxV = -1000.0f;
-		for (const auto& vertex : vertices) {
-			minU = std::min(minU, vertex.texCoord.x);
-			maxU = std::max(maxU, vertex.texCoord.x);
-			minV = std::min(minV, vertex.texCoord.y);
-			maxV = std::max(maxV, vertex.texCoord.y);
-		}
-		std::cout << filepath << " - UV Range: U(" << minU << " to " << maxU << ") V(" << minV << " to " << maxV << ")" << std::endl;
+	//	//std::cout << filepath << " - Vertices: " << vertices.size() << std::endl;
+	//	//std::cout << filepath << " - Indices: " << indices.size() << std::endl;
+	//	
+	//	// Debug UV coordinate ranges
+	//	float minU = 1000.0f, maxU = -1000.0f, minV = 1000.0f, maxV = -1000.0f;
+	//	for (const auto& vertex : vertices) {
+	//		minU = std::min(minU, vertex.texCoord.x);
+	//		maxU = std::max(maxU, vertex.texCoord.x);
+	//		minV = std::min(minV, vertex.texCoord.y);
+	//		maxV = std::max(maxV, vertex.texCoord.y);
+	//	}
+	//	std::cout << filepath << " - UV Range: U(" << minU << " to " << maxU << ") V(" << minV << " to " << maxV << ")" << std::endl;
 
-	}
+	//}
 
 	bool AvengModel::loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags)
 	{
@@ -583,15 +584,52 @@ namespace aveng {
 		aiNode* rootNode = scene->mRootNode;
 
 		// Only for Embedded textures.
-		//if (scene->HasTextures()) {
-			// Currently Unsupported
-		//}
+		if (scene->HasTextures()) {
+			unsigned int numTextures = scene->mNumTextures;
+
+			for (int i = 0; i < scene->mNumTextures; ++i) {
+				std::string texName = scene->mTextures[i]->mFilename.C_Str();
+
+				int height = scene->mTextures[i]->mHeight;
+				int width = scene->mTextures[i]->mWidth;
+				aiTexel* data = scene->mTextures[i]->pcData;
+
+				VkTextureData newTex{};
+				if (!Texture::loadTexture(engineDevice, renderData, newTex, texName, data, width, height)) {
+					return false;
+				}
+
+				std::string internalTexName = "*" + std::to_string(i);
+				std::printf("%s: - added internal texture '%s'\n", __FUNCTION__, internalTexName.c_str());
+				mTextures.insert({ internalTexName, newTex });
+			}
+
+			std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
+		}
+
+		/* add a white texture in case there is no diffuse tex but colors */
+		std::string whiteTexName = "textures/white.png";
+		if (!Texture::loadTexture(engineDevice, renderData, mWhiteTexture, whiteTexName)) {
+			std::printf("%s error: could not load white default texture '%s'\n", __FUNCTION__, whiteTexName.c_str());
+			return false;
+		}
+
+		/* add a placeholder texture in case there is no diffuse tex */
+		std::string placeholderTexName = "textures/missing_tex.png";
+		if (!Texture::loadTexture(engineDevice, renderData, mPlaceholderTexture, placeholderTexName)) {
+			std::printf("%s error: could not load placeholder texture '%s'\n", __FUNCTION__, placeholderTexName.c_str());
+			return false;
+		}
+
+		/* the textures are stored directly or relative to the model file */
+		std::string assetDirectory = filepath.substr(0, filepath.find_last_of('/'));
+
 
 		std::string rootNodeName = rootNode->mName.C_Str();
 		mRootNode = AssimpNode::createNode(rootNodeName);
 		std::printf("%s: root node name: '%s'\n", __FUNCTION__, rootNodeName.c_str());
 
-		processNode(renderData, mRootNode, rootNode, scene);
+		processNode(renderData, mRootNode, rootNode, scene, assetDirectory);
 
 		/**
 		  * Check your work
@@ -722,7 +760,7 @@ namespace aveng {
 		return true;
 	}
 
-	void AvengModel::processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene/*, std::string assetDirectory*/) {
+	void AvengModel::processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory) {
 		std::string nodeName = aNode->mName.C_Str();
 		std::printf("%s: node name: '%s'\n", __FUNCTION__, nodeName.c_str());
 
@@ -733,7 +771,7 @@ namespace aveng {
 				aiMesh* modelMesh = scene->mMeshes[aNode->mMeshes[i]];
 
 				AssimpMesh mesh;
-				mesh.processMesh(renderData, modelMesh, scene/*, assetDirectory, mTextures*/);
+				mesh.processMesh(renderData, modelMesh, scene, assetDirectory, mTextures);
 
 				mModelMeshes.emplace_back(mesh.getMesh());
 
@@ -759,7 +797,7 @@ namespace aveng {
 			std::printf("%s: --- found child node '%s'\n", __FUNCTION__, childName.c_str());
 
 			std::shared_ptr<AssimpNode> childNode = node->addChild(childName);
-			processNode(renderData, childNode, aNode->mChildren[i], scene/*, assetDirectory */ );
+			processNode(renderData, childNode, aNode->mChildren[i], scene, assetDirectory);
 		}
 	}
 
@@ -798,5 +836,32 @@ namespace aveng {
 	VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) {
 		return mMatrixMultPerModelDescriptorSets[frameIndex];
 	}
+
+	void AvengModel::cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames) {
+
+		VkDescriptorPool pool = renderData.avengDescriptorPool->getPool();
+
+		for (int i = 0; i < frames; i++) {
+			vkFreeDescriptorSets(engineDevice.device(), pool, 1, &mMatrixMultPerModelDescriptorSets[i]);
+		}
+
+		for (auto buffer : mVertexBuffers) {
+			VertexBuffer::cleanup(engineDevice, buffer);
+		}
+		for (auto buffer : mIndexBuffers) {
+			IndexBuffer::cleanup(engineDevice, buffer);
+		}
+
+		//ShaderStorageBuffer::cleanup(renderData, mShaderBoneMatrixOffsetBuffer);
+		//ShaderStorageBuffer::cleanup(renderData, mShaderBoneParentBuffer);
+
+		for (auto& tex : mTextures) {
+			Texture::cleanup(engineDevice, renderData, tex.second);
+		}
+
+		Texture::cleanup(engineDevice, renderData, mPlaceholderTexture);
+		Texture::cleanup(engineDevice, renderData, mWhiteTexture);
+	}
+
 
 }
