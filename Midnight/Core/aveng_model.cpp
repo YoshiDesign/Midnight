@@ -633,13 +633,13 @@ namespace aveng {
 		/* create vertex buffers for the meshes */
 		for (const auto& mesh : mModelMeshes) {
 			VkVertexBufferData vertexBuffer;
-			VertexBuffer::init(renderData, vertexBuffer, mesh.vertices.size() * sizeof(VkVertex));
-			VertexBuffer::uploadData(renderData, vertexBuffer, mesh);
+			VertexBuffer::init(engineDevice, vertexBuffer, mesh.vertices.size() * sizeof(VkVertex));
+			VertexBuffer::uploadData(engineDevice, vertexBuffer, mesh);
 			mVertexBuffers.emplace_back(vertexBuffer);
 
 			VkIndexBufferData indexBuffer;
-			IndexBuffer::init(renderData, indexBuffer, mesh.indices.size() * sizeof(uint32_t));
-			IndexBuffer::uploadData(renderData, indexBuffer, mesh);
+			IndexBuffer::init(engineDevice, indexBuffer, mesh.indices.size() * sizeof(uint32_t));
+			IndexBuffer::uploadData(engineDevice, indexBuffer, mesh);
 			mIndexBuffers.emplace_back(indexBuffer);
 		}
 

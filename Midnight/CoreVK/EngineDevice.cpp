@@ -888,12 +888,11 @@ namespace aveng {
         return true;
     }
 
-    bool EngineDevice::submitSingleShotBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer, VkQueue queue) {
+    bool EngineDevice::submitSingleShotBuffer(VkCommandBuffer commandBuffer) {
         std::printf( "%s: submitting single shot command buffer\n", __FUNCTION__);
 
-        VkResult result = vkEndCommandBuffer(commandBuffer);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: failed to end command buffer (error: %i)\n", __FUNCTION__, result);
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            std::printf("%s error: failed to end command buffer (error)\n", __FUNCTION__); // VkResult result = vkEndCommandBuffer(commandBuffer); print with %i
             return false;
         }
 
@@ -908,32 +907,34 @@ namespace aveng {
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-        result = vkCreateFence(_device, &fenceInfo, nullptr, &bufferFence);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: failed to create buffer fence (error: %i)\n", __FUNCTION__, result);
+
+        /*
+            NOTE TO SELF: If you store the results of these if statements in a variable in a `VkResult`
+            you can directly print it formatted as %i
+        */
+
+        if (vkCreateFence(_device, &fenceInfo, nullptr, &bufferFence) != VK_SUCCESS) {
+            std::printf("%s error: failed to create buffer fence (error)\n", __FUNCTION__);
             return false;
         }
 
-        result = vkResetFences(_device, 1, &bufferFence);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: buffer fence reset failed (error: %i)\n", __FUNCTION__, result);
+        if (vkResetFences(_device, 1, &bufferFence) != VK_SUCCESS) {
+            std::printf("%s error: buffer fence reset failed (error)\n", __FUNCTION__);
             return false;
         }
 
-        result = vkQueueSubmit(queue, 1, &submitInfo, bufferFence);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: failed to submit buffer copy command buffer (error: %i)\n", __FUNCTION__, result);
+        if (vkQueueSubmit(_graphicsQueue, 1, &submitInfo, bufferFence) != VK_SUCCESS) {
+            std::printf("%s error: failed to submit buffer copy command buffer (error)\n", __FUNCTION__);
             return false;
         }
 
-        result = vkWaitForFences(_device, 1, &bufferFence, VK_TRUE, UINT64_MAX);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: waiting for buffer fence failed (error: %i)\n", __FUNCTION__, result);
+        if (vkWaitForFences(_device, 1, &bufferFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+            std::printf("%s error: waiting for buffer fence failed (error)\n", __FUNCTION__);  // %i result
             return false;
         }
 
         vkDestroyFence(_device, bufferFence, nullptr);
-        cleanupCommandBuffer(pool, commandBuffer);
+        cleanupCommandBuffer(_commandPoolGraphics, commandBuffer);
 
         std::printf("%s: single shot command buffer successfully submitted\n", __FUNCTION__);
         return true;

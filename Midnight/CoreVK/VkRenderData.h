@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 
 #include <vulkan/vulkan.h>
+#include "AMD/vk_mem_alloc.h"
 #include <GLFW/glfw3.h>
 
 #include <assimp/material.h>
@@ -135,15 +136,20 @@ namespace aveng {
 	};
 
 	struct VkVertexBufferData {
-		// Placeholder for actual Vulkan vertex buffer
-		size_t bufferSize = 0;
-		bool isCreated = false;
+		unsigned int bufferSize = 0;
+		void* data = nullptr;
+		VkBuffer buffer = VK_NULL_HANDLE;
+		VmaAllocation bufferAlloc = VK_NULL_HANDLE;
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VmaAllocation stagingBufferAlloc = VK_NULL_HANDLE;
 	};
 
 	struct VkIndexBufferData {
-		// Placeholder for actual Vulkan index buffer  
 		size_t bufferSize = 0;
-		bool isCreated = false;
+		VkBuffer buffer = VK_NULL_HANDLE;
+		VmaAllocation bufferAlloc = nullptr;
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VmaAllocation stagingBufferAlloc = nullptr;
 	};
 
 	struct VkUniformBufferData {

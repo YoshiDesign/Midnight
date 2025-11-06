@@ -12,6 +12,8 @@
 #include "CoreVK/swapchain.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/aveng_buffer.h"
+#include "CoreVK/VertexBuffer.h"
+#include "CoreVK/IndexBuffer.h"
 #include "CoreVK/aveng_descriptors.h"
 #include "Core/Modeling/AssimpNode.h"
 #include "Core/Modeling/AssimpMesh.h"

@@ -111,7 +111,7 @@ namespace aveng {
         // V2
         bool initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers);
         bool beginSingleShotCommand(VkCommandBuffer& commandBuffer); // Reuses a reset command buffer (faster)
-        bool submitSingleShotBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer, VkQueue queue);
+        bool submitSingleShotBuffer(VkCommandBuffer commandBuffer);
         bool resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags = 0);
         bool beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo);
         bool endCommandBuffer(VkCommandBuffer& commandBuffer);

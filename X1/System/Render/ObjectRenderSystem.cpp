@@ -65,7 +65,7 @@ namespace aveng {
 		
 		updateCamera(frameTime);
 
-		// Deprecate this in favor of the new renderData object
+		// This needs to be updated to accommodate game data
 		updateData(frameTime);
 
 		renderer.beginFrame();
