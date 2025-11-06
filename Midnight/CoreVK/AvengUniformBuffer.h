@@ -1,14 +1,21 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-
+#include <memory>
 #include "VkRenderData.h"
+#include "CoreVK/aveng_buffer.h"
+
 namespace aveng {
     class UniformBuffer {
     public:
-        static bool init(VkRenderData& renderData, EngineDevice& engineDevice, VkUniformBufferData& uboData);
-        static void uploadData(VkRenderData& renderData, EngineDevice& engineDevice, VkUniformBufferData& uboData, VkUploadMatrices matrices);
-        static void cleanup(VkRenderData& renderData, EngineDevice& engineDevice, VkUniformBufferData& uboData);
+        template <typename T>
+        static void uploadData(std::unique_ptr<AvengBuffer>& ubo, T* data) {
+           
+            ubo->writeToBuffer(data, sizeof(T));
+            ubo->flush();
+
+        }
+
     };
 
 }

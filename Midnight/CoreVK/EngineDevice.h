@@ -22,7 +22,8 @@ namespace aveng {
     struct QueueFamilyIndices {
         uint32_t graphicsFamily;
         uint32_t presentFamily;
-        uint32_t computeFamily;
+        uint32_t computeFamily; // This could cause issues for devices without support. We haven't fully implemented a fallback.
+                                // One big TODO is to make sure we can ship games that don't use compute shaders at all (no animation support)
         bool graphicsFamilyHasValue = false;
         bool presentFamilyHasValue = false;
         bool computeFamilyHasValue = false;
@@ -74,6 +75,7 @@ namespace aveng {
         VkDevice device()                       { return _device; }
         VkSurfaceKHR surface()                  { return _surface; }
         VkQueue graphicsQueue()                 { return _graphicsQueue; }
+        VkQueue computeQueue()                  { return _computeQueue; }
         VkQueue presentQueue()                  { return _presentQueue; }
         VmaAllocator allocator()                { return _allocator; }
         void checkBufferCoherence(VmaAllocation& allocation);
@@ -103,9 +105,18 @@ namespace aveng {
             VmaAllocationCreateFlags flags = 0
         );
 
-        VkCommandBuffer beginSingleTimeCommands();
-
+        VkCommandBuffer createSingleShotBuffer();  // allocates a new one-time buffer. Deprecate this, probably
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+        // V2
+        bool initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers);
+        bool beginSingleShotCommand(VkCommandBuffer& commandBuffer); // Reuses a reset command buffer (faster)
+        bool submitSingleShotBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer, VkQueue queue);
+        bool resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags = 0);
+        bool beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo);
+        bool endCommandBuffer(VkCommandBuffer& commandBuffer);
+        void cleanupCommandBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer);
+
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void copyBufferToImage(
             VkBuffer buffer, 

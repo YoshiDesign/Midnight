@@ -2,7 +2,7 @@
 
 #define VMA_IMPLEMENTATION
 #include "AMD/vk_mem_alloc.h"
-
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <set>
@@ -793,7 +793,7 @@ namespace aveng {
     * @function beginSingleTimeCommands(void)
     * Allocate a command buffer in memory and return a pointer to it
     */
-    VkCommandBuffer EngineDevice::beginSingleTimeCommands() {
+    VkCommandBuffer EngineDevice::createSingleShotBuffer() {
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -816,7 +816,10 @@ namespace aveng {
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create Single Time Command!");
+        };
         return commandBuffer;
     }
 
@@ -857,9 +860,123 @@ namespace aveng {
 
     }
 
+    bool EngineDevice::initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers)
+    {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        // Command buffer memory is allocated from a command pool
+        allocInfo.commandPool = commandPoolGraphics();
+        allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
+
+        if (vkAllocateCommandBuffers(_device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to allocate command buffers.");
+        }
+    }
+
+    bool EngineDevice::beginSingleShotCommand(VkCommandBuffer& commandBuffer) {
+        VkCommandBufferBeginInfo cmdBeginInfo{};
+        cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        VkResult result = vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: could not begin new command buffer (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        return true;
+    }
+
+    bool EngineDevice::submitSingleShotBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer, VkQueue queue) {
+        std::printf( "%s: submitting single shot command buffer\n", __FUNCTION__);
+
+        VkResult result = vkEndCommandBuffer(commandBuffer);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: failed to end command buffer (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        VkFence bufferFence;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        result = vkCreateFence(_device, &fenceInfo, nullptr, &bufferFence);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: failed to create buffer fence (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+
+        result = vkResetFences(_device, 1, &bufferFence);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: buffer fence reset failed (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+
+        result = vkQueueSubmit(queue, 1, &submitInfo, bufferFence);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: failed to submit buffer copy command buffer (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+
+        result = vkWaitForFences(_device, 1, &bufferFence, VK_TRUE, UINT64_MAX);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: waiting for buffer fence failed (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+
+        vkDestroyFence(_device, bufferFence, nullptr);
+        cleanupCommandBuffer(pool, commandBuffer);
+
+        std::printf("%s: single shot command buffer successfully submitted\n", __FUNCTION__);
+        return true;
+    }
+
+    bool EngineDevice::resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags)
+    {
+        VkResult result = vkResetCommandBuffer(commandBuffer, flags);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: could not reset command buffer (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        return true;
+    }
+
+    bool EngineDevice::beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo)
+    {
+        VkResult result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: could not begin new command buffer\n", __FUNCTION__);
+            return false;
+        }
+        return true;
+    }
+
+    bool EngineDevice::endCommandBuffer(VkCommandBuffer& commandBuffer)
+    {
+        VkResult result = vkEndCommandBuffer(commandBuffer);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: could not end render pass (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        return true;
+    }
+
+    void EngineDevice::cleanupCommandBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer)
+    {
+        vkFreeCommandBuffers(device(), pool, 1, &commandBuffer);
+    }
+
     void EngineDevice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) 
     {
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = createSingleShotBuffer();
 
         VkBufferCopy copyRegion{};
         //copyRegion.srcOffset = 0;  // Optional
@@ -872,7 +989,7 @@ namespace aveng {
 
     void EngineDevice::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount) 
     {
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = createSingleShotBuffer();
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;        // Offset at which the pixels start

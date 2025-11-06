@@ -1,5 +1,4 @@
 #include "ObjectRenderSystem.h"
-#include "Core/Animation/AssimpInstance.h"
 #include "Utils/window_callbacks.h"
 
 namespace aveng {
@@ -83,12 +82,6 @@ namespace aveng {
 		//	AvengModel* model = obj.model.get();						// TODO: This is a shared ptr
 		//	//std::cout << "Object to render: " << model->path << std::endl;
 		//	objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
-
-		//	/**
-		//	* TODO : You could be collecting render batches here instead of looping through objectData again during instanced rendering
-		//	* Think Renderer::createRenderBatches(...)
-		//	*/
-
 		//}
 
 		//if (firstFrame) {

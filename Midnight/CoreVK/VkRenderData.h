@@ -1,6 +1,7 @@
 /* Vulkan */
 #pragma once
 
+#include <memory>
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -234,6 +235,14 @@ namespace aveng {
 
 	struct VkRenderData {
 
+		/**
+		* Here you'll find many of the resources required to operate the vulkan api.
+		* However, the EngineDevice still maintains these responsibilities: 
+			- command buffer operations
+			- queues
+			- command pools
+		*/
+
 		GLFWwindow* rdWindow = nullptr;
 
 		int rdWidth = 0;
@@ -251,54 +260,19 @@ namespace aveng {
 		float rdUIGenerateTime = 0.0f;
 		float rdUIDrawTime = 0.0f;
 
-		// Command Buffers
-		VkCommandBuffer rdCommandBufferGraphics = VK_NULL_HANDLE;
-		VkCommandBuffer rdCommandBufferCompute = VK_NULL_HANDLE;
-		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
-		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
+		//int rdMoveForward = 0;
+		//int rdMoveRight = 0;
+		//int rdMoveUp = 0;
 
-		int rdMoveForward = 0;
-		int rdMoveRight = 0;
-		int rdMoveUp = 0;
-
-		float rdViewAzimuth = 330.0f;
-		float rdViewElevation = -20.0f;
-		glm::vec3 rdCameraWorldPosition = glm::vec3(2.0f, 5.0f, 7.0f);
-
-		std::vector<VkImage> rdSwapchainImages{};
-		std::vector<VkImageView> rdSwapchainImageViews{};
-		std::vector<VkFramebuffer> rdFramebuffers{};
-
-		//VkQueue rdGraphicsQueue = VK_NULL_HANDLE;
-		//VkQueue rdPresentQueue = VK_NULL_HANDLE;
-		VkQueue rdComputeQueue = VK_NULL_HANDLE;
-
-		//VkImage rdDepthImage = VK_NULL_HANDLE;
-		//VkImageView rdDepthImageView = VK_NULL_HANDLE;
-		//VkFormat rdDepthFormat = VK_FORMAT_UNDEFINED;
-
-		//VkRenderPass rdRenderpass = VK_NULL_HANDLE;
-
-		/*
-		* Pipeline
-		*/
-		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengSkinningPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengComputeTransformaPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
-
-		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
-		VkPipeline rdAvengSkinningPipeline = VK_NULL_HANDLE;
-		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
-		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
+		//float rdViewAzimuth = 330.0f;
+		//float rdViewElevation = -20.0f;
+		//glm::vec3 rdCameraWorldPosition = glm::vec3(2.0f, 5.0f, 7.0f);
 
 		/**
-		* Commands
+		* Command buffers
 		*/
-		VkCommandPool rdCommandPool = VK_NULL_HANDLE;
-		VkCommandPool rdComputeCommandPool = VK_NULL_HANDLE;
-		VkCommandBuffer rdCommandBuffer = VK_NULL_HANDLE;
-		VkCommandBuffer rdComputeCommandBuffer = VK_NULL_HANDLE;
+		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
+		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
 
 		/**
 		* Sync
@@ -313,7 +287,7 @@ namespace aveng {
 		/*
 		* Descriptors
 		*/
-		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
+		std::unique_ptr<AvengDescriptorPool> avengDescriptorPool = VK_NULL_HANDLE;
 
 		std::unique_ptr<AvengDescriptorSetLayout> rdAvengBasicDescriptorLayout = nullptr;
 		std::unique_ptr<AvengDescriptorSetLayout> rdAvengAnimationDescriptorLayout = nullptr;
@@ -330,10 +304,18 @@ namespace aveng {
 		std::vector<VkDescriptorSet> basicLightingDescriptorSets;
 		std::vector<VkDescriptorSet> textureDescriptorSets;
 
-		VkDescriptorSet rdAvengDescriptorSet = VK_NULL_HANDLE;
-		VkDescriptorSet rdAvengSkinningDescriptorSet = VK_NULL_HANDLE;
-		VkDescriptorSet rdAvengComputeTransformDescriptorSet = VK_NULL_HANDLE;
-		VkDescriptorSet rdAvengComputeMatrixMultDescriptorSet = VK_NULL_HANDLE;
+		/*
+		* Pipeline
+		*/
+		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengComputeTransformaPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
+
+		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengAnimationPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
 
 		//VkDescriptorPool rdImguiDescriptorPool = VK_NULL_HANDLE;
 	};

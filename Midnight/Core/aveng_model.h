@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "data.h"
+#include "CoreVK/swapchain.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/aveng_buffer.h"
 #include "CoreVK/aveng_descriptors.h"
@@ -17,6 +18,7 @@
 #include "Core/Modeling/AssimpAnimClip.h"
 #include "CoreVK/VkRenderData.h"
 #include "Core/Modeling/Tools.h"
+#include "CoreVK/AvengStorageBuffer.h"
 
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
@@ -48,14 +50,15 @@ namespace aveng {
 		AvengModel& operator=(const AvengModel&) = delete;
 
 		bool loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags = 0);
-		bool createDescriptorSet(VkRenderData& renderData);
+		bool createDescriptorSet(VkRenderData& renderData, std::vector<glm::mat4>& boneOffsetMatricesList, std::vector<int32_t>& boneParentIndexList);
 		void processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene/*, std::string assetDirectory*/);
 
 		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
-		VkShaderStorageBufferData& getBoneMatrixOffsetBuffer();
-		VkShaderStorageBufferData& getBoneParentBuffer();
-		VkDescriptorSet& getMatrixMultDescriptorSet();
+		std::vector<std::unique_ptr<AvengBuffer>> getBoneMatrixOffsetBuffers();
+		std::vector<std::unique_ptr<AvengBuffer>> getBoneParentBuffers();
+		std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
+		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex);
 		glm::mat4 getRootTranformationMatrix();
 		bool hasAnimations();
 		unsigned int getTriangleCount();
@@ -66,7 +69,7 @@ namespace aveng {
 		void bind(VkCommandBuffer commandBuffer);
 		void bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer);
 		void draw(VkCommandBuffer commandBuffer);
-		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount);
+		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex);
 		void drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
 		
 		// Static methods for instance rendering setup
@@ -86,23 +89,22 @@ namespace aveng {
 
 		EngineDevice& engineDevice;
 		bool hasIndexBuffer = false;
-		uint32_t vertexCount;
-		uint32_t indexCount;
+		uint32_t vertexCount; // Old
+		uint32_t indexCount; // Old
 
-		unsigned int mVertexCount;
+		unsigned int mVertexCount; // Old
+		unsigned int mTriangleCount; // Old
+
+		std::vector<VkMesh> mModelMeshes{};
+		std::vector<VkVertexBufferData> mVertexBuffers{};
+		std::vector<VkIndexBufferData> mIndexBuffers{};
 		unsigned int mTriangleCount;
 
 		/* store the root node for direct access */
 		std::shared_ptr<AssimpNode> mRootNode = nullptr;
 
-		std::vector<VkMesh> mModelMeshes{};
-		unsigned int mTriangleCount;
-
 		std::vector<std::unique_ptr<AvengBuffer>> mBoneParentMatrixBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mShaderBoneMatrixOffsetBuffers;
-
-		VkShaderStorageBufferData mShaderBoneParentBuffer{};
-		VkShaderStorageBufferData mShaderBoneMatrixOffsetBuffer{};
 
 		/* a map to find the node by name */
 		std::unordered_map<std::string, std::shared_ptr<AssimpNode>> mNodeMap{};
@@ -113,12 +115,9 @@ namespace aveng {
 
 		std::vector<std::shared_ptr<AssimpAnimClip>> mAnimClips{};
 
-		//VkShaderStorageBufferData mShaderBoneParentBuffer{};
-		//VkShaderStorageBufferData mShaderBoneMatrixOffsetBuffer{};
-
 		glm::mat4 mRootTransformMatrix = glm::mat4(1.0f);
 
-		VkDescriptorSet mMatrixMultPerModelDescriptorSet = VK_NULL_HANDLE;
+		std::vector<VkDescriptorSet> mMatrixMultPerModelDescriptorSets;
 		VkDescriptorSetLayout mComputeMatrixMultPerModelDescriptorSetLayout;
 
 		// NEW
@@ -126,6 +125,9 @@ namespace aveng {
 
 		// NEW
 		std::unique_ptr<AvengBuffer> indexBuffer;
+
+		std::string mModelFilenamePath;
+		std::string mModelFilename;
 
 	};
 

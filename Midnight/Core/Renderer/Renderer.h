@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <vector>
-#include <cassert>
 #include <unordered_map>
 #include "CoreVK/aveng_descriptors.h"
 #include "CoreVK/AvengImageSystem.h"
@@ -11,7 +10,6 @@
 #include "CoreVK/aveng_buffer.h"
 #include "CoreVK/GFXPipeline.h"
 #include "CoreVK/swapchain.h"
-#include "CoreVK/CommandBuffers.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "Core/Renderer/PipelineConfigManager.h"
 #include "Core/Modeling/AssimpInstance.h"
@@ -52,12 +50,14 @@ namespace aveng {
 		float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
 		bool isFrameInProgress() const { return isFrameStarted; }
 
+		// Just use the returned values directly if working in renderer.cpp
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
 		{
 			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
 			return renderData.rdCommandBuffersGraphics[currentFrameIndex];
 		}
 
+		// Just use the returned values directly if working in renderer.cpp
 		VkCommandBuffer getCurrentCommandBufferCompute() const
 		{
 			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
@@ -116,10 +116,6 @@ namespace aveng {
 		VkResult err;
 		GameData& gameData;
 		VkRenderData renderData;
-		VkPushConstants mModelData{};
-		ModelAndInstanceData mModelInstanceData{};
-		VkComputePushConstants mComputeModelData{};
-		VkUniformBufferData mPerspectiveViewMatrixUBO{};
 
 		Timer mFrameTimer{};
 		Timer mMatrixGenerateTimer{};
@@ -129,15 +125,7 @@ namespace aveng {
 
 		// Uniform buffer V1
 		LightsUbo u_LightsData{};
-		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 
-		// Shader Data
-		std::vector<glm::mat4> mWorldPosMatrices{};	
-		std::vector<NodeTransformData> mNodeTransFormData{};
-		VkShaderStorageBufferData mShaderModelRootMatrixBuffer{}; // For animated and non-animated models
-		VkShaderStorageBufferData mShaderBoneMatrixBuffer{}; // For animated models
-		VkShaderStorageBufferData mShaderTRSMatrixBuffer{};
-		VkShaderStorageBufferData mShaderNodeTransformBuffer{};
 
 		const char* default_scene_file = "scenes/demo-scene.json";
 
@@ -169,15 +157,47 @@ namespace aveng {
 		void createPipelineLayout();
 		void createPipelines();
 		bool pipelineCreated = false;
+		VkCommandBuffer commandBuffer;
+		VkCommandBuffer computeCommandBuffer;
+
 		
 		// Descriptors and Buffers
-		std::unique_ptr<AvengDescriptorPool> descriptorPool{};
 		std::vector<std::unique_ptr<AvengBuffer>> mPerspectiveViewMatrixUBOBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mShaderModelRootMatrixBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mShaderBoneMatrixBuffers;
+		std::vector<std::unique_ptr<AvengBuffer>> mShaderTrsMatrixBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mNodeTransformBuffers;
-		std::vector<std::unique_ptr<AvengBuffer>> mTrsMatrixBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mLightDataBuffers;
+
+		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
+
+		ModelAndInstanceData mModelInstanceData{}; 
+
+		// Shader Data
+		//std::vector<glm::mat4> mWorldPosMatrices{};
+		//std::vector<NodeTransformData> mNodeTransFormData{};
+		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderModelRootMatrixBuffer{}; // For animated and non-animated models
+		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderBoneMatrixBuffer{}; // For animated models
+		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderTRSMatrixBuffer{};
+		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderNodeTransformBuffer{};
+		//std::vector <std::unique_ptr <VkUniformBufferData>> mPerspectiveViewMatrixUBO{};
+
+		VkPushConstants mModelData{};
+		VkComputePushConstants mComputeModelData{};
+
+		/* for animated and non-animated models */
+
+		std::vector<glm::mat4> mWorldPosMatrices{};
+
+		/* for animated models */
+		VkShaderStorageBufferData mShaderBoneMatrixBuffer{};
+
+		/* for compute shader */
+		bool mHasDedicatedComputeQueue = false;
+		VkShaderStorageBufferData mShaderTRSMatrixBuffer{};
+		VkShaderStorageBufferData mShaderNodeTransformBuffer{};
+		std::vector<NodeTransformData> mNodeTransFormData{};
+
 
 #ifdef ENABLE_EDITOR
 		aveng::Editor editor{ renderData, gameData, engineDevice };

@@ -52,42 +52,13 @@ namespace aveng {
         VkResult invalidateIndex(int index);
 
         VkBuffer getBuffer() const { return buffer; }
+        VkDeviceSize getBufferSize() const { return bufferSize; }
         void* getMappedMemory() const { return mapped; }
         uint32_t getInstanceCount() const { return instanceCount; }
         VkDeviceSize getInstanceSize() const { return instanceSize; }
         VkDeviceSize getAlignmentSize() const { return alignmentSize; }
         VkBufferUsageFlags getUsageFlags() const { return usageFlags; }
-        VkDeviceSize getBufferSize() const { return bufferSize; }
 
-        template <typename T>
-        static bool uploadSsboData(AvengBuffer& Ssbo, std::vector<T> bufferData) {
-            if (bufferData.empty()) {
-                return false;
-            }
-
-            bool bufferResized = false;
-            size_t bufferSize = bufferData.size() * sizeof(T);
-            if (bufferSize > Ssbo.bufferSize) {
-                std::printf("%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, Ssbo.buffer, Ssbo.bufferSize, bufferSize);
-                // cleanup(renderData, SSBOData);
-                // init(renderData, SSBOData, bufferSize); // THIS IS THE STORAGE BUFFER'S INIT FUNCTION WE HAVEN'T IMPLEMENTED OUR FLAVOR OF THIS YET
-                bufferResized = true;
-            }
-
-            if (Ssbo.map() != VK_SUCCESS) {
-                std::printf("%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
-                return false;
-            }
-
-            Ssbo.writeToBuffer();
-            Ssbo.unmap();
-            Ssbo.flush();
-
-            return bufferResized;
-        }
-
-        static bool checkForResize(AvengBuffer& Ssbo, size_t bufferSize);
-        
         // New getters for VMA support
         bool isUsingVMA() const { return usingVMA; }
         VmaAllocation getVmaAllocation() const { return vmaAllocation; }

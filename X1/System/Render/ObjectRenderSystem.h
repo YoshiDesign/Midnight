@@ -51,9 +51,6 @@ namespace aveng {
 		bool firstFrame;
 		int last_sec;
 		float aspect;
-		
-		// Store animated instances for rendering
-		std::vector<std::shared_ptr<class AssimpInstance>> animatedInstances;
 
 		// Application-level components
 		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
