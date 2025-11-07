@@ -31,7 +31,6 @@ namespace aveng {
         }
         else {
             std::printf("%s error: could not open file %s\n", __FUNCTION__, fileName.c_str());
-            std::printf("%s error: system says '%s'\n", __FUNCTION__, strerror(errno));
             return std::string();
         }
 

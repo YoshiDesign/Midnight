@@ -3,9 +3,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-
-#include <glm/glm.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "Utils/glm_includes.h"
 
 #include <assimp/anim.h>
 

@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <unordered_map>
 
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 
 #include <vulkan/vulkan.h>
 #include "AMD/vk_mem_alloc.h"
@@ -20,7 +20,81 @@
 
 namespace aveng {
 
-	// Data structures moved from ObjectRenderSystem
+	//struct Vertex {
+	//	// These 4 items get packed into our vertex buffers
+	//	glm::vec3 position{};		// Position of the vertex
+	//	glm::vec3 color{};			// color at this vertex
+	//	glm::vec3 normal{};			// surface norms
+	//	glm::vec2 texCoord{};		// 2d texture coordinates
+
+	//	/*
+	//	* Required to communicate with the vertex shader.
+	//	* Descriptions of our vertex buffers and how they are to be bound.
+	//	*/
+	//	static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
+	//	static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+
+	//	// This is used with our hashing function to generate keys in our ordered map of vertices
+	//	bool operator==(const Vertex& other) const
+	//	{
+	//		return position == other.position && color == other.color && normal == other.normal && texCoord == other.texCoord;
+	//	}
+
+	//};
+
+	//// Animation vertex structure with bone weights - perfect 16-byte alignment
+	//struct AnimatedVertex {
+	//	glm::vec4 position{};     // position.xyz + texCoord.x in .w
+	//	glm::vec4 color{};        // color.xyz + texCoord.y in .w
+	//	glm::vec4 normal{};       // normal.xyz + unused .w (could store tangent.x, etc.)
+
+	//	// Skeletal animation data - naturally 16-byte aligned, no alignas needed!
+	//	glm::uvec4 boneNumber = glm::uvec4(0);
+	//	glm::vec4 boneWeight = glm::vec4(0.0f);
+
+	//	bool operator==(const AnimatedVertex& other) const {
+	//		return position == other.position &&
+	//			color == other.color &&
+	//			normal == other.normal &&
+	//			boneNumber == other.boneNumber &&
+	//			boneWeight == other.boneWeight;
+	//	}
+	//};
+
+	//// Transformed vertex structure (output from compute shader) - matches transformed_shader.vert
+	//struct TransformedVertex {
+	//	glm::vec3 position{};      // Already transformed position
+	//	glm::vec3 color{};         // Color data
+	//	glm::vec3 normal{};        // Already transformed normal
+	//	glm::vec2 texCoord{};      // Texture coordinates
+	//	// NO bone data - transformation already applied!
+
+	//	bool operator==(const TransformedVertex& other) const {
+	//		return position == other.position &&
+	//			color == other.color &&
+	//			normal == other.normal &&
+	//			texCoord == other.texCoord;
+	//	}
+
+	//	// Required for Vulkan pipeline to understand vertex layout
+	//	static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
+	//		std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
+	//		bindingDescriptions[0].binding = 0;
+	//		bindingDescriptions[0].stride = sizeof(TransformedVertex);
+	//		bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	//		return bindingDescriptions;
+	//	}
+
+	//	static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+	//		std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
+	//		attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, position) });
+	//		attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, color) });
+	//		attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, normal) });
+	//		attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(TransformedVertex, texCoord) });
+	//		return attributeDescriptions;
+	//	}
+	//};
+
 	struct LightsUbo {
 		static constexpr int MAX_LIGHTS = 100;
 		uint32_t numLights{ 0 };
@@ -28,101 +102,9 @@ namespace aveng {
 		alignas(16) glm::vec4 lightColors[MAX_LIGHTS];     // w component is intensity
 	};
 
-	struct GlobalUbo {
-		glm::mat4 projection{ 1.f };
-		glm::mat4 view{ 1.f };
-		glm::vec4 ambientLightColor{ 0.f, 0.f, 0.89f, .05f };
-		glm::vec3 lightPosition{ 5.0f, -20.0f, 2.8f };
-		alignas(16) glm::vec4 lightColor{ 1.f, 1.f, 1.f, 1.f };
-		alignas(16) int renderMode{ 0 };  // 0 = STANDARD, 1 = WIREFRAME, 2 = DISTORTED
-		alignas(16) float time{ 0.0f };   // For animated effects
-	};
-
+	// NOTE: USE THESE FOR DYNAMIC UBOs YOU FOOL (see Renderer::calculateDynamicUBOStride) Change it to whatever you need
 	struct ObjectUniformData {
 		alignas(16) int texIndex;
-	};
-
-	struct Vertex {
-		// These 4 items get packed into our vertex buffers
-		glm::vec3 position{};		// Position of the vertex
-		glm::vec3 color{};			// color at this vertex
-		glm::vec3 normal{};			// surface norms
-		glm::vec2 texCoord{};		// 2d texture coordinates
-
-		/*
-		* Required to communicate with the vertex shader.
-		* Descriptions of our vertex buffers and how they are to be bound.
-		*/
-		static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
-		static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
-
-		// This is used with our hashing function to generate keys in our ordered map of vertices
-		bool operator==(const Vertex& other) const
-		{
-			return position == other.position && color == other.color && normal == other.normal && texCoord == other.texCoord;
-		}
-
-	};
-
-	// Instance data for instanced rendering - per object instance
-	struct InstanceData {
-		alignas(16) glm::mat4 modelMatrix;
-		alignas(16) glm::mat4 normalMatrix;
-		alignas(16) int textureIndex;
-		alignas(16) int padding[3]; // Ensure 16-byte alignment
-	};
-
-	// Animation vertex structure with bone weights - perfect 16-byte alignment
-	struct AnimatedVertex {
-		glm::vec4 position{};     // position.xyz + texCoord.x in .w
-		glm::vec4 color{};        // color.xyz + texCoord.y in .w
-		glm::vec4 normal{};       // normal.xyz + unused .w (could store tangent.x, etc.)
-
-		// Skeletal animation data - naturally 16-byte aligned, no alignas needed!
-		glm::uvec4 boneNumber = glm::uvec4(0);
-		glm::vec4 boneWeight = glm::vec4(0.0f);
-
-		bool operator==(const AnimatedVertex& other) const {
-			return position == other.position &&
-				color == other.color &&
-				normal == other.normal &&
-				boneNumber == other.boneNumber &&
-				boneWeight == other.boneWeight;
-		}
-	};
-
-	// Transformed vertex structure (output from compute shader) - matches transformed_shader.vert
-	struct TransformedVertex {
-		glm::vec3 position{};      // Already transformed position
-		glm::vec3 color{};         // Color data
-		glm::vec3 normal{};        // Already transformed normal
-		glm::vec2 texCoord{};      // Texture coordinates
-		// NO bone data - transformation already applied!
-
-		bool operator==(const TransformedVertex& other) const {
-			return position == other.position &&
-				color == other.color &&
-				normal == other.normal &&
-				texCoord == other.texCoord;
-		}
-
-		// Required for Vulkan pipeline to understand vertex layout
-		static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
-			std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
-			bindingDescriptions[0].binding = 0;
-			bindingDescriptions[0].stride = sizeof(TransformedVertex);
-			bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-			return bindingDescriptions;
-		}
-
-		static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-			std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
-			attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, position) });
-			attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, color) });
-			attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, normal) });
-			attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(TransformedVertex, texCoord) });
-			return attributeDescriptions;
-		}
 	};
 
 	struct VkTextureData {
@@ -225,8 +207,9 @@ namespace aveng {
 	};
 
 	struct VkUploadMatrices {
-		glm::mat4 viewMatrix{};
-		glm::mat4 projectionMatrix{};
+		alignas(16) glm::vec4 ambientLight{};
+		alignas(16) glm::mat4 viewMatrix{};
+		alignas(16) glm::mat4 projectionMatrix{};
 	};
 
 	struct VkPushConstants {
@@ -315,7 +298,7 @@ namespace aveng {
 		*/
 		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengComputeTransformaPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
 
 		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 #include <assimp/anim.h>
 namespace aveng {
     class AssimpBone {

@@ -3,7 +3,8 @@
 
 #include <vector>
 #include <memory>
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
+
 namespace aveng {
 	struct InstanceSettings {
 		glm::vec3 isWorldPosition = glm::vec3(0.0f);

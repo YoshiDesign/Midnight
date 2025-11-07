@@ -1,12 +1,10 @@
 #pragma once
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include "Utils/glm_includes.h"
 #include <assimp/matrix4x4.h>
 #include <assimp/vector3.h>
 #include <assimp/quaternion.h>
 #include <cstring>
+#include <string>
 
 namespace aveng {
 

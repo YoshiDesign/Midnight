@@ -75,7 +75,7 @@ namespace aveng {
 
         // upload fonts, this is done by recording and submitting a one time use command buffer
         // which can be done easily by using some existing helper functions on the EngineDevice object
-        auto commandBuffer = engineDevice.beginSingleTimeCommands();
+        auto commandBuffer = engineDevice.createSingleShotBuffer();
         ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
         engineDevice.endSingleTimeCommands(commandBuffer);
 

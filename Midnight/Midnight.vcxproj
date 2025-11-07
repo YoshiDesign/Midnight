@@ -170,7 +170,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CoreVK\AvengImageSystem.cpp" />
     <ClCompile Include="CoreVK\AvengUniformBuffer.cpp" />
     <ClCompile Include="CoreVK\aveng_buffer.cpp" />
     <ClCompile Include="CoreVK\aveng_descriptors.cpp" />
@@ -204,7 +203,7 @@
     <ClCompile Include="Utils\window_callbacks.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CoreVK\AvengImageSystem.h" />
+    <ClInclude Include="avpch.h" />
     <ClInclude Include="CoreVK\AvengStorageBuffer.h" />
     <ClInclude Include="CoreVK\AvengUniformBuffer.h" />
     <ClInclude Include="CoreVK\aveng_buffer.h" />
@@ -262,6 +261,7 @@
     <ClInclude Include="stb\stb_truetype.h" />
     <ClInclude Include="stb\stb_voxel_render.h" />
     <ClInclude Include="Utils\aveng_utils.h" />
+    <ClInclude Include="Utils\glm_includes.h" />
     <ClInclude Include="Utils\Timer.h" />
     <ClInclude Include="Utils\window_callbacks.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />

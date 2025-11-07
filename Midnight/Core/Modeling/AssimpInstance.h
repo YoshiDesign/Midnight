@@ -4,7 +4,7 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 
 #include "Core/aveng_model.h"
 #include "./AssimpNode.h"

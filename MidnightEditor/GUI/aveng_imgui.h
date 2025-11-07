@@ -1,15 +1,17 @@
 #pragma once
 
 #include "CoreVK/EngineDevice.h"
+#include "CoreVK/VkRenderData.h"
 #include "Core/data.h"
 #include "Core/aveng_window.h"
 #include "Utils/window_callbacks.h"
 
 // libs
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+
 // std
 #include <stdexcept>
 

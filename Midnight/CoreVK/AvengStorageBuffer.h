@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <vulkan/vulkan.h>
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 
 #include "CoreVK/VkRenderData.h"
 #include "CoreVK/aveng_buffer.h"

@@ -39,6 +39,7 @@ namespace aveng {
 		std::vector<tinyobj::material_t> materials;
 	};
 
+	// Deprecated
 	AvengModel::AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath)
 		: engineDevice{ device }
 	{
@@ -57,7 +58,9 @@ namespace aveng {
 	}
 
 	AvengModel::AvengModel(EngineDevice& device, VkRenderData& renderData, const std::string& filepath) 
-		: engineDevice{ device }
+		: engineDevice{ device },
+		mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
+		mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT)
 	{
 		loadModelV2(renderData, filepath);
 	}
@@ -706,8 +709,8 @@ namespace aveng {
 		/* get root transformation matrix from model's root node */
 		mRootTransformMatrix = Tools::convertAiToGLM(rootNode->mTransformation);
 
-		std::printf("%s: - model has a total of %i bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
-		std::printf("%s: - model has a total of %i animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
+		std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
+		std::printf("%s: - model has a total of %zi animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
 
 		std::printf("%s: successfully loaded model '%s' (%s)\n", __FUNCTION__, filepath.c_str(), mModelFilename.c_str());
 		return true;
@@ -719,7 +722,7 @@ namespace aveng {
 		/* init all SSBOs - These will take the current frame index into account, hence the vector usage */
 		for (int i = 0; i < mBoneParentMatrixBuffers.size(); i++) {
 			mBoneParentMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(boneParentIndexList.size()), 
+				sizeof(boneParentIndexList.size()) * sizeof(int32_t),
 				1,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
@@ -732,7 +735,7 @@ namespace aveng {
 
 		for (int i = 0; i < mShaderBoneMatrixOffsetBuffers.size(); i++) {
 			mShaderBoneMatrixOffsetBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(boneOffsetMatricesList.size()), 
+				sizeof(boneOffsetMatricesList.size()) * sizeof(glm::mat4),
 				1,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
@@ -771,7 +774,7 @@ namespace aveng {
 				aiMesh* modelMesh = scene->mMeshes[aNode->mMeshes[i]];
 
 				AssimpMesh mesh;
-				mesh.processMesh(renderData, modelMesh, scene, assetDirectory, mTextures);
+				mesh.processMesh(renderData, engineDevice, modelMesh, scene, assetDirectory, mTextures);
 
 				mModelMeshes.emplace_back(mesh.getMesh());
 
@@ -821,11 +824,11 @@ namespace aveng {
 		return mTriangleCount;
 	}
 
-	std::vector<std::unique_ptr<AvengBuffer>> AvengModel::getBoneMatrixOffsetBuffers() {
+	const std::vector<std::unique_ptr<AvengBuffer>>& AvengModel::getBoneMatrixOffsetBuffers() const {
 		return mShaderBoneMatrixOffsetBuffers;
 	}
 
-	std::vector<std::unique_ptr<AvengBuffer>> AvengModel::getBoneParentBuffers() {
+	const std::vector<std::unique_ptr<AvengBuffer>>& AvengModel::getBoneParentBuffers() const {
 		return mBoneParentMatrixBuffers;
 	}
 

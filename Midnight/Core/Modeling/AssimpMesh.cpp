@@ -2,7 +2,8 @@
 
 #include "Tools.h"
 namespace aveng {
-    bool AssimpMesh::processMesh(VkRenderData& renderData, aiMesh* mesh, const aiScene* scene, std::string assetDirectory, std::unordered_map<std::string, VkTextureData>& textures) {
+    // TODO - You're drilling a ref to the engine Device into this class, consider moving the entire engine device to VkRenderData
+    bool AssimpMesh::processMesh(VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, std::string assetDirectory, std::unordered_map<std::string, VkTextureData>& textures) {
         mMeshName = mesh->mName.C_Str();
 
         mTriangleCount = mesh->mNumFaces;
@@ -55,9 +56,9 @@ namespace aveng {
                             if (!texName.empty() && texName.find("*") != 0) {
                                 VkTextureData newTex{};
                                 std::string texNameWithPath = assetDirectory + '/' + texName;
-                                if (!Texture::loadTexture(renderData, newTex, texNameWithPath)) {
+                                if (!Texture::loadTexture(engineDevice, renderData, newTex, texNameWithPath)) {
                                     std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
-                                    Texture::cleanup(renderData, newTex);
+                                    Texture::cleanup(engineDevice, renderData, newTex);
                                     continue;
                                 }
 

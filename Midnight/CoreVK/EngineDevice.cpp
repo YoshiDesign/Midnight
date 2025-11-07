@@ -315,25 +315,25 @@ namespace aveng {
         QueueFamilyIndices queueFamilyIndices = findPhysicalQueueFamilies();
 
         // Graphics Pool
-        VkCommandPoolCreateInfo poolInfo = {};
-        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
-        poolInfo.flags =
+        VkCommandPoolCreateInfo gfx_poolInfo = {};
+        gfx_poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        gfx_poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+        gfx_poolInfo.flags =
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPoolGraphics) != VK_SUCCESS) 
+        if (vkCreateCommandPool(_device, &gfx_poolInfo, nullptr, &_commandPoolGraphics) != VK_SUCCESS)
         {
             throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
         }
 
         // Compute Pool
-        VkCommandPoolCreateInfo poolInfo = {};
-        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.queueFamilyIndex = queueFamilyIndices.computeFamilyHasValue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
-        poolInfo.flags =
+        VkCommandPoolCreateInfo cmp_poolInfo = {};
+        cmp_poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        cmp_poolInfo.queueFamilyIndex = queueFamilyIndices.computeFamilyHasValue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
+        cmp_poolInfo.flags =
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPoolCompute) != VK_SUCCESS)
+        if (vkCreateCommandPool(_device, &cmp_poolInfo, nullptr, &_commandPoolCompute) != VK_SUCCESS)
         {
             throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
         }

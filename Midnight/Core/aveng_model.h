@@ -1,8 +1,6 @@
 #pragma once
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 
 #include <array>
 #include <memory>
@@ -42,7 +40,7 @@ namespace aveng {
 			
 		};
 
-		//AvengModel(EngineDevice& device, const AvengModel::Builder& builder);
+		// Deprecated
 		AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath);
 		AvengModel(EngineDevice& device, VkRenderData& renderData, const std::string& filepath);
 
@@ -57,8 +55,8 @@ namespace aveng {
 
 		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
-		std::vector<std::unique_ptr<AvengBuffer>> getBoneMatrixOffsetBuffers();
-		std::vector<std::unique_ptr<AvengBuffer>> getBoneParentBuffers();
+		const std::vector<std::unique_ptr<AvengBuffer>>& getBoneMatrixOffsetBuffers() const;
+		const std::vector<std::unique_ptr<AvengBuffer>>& getBoneParentBuffers() const;
 		std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
 		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex);
 		glm::mat4 getRootTranformationMatrix();
@@ -96,9 +94,6 @@ namespace aveng {
 		uint32_t vertexCount; // Old
 		uint32_t indexCount; // Old
 
-		unsigned int mVertexCount; // Old
-		unsigned int mTriangleCount; // Old
-
 		// map textures to external or internal texture names
 		std::unordered_map<std::string, VkTextureData> mTextures{};
 		VkTextureData mPlaceholderTexture{};
@@ -108,6 +103,7 @@ namespace aveng {
 		std::vector<VkVertexBufferData> mVertexBuffers{};
 		std::vector<VkIndexBufferData> mIndexBuffers{};
 		unsigned int mTriangleCount;
+		unsigned int mVertexCount;
 
 		/* store the root node for direct access */
 		std::shared_ptr<AssimpNode> mRootNode = nullptr;

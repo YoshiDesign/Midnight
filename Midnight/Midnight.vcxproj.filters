@@ -51,9 +51,6 @@
     <ClCompile Include="Core\aveng_scene_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CoreVK\AvengImageSystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CoreVK\PointLightSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1148,9 +1145,6 @@
     <ClInclude Include="Core\aveng_scene_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreVK\AvengImageSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="CoreVK\PointLightSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1221,6 +1215,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CoreVK\SyncObjects.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\glm_includes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="avpch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

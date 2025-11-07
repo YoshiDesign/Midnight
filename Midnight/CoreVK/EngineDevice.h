@@ -105,16 +105,15 @@ namespace aveng {
             VmaAllocationCreateFlags flags = 0
         );
 
-        VkCommandBuffer createSingleShotBuffer();  // allocates a new one-time buffer. Deprecate this, probably
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-
         // V2
+        VkCommandBuffer createSingleShotBuffer();  // allocates a new one-time buffer. Deprecate this, probably
         bool initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers);
         bool beginSingleShotCommand(VkCommandBuffer& commandBuffer); // Reuses a reset command buffer (faster)
+        bool beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo);
         bool submitSingleShotBuffer(VkCommandBuffer commandBuffer);
         bool resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags = 0);
-        bool beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo);
         bool endCommandBuffer(VkCommandBuffer& commandBuffer);
+        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
         void cleanupCommandBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer);
 
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);

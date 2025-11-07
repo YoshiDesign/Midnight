@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <vulkan/vulkan.h>
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 #include "CoreVK/EngineDevice.h"
 
 #include "VkRenderData.h"

@@ -5,7 +5,7 @@
 [] V2 Pipeline(s)
 
 [] Accommodate the v2 shaders:
-	[] New Vertex and Index Buffers
+	[x] New Vertex and Index Buffers
 	[x] Descriptor Set Types
 	[x] Descriptor Layouts
 	[x] Storage Buffers

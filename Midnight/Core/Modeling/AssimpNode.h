@@ -3,8 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include "Utils/glm_includes.h"
 
 class AssimpNode : public std::enable_shared_from_this<AssimpNode> {
 public:

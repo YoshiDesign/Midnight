@@ -33,12 +33,6 @@ namespace aveng {
 
 		//sceneLoader.load(default_scene_file, engineDevice);
 
-		//const auto& sceneTextures = sceneLoader.getSceneTextures();
-		//std::cout << "Scene has " << sceneTextures.size() << " textures defined" << std::endl;
-
-		// Initialize ImageSystem with scene textures
-		//initializeImageSystem(sceneTextures);
-
 		// Initialize our descriptor sets, map buffers to device memory.
 		setupDescriptors();
 
@@ -286,28 +280,8 @@ namespace aveng {
 		vkCmdEndRenderPass(_commandBufferGraphics);
 	}
 
-	void Renderer::initializeImageSystem(const std::vector<std::string>& texturePaths)
-	{
-		std::cout << "Initializing ImageSystem with " << texturePaths.size() << " textures from scene" << std::endl;
-		
-		if (texturePaths.empty()) {
-			// Use empty texture list - ImageSystem will handle this gracefully
-			imageSystem = std::make_unique<ImageSystem>(engineDevice, std::vector<std::string>());
-			currentTextureCount = 1; // Minimum of 1 for empty scenes
-		} else {
-			imageSystem = std::make_unique<ImageSystem>(engineDevice, texturePaths);
-			currentTextureCount = static_cast<uint32_t>(imageSystem->getTextureCount());
-		}
-		
-		std::cout << "ImageSystem initialized with " << imageSystem->getTextureCount() << " textures" << std::endl;
-		std::cout << "Pipeline will be created with texture array size: " << currentTextureCount << std::endl;
-	}
-
 	void Renderer::setupDescriptors()
 	{
-		if (!imageSystem) {
-			throw std::runtime_error("ImageSystem must be initialized before setting up descriptors (call initializeImageSystem first)");
-		}
 
 		int numObjects = sceneLoader.getObjectCount();
 
@@ -321,13 +295,12 @@ namespace aveng {
 			.build();
 
 		// Define buffer vec's that are managed by the Renderer
-		mPerspectiveViewMatrixUBOBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		mShaderModelRootMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		mNodeTransformBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		mShaderTrsMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		mShaderBoneMatrixBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		mLightDataBuffers = std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		// Note: Textures are stored in the imageSystem's imageViews
+		mPerspectiveViewMatrixUBOBuffers	= std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mShaderModelRootMatrixBuffers		= std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mNodeTransformBuffers				= std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mShaderTrsMatrixBuffers				= std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mShaderBoneMatrixBuffers			= std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mLightDataBuffers					= std::vector<std::unique_ptr<AvengBuffer>>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Define descriptor set vec's
 		renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(2, VK_NULL_HANDLE);
@@ -345,7 +318,7 @@ namespace aveng {
 		// Renderer::draw
 		for (int i = 0; i < mPerspectiveViewMatrixUBOBuffers.size(); i++) {
 			mPerspectiveViewMatrixUBOBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				bufferSize, 
+				bufferSize, // sizeof(VkUploadMatrices) perhaps
 				1,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
@@ -448,7 +421,7 @@ namespace aveng {
 		/* non-animated shader */
 		renderData.rdAvengBasicDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Perspective/View Matrix UBO
+			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Perspective/View/AmbientLight Matrix UBO
 			.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1) // Model Root Matrix SSBO (worldPos) Can this be a Dynamic UBO for perf increase??
 			.build();
 
@@ -485,11 +458,6 @@ namespace aveng {
 			AvengDescriptorSetLayout::Builder(engineDevice)
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1) // Light Data UBO
 			.build();
-
-		//// Initialize animation rendering system only if it exists
-		//if (animationSystem) {
-		//	animationSystem->initializeDescriptors(*descriptorPool, SwapChain::MAX_FRAMES_IN_FLIGHT);
-		//}
 
 		updateDescriptorSets();
 		updateComputeDescriptorSets();
@@ -578,7 +546,7 @@ namespace aveng {
 		std::vector<VkDescriptorSetLayout> transformLayouts = {
 		  renderData.rdAvengComputeTransformDescriptorLayout->getDescriptorSetLayout() };
 
-		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeTransformaPipelineLayout, transformLayouts, computePushConstants)) {
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout, transformLayouts, computePushConstants)) {
 			std::printf("%s error: could not init Assimp transform compute pipeline layout\n", __FUNCTION__);
 			return false;
 		}
@@ -617,7 +585,7 @@ namespace aveng {
 		}
 
 		std::string computeShaderFile = "shader/assimp_instance_transform.comp.spv";
-		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeTransformaPipelineLayout,
+		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout,
 			renderData.rdAvengComputeTransformPipeline, computeShaderFile)) {
 			std::printf("%s error: could not init Assimp Transform compute shader pipeline\n", __FUNCTION__);
 			return false;
@@ -653,11 +621,11 @@ namespace aveng {
 		vkCmdBindPipeline(getCurrentCommandBufferCompute(), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipeline);
 		vkCmdBindDescriptorSets(getCurrentCommandBufferCompute(), VK_PIPELINE_BIND_POINT_COMPUTE,
-			renderData.rdAvengComputeTransformaPipelineLayout, 0, 1, &renderData.rdAvengComputeTransformDescriptorSets[currentFrameIndex], 0, 0);
+			renderData.rdAvengComputeTransformPipelineLayout, 0, 1, &renderData.rdAvengComputeTransformDescriptorSets[currentFrameIndex], 0, 0);
 
 		mUploadToUBOTimer.start();
 		mComputeModelData.pkModelOffset = modelOffset;
-		vkCmdPushConstants(getCurrentCommandBufferCompute(), renderData.rdAvengComputeTransformaPipelineLayout,
+		vkCmdPushConstants(getCurrentCommandBufferCompute(), renderData.rdAvengComputeTransformPipelineLayout,
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
@@ -1026,20 +994,13 @@ namespace aveng {
 	}
 
 	void Renderer::updateDescriptorSets() {
-		// Why auto - This can be removed to the ImageSystem class along with the descriptor writing
-		// This descriptor would need to be rewritten at runtime to load new textures during run
-		//auto imageInfo = imageSystem->descriptorInfoForAllImages();
 
 		// Write the descriptor sets that are ready to go
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
-			//AvengDescriptorSetWriter(*renderData.rdAvengTextureDescriptorLayout, *renderData.avengDescriptorPool)
-			//	.writeImage(1, imageInfo.data(), imageInfo.size())
-			//	.build(renderData.textureDescriptorSets[i]);
-
-			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
-			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
-			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof(VkUploadMatrices), 0); // TODO?
+			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
+			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
 
 			// Basic Shader
 			AvengDescriptorSetWriter(*renderData.rdAvengBasicDescriptorLayout, *renderData.avengDescriptorPool)
@@ -1088,6 +1049,7 @@ namespace aveng {
 	{
 		mMatrices.projectionMatrix = projection;
 		mMatrices.viewMatrix = view;
+		// ambient light as well but it's static for now
 	}
 
 	bool Renderer::createSyncObjects() {
@@ -1125,7 +1087,7 @@ namespace aveng {
 
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengPipelineLayout);
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengAnimationPipelineLayout);
-		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformaPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformPipelineLayout);
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout);
 		
 

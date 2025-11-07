@@ -4,14 +4,6 @@ layout(location=0) in vec2 fragOffset;
 layout(location=1) in vec4 lightColor;
 layout(location=0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform GlobalUbo {
-	mat4 projection;
-	mat4 view;
-	vec4 ambientLightColor; // w is intensity
-	vec3 lightPosition;
-	vec4 lightColor;
-} ubo;
-
 void main() 
 {
 	float dis = sqrt(dot(fragOffset, fragOffset)); // calculate the distance this fragment is from the light's position (its origin)

@@ -18,12 +18,11 @@ namespace aveng {
 
 	void ObjectRenderSystem::initialize() 
 	{
-		// Note: ImageSystem should be initialized first in loadGame() before calling this
 
 		// Lights, temporary placement
 		for (int i = 0; i <= 4; i++) {
 			for (int j = 0; j < 5; j++) {
-
+				
 				renderer.addLight(
 					glm::vec3(i * 4.f, -50.f, j * -4.0f),  // position
 					glm::vec3(1.f, 0.0f, 0.0f),    // red color
@@ -102,7 +101,7 @@ namespace aveng {
 		//if (!animatedInstances.empty()) {
 		//	renderer.renderAnimatedModels(animatedInstances);
 		//}
-
+		
 		// Render lights -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
 		renderer.renderLights();
 	

@@ -4,7 +4,6 @@
 #include <vector>
 #include <unordered_map>
 #include "CoreVK/aveng_descriptors.h"
-#include "CoreVK/AvengImageSystem.h"
 #include "CoreVK/PointLightSystem.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/aveng_buffer.h"
@@ -29,9 +28,7 @@
 #include "Editor.h"
 #endif
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
+#include "Utils/glm_includes.h"
 
 #include "CoreVK/VkRenderData.h"
 
@@ -98,7 +95,6 @@ namespace aveng {
 		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
 		// New methods for descriptor/buffer management
-		void initializeImageSystem(const std::vector<std::string>& texturePaths);
 		void initializePointLightSystem();
 		void updateFrameData(const glm::mat4& projection, const glm::mat4& view);
 
@@ -142,7 +138,6 @@ namespace aveng {
 		EngineDevice engineDevice{ aveng_window };			// The Engine Service - Stack allocated
 		AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
-		//std::unique_ptr<ImageSystem> imageSystem;			// Texture stuff
 		PointLightSystem pointLightSystem{ engineDevice };	// Light stuff
 		
 		// Dynamic texture array support
@@ -177,7 +172,7 @@ namespace aveng {
 		std::vector<std::unique_ptr<AvengBuffer>> mNodeTransformBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mLightDataBuffers;
 
-		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
+		VkUploadMatrices mMatrices{ glm::vec4(0.80f, 0.80f, 0.89f, .05f), glm::mat4(1.0f), glm::mat4(1.0f) };
 
 		ModelAndInstanceData mModelInstanceData{}; 
 
