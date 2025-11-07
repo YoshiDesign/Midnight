@@ -186,7 +186,6 @@
     <ClCompile Include="CoreVK\VertexBuffer.cpp" />
     <ClCompile Include="Core\app_object.cpp" />
     <ClCompile Include="Core\aveng_model.cpp" />
-    <ClCompile Include="Core\aveng_scene_loader.cpp" />
     <ClCompile Include="Core\aveng_window.cpp" />
     <ClCompile Include="Core\Modeling\AssimpAnimChannel.cpp" />
     <ClCompile Include="Core\Modeling\AssimpAnimClip.cpp" />
@@ -224,7 +223,6 @@
     <ClInclude Include="Core\AvengComponent.h" />
     <ClInclude Include="Core\aveng_frame_content.h" />
     <ClInclude Include="Core\aveng_model.h" />
-    <ClInclude Include="Core\aveng_scene_loader.h" />
     <ClInclude Include="Core\aveng_window.h" />
     <ClInclude Include="Core\data.h" />
     <ClInclude Include="Core\Modeling\AssimpAnimChannel.h" />

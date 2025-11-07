@@ -31,17 +31,17 @@ namespace aveng {
 
 	public:
 
-		// Vertex and index information to be sent to the model's vertex and index buffer memory
-		struct Builder {
-			std::vector<Vertex> vertices{};
-			std::vector<uint32_t> indices{};
+		//// Vertex and index information to be sent to the model's vertex and index buffer memory
+		//struct Builder {
+		//	std::vector<VkVertex> vertices{};
+		//	std::vector<uint32_t> indices{};
 
-			void loadModel(const std::string& filepath);
-			
-		};
+		//	void loadModel(const std::string& filepath);
+		//	
+		//};
 
 		// Deprecated
-		AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath);
+		// AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath);
 		AvengModel(EngineDevice& device, VkRenderData& renderData, const std::string& filepath);
 
 		~AvengModel();
@@ -53,6 +53,9 @@ namespace aveng {
 		bool createDescriptorSet(VkRenderData& renderData, std::vector<glm::mat4>& boneOffsetMatricesList, std::vector<int32_t>& boneParentIndexList);
 		void processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory);
 
+		std::string getModelFileName();
+		std::string getModelFileNamePath();
+
 		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
 		const std::vector<std::unique_ptr<AvengBuffer>>& getBoneMatrixOffsetBuffers() const;
@@ -63,9 +66,6 @@ namespace aveng {
 		bool hasAnimations();
 		unsigned int getTriangleCount();
 
-		static std::unique_ptr<AvengModel> createModelFromFile(EngineDevice& device, VkRenderData& renderData, const std::string& filepath);
-		static std::unique_ptr<AvengModel> drawTriangle(EngineDevice& device, glm::vec3 pos, const std::string& filepath);
-		
 		void bind(VkCommandBuffer commandBuffer);
 		void bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer); // DEPRECATED
 		void draw(VkCommandBuffer commandBuffer);
@@ -73,21 +73,13 @@ namespace aveng {
 		void drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
 
 		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames);
-		
-		// Static methods for instance rendering setup
-		static std::vector<VkVertexInputBindingDescription> getInstancedBindingDescriptions();
-		static std::vector<VkVertexInputAttributeDescription> getInstancedAttributeDescriptions();
-
-
-		static std::vector<VkVertexInputBindingDescription> getV2BindingDescriptions();
-		static std::vector<VkVertexInputAttributeDescription> getV2AttributeDescriptions();
 	
 		std::string path; 
 
 	private:
 
-		void createVertexBuffers(const std::vector<Vertex>& vertices);
-		void createIndexBuffers(const std::vector<uint32_t>& indices);
+		//void createVertexBuffers(const std::vector<Vertex>& vertices);
+		//void createIndexBuffers(const std::vector<uint32_t>& indices);
 
 		EngineDevice& engineDevice;
 		bool hasIndexBuffer = false;

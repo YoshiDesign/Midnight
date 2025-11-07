@@ -19,12 +19,12 @@ namespace std {
 	// This function allows us to take a vertex struct instance and hash it, for use by an unordered map key
 	// This allows us to create vertex buffers which only contain unique vertices
 	template<>
-	struct hash<aveng::Vertex> {
-		size_t operator()(aveng::Vertex const& vertex) const {
+	struct hash<aveng::VkVertex> {
+		size_t operator()(aveng::VkVertex const& vertex) const {
 	
 			// for final hash value
 			size_t seed = 0;
-			aveng::hashCombine(seed, vertex.position, vertex.color, vertex.normal, vertex.texCoord);
+			aveng::hashCombine(seed, vertex.position, vertex.color, vertex.normal, vertex.boneNumber, vertex.boneWeight);
 			return seed;
 	
 		}
@@ -40,55 +40,55 @@ namespace aveng {
 	};
 
 	// Deprecated
-	AvengModel::AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath)
-		: engineDevice{ device }
-	{
-		std::cout << "Instantiating Model..." << std::endl;
-		createVertexBuffers(vertices);
-		createIndexBuffers(indices);
+	//AvengModel::AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath)
+	//	: engineDevice{ device }
+	//{
+	//	std::cout << "Instantiating Model..." << std::endl;
+	//	createVertexBuffers(vertices);
+	//	createIndexBuffers(indices);
 
-		path = filepath;
-		
-		// Verify VMA allocation for model buffers
-		std::cout << "  Model VMA Verification:" << std::endl;
-		std::cout << "    Vertex Buffer using VMA: " << (vertexBuffer->isUsingVMA() ? "YES" : "NO") << std::endl;
-		if (hasIndexBuffer) {
-			std::cout << "    Index Buffer using VMA: " << (indexBuffer->isUsingVMA() ? "YES" : "NO") << std::endl;
-		}
-	}
+	//	path = filepath;
+	//	
+	//	// Verify VMA allocation for model buffers
+	//	std::cout << "  Model VMA Verification:" << std::endl;
+	//	std::cout << "    Vertex Buffer using VMA: " << (vertexBuffer->isUsingVMA() ? "YES" : "NO") << std::endl;
+	//	if (hasIndexBuffer) {
+	//		std::cout << "    Index Buffer using VMA: " << (indexBuffer->isUsingVMA() ? "YES" : "NO") << std::endl;
+	//	}
+	//}
 
 	AvengModel::AvengModel(EngineDevice& device, VkRenderData& renderData, const std::string& filepath) 
 		: engineDevice{ device },
-		mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
-		mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT)
+		  mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
+		  mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT)
 	{
 		loadModelV2(renderData, filepath);
 	}
 
 	AvengModel::~AvengModel() {}
 
-	std::unique_ptr<AvengModel> AvengModel::createModelFromFile(EngineDevice& device, VkRenderData& renderData, const std::string& filepath)
-	{
-		// DEPRECATED
-		//Builder builder{};
-		//builder.loadModel(filepath);
-		// return std::make_unique<AvengModel>(device, builder.vertices, builder.indices, filepath);
+	//std::unique_ptr<AvengModel> AvengModel::createModelFromFile(EngineDevice& device, VkRenderData& renderData, const std::string& filepath)
+	//{
+	//	// DEPRECATED
+	//	//Builder builder{};
+	//	//builder.loadModel(filepath);
+	//	// return std::make_unique<AvengModel>(device, builder.vertices, builder.indices, filepath);
 
-		// V2
-		return std::make_unique<AvengModel>(device, renderData, filepath);
-	}
+	//	// V2
+	//	return std::make_unique<AvengModel>(device, renderData, filepath);
+	//}
 
-	std::unique_ptr<AvengModel> AvengModel::drawTriangle(EngineDevice& device, glm::vec3 pos, const std::string& filepath)
-	{
-		std::vector<Vertex> vertices { // vector
-			{ { pos.x, pos.y, pos.z }, {1.0f, 1.0f, 1.0f }, {1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } },
-			{ { pos.x + 0.5f,  pos.y + 0.5f, pos.z }, {1.0f, 1.0f, 1.0f }, {1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } },
-			{ { pos.x - 0.5f,  pos.y + 0.5f, pos.z }, {1.0f, 1.0f, 1.0f }, {1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } }
-		};
+	//std::unique_ptr<AvengModel> AvengModel::drawTriangle(EngineDevice& device, glm::vec3 pos, const std::string& filepath)
+	//{
+	//	std::vector<Vertex> vertices { // vector
+	//		{ { pos.x, pos.y, pos.z }, {1.0f, 1.0f, 1.0f }, {1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } },
+	//		{ { pos.x + 0.5f,  pos.y + 0.5f, pos.z }, {1.0f, 1.0f, 1.0f }, {1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } },
+	//		{ { pos.x - 0.5f,  pos.y + 0.5f, pos.z }, {1.0f, 1.0f, 1.0f }, {1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } }
+	//	};
 
-		std::vector<uint32_t> indices = { 0,1,2 };
-		return std::make_unique<AvengModel>(device, vertices, indices, filepath);
-	}
+	//	std::vector<uint32_t> indices = { 0,1,2 };
+	//	return std::make_unique<AvengModel>(device, vertices, indices, filepath);
+	//}
 
 	/**
 	* TODO - Make sure these buffers get VMA allocated
@@ -97,104 +97,104 @@ namespace aveng {
 		These buffers are used to write information to device memory
 		- vkMapMemory maps a buffer on the host to a buffer on the device
 	*/
-	void AvengModel::createVertexBuffers(const std::vector<Vertex>& vertices)
-	{
-		vertexCount = static_cast<uint32_t>(vertices.size());
-		assert(vertexCount >= 3 && "Vertex count must be at least 3");
-		// Size of a vertex * number of vertices
-		VkDeviceSize bufferSize = sizeof(vertices[0]) * vertexCount;
-		uint32_t vertexSize = sizeof(vertices[0]);
+	//void AvengModel::createVertexBuffers(const std::vector<Vertex>& vertices)
+	//{
+	//	vertexCount = static_cast<uint32_t>(vertices.size());
+	//	assert(vertexCount >= 3 && "Vertex count must be at least 3");
+	//	// Size of a vertex * number of vertices
+	//	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertexCount;
+	//	uint32_t vertexSize = sizeof(vertices[0]);
 
-		// Used to map data from the CPU to the GPU via staging buffer which will then copy the data to the device's optimal memory location
-		AvengBuffer stagingBuffer{
-			engineDevice,
-			vertexSize,
-			vertexCount,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VMA_MEMORY_USAGE_AUTO,
-			1, // minOffsetAlignment
-			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
-		};
+	//	// Used to map data from the CPU to the GPU via staging buffer which will then copy the data to the device's optimal memory location
+	//	AvengBuffer stagingBuffer{
+	//		engineDevice,
+	//		vertexSize,
+	//		vertexCount,
+	//		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	//		VMA_MEMORY_USAGE_AUTO,
+	//		1, // minOffsetAlignment
+	//		VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
+	//	};
 
-		// This takes care of vkMapMemory -> memcpy(vertices.data() ...) -> vkUnmapMemory
-		stagingBuffer.map();
-		stagingBuffer.writeToBuffer((void*)vertices.data());
+	//	// This takes care of vkMapMemory -> memcpy(vertices.data() ...) -> vkUnmapMemory
+	//	stagingBuffer.map();
+	//	stagingBuffer.writeToBuffer((void*)vertices.data());
 
-		vertexBuffer = std::make_unique<AvengBuffer>(
-			engineDevice,
-			vertexSize,
-			vertexCount,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // VMA automatically chooses fastest memory type available
-		);
+	//	vertexBuffer = std::make_unique<AvengBuffer>(
+	//		engineDevice,
+	//		vertexSize,
+	//		vertexCount,
+	//		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//		VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // VMA automatically chooses fastest memory type available
+	//	);
 
-		// Copy memory from the staging buffer to the vertex buffer
-		engineDevice.copyBuffer(stagingBuffer.getBuffer(), vertexBuffer->getBuffer(), bufferSize); // (src buffer, dst buffer, bufferSize)
+	//	// Copy memory from the staging buffer to the vertex buffer
+	//	engineDevice.copyBuffer(stagingBuffer.getBuffer(), vertexBuffer->getBuffer(), bufferSize); // (src buffer, dst buffer, bufferSize)
 
-	}
+	//}
 
-	/*
-		Create an index buffer in our device memory
-		These buffers are used to write information to device memory
-		- vkMapMemory maps a buffer on the host to a buffer on the device
-	*/
-	void AvengModel::createIndexBuffers(const std::vector<uint32_t>& indices)
-	{
-		indexCount = static_cast<uint32_t>(indices.size());
-		hasIndexBuffer = indexCount > 0;
+	///*
+	//	Create an index buffer in our device memory
+	//	These buffers are used to write information to device memory
+	//	- vkMapMemory maps a buffer on the host to a buffer on the device
+	//*/
+	//void AvengModel::createIndexBuffers(const std::vector<uint32_t>& indices)
+	//{
+	//	indexCount = static_cast<uint32_t>(indices.size());
+	//	hasIndexBuffer = indexCount > 0;
 
-		if (!hasIndexBuffer) return;
+	//	if (!hasIndexBuffer) return;
 
-		// Size of a vertex * number of indices
-		VkDeviceSize bufferSize = sizeof(indices[0]) * indexCount;
-		uint32_t indexSize = sizeof(indices[0]);
+	//	// Size of a vertex * number of indices
+	//	VkDeviceSize bufferSize = sizeof(indices[0]) * indexCount;
+	//	uint32_t indexSize = sizeof(indices[0]);
 
-		AvengBuffer stagingBuffer{
-			engineDevice,
-			indexSize,
-			indexCount,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VMA_MEMORY_USAGE_AUTO,
-			1, // minOffsetAlignment
-			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
-		};
+	//	AvengBuffer stagingBuffer{
+	//		engineDevice,
+	//		indexSize,
+	//		indexCount,
+	//		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	//		VMA_MEMORY_USAGE_AUTO,
+	//		1, // minOffsetAlignment
+	//		VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
+	//	};
 
-		stagingBuffer.map();
-		stagingBuffer.writeToBuffer((void*)indices.data());
+	//	stagingBuffer.map();
+	//	stagingBuffer.writeToBuffer((void*)indices.data());
 
-		indexBuffer = std::make_unique<AvengBuffer>(
-			engineDevice,
-			indexSize,
-			indexCount,
-			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // VMA automatically chooses fastest memory type available
-		);
+	//	indexBuffer = std::make_unique<AvengBuffer>(
+	//		engineDevice,
+	//		indexSize,
+	//		indexCount,
+	//		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//		VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // VMA automatically chooses fastest memory type available
+	//	);
 
-		engineDevice.copyBuffer(stagingBuffer.getBuffer(), indexBuffer->getBuffer(), bufferSize);
+	//	engineDevice.copyBuffer(stagingBuffer.getBuffer(), indexBuffer->getBuffer(), bufferSize);
 
-	}
+	//}
 
-	void AvengModel::draw(VkCommandBuffer commandBuffer) 
-	{
-		if (hasIndexBuffer) 
-		{
-			vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
-		}
-		else {
-			vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0);
-		}
-	}
+	//void AvengModel::draw(VkCommandBuffer commandBuffer) 
+	//{
+	//	if (hasIndexBuffer) 
+	//	{
+	//		vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+	//	}
+	//	else {
+	//		vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0);
+	//	}
+	//}
 
-	void AvengModel::drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance)
-	{
-		if (hasIndexBuffer)
-		{
-			vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, 0, 0, firstInstance);
-		}
-		else {
-			vkCmdDraw(commandBuffer, vertexCount, instanceCount, 0, firstInstance);
-		}
-	}
+	//void AvengModel::drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance)
+	//{
+	//	if (hasIndexBuffer)
+	//	{
+	//		vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, 0, 0, firstInstance);
+	//	}
+	//	else {
+	//		vkCmdDraw(commandBuffer, vertexCount, instanceCount, 0, firstInstance);
+	//	}
+	//}
 
 	void AvengModel::drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex) {
 		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
@@ -543,6 +543,15 @@ namespace aveng {
 	//	std::cout << filepath << " - UV Range: U(" << minU << " to " << maxU << ") V(" << minV << " to " << maxV << ")" << std::endl;
 
 	//}
+
+	std::string AvengModel::getModelFileName() {
+		return mModelFilename;
+	}
+
+	std::string AvengModel::getModelFileNamePath() {
+		return mModelFilenamePath;
+	}
+
 
 	bool AvengModel::loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags)
 	{

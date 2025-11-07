@@ -42,15 +42,15 @@ namespace aveng {
         void createPipelines(VkRenderPass renderPass, VkPipelineLayout pipelineLayout, uint32_t textureArraySize);
         
         // Get pipeline by name or ID
-        GFXPipeline* getPipeline(const std::string& name);
-        GFXPipeline* getPipeline(int id);
-        
-        // Get all pipeline names
-        std::vector<std::string> getPipelineNames() const;
-        
-        // Check if pipeline exists
-        bool hasPipeline(const std::string& name) const;
-        bool hasPipeline(int id) const;
+        //GFXPipeline* getPipeline(const std::string& name);
+        //GFXPipeline* getPipeline(int id);
+        //
+        //// Get all pipeline names
+        //std::vector<std::string> getPipelineNames() const;
+        //
+        //// Check if pipeline exists
+        //bool hasPipeline(const std::string& name) const;
+        //bool hasPipeline(int id) const;
         
     private:
         EngineDevice& engineDevice;
@@ -59,16 +59,16 @@ namespace aveng {
         std::map<int, GFXPipeline*> pipelinesById;  // Raw pointers for ID-based lookup
         
         // Helper methods
-        VkPolygonMode parsePolygonMode(const std::string& mode);
+       /* VkPolygonMode parsePolygonMode(const std::string& mode);
         VkCullModeFlags parseCullMode(const std::string& mode);
         VkFrontFace parseFrontFace(const std::string& face);
         VkBlendFactor parseBlendFactor(const std::string& factor);
-        VkBlendOp parseBlendOp(const std::string& op);
+        VkBlendOp parseBlendOp(const std::string& op);*/
         
         void createPipelineFromDefinition(const PipelineDefinition& def, VkRenderPass renderPass, 
                                         VkPipelineLayout pipelineLayout, uint32_t textureArraySize);
 
-        void createComputePipeline();
+        //void createComputePipeline();
     };
 
 } 

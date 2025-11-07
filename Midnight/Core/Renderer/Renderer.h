@@ -17,6 +17,7 @@
 #include "Core/app_object.h"
 #include "Core/data.h"
 #include "Utils/Timer.h"
+#include "Utils/glm_includes.h"
 #include "CoreVK/AvengStorageBuffer.h"
 #include "CoreVK/AvengUniformBuffer.h"
 #include "CoreVK/PipelineLayout.h"
@@ -36,6 +37,8 @@ namespace aveng {
 
 	class Renderer {
 
+		void updateTriangleCount();
+
 	public:
 
 		Renderer(AvengWindow& window, GameData& _gameData);
@@ -51,6 +54,16 @@ namespace aveng {
 		bool isFrameInProgress() const { return isFrameStarted; }
 		bool createPipelineLayouts();
 		bool createPipelines();
+
+		// These 8 functions might get moved to ObjectRenderSystem
+		bool hasModel(std::string modelFileName);
+		std::shared_ptr<AvengModel> getModel(std::string modelFileName);
+		bool addModel(std::string modelFileName);
+		void deleteModel(std::string modelFileName);
+		std::shared_ptr<AssimpInstance> addInstance(std::shared_ptr<AvengModel> model);
+		void addInstances(std::shared_ptr<AvengModel> model, int numInstances);
+		void deleteInstance(std::shared_ptr<AssimpInstance> instance);
+		void cloneInstance(std::shared_ptr<AssimpInstance> instance);
 
 		// Just use the returned values directly if working in renderer.cpp
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
@@ -102,14 +115,14 @@ namespace aveng {
 
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
-		const std::vector<AvengAppObject>& getAppObjects() const { return sceneLoader.getAppObjects(); };
+		// const std::vector<AvengAppObject>& getAppObjects() const { return sceneLoader.getAppObjects(); };
 
 		void renderLights();
 		int getLightCount() const { return u_LightsData.numLights; }
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();
 
-		void loadScenes(const char* filepath);
+		// void loadScenes(const char* filepath);
 		
 		// Pipeline management methods
 		bool reloadPipelineConfig(const std::string& configPath = "");
@@ -131,12 +144,12 @@ namespace aveng {
 		// Uniform buffer V1
 		LightsUbo u_LightsData{};
 
-		const char* default_scene_file = "scenes/demo-scene.json";
+		// const char* default_scene_file = "scenes/demo-scene.json";
 
 		// Engine systems
 		AvengWindow& aveng_window;
 		EngineDevice engineDevice{ aveng_window };			// The Engine Service - Stack allocated
-		AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
+		//AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
 		PointLightSystem pointLightSystem{ engineDevice };	// Light stuff
 		

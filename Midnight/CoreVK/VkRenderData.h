@@ -280,7 +280,7 @@ namespace aveng {
 
 		std::unique_ptr<AvengDescriptorSetLayout> rdAvengBasicDescriptorLayout = nullptr;
 		std::unique_ptr<AvengDescriptorSetLayout> rdAvengAnimationDescriptorLayout = nullptr;
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengTextureDescriptorLayout = nullptr; // Basic, no animations
+		std::unique_ptr<AvengDescriptorSetLayout> rdAvengTextureDescriptorLayout = nullptr;
 		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeTransformDescriptorLayout = nullptr;
 		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeMatrixMultDescriptorLayout = nullptr;
 		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeMatrixMultPerModelDescriptorLayout = nullptr;

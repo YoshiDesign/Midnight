@@ -1,23 +1,15 @@
 #include "Renderer.h"
-#include <iostream>
+#include <filesystem>
 #include <stdexcept>
+#include <iostream>
 #include <cassert>
 #include <cstdio>
 #include <array>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
 
 #define LOG(a) std::cout<<a<<std::endl;
 #define DESTROY_UNIFORM_BUFFERS 1	// Unused as far as I can tell
 
 namespace aveng {
-
-	// Push constants - now properly handled
-	struct PushConstantData {
-		glm::mat4 modelMatrix;
-		glm::mat4 normalMatrix;
-		int32_t boneMatrixOffset;  // For compatibility with animation system (unused here)
-	};
 
 	Renderer::Renderer(AvengWindow& window, GameData& _gameData) : aveng_window{ window }, gameData{_gameData}
 	{
@@ -37,7 +29,6 @@ namespace aveng {
 		setupDescriptors();
 
 		// Create pipelines now that descriptor layouts are ready
-		// createPipelines();
 		if (!createPipelineLayouts()) {
 			std::cerr << "error [Renderer 1]!" << std::endl;
 		}
@@ -50,6 +41,30 @@ namespace aveng {
 			std::cerr << "error [Renderer 3]!" << std::endl;
 		}
 
+		/* register callbacks */
+		mModelInstanceData.miModelCheckCallbackFunction = [this](std::string fileName) { return hasModel(fileName); };
+		mModelInstanceData.miModelAddCallbackFunction = [this](std::string fileName) { return addModel(fileName); };
+		mModelInstanceData.miModelDeleteCallbackFunction = [this](std::string modelName) { deleteModel(modelName); };
+
+		mModelInstanceData.miInstanceAddCallbackFunction = [this](std::shared_ptr<AvengModel> model) { return addInstance(model); };
+		mModelInstanceData.miInstanceAddManyCallbackFunction = [this](std::shared_ptr<AvengModel> model, int numInstances) { addInstances(model, numInstances); };
+		mModelInstanceData.miInstanceDeleteCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { deleteInstance(instance); };
+		mModelInstanceData.miInstanceCloneCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { cloneInstance(instance); };
+
+		/* signal graphics semaphore before doing anything else to be able to run compute submit */
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = &renderData.rdGraphicSemaphore;
+
+		VkResult result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+		if (result != VK_SUCCESS) {
+			std::printf("%s error: failed to submit initial semaphore (%i)\n", __FUNCTION__, result);
+		}
+
+		mFrameTimer.start();
+		std::printf("%s: Vulkan renderer initialized!\n");
+
 	}
 
 	Renderer::~Renderer()
@@ -59,10 +74,170 @@ namespace aveng {
 		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
 	}
 
-	void Renderer::loadScenes(const char* filepath)
-	{
 
+	bool Renderer::hasModel(std::string modelFileName) {
+		auto modelIter = std::find_if(mModelInstanceData.miModelList.begin(), mModelInstanceData.miModelList.end(),
+			[modelFileName](const auto& model) {
+			return model->getModelFileNamePath() == modelFileName || model->getModelFileName() == modelFileName;
+		});
+		return modelIter != mModelInstanceData.miModelList.end();
 	}
+
+	std::shared_ptr<AvengModel> Renderer::getModel(std::string modelFileName) {
+		auto modelIter = std::find_if(mModelInstanceData.miModelList.begin(), mModelInstanceData.miModelList.end(),
+			[modelFileName](const auto& model) {
+			return model->getModelFileNamePath() == modelFileName || model->getModelFileName() == modelFileName;
+		});
+		if (modelIter != mModelInstanceData.miModelList.end()) {
+			return *modelIter;
+		}
+		return nullptr;
+	}
+
+	bool Renderer::addModel(std::string modelFileName) {
+		if (hasModel(modelFileName)) {
+			std::printf("%s warning: model '%s' already existed, skipping\n", __FUNCTION__, modelFileName.c_str());
+			return false;
+		}
+
+		std::shared_ptr<AvengModel> model = std::make_shared<AvengModel>(engineDevice, renderData, modelFileName);
+		if (!model->loadModelV2(renderData, modelFileName)) {
+			std::printf("%s error: could not load model file '%s'\n", __FUNCTION__, modelFileName.c_str());
+			return false;
+		}
+
+		mModelInstanceData.miModelList.emplace_back(model);
+
+		/* also add a new instance here to see the model */
+		addInstance(model);
+
+		return true;
+	}
+
+	void Renderer::deleteModel(std::string modelFileName) {
+		std::string shortModelFileName = std::filesystem::path(modelFileName).filename().generic_string();
+
+		if (!mModelInstanceData.miAssimpInstances.empty()) {
+			mModelInstanceData.miAssimpInstances.erase(
+				std::remove_if(
+					mModelInstanceData.miAssimpInstances.begin(),
+					mModelInstanceData.miAssimpInstances.end(),
+					[shortModelFileName](std::shared_ptr<AssimpInstance> instance) {
+				return instance->getModel()->getModelFileName() == shortModelFileName;
+			}
+				),
+				mModelInstanceData.miAssimpInstances.end()
+			);
+		}
+
+		if (mModelInstanceData.miAssimpInstancesPerModel.count(shortModelFileName) > 0) {
+			mModelInstanceData.miAssimpInstancesPerModel[shortModelFileName].clear();
+			mModelInstanceData.miAssimpInstancesPerModel.erase(shortModelFileName);
+		}
+
+		/* add models to pending delete list */
+		for (const auto& model : mModelInstanceData.miModelList) {
+			if (model && (model->getTriangleCount() > 0)) {
+				mModelInstanceData.miPendingDeleteAvengModels.insert(model);
+			}
+		}
+
+		mModelInstanceData.miModelList.erase(
+			std::remove_if(
+				mModelInstanceData.miModelList.begin(),
+				mModelInstanceData.miModelList.end(),
+				[modelFileName](std::shared_ptr<AvengModel> model) {
+			return model->getModelFileName() == modelFileName;
+		}
+			)
+		);
+
+		updateTriangleCount();
+	}
+
+	std::shared_ptr<AssimpInstance> Renderer::addInstance(std::shared_ptr<AvengModel> model) {
+		std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model);
+		mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
+		mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
+
+		updateTriangleCount();
+
+		return newInstance;
+	}
+
+	void Renderer::addInstances(std::shared_ptr<AvengModel> model, int numInstances) {
+		size_t animClipNum = model->getAnimClips().size();
+		for (int i = 0; i < numInstances; ++i) {
+			int xPos = std::rand() % 50 - 25;
+			int zPos = std::rand() % 50 - 25;
+			int rotation = std::rand() % 360 - 180;
+			int clipNr = std::rand() % animClipNum;
+
+			std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model, glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
+			if (animClipNum > 0) {
+				InstanceSettings instSettings = newInstance->getInstanceSettings();
+				instSettings.isAnimClipNr = clipNr;
+				newInstance->setInstanceSettings(instSettings);
+			}
+
+			mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
+			mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
+		}
+		updateTriangleCount();
+	}
+
+	void Renderer::deleteInstance(std::shared_ptr<AssimpInstance> instance) {
+		std::shared_ptr<AvengModel> currentModel = instance->getModel();
+		std::string currentModelName = currentModel->getModelFileName();
+
+		mModelInstanceData.miAssimpInstances.erase(
+			std::remove_if(
+				mModelInstanceData.miAssimpInstances.begin(),
+				mModelInstanceData.miAssimpInstances.end(),
+				[instance](std::shared_ptr<AssimpInstance> inst) {
+			return inst == instance;
+		}
+			));
+
+
+		mModelInstanceData.miAssimpInstancesPerModel[currentModelName].erase(
+			std::remove_if(
+				mModelInstanceData.miAssimpInstancesPerModel[currentModelName].begin(),
+				mModelInstanceData.miAssimpInstancesPerModel[currentModelName].end(),
+				[instance](std::shared_ptr<AssimpInstance> inst) {
+			return inst == instance;
+		}
+			));
+
+		updateTriangleCount();
+	}
+
+	void Renderer::cloneInstance(std::shared_ptr<AssimpInstance> instance) {
+		std::shared_ptr<AvengModel> currentModel = instance->getModel();
+		std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(currentModel);
+		InstanceSettings newInstanceSettings = instance->getInstanceSettings();
+
+		/* slight offset to see new instance */
+		newInstanceSettings.isWorldPosition += glm::vec3(1.0f, 0.0f, -1.0f);
+		newInstance->setInstanceSettings(newInstanceSettings);
+
+		mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
+		mModelInstanceData.miAssimpInstancesPerModel[currentModel->getModelFileName()].emplace_back(newInstance);
+
+		updateTriangleCount();
+	}
+
+	void Renderer::updateTriangleCount() {
+		renderData.rdTriangleCount = 0;
+		for (const auto& instance : mModelInstanceData.miAssimpInstances) {
+			renderData.rdTriangleCount += instance->getModel()->getTriangleCount();
+		}
+	}
+
+	//void Renderer::loadScenes(const char* filepath)
+	//{
+
+	//}
 
 	/*
 	* Important: Recreating the swapchain isn't sufficient if the image format changes
@@ -283,7 +458,7 @@ namespace aveng {
 	void Renderer::setupDescriptors()
 	{
 
-		int numObjects = sceneLoader.getObjectCount();
+		// int numObjects = sceneLoader.getObjectCount();
 
 		// Create Descriptor Pools using dynamic texture count
 		renderData.avengDescriptorPool = AvengDescriptorPool::Builder(engineDevice)
@@ -515,7 +690,6 @@ namespace aveng {
 		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));
 		memset(u_LightsData.lightColors, 0, sizeof(u_LightsData.lightColors));
 	}
-
 
 	bool Renderer::createPipelineLayouts() {
 		/* non-animated model */
@@ -1091,10 +1265,10 @@ namespace aveng {
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout);
 		
 
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpDescriptorSet);
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpSkinningDescriptorSet);
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpComputeTransformDescriptorSet);
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &mRenderData.rdAssimpComputeMatrixMultDescriptorSet);
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpDescriptorSet);
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpSkinningDescriptorSet);
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpComputeTransformDescriptorSet);
+		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpComputeMatrixMultDescriptorSet);
 
 		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengDescriptorSets);
 		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengAnimationDescriptorSets);
@@ -1104,14 +1278,14 @@ namespace aveng {
 		// TODO - Light Descriptor Cleanup, check texture descriptor cleanup, etc.
 
 		// These should be handled by the implicit destructor
-		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpSkinningDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpTextureDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpComputeTransformDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpComputeMatrixMultDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(mRenderData.rdVkbDevice.device, mRenderData.rdAssimpComputeMatrixMultPerModelDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpSkinningDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpTextureDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpComputeTransformDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpComputeMatrixMultDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpComputeMatrixMultPerModelDescriptorLayout, nullptr);
 		// Ditto
-		//vkDestroyDescriptorPool(mRenderData.rdVkbDevice.device, mRenderData.rdDescriptorPool, nullptr);
+		//vkDestroyDescriptorPool(renderData.rdVkbDevice.device, renderData.rdDescriptorPool, nullptr);
 
 		std::printf("%s: Vulkan renderer destroyed\n", __FUNCTION__);
 	}

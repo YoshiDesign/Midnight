@@ -48,9 +48,6 @@
     <ClCompile Include="Core\UUID.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\aveng_scene_loader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CoreVK\PointLightSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1140,9 +1137,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\data.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\aveng_scene_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CoreVK\PointLightSystem.h">

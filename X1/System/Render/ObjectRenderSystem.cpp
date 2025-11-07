@@ -142,7 +142,7 @@ namespace aveng {
 	{
 		std::cout << "Loading scene from: " << scenePath << std::endl;
 		
-		renderer.loadScenes(scenePath.c_str());
+		//renderer.loadScenes(scenePath.c_str());
 	}
 
 } //
