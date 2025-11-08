@@ -265,12 +265,12 @@ namespace aveng {
 		/**
 		* Sync
 		*/
-		VkSemaphore rdPresentSemaphore = VK_NULL_HANDLE;
-		VkSemaphore rdRenderSemaphore = VK_NULL_HANDLE;
-		VkSemaphore rdGraphicSemaphore = VK_NULL_HANDLE;
-		VkSemaphore rdComputeSemaphore = VK_NULL_HANDLE;
-		VkFence rdRenderFence = VK_NULL_HANDLE;
-		VkFence rdComputeFence = VK_NULL_HANDLE;
+		std::vector<VkSemaphore> rdPresentSemaphore;
+		std::vector<VkSemaphore>rdRenderSemaphore;
+		std::vector<VkSemaphore>rdGraphicSemaphore;
+		std::vector<VkSemaphore>rdComputeSemaphore;
+		std::vector<VkFence>rdRenderFence;
+		std::vector<VkFence>rdComputeFence;
 
 		/*
 		* Descriptors

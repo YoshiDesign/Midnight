@@ -860,13 +860,13 @@ namespace aveng {
 
     }
 
-    bool EngineDevice::initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers)
+    bool EngineDevice::initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers, const char* type)
     {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         // Command buffer memory is allocated from a command pool
-        allocInfo.commandPool = commandPoolGraphics();
+        allocInfo.commandPool = type == "compute" ? commandPoolCompute() : commandPoolGraphics();
         allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
         if (vkAllocateCommandBuffers(_device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)

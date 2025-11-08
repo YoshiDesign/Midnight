@@ -107,7 +107,7 @@ namespace aveng {
 
         // V2
         VkCommandBuffer createSingleShotBuffer();  // allocates a new one-time buffer. Deprecate this, probably
-        bool initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers);
+        bool initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers, const char* type = "graphics");
         bool beginSingleShotCommand(VkCommandBuffer& commandBuffer); // Reuses a reset command buffer (faster)
         bool beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo);
         bool submitSingleShotBuffer(VkCommandBuffer commandBuffer);

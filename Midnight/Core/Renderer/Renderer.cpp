@@ -37,7 +37,7 @@ namespace aveng {
 		}
 
 		// Initialize PointLightSystem now that descriptor layouts are created
-		initializePointLightSystem();
+		// initializePointLightSystem();
 
 		editor.init(window, aveng_swapchain.get());
 
@@ -51,16 +51,19 @@ namespace aveng {
 		mModelInstanceData.miInstanceDeleteCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { deleteInstance(instance); };
 		mModelInstanceData.miInstanceCloneCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { cloneInstance(instance); };
 
-		/* signal graphics semaphore before doing anything else to be able to run compute submit */
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &renderData.rdGraphicSemaphore;
+		/* signal graphics semaphores before doing anything else to be able to run compute submit */
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			VkSubmitInfo submitInfo{};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.signalSemaphoreCount = 1;
+			submitInfo.pSignalSemaphores = &renderData.rdGraphicSemaphore[i];
 
-		VkResult result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-		if (result != VK_SUCCESS) {
-			std::printf("%s error: failed to submit initial semaphore (%i)\n", __FUNCTION__, result);
+			VkResult result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+			if (result != VK_SUCCESS) {
+				std::printf("%s error: failed to submit initial semaphore for frame %i (%i)\n", __FUNCTION__, i, result);
+			}
 		}
+		vkQueueWaitIdle(engineDevice.graphicsQueue());
 
 		mFrameTimer.start();
 		std::printf("%s: Vulkan renderer initialized!\n");
@@ -71,6 +74,7 @@ namespace aveng {
 	{
 		std::cout << "Destroying Renderer..." << std::endl;
 		freeCommandBuffers();
+		cleanup();
 		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
 	}
 
@@ -291,7 +295,7 @@ namespace aveng {
 		renderData.rdCommandBuffersCompute.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		engineDevice.initCommandBuffers(renderData.rdCommandBuffersGraphics);
-		engineDevice.initCommandBuffers(renderData.rdCommandBuffersCompute);
+		engineDevice.initCommandBuffers(renderData.rdCommandBuffersCompute, "compute");
 
 	}
 
@@ -320,7 +324,30 @@ namespace aveng {
 	{
 		assert(!isFrameStarted && "Can't call beginFrame while already in progress.");
 
-		auto result = aveng_swapchain->acquireNextImage(&currentImageIndex);
+		/* wait for both fences before getting the new framebuffer image */
+		std::vector<VkFence> waitFences = { renderData.rdComputeFence[currentFrameIndex], renderData.rdRenderFence[currentFrameIndex] };
+		VkResult result = vkWaitForFences(
+			engineDevice.device(),
+			static_cast<uint32_t>(waitFences.size()),
+			waitFences.data(),
+			VK_TRUE,
+			UINT64_MAX
+		);
+
+		if (result != VK_SUCCESS) {
+			std::printf("%s error: waiting for fences failed (error: %i)\n", __FUNCTION__, result);
+			throw std::runtime_error("waiting for fences failed");
+		}
+		//currentImageIndex = 0;
+		// Acquire an image from the swap chain
+		result = vkAcquireNextImageKHR(
+			engineDevice.device(),
+			aveng_swapchain->getSwapchain(),
+			UINT64_MAX, //std::numeric_limits<uint64_t>::max(), // Is this more portable?
+			renderData.rdPresentSemaphore[currentFrameIndex],  // Can be an unsignaled semaphore, fence, or both
+			VK_NULL_HANDLE,
+			&currentImageIndex
+		);
 
 		// This error will occur after window resize
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -337,25 +364,16 @@ namespace aveng {
 		isFrameStarted = true;
 
 		// This is the first point during a new frame where the command buffer is first captured.
-		commandBuffer = getCurrentCommandBufferGraphics();
+		assert(renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics()
+			&& "Incorrect Command Buffer in use");
 
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+		if (vkBeginCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex], &beginInfo) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Command Buffer failed to begin recording.");
 		}
-
-		/**
-		 * Next Step, begin the render pass
-		 */
-
-		// Clear Color for now
-		glm::vec3 clear_color = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
-
-		// This might be better off happening AFTER a certain block of the draw() method
-		beginSwapChainRenderPass(commandBuffer, clear_color);
 
 	}
 
@@ -364,17 +382,57 @@ namespace aveng {
 	{
 		assert(isFrameStarted && "Can't call endFrame while frame is not in progress.");
 
-		
-		commandBuffer = getCurrentCommandBufferGraphics();
-		endSwapChainRenderPass(commandBuffer);
-		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+		endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+		if (vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex]) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to record command buffer.");
 		}
 
-
 		// Submit to graphics queue while handling cpu and gpu sync, executing the command buffers. NOTE: Why are we passing the image index in a pointer?
-		auto result = aveng_swapchain->submitCommandBuffers(&commandBuffer, &currentImageIndex);
+		//auto result = aveng_swapchain->submitCommandBuffers(&commandBuffer, &currentImageIndex); DEPRECATED
+
+		/* submit command buffer */
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore[currentFrameIndex], renderData.rdPresentSemaphore[currentFrameIndex]};
+		std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+		/* compute shader: contine if in vertex input ready
+		 * vertex shader: wait for color attachment output ready */
+		submitInfo.pWaitDstStageMask = waitStages.data();
+
+		submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
+		submitInfo.pWaitSemaphores = waitSemaphores.data();
+
+		std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore[currentFrameIndex], renderData.rdGraphicSemaphore[currentFrameIndex]};
+
+		submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
+		submitInfo.pSignalSemaphores = signalSemaphores.data();
+
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &renderData.rdCommandBuffersGraphics[currentFrameIndex];
+
+		result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence[currentFrameIndex]);
+		if (result != VK_SUCCESS) {
+			std::printf("%s error: failed to submit draw command buffer (%i)\n", __FUNCTION__, result);
+			throw std::runtime_error("failed to submit draw command buffer");
+		}
+
+		/* trigger swapchain image presentation */
+		VkPresentInfoKHR presentInfo{};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &renderData.rdRenderSemaphore[currentFrameIndex];
+
+		VkSwapchainKHR swapchain = aveng_swapchain->getSwapchain();
+
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = &swapchain;
+
+		presentInfo.pImageIndices = &currentImageIndex;
+
+		result = vkQueuePresentKHR(engineDevice.presentQueue(), &presentInfo);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || aveng_window.wasWindowResized())
 		{
@@ -397,20 +455,18 @@ namespace aveng {
 	}
 
 
-	void  Renderer::beginSwapChainRenderPass(VkCommandBuffer _commandBufferGraphics, glm::vec3 rgb)
+	void  Renderer::beginSwapChainRenderPass()
 	{
-	
+
 		assert(isFrameStarted && "Can't call beginSwapChain if frame is not in progress.");
 		assert(
-			_commandBufferGraphics == getCurrentCommandBufferGraphics() && 
+			renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics() &&
 			"Can't begin render pass on command buffer from a different frame");
 
+		// Clear Color for now
+		glm::vec3 rgb = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
 
-		/*
-			Record Commands
-		*/
-
-		// 1. Begin a render pass
+		// Render pass info
 		VkRenderPassBeginInfo renderPassInfo{};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassInfo.renderPass = aveng_swapchain->getRenderPass();
@@ -426,12 +482,10 @@ namespace aveng {
 		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 		renderPassInfo.pClearValues = clearValues.data();
 
-		// 2. Submit to command buffers to begin the render pass
-
 		// VK_SUBPASS_CONTENTS_INLINE signals that subsequent renderpass commands come directly from the primary command buffer.
 		// No secondary buffers are currently being utilized.
-		// For this reason we cannot Mix both Inline command buffers AND secondary command buffers in our render pass execution.
-		vkCmdBeginRenderPass(_commandBufferGraphics, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		// For this reason we cannot Mix both Inline command buffers AND secondary command buffers in this render pass's execution.
+		vkCmdBeginRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		// Configure the viewport and scissor
 		VkViewport viewport{};
@@ -442,8 +496,8 @@ namespace aveng {
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		VkRect2D scissor{ {0, 0}, aveng_swapchain->getSwapChainExtent() };
-		vkCmdSetViewport(_commandBufferGraphics, 0, 1, &viewport);
-		vkCmdSetScissor(_commandBufferGraphics, 0, 1, &scissor);
+		vkCmdSetViewport(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0, 1, &viewport);
+		vkCmdSetScissor(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0, 1, &scissor);
 
 	}
 
@@ -592,7 +646,7 @@ namespace aveng {
 		/* imageViews */
 		renderData.rdAvengTextureDescriptorLayout =
 			AvengDescriptorSetLayout::Builder(engineDevice)
-			.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, currentTextureCount) // Image Views
+			.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1) // Texture count is 1 for now
 			.build();
 
 		/* non-animated shader */
@@ -661,15 +715,17 @@ namespace aveng {
 		if (u_LightsData.numLights <= 0) {
 			return; // Nothing to render
 		}
-		commandBuffer = getCurrentCommandBufferGraphics();
-		pointLightSystem.getPipeline()->bind(commandBuffer);
+		assert(renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics()
+			&& "Point Light system is using the wrong command buffer");
+
+		pointLightSystem.getPipeline()->bind(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
 
 		// vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengPipeline);
 
 		// Bind both descriptor sets
 		VkDescriptorSet descriptorSets[2] = { renderData.rdAvengDescriptorSets[currentFrameIndex], renderData.basicLightingDescriptorSets[currentFrameIndex] };
 		vkCmdBindDescriptorSets(
-			commandBuffer,
+			renderData.rdCommandBuffersGraphics[currentFrameIndex],
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
 			pointLightSystem.getPipelineLayout(),
 			0,
@@ -679,7 +735,7 @@ namespace aveng {
 			nullptr);
 
 		// Use instanced rendering: 6 vertices per light, numLights instances
-		vkCmdDraw(commandBuffer, 6, u_LightsData.numLights, 0, 0);
+		vkCmdDraw(renderData.rdCommandBuffersGraphics[currentFrameIndex], 6, u_LightsData.numLights, 0, 0);
 	}
 
 	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
@@ -887,14 +943,7 @@ namespace aveng {
 		renderData.rdMatrixGenerateTime = 0.0f;
 		renderData.rdUIGenerateTime = 0.0f;
 
-		/* wait for both fences before getting the new framebuffer image */
-		std::vector<VkFence> waitFences = { renderData.rdComputeFence };
-		VkResult result = vkWaitForFences(engineDevice.device(),
-			static_cast<uint32_t>(waitFences.size()), waitFences.data(), VK_TRUE, UINT64_MAX);
-		if (result != VK_SUCCESS) {
-			std::printf("%s error: waiting for fences failed (error: %i)\n", __FUNCTION__, result);
-			return false;
-		}
+		beginFrame();
 
 		/* calculate the size of the node matrix buffer over all animated instances */
 		size_t boneMatrixBufferSize = 0;
@@ -996,7 +1045,7 @@ namespace aveng {
 		}
 
 		/* record compute commands */
-		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence);
+		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence[currentFrameIndex]);
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
 			return false;
@@ -1046,12 +1095,12 @@ namespace aveng {
 			computeSubmitInfo.commandBufferCount = 1;
 			computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute[currentFrameIndex];
 			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore;
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
 			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore;
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
 			computeSubmitInfo.pWaitDstStageMask = &waitStage;
 
-			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence);
+			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
 				return false;
@@ -1064,12 +1113,13 @@ namespace aveng {
 			VkSubmitInfo computeSubmitInfo{};
 			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore;
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
 			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore;
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
 			computeSubmitInfo.pWaitDstStageMask = &waitStage;
 
-			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence);
+			// No Validation errors on first frame
+			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
 				return false;
@@ -1086,20 +1136,21 @@ namespace aveng {
 
 		if (bufferResized) {
 			updateDescriptorSets();
+			updateComputeDescriptorSets();
 		}
 
 		/* start with graphics rendering */
-		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence);
+		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence[currentFrameIndex]);
 		if (result != VK_SUCCESS) {
 			std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
 			return false;
 		}
 
-		// NOTE: This destroys the current renderpass
-		//if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0)) {
-		//	std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);
-		//	return false;
-		//}
+		// NOTE: This would destroy the current renderpass (if there were one)
+		if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0)) {
+			std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);
+			return false;
+		}
 
 		////setupCommandBuffer = engineDevice.beginSingleTimeCommands()
 
@@ -1116,10 +1167,12 @@ namespace aveng {
 		//* [!][!]
 		//*/
 
-		//if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersGraphics[currentFrameIndex])) {
-		//	std::printf("%s error: failed to begin command buffer\n", __FUNCTION__);
-		//	return false;
-		//}
+		if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersGraphics[currentFrameIndex])) {
+			std::printf("%s error: failed to begin command buffer\n", __FUNCTION__);
+			return false;
+		}
+
+		beginSwapChainRenderPass();
 
 		/* draw the models */
 		uint32_t worldPosOffset = 0;
@@ -1175,17 +1228,13 @@ namespace aveng {
 			}
 		}
 
-		renderLights();
+		//renderLights();
 
 #ifdef ENABLE_EDITOR
 		renderEditor();
 #endif
 
-		// Is this necessary?
-		//if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex])) {
-		//	std::printf("%s error: failed to end command buffer\n", __FUNCTION__);
-		//	return false;
-		//}
+		endFrame();
 
 		return true;
 	}
@@ -1255,7 +1304,16 @@ namespace aveng {
 	}
 
 	bool Renderer::createSyncObjects() {
-		if (!SyncObjects::init(engineDevice, renderData)) {
+
+		renderData.rdPresentSemaphore.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdRenderSemaphore.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdGraphicSemaphore.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdComputeSemaphore.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+		renderData.rdRenderFence.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdComputeFence.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+		if (!SyncObjects::init(engineDevice, renderData, SwapChain::MAX_FRAMES_IN_FLIGHT)) {
 			std::printf("%s error: could not create sync objects\n", __FUNCTION__);
 			return false;
 		}
@@ -1280,7 +1338,7 @@ namespace aveng {
 
 		// mUserInterface.cleanup(renderData);
 
-		SyncObjects::cleanup(engineDevice, renderData);
+		SyncObjects::cleanup(engineDevice, renderData, SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengPipeline);
 		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengAnimationPipeline);
@@ -1298,10 +1356,10 @@ namespace aveng {
 		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpComputeTransformDescriptorSet);
 		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpComputeMatrixMultDescriptorSet);
 
-		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengDescriptorSets);
-		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengAnimationDescriptorSets);
-		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeTransformDescriptorSets);
-		renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeMatrixMultDescriptorSets);
+		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengDescriptorSets);
+		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengAnimationDescriptorSets);
+		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeTransformDescriptorSets);
+		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeMatrixMultDescriptorSets);
 
 		// TODO - Light Descriptor Cleanup, check texture descriptor cleanup, etc.
 

@@ -67,8 +67,6 @@ namespace aveng {
 		// This needs to be updated to accommodate game data
 		updateData(frameTime);
 
-		renderer.beginFrame();
-
 		// Update frame data in renderer
 		renderer.updateFrameData(aveng_camera.getProjection(), aveng_camera.getView());
 
@@ -77,7 +75,7 @@ namespace aveng {
 		// Render lights -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
 		// renderer.renderLights();
 	
-		renderer.endFrame();
+		// renderer.endFrame();
 	}
 
 	void ObjectRenderSystem::updateCamera(float frameTime)

@@ -38,9 +38,11 @@ namespace aveng {
         size_t               swapChainImagesSize() { return swapChainImages.size(); }
         std::vector<VkImageView>& getSwapChainImageViews() { return swapChainImageViews; }
 
-        VkResult            submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex);
-        VkResult            acquireNextImage(uint32_t* imageIndex);
+        //VkResult            submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex);
+        //VkResult            acquireNextImage(uint32_t* imageIndex);
         VkFormat            findDepthFormat();
+
+        VkSwapchainKHR getSwapchain() { return swapChain; }
 
         void createTextureImageViews();
 
@@ -62,7 +64,7 @@ namespace aveng {
         void createDepthResources();
         void createRenderPass();
         void createFramebuffers();
-        void createSyncObjects();
+        // void createSyncObjects();
 
         // Helper functions
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
@@ -88,13 +90,11 @@ namespace aveng {
         VkSwapchainKHR swapChain;
         std::shared_ptr<SwapChain> oldSwapChain;
 
-        std::vector<VkSemaphore> imageAvailableSemaphores;
-        std::vector<VkSemaphore> renderFinishedSemaphores;
-        std::vector<VkFence> inFlightFences;
-        std::vector<VkFence> imagesInFlight;
+        //std::vector<VkSemaphore> imageAvailableSemaphores;
+        //std::vector<VkSemaphore> renderFinishedSemaphores;
+        //std::vector<VkFence> inFlightFences;
+        //std::vector<VkFence> imagesInFlight;
         size_t currentFrame = 0;
-
-        VkImageView textureImageView;
 
     };
 

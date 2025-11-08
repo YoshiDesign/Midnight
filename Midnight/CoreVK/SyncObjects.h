@@ -8,7 +8,7 @@
 namespace aveng {
     class SyncObjects {
     public:
-        static bool init(EngineDevice& engineDevice, VkRenderData& renderData);
-        static void cleanup(EngineDevice& engineDevice, VkRenderData& renderData);
+        static bool init(EngineDevice& engineDevice, VkRenderData& renderData, int frames);
+        static void cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames);
     };
 }

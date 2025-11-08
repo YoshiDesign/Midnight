@@ -104,7 +104,7 @@ namespace aveng {
 		bool draw(float deltaTime);
 		void beginFrame();
 		void endFrame();
-		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, glm::vec3 rgb);
+		void beginSwapChainRenderPass();
 		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
 		// New methods for descriptor/buffer management
@@ -131,7 +131,12 @@ namespace aveng {
 		void cleanup();
 
 	private:
+		// Engine systems
+		AvengWindow& aveng_window;
+		EngineDevice engineDevice{ aveng_window };			// The Engine Service - Stack allocated
+
 		VkResult err;
+		VkResult result;
 		GameData& gameData;
 		VkRenderData renderData;
 
@@ -146,9 +151,7 @@ namespace aveng {
 
 		// const char* default_scene_file = "scenes/demo-scene.json";
 
-		// Engine systems
-		AvengWindow& aveng_window;
-		EngineDevice engineDevice{ aveng_window };			// The Engine Service - Stack allocated
+		
 		//AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
 		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
@@ -172,10 +175,6 @@ namespace aveng {
 		VkPipelineLayout pipelineLayout{};
 		void createPipelineLayout();
 		bool pipelineCreated = false;
-
-		// NOTE: This could be problematic since we're indirectly using the rd command buffers
-		VkCommandBuffer commandBuffer;
-		VkCommandBuffer computeCommandBuffer;
 
 		// Descriptors and Buffers
 		std::vector<std::unique_ptr<AvengBuffer>> mPerspectiveViewMatrixUBOBuffers;
