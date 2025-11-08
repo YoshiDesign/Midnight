@@ -105,7 +105,7 @@ namespace aveng {
 
     AvengBuffer::~AvengBuffer() 
     {
-        std::cout << "Destroying Buffer: " << usingVMA << std::endl;
+        std::cout << "Destroying AvengBuffer: " << usingVMA << std::endl;
         unmap();
         
         if (usingVMA) {

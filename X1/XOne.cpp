@@ -35,20 +35,21 @@ namespace aveng {
 
 		//camera.setViewTarget(glm::vec3(-1.f, -2.f, -20.f), glm::vec3(0.f, 0.f, 3.5f));
 
-		auto currentTime = std::chrono::high_resolution_clock::now();
+		std::chrono::time_point<std::chrono::steady_clock> loopStartTime = std::chrono::steady_clock::now();
+		std::chrono::time_point<std::chrono::steady_clock> loopEndTime = std::chrono::steady_clock::now();
 
 		// Render Loop
 		while (!aveng_window.shouldClose()) {
 
+			objectRenderSystem.render(frameTime);
+
 			// Potentially blocking
 			glfwPollEvents();
 
-			// Calculate time between iterations
-			auto newTime = std::chrono::high_resolution_clock::now();
-			frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
-			currentTime = newTime;
-
-			objectRenderSystem.render(frameTime);
+			// Calculate time between frames
+			loopEndTime = std::chrono::steady_clock::now();
+			frameTime = std::chrono::duration<float, std::chrono::seconds::period>(loopEndTime - loopStartTime).count();
+			loopStartTime = loopEndTime;
 
 		}
 

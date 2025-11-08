@@ -36,24 +36,25 @@ namespace aveng {
 
             // you probably meant size in bytes, not just element count
             const size_t dataSize = bufferData.size() * sizeof(T);
+            const size_t requiredSize = bufferData.size() * ssbo->getAlignmentSize();
 
             bool bufferResized = false;
 
             // compare bytes-to-bytes
-            if (dataSize > ssbo->getBufferSize()) {
+            if (requiredSize > ssbo->getBufferSize()) {
                 std::printf("%s: [1] resize SSBO %p from %zu to %zu bytes\n",
                     __FUNCTION__,
                     ssbo->getBuffer(),
                     ssbo->getBufferSize(),
                     dataSize);
-                return false;
+                bufferResized = true;
             }
 
             VkResult result = ssbo->map();
             if (result != VK_SUCCESS) {
                 std::printf("%s error: could not map SSBO memory (error: %i)\n",
                     __FUNCTION__, result);
-                return false;
+                bufferResized = true;
             }
 
             // you probably want to pass the data to the buffer:

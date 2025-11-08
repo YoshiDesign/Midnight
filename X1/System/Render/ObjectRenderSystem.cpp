@@ -72,42 +72,11 @@ namespace aveng {
 		// Update frame data in renderer
 		renderer.updateFrameData(aveng_camera.getProjection(), aveng_camera.getView());
 
-		//// Prepare object data for rendering - TODO (Too many declarations!!!)
-		//std::vector<std::tuple<ObjectUniformData, glm::mat4, glm::mat4, AvengModel*>> objectData;
-		//for (const auto& obj : renderer.getAppObjects()) {
-		//	ObjectUniformData objUniform{ obj.get_texture() };		// Model's texture index
-		//	glm::mat4 modelMatrix = obj.transform._mat4();			// Local model matrix
-		//	glm::mat4 normalMatrix = obj.transform.normalMatrix();	// Local model normal matrix
-		//	AvengModel* model = obj.model.get();						// TODO: This is a shared ptr
-		//	//std::cout << "Object to render: " << model->path << std::endl;
-		//	objectData.emplace_back(objUniform, modelMatrix, normalMatrix, model);
-		//}
-
-		//if (firstFrame) {
-		//	std::cout << "First Frame!" << std::endl;
-		//	std::cout << "Objects this frame: " << objectData.size() << std::endl;
-		//	firstFrame = false;
-		//}
 		renderer.draw(frameTime);
-		/*
-			NOTE: renderer.renderObjectsInstanced uses the pipelineManager to select/bind the gfxpipeline
-				  Whereas renderer.renderLights punts to the pointLightSystem which handles gfxpipeline binding on its own
-		*/
-		// Render regular objects (standard pipeline) -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
-		//renderer.renderObjectsInstanced(objectData);
-		// renderer.renderObjects(objectData);
 
-		// STEP 1F: Enable animation rendering pipeline  
-		//if (!animatedInstances.empty()) {
-		//	renderer.renderAnimatedModels(animatedInstances);
-		//}
-		
 		// Render lights -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
-		renderer.renderLights();
+		// renderer.renderLights();
 	
-#ifdef ENABLE_EDITOR
-		renderer.renderEditor();
-#endif
 		renderer.endFrame();
 	}
 

@@ -207,7 +207,6 @@ namespace aveng {
 	};
 
 	struct VkUploadMatrices {
-		alignas(16) glm::vec4 ambientLight{};
 		alignas(16) glm::mat4 viewMatrix{};
 		alignas(16) glm::mat4 projectionMatrix{};
 	};

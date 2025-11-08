@@ -1,3 +1,12 @@
+
+## Things that might f*ck you up (and some questions):
+- Call order of buffer writes. see AvengStorageBuffer map -> write -> unmap -> flush
+- SSBO resizing!
+- There's a buffer for each MAX_FRAMES_IN_FLIGHT, or there's only 1 in certain cases. What are those certain cases?
+- Utilization of the GfxPipeline class vs. the new approach.
+- Missing member variable init/usage due to my not using the lower lvl details and engine setup.
+
+
 ## Immediate TODO
 [x] Re-implement command buffer command submission (you're freeing them too frequently instead of taking a more common approach)
 

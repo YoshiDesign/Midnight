@@ -12,10 +12,9 @@ const vec2 OFFSETS[6] = vec2[](
 layout (location = 0) out vec2 fragOffset;
 layout (location = 1) out vec4 lightColor;
 
-layout(set = 0, binding = 0) uniform GlobalUbo {
+layout(set = 0, binding = 0) uniform Matrices {
 	mat4 projection;
 	mat4 view;
-	vec4 ambientLightColor; // w is intensity
 } ubo;
 
 // Lights uniform buffer - matches fragment shader layout
@@ -31,7 +30,7 @@ void main() {
 	
 	if (lightIndex >= lightsUbo.numLights) {
 		// Render off-screen if we're beyond the number of lights
-		gl_Position = vec4(-2.0, -2.0, -2.0, 1.0);
+		gl_Position = vec4(-2.0, -2.0, -2.0, 1.0); // ai nonsense
 		return;
 	}
 

@@ -67,7 +67,6 @@ namespace aveng {
 		unsigned int getTriangleCount();
 
 		void bind(VkCommandBuffer commandBuffer);
-		void bindInstanced(VkCommandBuffer commandBuffer, VkBuffer instanceBuffer); // DEPRECATED
 		void draw(VkCommandBuffer commandBuffer);
 		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex);
 		void drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);

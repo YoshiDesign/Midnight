@@ -1,15 +1,19 @@
-#include "PointLightSystem.h"
 #include <stdexcept>
 #include <cassert>
+#include "PointLightSystem.h"
 
 namespace aveng {
 
-	PointLightSystem::PointLightSystem(EngineDevice& device) : engineDevice{ device } 
+	PointLightSystem::PointLightSystem(EngineDevice& device, VkRenderData& renderData) 
+		: engineDevice{ device }, renderData{ renderData }
 	{}
 
-	void PointLightSystem::initialize(VkRenderPass renderPass, VkDescriptorSetLayout globalDescriptorSetLayout, VkDescriptorSetLayout lightsDescriptorSetLayout)
+	void PointLightSystem::initialize(VkRenderPass renderPass)
 	{
-		VkDescriptorSetLayout descriptorSetLayouts[2] = { globalDescriptorSetLayout, lightsDescriptorSetLayout };
+		VkDescriptorSetLayout descriptorSetLayouts[2] = { 
+			renderData.rdAvengBasicDescriptorLayout->getDescriptorSetLayout(), 
+			renderData.rdAvengBasicLightingDescriptorLayout->getDescriptorSetLayout()};
+
 		createPipelineLayout(descriptorSetLayouts);
 		createPipeline(renderPass);
 	}
@@ -67,28 +71,9 @@ namespace aveng {
 		);
 	}
 
-	void PointLightSystem::render(VkDescriptorSet globalDescriptorSet, VkDescriptorSet lightsDescriptorSet, VkCommandBuffer commandBuffer, int numLights)
-	{
-		if (numLights <= 0) {
-			return; // Nothing to render
-		}
+	//void PointLightSystem::render(int frameIndex, VkCommandBuffer commandBuffer, int numLights)
+	//{
 
-		gfxPipeline->bind(commandBuffer);
-	
-		// Bind both descriptor sets
-		VkDescriptorSet descriptorSets[2] = { globalDescriptorSet, lightsDescriptorSet };
-		vkCmdBindDescriptorSets(
-			commandBuffer,
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipelineLayout,
-			0,
-			2, // binding 2 descriptor sets
-			descriptorSets,
-			0,
-			nullptr);
-
-		// Use instanced rendering: 6 vertices per light, numLights instances
-		vkCmdDraw(commandBuffer, 6, numLights, 0, 0);
-	}
+	//}
 
 } 

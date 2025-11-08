@@ -52,7 +52,7 @@ namespace aveng {
                                 continue;
                             }
 
-                            // do not try to load internal textures
+                            // internal textures
                             if (!texName.empty() && texName.find("*") != 0) {
                                 VkTextureData newTex{};
                                 std::string texNameWithPath = assetDirectory + '/' + texName;

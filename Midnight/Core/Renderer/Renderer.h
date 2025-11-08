@@ -151,7 +151,7 @@ namespace aveng {
 		EngineDevice engineDevice{ aveng_window };			// The Engine Service - Stack allocated
 		//AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
-		PointLightSystem pointLightSystem{ engineDevice };	// Light stuff
+		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 		
 		// Dynamic texture array support
 		uint32_t currentTextureCount = 8;	// Track current texture count for pipeline creation
@@ -185,7 +185,7 @@ namespace aveng {
 		std::vector<std::unique_ptr<AvengBuffer>> mNodeTransformBuffers;
 		std::vector<std::unique_ptr<AvengBuffer>> mLightDataBuffers;
 
-		VkUploadMatrices mMatrices{ glm::vec4(0.80f, 0.80f, 0.89f, .05f), glm::mat4(1.0f), glm::mat4(1.0f) };
+		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 
 		ModelAndInstanceData mModelInstanceData{}; 
 
