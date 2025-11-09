@@ -248,13 +248,13 @@ namespace aveng {
 		float rdUIGenerateTime = 0.0f;
 		float rdUIDrawTime = 0.0f;
 
-		//int rdMoveForward = 0;
-		//int rdMoveRight = 0;
-		//int rdMoveUp = 0;
+		int rdMoveForward = 0;
+		int rdMoveRight = 0;
+		int rdMoveUp = 0;
 
-		//float rdViewAzimuth = 330.0f;
-		//float rdViewElevation = -20.0f;
-		//glm::vec3 rdCameraWorldPosition = glm::vec3(2.0f, 5.0f, 7.0f);
+		float rdViewAzimuth = 330.0f;
+		float rdViewElevation = -20.0f;
+		glm::vec3 rdCameraWorldPosition = glm::vec3(2.0f, 5.0f, 7.0f);
 
 		/**
 		* Command buffers

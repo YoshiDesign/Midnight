@@ -4,8 +4,8 @@
 
 namespace aveng {
 
-	Editor::Editor(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice)
-		: renderData{ _renderData }, gameData{ _gameData }, engineDevice{_engineDevice}
+	Editor::Editor(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice, ModelAndInstanceData& modelInstanceData)
+		: renderData{ _renderData }, gameData{ _gameData }, engineDevice{ _engineDevice }, mModelInstanceData{ modelInstanceData }
 	{}
 
 	Editor::~Editor() 

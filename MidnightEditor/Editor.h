@@ -4,12 +4,13 @@
 #include "CoreVK/swapchain.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
+#include "Core/Modeling/ModelAndInstanceData.h"
 
 namespace aveng {
 
 	class Editor {
 	public:
-		Editor(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice);
+		Editor(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice, ModelAndInstanceData& modelInstanceData);
 		~Editor();
 		void init(AvengWindow& window, SwapChain* swapchain);
 		void render(VkCommandBuffer& commandBuffer);
@@ -17,8 +18,9 @@ namespace aveng {
 	private:
 		VkRenderData& renderData;
 		GameData& gameData;
+		ModelAndInstanceData& mModelInstanceData;
 		EngineDevice& engineDevice;
-		AvengImgui aveng_imgui{ renderData, gameData, engineDevice };
+		AvengImgui aveng_imgui{ renderData, gameData, engineDevice, mModelInstanceData };
 	};
 
 }

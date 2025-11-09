@@ -151,7 +151,6 @@ namespace aveng {
 
 		// const char* default_scene_file = "scenes/demo-scene.json";
 
-		
 		//AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
 		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
@@ -215,7 +214,7 @@ namespace aveng {
 
 
 #ifdef ENABLE_EDITOR
-		aveng::Editor editor{ renderData, gameData, engineDevice };
+		aveng::Editor editor{ renderData, gameData, engineDevice, mModelInstanceData };
 #endif
 
 	};

@@ -118,6 +118,7 @@
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\include;$(SolutionDir)Midnight;$(VULKAN_SDK)\Include;$(SolutionDir)X1;$(SolutionDir)MidnightEditor;$(SolutionDir)vendor</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -158,6 +159,7 @@
     <ClCompile Include="Editor.cpp" />
     <ClCompile Include="GUI\aveng_imgui.cpp" />
     <ClCompile Include="GUI\imgui.cpp" />
+    <ClCompile Include="GUI\ImGuiFileDialog.cpp" />
     <ClCompile Include="GUI\imgui_demo.cpp" />
     <ClCompile Include="GUI\imgui_draw.cpp" />
     <ClCompile Include="GUI\imgui_impl_glfw.cpp" />
@@ -168,8 +170,11 @@
   <ItemGroup>
     <ClInclude Include="Editor.h" />
     <ClInclude Include="GUI\aveng_imgui.h" />
+    <ClInclude Include="GUI\dirent\dirent.h" />
     <ClInclude Include="GUI\imconfig.h" />
     <ClInclude Include="GUI\imgui.h" />
+    <ClInclude Include="GUI\ImGuiFileDialog.h" />
+    <ClInclude Include="GUI\ImGuiFileDialogConfig.h" />
     <ClInclude Include="GUI\imgui_impl_glfw.h" />
     <ClInclude Include="GUI\imgui_impl_vulkan.h" />
     <ClInclude Include="GUI\imgui_internal.h" />
