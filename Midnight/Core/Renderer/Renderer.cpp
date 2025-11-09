@@ -517,11 +517,11 @@ namespace aveng {
 
 		// Create Descriptor Pools using dynamic texture count
 		renderData.avengDescriptorPool = AvengDescriptorPool::Builder(engineDevice)
-			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 100)  // Increased for animation descriptor sets
-			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 10)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * currentTextureCount)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT * 10)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 10)  // NEW: For animation SSBOs
+			.setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 2000)  // Increased for animation descriptor sets
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 500)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * 500)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, SwapChain::MAX_FRAMES_IN_FLIGHT * 500)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 500)  // NEW: For animation SSBOs
 			.build();
 
 		// Define buffer vec's that are managed by the Renderer
@@ -690,9 +690,55 @@ namespace aveng {
 			.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL_GRAPHICS, 1) // Light Data UBO
 			.build();
 
-		updateDescriptorSets();
-		updateComputeDescriptorSets();
-		updateLightingDescriptorSets();
+
+		// Initial update for all graphics pipeline descriptor sets
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof(VkUploadMatrices), 0); // TODO?
+			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
+			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
+
+			// Basic Shader
+			AvengDescriptorSetWriter(*renderData.rdAvengBasicDescriptorLayout, *renderData.avengDescriptorPool)
+				.writeBuffer(0, &perspectiveViewBufferInfo)
+				.writeBuffer(1, &modelRootBufferInfo)
+				.build(renderData.rdAvengDescriptorSets[i]);
+
+			// Animation Shader
+			AvengDescriptorSetWriter(*renderData.rdAvengAnimationDescriptorLayout, *renderData.avengDescriptorPool)
+				.writeBuffer(0, &perspectiveViewBufferInfo)
+				.writeBuffer(1, &shaderBoneMatrixInfo)
+				.writeBuffer(2, &modelRootBufferInfo)
+				.build(renderData.rdAvengAnimationDescriptorSets[i]);
+
+			// Reference if we decide to use a dynamic UBO
+			// auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
+		}
+		// updateDescriptorSets();
+
+		// Initial update for all compute descriptor sets
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			auto nodeTransformInfo = mNodeTransformBuffers[i]->descriptorInfo(sizeof(NodeTransformData), 0);
+			auto trsMatrixinfo = mShaderTrsMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+
+			// Node Compute
+			AvengDescriptorSetWriter(*renderData.rdAvengComputeTransformDescriptorLayout, *renderData.avengDescriptorPool)
+				.writeBuffer(0, &nodeTransformInfo)
+				.writeBuffer(1, &trsMatrixinfo)
+				.build(renderData.rdAvengComputeTransformDescriptorSets[i]);
+
+			AvengDescriptorSetWriter(*renderData.rdAvengComputeMatrixMultDescriptorLayout, *renderData.avengDescriptorPool)
+				.writeBuffer(0, &trsMatrixinfo)
+				.writeBuffer(1, &shaderBoneMatrixInfo)
+				.build(renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
+
+		}
+		// updateComputeDescriptorSets();
+		
+		// TODO
+		// updateLightingDescriptorSets();
 	
 	}
 
@@ -885,7 +931,7 @@ namespace aveng {
 		trsBufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		trsBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		trsBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		trsBufferBarrier.buffer = mShaderTRSMatrixBuffer.buffer;
+		trsBufferBarrier.buffer = mShaderTrsMatrixBuffers[currentFrameIndex]->getBuffer();
 		trsBufferBarrier.offset = 0;
 		trsBufferBarrier.size = VK_WHOLE_SIZE;
 
@@ -918,7 +964,7 @@ namespace aveng {
 		boneMatrixBufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		boneMatrixBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		boneMatrixBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		boneMatrixBufferBarrier.buffer = mShaderBoneMatrixBuffer.buffer;
+		boneMatrixBufferBarrier.buffer = mShaderBoneMatrixBuffers[currentFrameIndex]->getBuffer();
 		boneMatrixBufferBarrier.offset = 0;
 		boneMatrixBufferBarrier.size = VK_WHOLE_SIZE;
 
@@ -1241,58 +1287,63 @@ namespace aveng {
 
 	void Renderer::updateDescriptorSets() {
 
-		// Write the descriptor sets that are ready to go
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+		int i = currentFrameIndex;
 
-			auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof(VkUploadMatrices), 0); // TODO?
-			auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
-			auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
+		auto perspectiveViewBufferInfo = mPerspectiveViewMatrixUBOBuffers[i]->descriptorInfo(sizeof(VkUploadMatrices), 0); // TODO?
+		auto modelRootBufferInfo = mShaderModelRootMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
+		auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0); // TODO
 
-			// Basic Shader
-			AvengDescriptorSetWriter(*renderData.rdAvengBasicDescriptorLayout, *renderData.avengDescriptorPool)
-				.writeBuffer(0, &perspectiveViewBufferInfo)
-				.writeBuffer(1, &modelRootBufferInfo)
-				.build(renderData.rdAvengDescriptorSets[i]);
+		// Basic Shader
+		AvengDescriptorSetWriter(*renderData.rdAvengBasicDescriptorLayout, *renderData.avengDescriptorPool)
+			.writeBuffer(0, &perspectiveViewBufferInfo)
+			.writeBuffer(1, &modelRootBufferInfo)
+			.build(renderData.rdAvengDescriptorSets[i]);
 
-			// Animation Shader
-			AvengDescriptorSetWriter(*renderData.rdAvengAnimationDescriptorLayout, *renderData.avengDescriptorPool)
-				.writeBuffer(0, &perspectiveViewBufferInfo)
-				.writeBuffer(1, &shaderBoneMatrixInfo)
-				.writeBuffer(2, &modelRootBufferInfo)
-				.build(renderData.rdAvengAnimationDescriptorSets[i]);
+		// Animation Shader
+		AvengDescriptorSetWriter(*renderData.rdAvengAnimationDescriptorLayout, *renderData.avengDescriptorPool)
+			.writeBuffer(0, &perspectiveViewBufferInfo)
+			.writeBuffer(1, &shaderBoneMatrixInfo)
+			.writeBuffer(2, &modelRootBufferInfo)
+			.build(renderData.rdAvengAnimationDescriptorSets[i]);
 
-			// Reference if we decide to use a dynamic UBO
-			// auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
-		}
+		// Reference if we decide to use a dynamic UBO
+		// auto objBufferInfo = u_ObjBuffers[i]->descriptorInfo(calculateDynamicUBOStride(), 0);
+		
 	}
 
 	void Renderer::updateLightingDescriptorSets() {
 
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+		int i = currentFrameIndex;
 
-			auto lightsBufferInfo = mLightDataBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
-			AvengDescriptorSetWriter(*renderData.rdAvengBasicLightingDescriptorLayout, *renderData.avengDescriptorPool)
-				.writeBuffer(0, &lightsBufferInfo)
-				.build(renderData.basicLightingDescriptorSets[i]);
-
-		}
+		// TODO
+		auto lightsBufferInfo = mLightDataBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
+		AvengDescriptorSetWriter(*renderData.rdAvengBasicLightingDescriptorLayout, *renderData.avengDescriptorPool)
+			.writeBuffer(0, &lightsBufferInfo)
+			.build(renderData.basicLightingDescriptorSets[i]);
+		
 	}
 
 	void Renderer::updateComputeDescriptorSets() {
 
-		// Write the descriptor sets that are ready to go
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+		int i = currentFrameIndex;
 
-			auto nodeTransformInfo = mNodeTransformBuffers[i]->descriptorInfo(sizeof(NodeTransformData), 0);
-			auto trsMatrixinfo = mShaderTrsMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+		auto nodeTransformInfo = mNodeTransformBuffers[i]->descriptorInfo(sizeof(NodeTransformData), 0);
+		auto trsMatrixinfo = mShaderTrsMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
+		auto shaderBoneMatrixInfo = mShaderBoneMatrixBuffers[i]->descriptorInfo(sizeof(VK_WHOLE_SIZE), 0);
 
-			// Node Compute
-			AvengDescriptorSetWriter(*renderData.rdAvengComputeTransformDescriptorLayout, *renderData.avengDescriptorPool)
-				.writeBuffer(0, &nodeTransformInfo)
-				.writeBuffer(1, &trsMatrixinfo)
-				.build(renderData.rdAvengComputeTransformDescriptorSets[i]);
+		// Node Compute
+		AvengDescriptorSetWriter(*renderData.rdAvengComputeTransformDescriptorLayout, *renderData.avengDescriptorPool)
+			.writeBuffer(0, &nodeTransformInfo)
+			.writeBuffer(1, &trsMatrixinfo)
+			.build(renderData.rdAvengComputeTransformDescriptorSets[i]);
 
-		}
+
+		AvengDescriptorSetWriter(*renderData.rdAvengComputeMatrixMultDescriptorLayout, *renderData.avengDescriptorPool)
+			.writeBuffer(0, &trsMatrixinfo)
+			.writeBuffer(1, &shaderBoneMatrixInfo)
+			.build(renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
+
+		
 
 	}
 

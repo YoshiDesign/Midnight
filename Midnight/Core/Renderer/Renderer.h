@@ -203,13 +203,9 @@ namespace aveng {
 
 		std::vector<glm::mat4> mWorldPosMatrices{};
 
-		/* for animated models */
-		VkShaderStorageBufferData mShaderBoneMatrixBuffer{};
-
 		/* for compute shader */
 		bool mHasDedicatedComputeQueue = false;
-		VkShaderStorageBufferData mShaderTRSMatrixBuffer{};
-		VkShaderStorageBufferData mShaderNodeTransformBuffer{};
+
 		std::vector<NodeTransformData> mNodeTransFormData{};
 
 

@@ -93,8 +93,8 @@ namespace aveng {
 		std::vector<VkMesh> mModelMeshes{};
 		std::vector<VkVertexBufferData> mVertexBuffers{};
 		std::vector<VkIndexBufferData> mIndexBuffers{};
-		unsigned int mTriangleCount;
-		unsigned int mVertexCount;
+		unsigned int mTriangleCount = 0;
+		unsigned int mVertexCount = 0;
 
 		/* store the root node for direct access */
 		std::shared_ptr<AssimpNode> mRootNode = nullptr;

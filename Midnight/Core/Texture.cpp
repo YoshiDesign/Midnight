@@ -6,6 +6,12 @@
 namespace aveng {
     bool Texture::loadTexture(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData, std::string textureFilename,
         bool generateMipmaps, bool flipImage) {
+        // Check if texture is already loaded (defensive check to prevent double-loading)
+        if (texData.image != VK_NULL_HANDLE) {
+            std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureFilename.c_str());
+            return true;
+        }
+
         int texWidth;
         int texHeight;
         int numberOfChannels;
@@ -69,6 +75,12 @@ namespace aveng {
     }
 
     bool Texture::loadTexture(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData, std::string textureName, aiTexel* textureData, int width, int height, bool generateMipmaps, bool flipImage) {
+        // Check if texture is already loaded (defensive check to prevent double-loading)
+        if (texData.image != VK_NULL_HANDLE) {
+            std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureName.c_str());
+            return true;
+        }
+
         if (!textureData) {
             std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, textureName.c_str());
             return false;
@@ -158,7 +170,7 @@ namespace aveng {
         imageInfo.arrayLayers = 1;
         imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Hmmm...
         imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -182,7 +194,7 @@ namespace aveng {
         /* 1st barrier, undefined to transfer optimal */
         VkImageMemoryBarrier stagingBufferTransferBarrier{};
         stagingBufferTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        stagingBufferTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        stagingBufferTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // HmMmmmMmMm
         stagingBufferTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         stagingBufferTransferBarrier.image = texData.image;
         stagingBufferTransferBarrier.subresourceRange = stagingBufferRange;
@@ -306,6 +318,7 @@ namespace aveng {
             lastBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             lastBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
+            // This throws a validation error!
             vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 0, 0, nullptr, 0, nullptr, 1, &lastBarrier);
         }
@@ -404,7 +417,7 @@ namespace aveng {
     }
 
     void Texture::cleanup(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData) {
-        // Note: stylistically, for handle-like things it’s simpler to make getPool() return by value
+        // Note: stylistically, for handle-like things itï¿½s simpler to make getPool() return by value
         // e.g. VkDescriptorPool getPool() const { return mPool; }
         vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool->getPool(), 1, &texData.descriptorSet);
         vkDestroySampler(engineDevice.device(), texData.sampler, nullptr);

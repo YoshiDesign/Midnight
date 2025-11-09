@@ -292,10 +292,12 @@ namespace aveng {
 
 	bool AvengModel::createDescriptorSet(VkRenderData& renderData, std::vector<glm::mat4>& boneOffsetMatricesList, std::vector<int32_t>& boneParentIndexList) {
 
+		mMatrixMultPerModelDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
 		/* init all SSBOs - These will take the current frame index into account, hence the vector usage */
 		for (int i = 0; i < mBoneParentMatrixBuffers.size(); i++) {
 			mBoneParentMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(boneParentIndexList.size()) * sizeof(int32_t),
+				boneParentIndexList.size() * sizeof(int32_t),
 				1,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
@@ -308,7 +310,7 @@ namespace aveng {
 
 		for (int i = 0; i < mShaderBoneMatrixOffsetBuffers.size(); i++) {
 			mShaderBoneMatrixOffsetBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				sizeof(boneOffsetMatricesList.size()) * sizeof(glm::mat4),
+				boneOffsetMatricesList.size() * sizeof(glm::mat4),
 				1,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 				VMA_MEMORY_USAGE_AUTO,
