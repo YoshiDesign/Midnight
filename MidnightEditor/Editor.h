@@ -13,7 +13,7 @@ namespace aveng {
 		Editor(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice, ModelAndInstanceData& modelInstanceData);
 		~Editor();
 		void init(AvengWindow& window, SwapChain* swapchain);
-		void render(VkCommandBuffer& commandBuffer);
+		void render(int frameIndex);
 
 	private:
 		VkRenderData& renderData;

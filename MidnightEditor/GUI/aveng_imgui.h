@@ -34,7 +34,7 @@ namespace aveng {
 		~AvengImgui();
 
 		void newFrame();
-		void render(VkCommandBuffer commandBuffer);
+		void render(int frameIndex);
 		void runGUI();
 
 		void hideMouse(bool hide);

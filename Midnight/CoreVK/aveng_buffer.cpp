@@ -88,13 +88,17 @@ namespace aveng {
 
         switch (usageFlags)
         {
-        case VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT: std::cout << "Creating VMA Uniform Buffer\n" << std::endl;
-        case VK_BUFFER_USAGE_STORAGE_BUFFER_BIT: std::cout << "Creating VMA Storage Buffer\n" << std::endl;
+        case VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT:
+            std::cout << "Creating VMA Uniform Buffer: " << bufferSize << std::endl;
+            break;
+        case VK_BUFFER_USAGE_STORAGE_BUFFER_BIT:
+            std::cout << "Creating VMA Storage Buffer: " << bufferSize << std::endl;
+            break;
         default:
             std::cout << "Instance Size:\t" << instanceSize
-                << "Instance Count:\t" << instanceCount
-                << "Alignment Size:\t" << alignmentSize
-                << "Buffer Size:\t" << bufferSize
+                << "\tInstance Count:\t" << instanceCount
+                << "\tAlignment Size:\t" << alignmentSize
+                << "\tBuffer Size:\t" << bufferSize
             << std::endl;
             break;
         }
@@ -132,7 +136,12 @@ namespace aveng {
         
         if (usingVMA) {
             std::cout << "Mapping with VMA Allocator" << std::endl;
-            return vmaMapMemory(engineDevice.allocator(), vmaAllocation, &mapped);
+            VkResult result = vmaMapMemory(engineDevice.allocator(), vmaAllocation, &mapped);
+            if (result != VK_SUCCESS) {
+                std::printf("%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+                throw std::runtime_error("Failed to map memory with VMA");
+            }
+            return result;  // FIXED: Return the result
         } else {
             return vkMapMemory(engineDevice.device(), memory, offset, size, 0, &mapped);
         }

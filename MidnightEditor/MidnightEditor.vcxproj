@@ -141,6 +141,7 @@
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\include;$(SolutionDir)Midnight;$(VULKAN_SDK)\Include;$(SolutionDir)X1;$(SolutionDir)MidnightEditor;$(SolutionDir)vendor</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

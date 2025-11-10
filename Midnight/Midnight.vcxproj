@@ -152,7 +152,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CONSOLE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CONSOLE;NDEBUG;ENABLE_EDITOR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -170,6 +170,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CoreVK\AvengStorageBuffer.cpp" />
     <ClCompile Include="CoreVK\AvengUniformBuffer.cpp" />
     <ClCompile Include="CoreVK\aveng_buffer.cpp" />
     <ClCompile Include="CoreVK\aveng_descriptors.cpp" />
@@ -198,6 +199,7 @@
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
     <ClCompile Include="Core\Texture.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
+    <ClCompile Include="Utils\Logger.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />
     <ClCompile Include="Utils\window_callbacks.cpp" />
   </ItemGroup>
@@ -260,6 +262,7 @@
     <ClInclude Include="stb\stb_voxel_render.h" />
     <ClInclude Include="Utils\aveng_utils.h" />
     <ClInclude Include="Utils\glm_includes.h" />
+    <ClInclude Include="Utils\Logger.h" />
     <ClInclude Include="Utils\Timer.h" />
     <ClInclude Include="Utils\window_callbacks.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />

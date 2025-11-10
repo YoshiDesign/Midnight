@@ -61,7 +61,7 @@ namespace aveng {
         AvengDescriptorSetLayout(const AvengDescriptorSetLayout&) = delete;
         AvengDescriptorSetLayout& operator=(const AvengDescriptorSetLayout&) = delete;
 
-        VkDescriptorSetLayout getDescriptorSetLayout() const { return descriptorSetLayout; }
+        VkDescriptorSetLayout& getDescriptorSetLayout() { return descriptorSetLayout; }
         size_t getDescriptorSetLayoutCount() { return layout_bindings.size(); }
 
     private:

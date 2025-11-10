@@ -22,11 +22,11 @@ namespace aveng {
 		);
 	}
 
-	void Editor::render(VkCommandBuffer& commandBuffer)
+	void Editor::render(int frameIndex)
 	{
 		aveng_imgui.newFrame();
 		aveng_imgui.runGUI();
-		aveng_imgui.render(commandBuffer);
+		aveng_imgui.render(frameIndex);
 	}
 	
 }

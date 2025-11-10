@@ -58,15 +58,14 @@ namespace aveng {
 
 		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
-		const std::vector<std::unique_ptr<AvengBuffer>>& getBoneMatrixOffsetBuffers() const;
-		const std::vector<std::unique_ptr<AvengBuffer>>& getBoneParentBuffers() const;
+		const std::vector<VkShaderStorageBufferData>& getBoneMatrixOffsetBuffers() const;
+		const std::vector<VkShaderStorageBufferData>& getBoneParentBuffers() const;
 		std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
 		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex);
 		glm::mat4 getRootTranformationMatrix();
 		bool hasAnimations();
 		unsigned int getTriangleCount();
 
-		void bind(VkCommandBuffer commandBuffer);
 		void draw(VkCommandBuffer commandBuffer);
 		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex);
 		void drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
@@ -99,8 +98,8 @@ namespace aveng {
 		/* store the root node for direct access */
 		std::shared_ptr<AssimpNode> mRootNode = nullptr;
 
-		std::vector<std::unique_ptr<AvengBuffer>> mBoneParentMatrixBuffers;
-		std::vector<std::unique_ptr<AvengBuffer>> mShaderBoneMatrixOffsetBuffers;
+		std::vector<VkShaderStorageBufferData> mBoneParentMatrixBuffers;
+		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixOffsetBuffers;
 
 		/* a map to find the node by name */
 		std::unordered_map<std::string, std::shared_ptr<AssimpNode>> mNodeMap{};
@@ -115,12 +114,6 @@ namespace aveng {
 
 		std::vector<VkDescriptorSet> mMatrixMultPerModelDescriptorSets;
 		VkDescriptorSetLayout mComputeMatrixMultPerModelDescriptorSetLayout;
-
-		// NEW
-		std::unique_ptr<AvengBuffer> vertexBuffer;
-
-		// NEW
-		std::unique_ptr<AvengBuffer> indexBuffer;
 
 		std::string mModelFilenamePath;
 		std::string mModelFilename;

@@ -10,12 +10,12 @@ namespace aveng {
 
 	void PointLightSystem::initialize(VkRenderPass renderPass)
 	{
-		VkDescriptorSetLayout descriptorSetLayouts[2] = { 
-			renderData.rdAvengBasicDescriptorLayout->getDescriptorSetLayout(), 
-			renderData.rdAvengBasicLightingDescriptorLayout->getDescriptorSetLayout()};
+		//VkDescriptorSetLayout descriptorSetLayouts[2] = { 
+		//	renderData.rdAvengBasicDescriptorLayout, 
+		//	renderData.rdAvengBasicLightingDescriptorLayout};
 
-		createPipelineLayout(descriptorSetLayouts);
-		createPipeline(renderPass);
+		//createPipelineLayout(descriptorSetLayouts);
+		//createPipeline(renderPass);
 	}
 
 	PointLightSystem::~PointLightSystem()

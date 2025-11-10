@@ -37,6 +37,11 @@ namespace aveng {
 
 	class Renderer {
 
+		struct PendingModelLoad {
+			std::string filepath;
+		};
+		std::vector<PendingModelLoad> mPendingModelLoads;
+
 		void updateTriangleCount();
 
 	public:
@@ -55,6 +60,10 @@ namespace aveng {
 		bool createPipelineLayouts();
 		bool createPipelines();
 
+		// Add public method:
+		bool queueModelLoad(const std::string& filepath);
+		void processPendingModelLoads();  // Call this before/after frames
+
 		// These 8 functions might get moved to ObjectRenderSystem
 		bool hasModel(std::string modelFileName);
 		std::shared_ptr<AvengModel> getModel(std::string modelFileName);
@@ -64,6 +73,9 @@ namespace aveng {
 		void addInstances(std::shared_ptr<AvengModel> model, int numInstances);
 		void deleteInstance(std::shared_ptr<AssimpInstance> instance);
 		void cloneInstance(std::shared_ptr<AssimpInstance> instance);
+
+		bool createSSBOs();
+		bool createMatrixUBO();
 
 		// Just use the returned values directly if working in renderer.cpp
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
@@ -85,9 +97,11 @@ namespace aveng {
 			return currentFrameIndex;
 		}
 
-		void setupDescriptors();
-		void updateDescriptorSets();
-		void updateComputeDescriptorSets();
+		bool createDescriptorLayouts();
+		bool createDescriptorSets();
+		bool setupDescriptors();
+		void updateDescriptorSets(int iters = 1);
+		void updateComputeDescriptorSets(int iters = 1);
 		void updateLightingDescriptorSets();
 
 		bool createSyncObjects();
@@ -105,7 +119,7 @@ namespace aveng {
 		void beginFrame();
 		void endFrame();
 		void beginSwapChainRenderPass();
-		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
+		void endSwapChainRenderPass();
 
 		// New methods for descriptor/buffer management
 		void initializePointLightSystem();
@@ -176,12 +190,12 @@ namespace aveng {
 		bool pipelineCreated = false;
 
 		// Descriptors and Buffers
-		std::vector<std::unique_ptr<AvengBuffer>> mPerspectiveViewMatrixUBOBuffers;
-		std::vector<std::unique_ptr<AvengBuffer>> mShaderModelRootMatrixBuffers;
-		std::vector<std::unique_ptr<AvengBuffer>> mShaderBoneMatrixBuffers;
-		std::vector<std::unique_ptr<AvengBuffer>> mShaderTrsMatrixBuffers;
-		std::vector<std::unique_ptr<AvengBuffer>> mNodeTransformBuffers;
-		std::vector<std::unique_ptr<AvengBuffer>> mLightDataBuffers;
+		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
+		std::vector<VkShaderStorageBufferData> mShaderModelRootMatrixBuffers;
+		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixBuffers;
+		std::vector<VkShaderStorageBufferData> mShaderTrsMatrixBuffers;
+		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
+		std::vector<VkShaderStorageBufferData> mLightDataBuffers;
 
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 
@@ -215,4 +229,4 @@ namespace aveng {
 
 	};
 
-}
+} 

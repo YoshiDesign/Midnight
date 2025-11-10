@@ -44,7 +44,7 @@ namespace aveng {
 		  mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
 		  mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT)
 	{
-		loadModelV2(renderData, filepath);
+		mMatrixMultPerModelDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 	}
 
 	AvengModel::~AvengModel() {}
@@ -92,19 +92,6 @@ namespace aveng {
 			vkCmdBindIndexBuffer(renderData.rdCommandBuffersGraphics[frameIndex], mIndexBuffers.at(i).buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(renderData.rdCommandBuffersGraphics[frameIndex], static_cast<uint32_t>(mesh.indices.size()), instanceCount, 0, 0, 0);
 		}
-	}
-
-	void AvengModel::bind(VkCommandBuffer commandBuffer)
-	{
-		VkBuffer buffers[] = { vertexBuffer->getBuffer() };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffers, offsets);
-
-		if (hasIndexBuffer) 
-		{
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32); // This index type can store up to 2^32 vertices
-		}
-
 	}
 
 	std::string AvengModel::getModelFileName() {
@@ -292,50 +279,57 @@ namespace aveng {
 
 	bool AvengModel::createDescriptorSet(VkRenderData& renderData, std::vector<glm::mat4>& boneOffsetMatricesList, std::vector<int32_t>& boneParentIndexList) {
 
-		mMatrixMultPerModelDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-
-		/* init all SSBOs - These will take the current frame index into account, hence the vector usage */
-		for (int i = 0; i < mBoneParentMatrixBuffers.size(); i++) {
-			mBoneParentMatrixBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				boneParentIndexList.size() * sizeof(int32_t),
-				1,
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-			mBoneParentMatrixBuffers[i]->map();
-			mBoneParentMatrixBuffers[i]->writeToBuffer(boneParentIndexList.data());
-		}
-
-		for (int i = 0; i < mShaderBoneMatrixOffsetBuffers.size(); i++) {
-			mShaderBoneMatrixOffsetBuffers[i] = std::make_unique<AvengBuffer>(engineDevice,
-				boneOffsetMatricesList.size() * sizeof(glm::mat4),
-				1,
-				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-				VMA_MEMORY_USAGE_AUTO,
-				1, // minOffsetAlignment
-				VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-			mShaderBoneMatrixOffsetBuffers[i]->map();
-			mShaderBoneMatrixOffsetBuffers[i]->writeToBuffer(boneOffsetMatricesList.data());
-		}
-		
-		/* matrix multiplication, per-model data */
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
-			auto parentNodeInfo = mBoneParentMatrixBuffers[i]->descriptorInfo(VK_WHOLE_SIZE, 0);
-			auto boneOffsetInfo = mShaderBoneMatrixOffsetBuffers[i]->descriptorInfo(VK_WHOLE_SIZE, 0);
-		
-			// Basic Shader
-			AvengDescriptorSetWriter(*renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, *renderData.avengDescriptorPool)
-				.writeBuffer(0, &parentNodeInfo)
-				.writeBuffer(1, &boneOffsetInfo)
-				.build(mMatrixMultPerModelDescriptorSets[i]);
+			/* matrix multiplication, per-model data */
+			VkDescriptorSetAllocateInfo computeMatrixMultPerModelDescriptorAllocateInfo{};
+			computeMatrixMultPerModelDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			computeMatrixMultPerModelDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
+			computeMatrixMultPerModelDescriptorAllocateInfo.descriptorSetCount = 1;
+			computeMatrixMultPerModelDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout;
 
+			VkResult result = vkAllocateDescriptorSets(engineDevice.device(), &computeMatrixMultPerModelDescriptorAllocateInfo,
+				&mMatrixMultPerModelDescriptorSets[0]);
+			if (result != VK_SUCCESS) {
+				Logger::log(1, "%s error: could not allocate Assimp Matrix Mult Compute per-model descriptor set (error: %i)\n", __FUNCTION__, result);
+				return false;
+			}
+
+			VkDescriptorBufferInfo parentNodeInfo{};
+			parentNodeInfo.buffer = mBoneParentMatrixBuffers[i].buffer;
+			parentNodeInfo.offset = 0;
+			parentNodeInfo.range = VK_WHOLE_SIZE;
+
+			VkDescriptorBufferInfo boneOffsetInfo{};
+			boneOffsetInfo.buffer = mShaderBoneMatrixOffsetBuffers[i].buffer;
+			boneOffsetInfo.offset = 0;
+			boneOffsetInfo.range = VK_WHOLE_SIZE;
+
+			VkWriteDescriptorSet parentNodeWriteDescriptorSet{};
+			parentNodeWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			parentNodeWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			parentNodeWriteDescriptorSet.dstSet = mMatrixMultPerModelDescriptorSets[i];
+			parentNodeWriteDescriptorSet.dstBinding = 0;
+			parentNodeWriteDescriptorSet.descriptorCount = 1;
+			parentNodeWriteDescriptorSet.pBufferInfo = &parentNodeInfo;
+
+			VkWriteDescriptorSet boneOffsetWriteDescriptorSet{};
+			boneOffsetWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			boneOffsetWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			boneOffsetWriteDescriptorSet.dstSet = mMatrixMultPerModelDescriptorSets[i];
+			boneOffsetWriteDescriptorSet.dstBinding = 1;
+			boneOffsetWriteDescriptorSet.descriptorCount = 1;
+			boneOffsetWriteDescriptorSet.pBufferInfo = &boneOffsetInfo;
+
+			std::vector<VkWriteDescriptorSet> matrixMultWriteDescriptorSets =
+			{ parentNodeWriteDescriptorSet, boneOffsetWriteDescriptorSet };
+
+			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(matrixMultWriteDescriptorSets.size()),
+				matrixMultWriteDescriptorSets.data(), 0, nullptr);
+
+			return true;
 		}
-		
-		return true;
+
 	}
 
 	void AvengModel::processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory) {
@@ -399,11 +393,11 @@ namespace aveng {
 		return mTriangleCount;
 	}
 
-	const std::vector<std::unique_ptr<AvengBuffer>>& AvengModel::getBoneMatrixOffsetBuffers() const {
+	const std::vector<VkShaderStorageBufferData>& AvengModel::getBoneMatrixOffsetBuffers() const {
 		return mShaderBoneMatrixOffsetBuffers;
 	}
 
-	const std::vector<std::unique_ptr<AvengBuffer>>& AvengModel::getBoneParentBuffers() const {
+	const std::vector<VkShaderStorageBufferData>& AvengModel::getBoneParentBuffers() const {
 		return mBoneParentMatrixBuffers;
 	}
 
@@ -417,7 +411,7 @@ namespace aveng {
 
 	void AvengModel::cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames) {
 
-		VkDescriptorPool pool = renderData.avengDescriptorPool->getPool();
+		VkDescriptorPool pool = renderData.avengDescriptorPool;
 
 		for (int i = 0; i < frames; i++) {
 			vkFreeDescriptorSets(engineDevice.device(), pool, 1, &mMatrixMultPerModelDescriptorSets[i]);

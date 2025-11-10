@@ -105,6 +105,12 @@
     <ClCompile Include="CoreVK\SyncObjects.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CoreVK\AvengStorageBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1215,6 +1221,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="avpch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -143,7 +143,6 @@ namespace aveng {
 	};
 
 	struct VkShaderStorageBufferData {
-		// Placeholder for actual Vulkan SSBO
 		size_t bufferSize = 0;
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
@@ -259,6 +258,8 @@ namespace aveng {
 		/**
 		* Command buffers
 		*/
+		//VkCommandPool rdCommandPool = VK_NULL_HANDLE;			// Get from engine device
+		//VkCommandPool rdComputeCommandPool = VK_NULL_HANDLE;	// Get from engine device
 		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
 		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
 
@@ -275,15 +276,14 @@ namespace aveng {
 		/*
 		* Descriptors
 		*/
-		std::unique_ptr<AvengDescriptorPool> avengDescriptorPool = VK_NULL_HANDLE;
+		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
 
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengBasicDescriptorLayout = nullptr;
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengAnimationDescriptorLayout = nullptr;
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengTextureDescriptorLayout = nullptr;
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeTransformDescriptorLayout = nullptr;
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeMatrixMultDescriptorLayout = nullptr;
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengComputeMatrixMultPerModelDescriptorLayout = nullptr;
-		std::unique_ptr<AvengDescriptorSetLayout> rdAvengBasicLightingDescriptorLayout = nullptr;
+		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE;
 
 		std::vector<VkDescriptorSet> rdAvengDescriptorSets;
 		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;

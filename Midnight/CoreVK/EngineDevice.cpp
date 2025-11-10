@@ -75,7 +75,7 @@ namespace aveng {
         createInstance();
 
         // Enable Debug validation layer -- Disable for Release Build
-#if NDEBUG
+#if _DEBUG
         setupDebugMessenger();
 #endif
         // The surface is Vulkan's connection to our Window from GLFW.
@@ -91,7 +91,7 @@ namespace aveng {
 
         // Initialize VMA allocator
         VmaAllocatorCreateInfo allocatorInfo = {};
-        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_0;
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_1;  // Match instance API version
         allocatorInfo.physicalDevice = _physicalDevice;
         allocatorInfo.device = _device;
         allocatorInfo.instance = _instance;
@@ -141,7 +141,7 @@ namespace aveng {
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "Midnight";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+        appInfo.apiVersion = VK_API_VERSION_1_1;  // GPU-assisted validation requires 1.1+
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -153,13 +153,27 @@ namespace aveng {
 
         if (enableValidationLayers) {
             // [Validators] Create this instance's Debug Validation Layer
+            
+            // Setup validation features for GPU-assisted validation
+            VkValidationFeatureEnableEXT enabledValidationFeatures[] = {
+                VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT
+            };
+            
+            VkValidationFeaturesEXT validationFeatures = {};
+            validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+            validationFeatures.enabledValidationFeatureCount = 1;
+            validationFeatures.pEnabledValidationFeatures = enabledValidationFeatures;
+            
+            // Setup debug messenger
             VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+            populateDebugMessengerCreateInfo(debugCreateInfo);
+            
+            // Chain structures: validationFeatures -> debugCreateInfo
+            validationFeatures.pNext = &debugCreateInfo;
 
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
-
-            populateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
+            createInfo.pNext = &validationFeatures;
 
         } 
         else {
@@ -319,7 +333,7 @@ namespace aveng {
         gfx_poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         gfx_poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
         gfx_poolInfo.flags =
-            VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            /* VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | */ VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
         if (vkCreateCommandPool(_device, &gfx_poolInfo, nullptr, &_commandPoolGraphics) != VK_SUCCESS)
         {
@@ -331,7 +345,7 @@ namespace aveng {
         cmp_poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         cmp_poolInfo.queueFamilyIndex = queueFamilyIndices.computeFamilyHasValue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
         cmp_poolInfo.flags =
-            VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            /* VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | */ VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
         if (vkCreateCommandPool(_device, &cmp_poolInfo, nullptr, &_commandPoolCompute) != VK_SUCCESS)
         {
@@ -422,7 +436,8 @@ namespace aveng {
       createInfo = {};
       createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
       // Bitwise OR enables all of the included
-      createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+      createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
       createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
@@ -773,12 +788,12 @@ namespace aveng {
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
         bufferInfo.usage = usage;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        // bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         // Create allocation info
         VmaAllocationCreateInfo allocInfo{};
         allocInfo.usage = memoryUsage;
-        allocInfo.flags = flags;
+        //allocInfo.flags = flags;
 
         // Create buffer and allocate memory with VMA
         if (vmaCreateBuffer(_allocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr) != VK_SUCCESS) {
@@ -823,7 +838,7 @@ namespace aveng {
         return commandBuffer;
     }
 
-    void EngineDevice::endSingleTimeCommands(VkCommandBuffer commandBuffer) 
+    void EngineDevice::endSingleTimeCommands(VkCommandBuffer& commandBuffer) 
     {
         vkEndCommandBuffer(commandBuffer);
 
@@ -970,7 +985,7 @@ namespace aveng {
         return true;
     }
 
-    void EngineDevice::cleanupCommandBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer)
+    void EngineDevice::cleanupCommandBuffer(VkCommandPool& pool, VkCommandBuffer& commandBuffer)
     {
         vkFreeCommandBuffers(device(), pool, 1, &commandBuffer);
     }

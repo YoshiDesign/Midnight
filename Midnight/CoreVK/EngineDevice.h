@@ -113,8 +113,8 @@ namespace aveng {
         bool submitSingleShotBuffer(VkCommandBuffer commandBuffer);
         bool resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags = 0);
         bool endCommandBuffer(VkCommandBuffer& commandBuffer);
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-        void cleanupCommandBuffer(VkCommandPool pool, VkCommandBuffer commandBuffer);
+        void endSingleTimeCommands(VkCommandBuffer& commandBuffer);
+        void cleanupCommandBuffer(VkCommandPool& pool, VkCommandBuffer& commandBuffer);
 
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void copyBufferToImage(

@@ -112,10 +112,10 @@ namespace aveng {
     // this tells imgui that we're done setting up the current frame,
     // then gets the draw data from imgui and uses it to record to the provided
     // command buffer the necessary draw commands
-    void AvengImgui::render(VkCommandBuffer commandBuffer) {
+    void AvengImgui::render(int frameIndex) {
         ImGui::Render();
         ImDrawData* drawdata = ImGui::GetDrawData();
-        ImGui_ImplVulkan_RenderDrawData(drawdata, commandBuffer);
+        ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdCommandBuffersGraphics[frameIndex]);
     }
 
     void AvengImgui::runGUI() {
@@ -398,6 +398,11 @@ namespace aveng {
                 bool modelListEmtpy = modInstData.miModelList.empty();
                 std::string selectedModelName;
 
+                /* Validate selected model index and reset if invalid */
+                if (!modelListEmtpy && (modInstData.miSelectedModel < 0 || modInstData.miSelectedModel >= modInstData.miModelList.size())) {
+                    modInstData.miSelectedModel = 0;
+                }
+
                 if (!modelListEmtpy) {
                     selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModel)->getModelFileName().c_str();
                 }
@@ -461,9 +466,8 @@ namespace aveng {
                             std::printf("%s error: unable to load model file '%s', unknown error \n", __FUNCTION__, filePathName.c_str());
                         }
                         else {
-                            /* select new model and new instance */
-                            modInstData.miSelectedModel = modInstData.miModelList.size() - 1;
-                            modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
+                            /* Model is queued but not loaded yet - selection will be updated after processing */
+                            std::printf("Model queued for loading: %s\n", filePathName.c_str());
                         }
                     }
                     ImGuiFileDialog::Instance()->Close();
@@ -528,6 +532,11 @@ namespace aveng {
 
             if (ImGui::CollapsingHeader("Instances")) {
                 size_t numberOfInstances = modInstData.miAssimpInstances.size();
+
+                /* Validate selected instance index and reset if invalid */
+                if (numberOfInstances > 0 && (modInstData.miSelectedInstance < 0 || modInstData.miSelectedInstance >= numberOfInstances)) {
+                    modInstData.miSelectedInstance = 0;
+                }
 
                 ImGui::Text("Number of Instances: %ld", numberOfInstances);
 

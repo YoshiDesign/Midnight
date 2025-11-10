@@ -6,65 +6,47 @@
 #include <cstdint>
 #include <vulkan/vulkan.h>
 #include "Utils/glm_includes.h"
-
+#include "Utils/Logger.h"
 #include "CoreVK/VkRenderData.h"
 #include "CoreVK/aveng_buffer.h"
 
 namespace aveng {
     class ShaderStorageBuffer {
     public:
-        static bool checkForResize(VkRenderData& renderData, std::unique_ptr<AvengBuffer>& ssbo, size_t bufferSize)
-        {
-
-            if (bufferSize > ssbo->getBufferSize()) {
-                std::printf("%s: [0] resize SSBO %p from %zu to %zu bytes\n",
-                    __FUNCTION__,
-                    ssbo->getBuffer(),
-                    ssbo->getBufferSize(),
-                    bufferSize);
-                return true;
-            }
-            return false;
-        }
+        /* set an arbitraty buffer size as default */
+        static bool init(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize = 1024);
 
         template <typename T>
-        static bool uploadSsboData(VkRenderData& renderData, std::unique_ptr<AvengBuffer>& ssbo, std::vector<T>& bufferData)
-        {
+        static bool uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::vector<T> bufferData) {
             if (bufferData.empty()) {
                 return false;
             }
 
-            // you probably meant size in bytes, not just element count
-            const size_t dataSize = bufferData.size() * sizeof(T);
-            const size_t requiredSize = bufferData.size() * ssbo->getAlignmentSize();
-
             bool bufferResized = false;
-
-            // compare bytes-to-bytes
-            if (requiredSize > ssbo->getBufferSize()) {
-                std::printf("%s: [1] resize SSBO %p from %zu to %zu bytes\n",
-                    __FUNCTION__,
-                    ssbo->getBuffer(),
-                    ssbo->getBufferSize(),
-                    dataSize);
+            size_t bufferSize = bufferData.size() * sizeof(T);
+            if (bufferSize > SSBOData.bufferSize) {
+                Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, bufferSize);
+                cleanup(engineDevice, SSBOData);
+                init(engineDevice, SSBOData, bufferSize);
                 bufferResized = true;
             }
 
-            VkResult result = ssbo->map();
+            void* data;
+            VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
             if (result != VK_SUCCESS) {
-                std::printf("%s error: could not map SSBO memory (error: %i)\n",
-                    __FUNCTION__, result);
-                bufferResized = true;
+                Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+                return false;
             }
-
-            // you probably want to pass the data to the buffer:
-            ssbo->writeToBuffer(bufferData.data(), dataSize);
-
-            ssbo->unmap();   // you commented this out, but typically you unmap
-            ssbo->flush();   // if your AvengBuffer supports it
+            std::memcpy(data, bufferData.data(), bufferSize);
+            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
 
             return bufferResized;
         }
-    };
 
+        static bool checkForResize(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData,
+            size_t bufferSize);
+
+        static void cleanup(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData);
+    };
 }

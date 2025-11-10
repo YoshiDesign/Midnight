@@ -2,20 +2,14 @@
 
 #include <vulkan/vulkan.h>
 #include <memory>
-#include "VkRenderData.h"
+#include "CoreVK/VkRenderData.h"
 #include "CoreVK/aveng_buffer.h"
 
 namespace aveng {
-    class UniformBuffer {
-    public:
-        template <typename T>
-        static void uploadData(std::unique_ptr<AvengBuffer>& ubo, T* data) {
-           
-            ubo->writeToBuffer(data, sizeof(T));
-            ubo->flush();
-
-        }
-
+    class UniformBuffer{
+      public:
+        static bool init(EngineDevice& engineDevice, VkUniformBufferData & uboData);
+        static void uploadData(EngineDevice& engineDevice, VkUniformBufferData& uboData, VkUploadMatrices matrices);
+        static void cleanup(EngineDevice& engineDevice, VkUniformBufferData& uboData);
     };
-
 }

@@ -237,7 +237,7 @@ namespace aveng {
         vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &stagingBufferShaderBarrier);
 
         /* generate mipmap blit commands */
-        if (generateMipmaps) {
+        if (generateMipmaps && mipmapLevels > 1) {
             VkImageSubresourceRange blitRange{};
             blitRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             blitRange.baseMipLevel = 0;
@@ -384,11 +384,11 @@ namespace aveng {
         }
 
         // This can't go out of scope before calling vkAllocateDescriptorSets
-        VkDescriptorSetLayout layout = renderData.rdAvengTextureDescriptorLayout->getDescriptorSetLayout();
+        VkDescriptorSetLayout layout = renderData.rdAvengTextureDescriptorLayout;
 
         VkDescriptorSetAllocateInfo descriptorAllocateInfo{};
         descriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        descriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool->getPool();
+        descriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
         descriptorAllocateInfo.descriptorSetCount = 1;
         descriptorAllocateInfo.pSetLayouts = &layout;
 
@@ -419,7 +419,7 @@ namespace aveng {
     void Texture::cleanup(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData) {
         // Note: stylistically, for handle-like things it�s simpler to make getPool() return by value
         // e.g. VkDescriptorPool getPool() const { return mPool; }
-        vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool->getPool(), 1, &texData.descriptorSet);
+        vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &texData.descriptorSet);
         vkDestroySampler(engineDevice.device(), texData.sampler, nullptr);
         vkDestroyImageView(engineDevice.device(), texData.imageView, nullptr);
         vmaDestroyImage(engineDevice.allocator(), texData.image, texData.imageAlloc);
