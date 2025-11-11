@@ -23,8 +23,6 @@ namespace aveng {
 		return true;
 	}
 
-
-
 	//size_t pad_uniform_buffer_size(size_t originalSize, VkDeviceSize minUniformBufferOffsetAlignment)
 	//{
 	//	// Calculate required alignment based on minimum device offset alignment

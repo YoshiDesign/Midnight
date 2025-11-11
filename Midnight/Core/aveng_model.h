@@ -50,7 +50,7 @@ namespace aveng {
 		AvengModel& operator=(const AvengModel&) = delete;
 
 		bool loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags = 0);
-		bool createDescriptorSet(VkRenderData& renderData, std::vector<glm::mat4>& boneOffsetMatricesList, std::vector<int32_t>& boneParentIndexList);
+		bool createDescriptorSet(VkRenderData& renderData);
 		void processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory);
 
 		std::string getModelFileName();

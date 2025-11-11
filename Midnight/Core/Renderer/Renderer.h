@@ -170,24 +170,14 @@ namespace aveng {
 		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 		
 		// Dynamic texture array support
-		uint32_t currentTextureCount = 8;	// Track current texture count for pipeline creation
 		uint32_t currentImageIndex{ 0 };
 		int currentFrameIndex; // Not tied to the image index
 		bool isFrameStarted{ false };
-
-		// Pipeline mode tracking
-		// ObjectRenderMode currentObjectMode = ObjectRenderMode::STANDARD;
 
 		void createCommandBuffers();
 		void freeCommandBuffers();
 		void recreateSwapChain();
 		size_t calculateDynamicUBOStride() const;
-
-		// Main pipeline creation entry point
-		//std::unique_ptr<PipelineConfigManager> pipelineManager = nullptr;
-		VkPipelineLayout pipelineLayout{};
-		void createPipelineLayout();
-		bool pipelineCreated = false;
 
 		// Descriptors and Buffers
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
@@ -197,31 +187,16 @@ namespace aveng {
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
 		std::vector<VkShaderStorageBufferData> mLightDataBuffers;
 
-		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
-
 		ModelAndInstanceData mModelInstanceData{}; 
 
-		// Shader Data
-		//std::vector<glm::mat4> mWorldPosMatrices{};
-		//std::vector<NodeTransformData> mNodeTransFormData{};
-		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderModelRootMatrixBuffer{}; // For animated and non-animated models
-		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderBoneMatrixBuffer{}; // For animated models
-		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderTRSMatrixBuffer{};
-		//std::vector <std::unique_ptr <VkShaderStorageBufferData>> mShaderNodeTransformBuffer{};
-		//std::vector <std::unique_ptr <VkUniformBufferData>> mPerspectiveViewMatrixUBO{};
-
+		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 		VkPushConstants mModelData{};
 		VkComputePushConstants mComputeModelData{};
 
 		/* for animated and non-animated models */
 
 		std::vector<glm::mat4> mWorldPosMatrices{};
-
-		/* for compute shader */
-		bool mHasDedicatedComputeQueue = false;
-
 		std::vector<NodeTransformData> mNodeTransFormData{};
-
 
 #ifdef ENABLE_EDITOR
 		aveng::Editor editor{ renderData, gameData, engineDevice, mModelInstanceData };

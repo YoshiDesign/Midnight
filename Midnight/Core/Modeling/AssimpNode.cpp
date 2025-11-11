@@ -11,7 +11,7 @@ std::shared_ptr<AssimpNode> AssimpNode::addChild(std::string childName) {
     std::shared_ptr<AssimpNode> child = std::make_shared<AssimpNode>(childName);
     child->mParentNode = shared_from_this();
 
-    std::printf("%s: -- adding child %s to parent %s\n", __FUNCTION__, childName.c_str(), child->getParentNodeName().c_str());
+    // std::printf("%s: -- adding child %s to parent %s\n", __FUNCTION__, childName.c_str(), child->getParentNodeName().c_str());
     mChildNodes.push_back(child);
     return child;
 }
@@ -21,7 +21,7 @@ void AssimpNode::addChilds(std::vector<std::string> childNodes) {
         std::shared_ptr<AssimpNode> child = std::make_shared<AssimpNode>(childName);
         child->mParentNode = shared_from_this();
 
-        std::printf("%s: -- adding child %s to parent %s\n", __FUNCTION__, childName.c_str(), child->getParentNodeName().c_str());
+        // std::printf("%s: -- adding child %s to parent %s\n", __FUNCTION__, childName.c_str(), child->getParentNodeName().c_str());
         mChildNodes.push_back(child);
     }
 }

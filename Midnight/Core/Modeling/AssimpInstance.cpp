@@ -7,7 +7,7 @@ namespace aveng {
 
     AssimpInstance::AssimpInstance(std::shared_ptr<AvengModel> model, glm::vec3 position, glm::vec3 rotation, float modelScale) : mAvengModel(model) {
         if (!model) {
-            std::printf("%s error: invalid model given\n", __FUNCTION__);
+            // std::printf("%s error: invalid model given\n", __FUNCTION__);
             return;
         }
         mInstanceSettings.isWorldPosition = position;

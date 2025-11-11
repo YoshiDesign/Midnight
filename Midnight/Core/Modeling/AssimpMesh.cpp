@@ -9,25 +9,25 @@ namespace aveng {
         mTriangleCount = mesh->mNumFaces;
         mVertexCount = mesh->mNumVertices;
 
-        std::printf("%s: -- mesh '%s' has %i faces (%i vertices)\n", __FUNCTION__, mMeshName.c_str(), mTriangleCount, mVertexCount);
+        // std::printf("%s: -- mesh '%s' has %i faces (%i vertices)\n", __FUNCTION__, mMeshName.c_str(), mTriangleCount, mVertexCount);
         for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_COLOR_SETS; ++i) {
             if (mesh->HasVertexColors(i)) {
-                std::printf("%s: --- mesh has vertex colors in set %i\n", __FUNCTION__, i);
+                // std::printf("%s: --- mesh has vertex colors in set %i\n", __FUNCTION__, i);
             }
         }
         if (mesh->HasNormals()) {
-            std::printf("%s: --- mesh has normals\n", __FUNCTION__);
+            // std::printf("%s: --- mesh has normals\n", __FUNCTION__);
         }
         for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_TEXTURECOORDS; ++i) {
             if (mesh->HasTextureCoords(i)) {
-                std::printf("%s: --- mesh has texture cooords in set %i\n", __FUNCTION__, i);
+                // std::printf("%s: --- mesh has texture cooords in set %i\n", __FUNCTION__, i);
             }
         }
 
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         if (material) {
             aiString materialName = material->GetName();
-            std::printf("%s: - material found, name '%s'\n", __FUNCTION__, materialName.C_Str());
+            // std::printf("%s: - material found, name '%s'\n", __FUNCTION__, materialName.C_Str());
 
             bool texturesFound = false;
             if (mesh->mMaterialIndex >= 0) {
@@ -36,11 +36,11 @@ namespace aveng {
                 for (const auto& texType : supportedTexTypes) {
                     unsigned int textureCount = material->GetTextureCount(texType);
                     if (textureCount > 0) {
-                        std::printf("%s: -- material '%s' has %i images of type %i\n", __FUNCTION__, materialName.C_Str(), textureCount, texType);
+                        // std::printf("%s: -- material '%s' has %i images of type %i\n", __FUNCTION__, materialName.C_Str(), textureCount, texType);
                         for (unsigned int i = 0; i < textureCount; ++i) {
                             aiString textureName;
                             material->GetTexture(texType, i, &textureName);
-                            std::printf("%s: --- image %i has name '%s'\n", __FUNCTION__, i, textureName.C_Str());
+                            // std::printf("%s: --- image %i has name '%s'\n", __FUNCTION__, i, textureName.C_Str());
 
                             std::string texName = textureName.C_Str();
                             mMesh.textures.insert({ texType, texName });
@@ -48,7 +48,7 @@ namespace aveng {
 
                             /* skip already loaded textures */
                             if (textures.count(texName) > 0) {
-                                std::printf("%s: texture '%s' already loaded, skipping\n", __FUNCTION__, texName.c_str());
+                                // std::printf("%s: texture '%s' already loaded, skipping\n", __FUNCTION__, texName.c_str());
                                 continue;
                             }
 
@@ -57,7 +57,7 @@ namespace aveng {
                                 VkTextureData newTex{};
                                 std::string texNameWithPath = assetDirectory + '/' + texName;
                                 if (!Texture::loadTexture(engineDevice, renderData, newTex, texNameWithPath)) {
-                                    std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
+                                    // std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
                                     Texture::cleanup(engineDevice, renderData, newTex);
                                     continue;
                                 }
@@ -127,11 +127,11 @@ namespace aveng {
 
         if (mesh->HasBones()) {
             unsigned int numBones = mesh->mNumBones;
-            std::printf("%s: -- mesh has information about %i bones\n", __FUNCTION__, numBones);
+            // std::printf("%s: -- mesh has information about %i bones\n", __FUNCTION__, numBones);
             for (unsigned int boneId = 0; boneId < numBones; ++boneId) {
                 std::string boneName = mesh->mBones[boneId]->mName.C_Str();
                 unsigned int numWeights = mesh->mBones[boneId]->mNumWeights;
-                std::printf("%s: --- bone nr. %i has name %s, contains %i weights\n", __FUNCTION__, boneId, boneName.c_str(), numWeights);
+                // std::printf("%s: --- bone nr. %i has name %s, contains %i weights\n", __FUNCTION__, boneId, boneName.c_str(), numWeights);
 
                 std::shared_ptr<AssimpBone> newBone = std::make_shared<AssimpBone>(boneId, boneName, Tools::convertAiToGLM(mesh->mBones[boneId]->mOffsetMatrix));
                 mBoneList.push_back(newBone);

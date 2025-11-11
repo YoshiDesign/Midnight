@@ -99,7 +99,7 @@ namespace aveng {
 		std::cout << "Destroying Renderer..." << std::endl;
 		freeCommandBuffers();
 		cleanup();
-		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
+		// vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
 	}
 
 
@@ -608,9 +608,7 @@ namespace aveng {
 		VkResult result;
 
 		{
-			/**
-			 * AvengDescriptorSetLayout::Builder& AvengDescriptorSetLayout::Builder::addBinding
-			 */
+
 			 /* texture */
 			VkDescriptorSetLayoutBinding assimpTextureBind{};
 			assimpTextureBind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -621,9 +619,6 @@ namespace aveng {
 
 			std::vector<VkDescriptorSetLayoutBinding> assimpTexBindings = { assimpTextureBind };
 
-			/**
-			 *  AvengDescriptorSetLayout::AvengDescriptorSetLayout CTOR
-			 */
 			VkDescriptorSetLayoutCreateInfo assimpTextureCreateInfo{};
 			assimpTextureCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			assimpTextureCreateInfo.bindingCount = static_cast<uint32_t>(assimpTexBindings.size());
@@ -1034,6 +1029,7 @@ namespace aveng {
 		/* node transformation */
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute[currentFrameIndex], VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipeline);
+		std::cout << "Check [0]" << std::endl;
 		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute[currentFrameIndex], VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipelineLayout, 0, 1, &renderData.rdAvengComputeTransformDescriptorSets[currentFrameIndex], 0, 0);
 
@@ -1043,15 +1039,9 @@ namespace aveng {
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		uint32_t dispatchY = static_cast<uint32_t>(std::ceil(static_cast<float>(numInstances) / 32.0f));
-		if (dispatchY == 0 || numberOfBones == 0) {
-			std::printf("ERROR: Invalid compute dispatch: bones=%d, instances=%d, dispatchY=%d\n",
-				numberOfBones, numInstances, dispatchY);
-			throw std::runtime_error("Invalid dispatch");
-		}
-		std::printf("Dispatching compute: %d x %d x 1\n", numberOfBones, dispatchY);
+		std::printf("Dispatching compute: %d x %d x 1\n", numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));
 
-		vkCmdDispatch(renderData.rdCommandBuffersCompute[currentFrameIndex], numberOfBones, dispatchY, 1);
+		vkCmdDispatch(renderData.rdCommandBuffersCompute[currentFrameIndex], numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
 		std::printf("Compute dispatch called: bones=%d, instanceGroups=%d\n",
 			numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));
 
@@ -1076,7 +1066,7 @@ namespace aveng {
 			renderData.rdAvengComputeMatrixMultPipeline);
 
 		VkDescriptorSet& modelDescriptorSet = model->getMatrixMultDescriptorSet(currentFrameIndex);
-		std::vector<VkDescriptorSet> computeSets = { renderData.rdAvengComputeMatrixMultDescriptorSets[currentFrameIndex], modelDescriptorSet };
+		std::vector<VkDescriptorSet> computeSets = { renderData.rdAvengComputeMatrixMultDescriptorSets[currentFrameIndex], modelDescriptorSet }; 
 		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute[currentFrameIndex], VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeMatrixMultPipelineLayout, 0, static_cast<uint32_t>(computeSets.size()), computeSets.data(), 0, 0);
 
@@ -1180,7 +1170,7 @@ namespace aveng {
 						// STORAGE BUFFER DATA - Packed with every instance's data
 						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + i * numberOfBones);
 
-						glm::mat4 mt = modelType.second.at(i)->getWorldTransformMatrix();
+						// glm::mat4 mt = modelType.second.at(i)->getWorldTransformMatrix();
 						//std::cout << "INSPECTING MAT" << std::endl;
 						//std::cout << glm::to_string(mt) << std::endl;
 						// STORAGE BUFFER DATA - Packed with every instance's data
@@ -1226,6 +1216,7 @@ namespace aveng {
 
 		// Note: this occurs if ANY buffer has a new size
 		if (bufferResized) {
+			std::cout << "StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
 			updateDescriptorSets();
 			updateComputeDescriptorSets();
 		}
@@ -1327,6 +1318,7 @@ namespace aveng {
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
 		if (bufferResized) {
+			std::cout << "UBO Resized - Updating Descriptor Sets" << std::endl;
 			updateDescriptorSets();
 			updateComputeDescriptorSets();
 		}
@@ -1733,29 +1725,30 @@ namespace aveng {
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengAnimationPipelineLayout);
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformPipelineLayout);
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout);
+
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			UniformBuffer::cleanup(engineDevice, mPerspectiveViewMatrixUBOBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, mShaderTrsMatrixBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, mShaderModelRootMatrixBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
 		
+			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
+			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);
+			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeTransformDescriptorSets[i]);
+			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
 
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpDescriptorSet);
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpSkinningDescriptorSet);
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpComputeTransformDescriptorSet);
-		//vkFreeDescriptorSets(engineDevice.device(), renderData.rdDescriptorPool, 1, &renderData.rdAssimpComputeMatrixMultDescriptorSet);
+		}
 
-		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengDescriptorSets);
-		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengAnimationDescriptorSets);
-		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeTransformDescriptorSets);
-		//renderData.avengDescriptorPool->freeDescriptors(renderData.rdAvengComputeMatrixMultDescriptorSets);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengDescriptorLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationDescriptorLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengTextureDescriptorLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeTransformDescriptorLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultDescriptorLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
 
-		// TODO - Light Descriptor Cleanup, check texture descriptor cleanup, etc.
-
-		// These should be handled by the implicit destructor
-		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpSkinningDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpTextureDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpComputeTransformDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpComputeMatrixMultDescriptorLayout, nullptr);
-		//vkDestroyDescriptorSetLayout(renderData.rdVkbDevice.device, renderData.rdAssimpComputeMatrixMultPerModelDescriptorLayout, nullptr);
-		// Ditto
-		//vkDestroyDescriptorPool(renderData.rdVkbDevice.device, renderData.rdDescriptorPool, nullptr);
+		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
 
 		std::printf("%s: Vulkan renderer destroyed\n", __FUNCTION__);
 	}

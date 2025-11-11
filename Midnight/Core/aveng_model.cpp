@@ -8,10 +8,10 @@
 #include <unordered_map>
 #include "aveng_model.h"
 #include "Utils/aveng_utils.h"
+#include "Utils/Logger.h"
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader/tiny_obj_loader.h>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
+#include "Utils/glm_includes.h"
 #include "data.h"
 
 namespace std {
@@ -42,10 +42,9 @@ namespace aveng {
 	AvengModel::AvengModel(EngineDevice& device, VkRenderData& renderData, const std::string& filepath) 
 		: engineDevice{ device },
 		  mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
-		  mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT)
-	{
-		mMatrixMultPerModelDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-	}
+		  mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
+		  mMatrixMultPerModelDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT)
+	{}
 
 	AvengModel::~AvengModel() {}
 
@@ -109,20 +108,7 @@ namespace aveng {
 
 		// Essential flags for proper mesh loading and deformation debugging
 		const aiScene* scene = importer.ReadFile(filepath,
-			aiProcess_CalcTangentSpace |
-			aiProcess_Triangulate |
-			aiProcess_JoinIdenticalVertices |
-			aiProcess_GenNormals |
-			aiProcess_FlipUVs |                 //  ESSENTIAL: Flip V for Vulkan
-			aiProcess_ValidateDataStructure |   // Validate mesh integrity
-			aiProcess_SortByPType |
-			// aiProcess_LimitBoneWeights |
-			extraImportFlags
-			// aiProcess_LimitBoneWeights |        // CRITICAL: Limit to 4 bones per vertex
-			// aiProcess_GenSmoothNormals |        //  Generate normals if missing  
-			// aiProcess_FixInfacingNormals |      //  Fix inverted normals
-			// aiProcess_ImproveCacheLocality         
-		);
+			aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_ValidateDataStructure | aiProcess_FlipUVs | extraImportFlags);
 
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 			std::printf("AssimpModel: Error loading '%s': %s\n", filepath.c_str(), importer.GetErrorString());
@@ -140,7 +126,7 @@ namespace aveng {
 			mVertexCount += numVertices;
 			mTriangleCount += numFaces;
 
-			std::printf("%s: mesh %i contains %i vertices and %i faces\n", __FUNCTION__, i, numVertices, numFaces);
+			// std::printf("%s: mesh %i contains %i vertices and %i faces\n", __FUNCTION__, i, numVertices, numFaces);
 		}
 		std::printf("AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
 
@@ -163,7 +149,7 @@ namespace aveng {
 				}
 
 				std::string internalTexName = "*" + std::to_string(i);
-				std::printf("%s: - added internal texture '%s'\n", __FUNCTION__, internalTexName.c_str());
+				// std::printf("%s: - added internal texture '%s'\n", __FUNCTION__, internalTexName.c_str());
 				mTextures.insert({ internalTexName, newTex });
 			}
 
@@ -173,14 +159,14 @@ namespace aveng {
 		/* add a white texture in case there is no diffuse tex but colors */
 		std::string whiteTexName = "textures/white.png";
 		if (!Texture::loadTexture(engineDevice, renderData, mWhiteTexture, whiteTexName)) {
-			std::printf("%s error: could not load white default texture '%s'\n", __FUNCTION__, whiteTexName.c_str());
+			// std::printf("%s error: could not load white default texture '%s'\n", __FUNCTION__, whiteTexName.c_str());
 			return false;
 		}
 
 		/* add a placeholder texture in case there is no diffuse tex */
 		std::string placeholderTexName = "textures/missing_tex.png";
 		if (!Texture::loadTexture(engineDevice, renderData, mPlaceholderTexture, placeholderTexName)) {
-			std::printf("%s error: could not load placeholder texture '%s'\n", __FUNCTION__, placeholderTexName.c_str());
+			// std::printf("%s error: could not load placeholder texture '%s'\n", __FUNCTION__, placeholderTexName.c_str());
 			return false;
 		}
 
@@ -201,10 +187,10 @@ namespace aveng {
 			std::vector<std::shared_ptr<AssimpNode>> childNodes = entry->getChilds();
 
 			std::string parentName = entry->getParentNodeName();
-			std::printf("%s: --- found node %s in node list, it has %i children, parent is %s\n", __FUNCTION__, entry->getNodeName().c_str(), childNodes.size(), parentName.c_str());
+			// std::printf("%s: --- found node %s in node list, it has %i children, parent is %s\n", __FUNCTION__, entry->getNodeName().c_str(), childNodes.size(), parentName.c_str());
 
 			for (const auto& node : childNodes) {
-				std::printf("%s: ---- child: %s\n", __FUNCTION__, node->getNodeName().c_str());
+				// std::printf("%s: ---- child: %s\n", __FUNCTION__, node->getNodeName().c_str());
 			}
 		}
 
@@ -224,12 +210,12 @@ namespace aveng {
 			}
 		}
 
-		std::printf("%s: -- bone parents --\n", __FUNCTION__);
-		for (unsigned int i = 0; i < mBoneList.size(); ++i) {
-			std::printf("%s: bone %i (%s) has parent %i (%s)\n", __FUNCTION__, i, mBoneList.at(i)->getBoneName().c_str(), boneParentIndexList.at(i),
-				boneParentIndexList.at(i) < 0 ? "invalid" : mBoneList.at(boneParentIndexList.at(i))->getBoneName().c_str());
-		}
-		std::printf("%s: -- bone parents --\n", __FUNCTION__);
+		// std::printf("%s: -- bone parents --\n", __FUNCTION__);
+		// for (unsigned int i = 0; i < mBoneList.size(); ++i) {
+			// std::printf("%s: bone %i (%s) has parent %i (%s)\n", __FUNCTION__, i, mBoneList.at(i)->getBoneName().c_str(), boneParentIndexList.at(i),
+				// boneParentIndexList.at(i) < 0 ? "invalid" : mBoneList.at(boneParentIndexList.at(i))->getBoneName().c_str());
+		// }
+		// std::printf("%s: -- bone parents --\n", __FUNCTION__);
 
 		/* create vertex buffers for the meshes */
 		for (const auto& mesh : mModelMeshes) {
@@ -244,16 +230,24 @@ namespace aveng {
 			mIndexBuffers.emplace_back(indexBuffer);
 		}
 
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i]);
+			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i]);
+
+			ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList);
+			ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList);
+		}
+
 		/* create descriptor set (for each available frame in flight) for per-model data */
-		createDescriptorSet(renderData, boneOffsetMatricesList, boneParentIndexList);
+		createDescriptorSet(renderData);
 
 		/* animations */
 		unsigned int numAnims = scene->mNumAnimations;
 		for (unsigned int i = 0; i < numAnims; ++i) {
 			aiAnimation* animation = scene->mAnimations[i];
 
-			std::printf("%s: -- animation clip %i has %i skeletal channels, %i mesh channels, and %i morph mesh channels\n",
-				__FUNCTION__, i, animation->mNumChannels, animation->mNumMeshChannels, animation->mNumMorphMeshChannels);
+			// std::printf("%s: -- animation clip %i has %i skeletal channels, %i mesh channels, and %i morph mesh channels\n",
+				// __FUNCTION__, i, animation->mNumChannels, animation->mNumMeshChannels, animation->mNumMorphMeshChannels);
 
 			std::shared_ptr<AssimpAnimClip> animClip = std::make_shared<AssimpAnimClip>();
 			animClip->addChannels(animation, mBoneList);
@@ -269,6 +263,7 @@ namespace aveng {
 		/* get root transformation matrix from model's root node */
 		mRootTransformMatrix = Tools::convertAiToGLM(rootNode->mTransformation);
 
+		Logger::log(1, "%s: - model has a total of %i texture%s\n", __FUNCTION__, mTextures.size(), mTextures.size() == 1 ? "" : "s");
 		std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
 		std::printf("%s: - model has a total of %zi animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
 
@@ -277,31 +272,31 @@ namespace aveng {
 
 	}
 
-	bool AvengModel::createDescriptorSet(VkRenderData& renderData, std::vector<glm::mat4>& boneOffsetMatricesList, std::vector<int32_t>& boneParentIndexList) {
+	bool AvengModel::createDescriptorSet(VkRenderData& renderData) {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			/* matrix multiplication, per-model data */
-			VkDescriptorSetAllocateInfo computeMatrixMultPerModelDescriptorAllocateInfo{};
+			VkDescriptorSetAllocateInfo computeMatrixMultPerModelDescriptorAllocateInfo{}; // ...This descriptor
 			computeMatrixMultPerModelDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			computeMatrixMultPerModelDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
 			computeMatrixMultPerModelDescriptorAllocateInfo.descriptorSetCount = 1;
-			computeMatrixMultPerModelDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout;
+			computeMatrixMultPerModelDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout; // ...is set upon this layout
 
 			VkResult result = vkAllocateDescriptorSets(engineDevice.device(), &computeMatrixMultPerModelDescriptorAllocateInfo,
-				&mMatrixMultPerModelDescriptorSets[0]);
+				&mMatrixMultPerModelDescriptorSets[i]);
 			if (result != VK_SUCCESS) {
 				Logger::log(1, "%s error: could not allocate Assimp Matrix Mult Compute per-model descriptor set (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
 
 			VkDescriptorBufferInfo parentNodeInfo{};
-			parentNodeInfo.buffer = mBoneParentMatrixBuffers[i].buffer;
+			parentNodeInfo.buffer = mBoneParentMatrixBuffers[i].buffer;	// ...attaching this data buffer
 			parentNodeInfo.offset = 0;
 			parentNodeInfo.range = VK_WHOLE_SIZE;
 
 			VkDescriptorBufferInfo boneOffsetInfo{};
-			boneOffsetInfo.buffer = mShaderBoneMatrixOffsetBuffers[i].buffer;
+			boneOffsetInfo.buffer = mShaderBoneMatrixOffsetBuffers[i].buffer; // ...and this data buffer
 			boneOffsetInfo.offset = 0;
 			boneOffsetInfo.range = VK_WHOLE_SIZE;
 
@@ -327,18 +322,19 @@ namespace aveng {
 			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(matrixMultWriteDescriptorSets.size()),
 				matrixMultWriteDescriptorSets.data(), 0, nullptr);
 
-			return true;
 		}
+
+		return true;
 
 	}
 
 	void AvengModel::processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory) {
 		std::string nodeName = aNode->mName.C_Str();
-		std::printf("%s: node name: '%s'\n", __FUNCTION__, nodeName.c_str());
+		// std::printf("%s: node name: '%s'\n", __FUNCTION__, nodeName.c_str());
 
 		unsigned int numMeshes = aNode->mNumMeshes;
 		if (numMeshes > 0) {
-			std::printf("%s: - node has %i meshes\n", __FUNCTION__, numMeshes);
+			// std::printf("%s: - node has %i meshes\n", __FUNCTION__, numMeshes);
 			for (unsigned int i = 0; i < numMeshes; ++i) {
 				aiMesh* modelMesh = scene->mMeshes[aNode->mMeshes[i]];
 
@@ -362,11 +358,11 @@ namespace aveng {
 		mNodeList.emplace_back(node);
 
 		unsigned int numChildren = aNode->mNumChildren;
-		std::printf("%s: - node has %i children \n", __FUNCTION__, numChildren);
+		// std::printf("%s: - node has %i children \n", __FUNCTION__, numChildren);
 
 		for (unsigned int i = 0; i < numChildren; ++i) {
 			std::string childName = aNode->mChildren[i]->mName.C_Str();
-			std::printf("%s: --- found child node '%s'\n", __FUNCTION__, childName.c_str());
+			// std::printf("%s: --- found child node '%s'\n", __FUNCTION__, childName.c_str());
 
 			std::shared_ptr<AssimpNode> childNode = node->addChild(childName);
 			processNode(renderData, childNode, aNode->mChildren[i], scene, assetDirectory);
@@ -424,8 +420,12 @@ namespace aveng {
 			IndexBuffer::cleanup(engineDevice, buffer);
 		}
 
-		//ShaderStorageBuffer::cleanup(renderData, mShaderBoneMatrixOffsetBuffer);
-		//ShaderStorageBuffer::cleanup(renderData, mShaderBoneParentBuffer);
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixOffsetBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, mBoneParentMatrixBuffers[i]);
+
+		}
 
 		for (auto& tex : mTextures) {
 			Texture::cleanup(engineDevice, renderData, tex.second);

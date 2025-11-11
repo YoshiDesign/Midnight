@@ -102,7 +102,7 @@ namespace aveng {
 		alignas(16) glm::vec4 lightColors[MAX_LIGHTS];     // w component is intensity
 	};
 
-	// NOTE: USE THESE FOR DYNAMIC UBOs YOU FOOL (see Renderer::calculateDynamicUBOStride) Change it to whatever you need
+	// NOTE: Recall Dynamic UBOs (see Renderer::calculateDynamicUBOStride) Change it to whatever you need
 	struct ObjectUniformData {
 		alignas(16) int texIndex;
 	};
@@ -150,31 +150,6 @@ namespace aveng {
 		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	};
 
-	// Instance animation state for SSBO
-	struct InstanceAnimationData {
-		alignas(16) glm::mat4 modelMatrix{ 1.0f };           // Instance transform
-		alignas(4) float animationTime{ 0.0f };              // Current animation time
-		alignas(4) int animationClipIndex{ 0 };              // Which animation to play
-		alignas(4) int boneMatrixOffset{ 0 };                // Offset into bone matrix buffer
-		alignas(4) int boneCount{ 0 };                       // Number of bones for this instance
-		alignas(16) glm::vec4 animationParams{ 1.0f, 0.0f, 0.0f, 0.0f }; // speed, loop, etc.
-	};
-
-	// Global uniform data for animation compute shader
-	struct AnimationComputeUbo {
-		alignas(4) float deltaTime{ 0.0f };                  // Frame delta time
-		alignas(4) uint32_t totalInstances { 0 };            // Number of animated instances
-		alignas(4) uint32_t maxBonesPerInstance { 128 };     // Maximum bones per model
-		alignas(4) uint32_t verticesPerInstance { 0 };       // Vertices to process per instance
-		alignas(16) glm::vec4 debugParams{ 0.0f };          // Debug/experimental parameters
-	};
-
-	// Animation-related UBOs for descriptor sets
-	struct AnimationUbo {
-		AnimationComputeUbo computeData;
-		alignas(16) glm::mat4 reserved[4];                 // Reserved for future expansion
-	};
-
 	struct VkVertex {
 		glm::vec4 position = glm::vec4(0.0f);	// last float is uv.x
 		glm::vec4 color = glm::vec4(1.0f);
@@ -190,19 +165,11 @@ namespace aveng {
 		bool usesPBRColors = false;
 	};
 
-	/* data format to be uploaded to compute shader */
-	//struct NodeTransformData {
-	//	glm::vec4 translation = glm::vec4(0.0f);
-	//	glm::vec4 scale = glm::vec4(1.0f);
-	//	glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion
-	//};
-
-	/* data format to be uploaded to compute shader - optimized for cache performance */
-	struct alignas(64) NodeTransformData {
+/* data format to be uploaded to compute shader */
+	struct NodeTransformData {
 		glm::vec4 translation = glm::vec4(0.0f);
-		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion  
 		glm::vec4 scale = glm::vec4(1.0f);
-		glm::vec4 padding = glm::vec4(0.0f); // Pad to 64 bytes for cache line alignment
+		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion
 	};
 
 	struct VkUploadMatrices {

@@ -6,12 +6,12 @@ namespace aveng {
         mClipDuration = static_cast<float>(animation->mDuration);
         mClipTicksPerSecond = static_cast<float>(animation->mTicksPerSecond);
 
-        std::printf("%s: - loading clip %s, duration %lf (%lf ticks per second)\n", __FUNCTION__, mClipName.c_str(), mClipDuration, mClipTicksPerSecond);
+        // std::printf("%s: - loading clip %s, duration %lf (%lf ticks per second)\n", __FUNCTION__, mClipName.c_str(), mClipDuration, mClipTicksPerSecond);
 
         for (unsigned int i = 0; i < animation->mNumChannels; ++i) {
             std::shared_ptr<AssimpAnimChannel> channel = std::make_shared<AssimpAnimChannel>();
 
-            std::printf("%s: -- loading channel %i for node '%s'\n", __FUNCTION__, i, animation->mChannels[i]->mNodeName.C_Str());
+            // std::printf("%s: -- loading channel %i for node '%s'\n", __FUNCTION__, i, animation->mChannels[i]->mNodeName.C_Str());
             channel->loadChannelData(animation->mChannels[i]);
 
             std::string targetNodeName = channel->getTargetNodeName();

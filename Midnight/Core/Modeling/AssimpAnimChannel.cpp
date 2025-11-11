@@ -9,8 +9,8 @@ namespace aveng {
         unsigned int preState = nodeAnim->mPreState;
         unsigned int postState = nodeAnim->mPostState;
 
-        std::printf("%s: - loading animation channel for node '%s', with %i translation keys, %i rotation keys, %i scaling keys (preState %i, postState %i)\n",
-            __FUNCTION__, mNodeName.c_str(), numTranslations, numRotations, numScalings, preState, postState);
+        //std::printf("%s: - loading animation channel for node '%s', with %i translation keys, %i rotation keys, %i scaling keys (preState %i, postState %i)\n",
+        //    __FUNCTION__, mNodeName.c_str(), numTranslations, numRotations, numScalings, preState, postState);
 
         for (unsigned int i = 0; i < numTranslations; ++i) {
             mTranslationTiminngs.emplace_back(static_cast<float>(nodeAnim->mPositionKeys[i].mTime));
