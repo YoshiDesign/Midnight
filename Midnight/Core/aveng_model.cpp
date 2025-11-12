@@ -101,7 +101,6 @@ namespace aveng {
 		return mModelFilenamePath;
 	}
 
-
 	bool AvengModel::loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags)
 	{
 		Assimp::Importer importer;

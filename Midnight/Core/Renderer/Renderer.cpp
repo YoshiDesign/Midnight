@@ -1029,7 +1029,7 @@ namespace aveng {
 		/* node transformation */
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute[currentFrameIndex], VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipeline);
-		std::cout << "Check [0]" << std::endl;
+		// std::cout << "Check [0]" << std::endl;
 		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute[currentFrameIndex], VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipelineLayout, 0, 1, &renderData.rdAvengComputeTransformDescriptorSets[currentFrameIndex], 0, 0);
 
@@ -1039,11 +1039,11 @@ namespace aveng {
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		std::printf("Dispatching compute: %d x %d x 1\n", numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));
+		// std::printf("Dispatching compute: %d x %d x 1\n", numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));
 
 		vkCmdDispatch(renderData.rdCommandBuffersCompute[currentFrameIndex], numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
-		std::printf("Compute dispatch called: bones=%d, instanceGroups=%d\n",
-			numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));
+		/*std::printf("Compute dispatch called: bones=%d, instanceGroups=%d\n",
+			numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));*/
 
 		/* memroy barrier between the compute shaders
 		 * wait for TRS buffer to be written  */
@@ -1130,7 +1130,7 @@ namespace aveng {
 
 					/* buffer size must always be a multiple of "local_size_y" instances to avoid undefined behavior */
 					boneMatrixBufferSize += numberOfBones * ((numberOfInstances - 1) / 32 + 1) * 32;
-					std::printf("boneMatrixBufferSize: %zu bytes", boneMatrixBufferSize);
+					//std::printf("boneMatrixBufferSize: %zu bytes\n", boneMatrixBufferSize);
 				}
 			}
 		}
@@ -1252,10 +1252,10 @@ namespace aveng {
 					if (model->hasAnimations() && !model->getBoneList().empty()) {
 						size_t numberOfBones = model->getBoneList().size();
 
-						std::printf("[runComputeShaders] Buffer sizes - NodeTransform: %zu, TRSMatrix: %zu, BoneMatrix: %zu\n",
-							mNodeTransformBuffers[currentFrameIndex].bufferSize,
-							mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize,
-							mShaderBoneMatrixBuffers[currentFrameIndex].bufferSize);
+						//std::printf("[runComputeShaders] Buffer sizes - NodeTransform: %zu, TRSMatrix: %zu, BoneMatrix: %zu\n",
+						//	mNodeTransformBuffers[currentFrameIndex].bufferSize,
+						//	mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize,
+						//	mShaderBoneMatrixBuffers[currentFrameIndex].bufferSize);
 
 						runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
 

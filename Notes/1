@@ -1,4 +1,13 @@
 
+## Materials and Lighting
+[] app_object normalMatrix for new model instances. Needed for lighting calculations I think
+[] Don't rely on Assimp. Bring material inspection into your engine.
+[] Maybe create another pipeline with shader modules that support mat's
+
+## Extras
+[] Reduce LoC in Renderer.cpp by re-introducing the GfxPipeline class
+
+
 ## Things that might f*ck you up (and some questions):
 - Call order of buffer writes. see AvengStorageBuffer map -> write -> unmap -> flush
 - SSBO resizing!
@@ -10,33 +19,27 @@
 ## Immediate TODO
 [x] Re-implement command buffer command submission (you're freeing them too frequently instead of taking a more common approach)
 
-[] V2 Vertex / Index buffers
-[] V2 Pipeline(s)
+[x] V2 Vertex / Index buffers
+[x] V2 Pipeline(s)
 
-[] Accommodate the v2 shaders:
+[x] Accommodate the v2 shaders:
 	[x] New Vertex and Index Buffers
 	[x] Descriptor Set Types
 	[x] Descriptor Layouts
 	[x] Storage Buffers
 	[x] Compute Shaders
-	[] New Push Constant
+	[x] New Push Constant
 		- VkPushConstants
 		- VkComputePushConstants
-	[] New Layout Attributes
-	[] Check yo' pipeline layout's layouts
-	[] app_object normalMatrix for new model instances. Needed for lighting calculations I think
+	[x] New Layout Attributes
+	[x] Check yo' pipeline layout's layouts
+	
 
 ## OVERALL
 [x] Make gltf (prefer glb) the primary model loader
-[] Materials
-	[] Material UBO
-	[] Add to frag shader
-	[] Maybe create another pipeline with shader modules that support mat's
-	[x] Include materials with gltf exports
 
 ## Side-Quests
-[](1) Implement a Compute Fence
-[](0) Vertex count for gameData
+[] Move mix() and slerp() from AssimpAnimChannel to the GPU
 [](0) Other gameData things. Might help you wrap your head around what needs to go where
 
 # Checkin' out the Tut
