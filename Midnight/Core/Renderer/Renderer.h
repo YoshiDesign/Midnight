@@ -9,38 +9,32 @@
 #include "CoreVK/aveng_buffer.h"
 #include "CoreVK/GFXPipeline.h"
 #include "CoreVK/swapchain.h"
-#include "Core/Modeling/ModelAndInstanceData.h"
-#include "Core/Modeling/AssimpInstance.h"
-#include "Core/aveng_scene_loader.h"
-#include "Core/aveng_window.h"
-#include "Core/aveng_model.h"
-#include "Core/app_object.h"
-#include "Core/data.h"
-#include "Utils/Timer.h"
-#include "Utils/glm_includes.h"
+#include "CoreVK/VkRenderData.h"
 #include "CoreVK/AvengStorageBuffer.h"
 #include "CoreVK/AvengUniformBuffer.h"
 #include "CoreVK/PipelineLayout.h"
 #include "CoreVK/SkinningPipeline.h"
 #include "CoreVK/ComputePipeline.h"
+#include "CoreVK/LinePipeline.h"
 #include "CoreVK/SyncObjects.h"
+#include "Core/Modeling/ModelAndInstanceData.h"
+#include "Core/Modeling/AssimpInstance.h"
+#include "Core/aveng_scene_loader.h"
+#include "Core/aveng_window.h"
+#include "Core/aveng_model.h"
+#include "Core/CameraProxy.h"
+#include "Core/app_object.h"
+#include "Core/data.h"
+#include "Utils/Timer.h"
+#include "Utils/glm_includes.h"
 
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
 #endif
 
-#include "Utils/glm_includes.h"
-
-#include "CoreVK/VkRenderData.h"
-
 namespace aveng {
 
 	class Renderer {
-
-		struct PendingModelLoad {
-			std::string filepath;
-		};
-		std::vector<PendingModelLoad> mPendingModelLoads;
 
 		void updateTriangleCount();
 
@@ -60,19 +54,24 @@ namespace aveng {
 		bool createPipelineLayouts();
 		bool createPipelines();
 
+		std::shared_ptr<CameraProxy> getMainCamera();
+
 		// Add public method:
 		bool queueModelLoad(const std::string& filepath);
 		void processPendingModelLoads();  // Call this before/after frames
 
 		// These 8 functions might get moved to ObjectRenderSystem
-		bool hasModel(std::string modelFileName);
-		std::shared_ptr<AvengModel> getModel(std::string modelFileName);
-		bool addModel(std::string modelFileName);
-		void deleteModel(std::string modelFileName);
+		bool hasModel(const std::string& modelFileName);
+		std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
+		bool addModel(const std::string& modelFileName);
+		void deleteModel(const std::string& modelFileName);
 		std::shared_ptr<AssimpInstance> addInstance(std::shared_ptr<AvengModel> model);
 		void addInstances(std::shared_ptr<AvengModel> model, int numInstances);
 		void deleteInstance(std::shared_ptr<AssimpInstance> instance);
 		void cloneInstance(std::shared_ptr<AssimpInstance> instance);
+		void cloneInstances(std::shared_ptr<AssimpInstance> instance, int numClones);
+		void centerInstance(std::shared_ptr<AssimpInstance> instance);
+		void assignInstanceIndices();
 
 		bool createSSBOs();
 		bool createMatrixUBO();
@@ -124,9 +123,10 @@ namespace aveng {
 		// New methods for descriptor/buffer management
 		void initializePointLightSystem();
 		void updateFrameData(const glm::mat4& projection, const glm::mat4& view);
-
+#if ENABLE_EDITOR
 		void renderEditor();
-
+		void setupEditor(float dt);
+#endif
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
 		// const std::vector<AvengAppObject>& getAppObjects() const { return sceneLoader.getAppObjects(); };
@@ -187,6 +187,7 @@ namespace aveng {
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
 		std::vector<VkShaderStorageBufferData> mLightDataBuffers;
 
+		// Renderer owns this
 		ModelAndInstanceData mModelInstanceData{}; 
 
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
@@ -199,7 +200,7 @@ namespace aveng {
 		std::vector<NodeTransformData> mNodeTransFormData{};
 
 #ifdef ENABLE_EDITOR
-		aveng::Editor editor{ renderData, gameData, engineDevice, mModelInstanceData };
+		aveng::Editor editor{ renderData, gameData, engineDevice, aveng_window, mModelInstanceData };
 #endif
 
 	};

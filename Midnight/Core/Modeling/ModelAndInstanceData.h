@@ -7,6 +7,11 @@
 #include <unordered_set>
 #include <functional>
 #include <string>
+
+/*
+TODO - Can this (partially) be moved to the Editor so Releases dont ship with it?
+*/
+
 namespace aveng {
 	// forward declaration
 	class AvengModel;
@@ -20,6 +25,9 @@ namespace aveng {
 	using instanceAddManyCallback = std::function<void(std::shared_ptr<AvengModel>, int)>;
 	using instanceDeleteCallback = std::function<void(std::shared_ptr<AssimpInstance>)>;
 	using instanceCloneCallback = std::function<void(std::shared_ptr<AssimpInstance>)>;
+	using instanceCloneManyCallback = std::function<void(std::shared_ptr<AssimpInstance>, int)>;
+
+	using instanceCenterCallback = std::function<void(std::shared_ptr<AssimpInstance>)>;
 
 	struct ModelAndInstanceData {
 		std::vector<std::shared_ptr<AvengModel>> miModelList{};
@@ -33,6 +41,9 @@ namespace aveng {
 		 * so let's use a separate pending list */
 		std::unordered_set<std::shared_ptr<AvengModel>> miPendingDeleteAvengModels{};
 
+		// Filepaths pending loading
+		std::vector<std::string> mPendingModelLoads;
+
 		/* callbacks */
 		modelCheckCallback miModelCheckCallbackFunction;
 		modelAddCallback miModelAddCallbackFunction;
@@ -42,6 +53,9 @@ namespace aveng {
 		instanceAddManyCallback miInstanceAddManyCallbackFunction;
 		instanceDeleteCallback miInstanceDeleteCallbackFunction;
 		instanceCloneCallback miInstanceCloneCallbackFunction;
+		instanceCloneManyCallback miInstanceCloneManyCallbackFunction;
+
+		instanceCenterCallback miInstanceCenterCallbackFunction;
 	};
 
 }

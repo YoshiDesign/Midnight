@@ -5,6 +5,7 @@
 // vulkan headers
 #include <vulkan/vulkan.h>
 #include "AMD/vk_mem_alloc.h"
+#include "CoreVK/VkRenderData.h"
 
 // std lib headers
 #include <memory>
@@ -27,7 +28,8 @@ namespace aveng {
         uint32_t            width() { return swapChainExtent.width; }
         uint32_t            height() { return swapChainExtent.height; }
         size_t              imageCount() { return swapChainImages.size(); }
-        VkRenderPass        getRenderPass() { return renderPass; }
+        VkRenderPass        getRenderPass() { return mRenderPass; }
+        // VkRenderPass        getSecondaryRenderPass() { return mSecondaryRenderPass; }
         VkExtent2D          getSwapChainExtent() { return swapChainExtent; }
         VkFormat            getSwapChainImageFormat() { return swapChainImageFormat; }
         VkFramebuffer       getFrameBuffer(int index) { return swapChainFramebuffers[index]; }
@@ -45,6 +47,7 @@ namespace aveng {
         VkSwapchainKHR getSwapchain() { return swapChain; }
 
         void createTextureImageViews();
+        bool createSecondaryRenderpass(VkRenderPass& renderPass);
 
         float extentAspectRatio() {
             return static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height);
@@ -76,7 +79,8 @@ namespace aveng {
         VkExtent2D swapChainExtent;
 
         std::vector<VkFramebuffer> swapChainFramebuffers;
-        VkRenderPass renderPass;
+        VkRenderPass mRenderPass;
+        //VkRenderPass mSecondaryRenderPass; // Stored in renderData
 
         std::vector<VkImage> depthImages;
         std::vector<VmaAllocation> depthImageAllocations;

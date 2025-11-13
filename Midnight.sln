@@ -44,29 +44,23 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shaders", "shaders", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
-		shaders\animated_shader.vert = shaders\animated_shader.vert
-		shaders\animated_shader.vert.spv = shaders\animated_shader.vert.spv
 		shaders\assimp.frag = shaders\assimp.frag
 		shaders\assimp.vert = shaders\assimp.vert
 		shaders\assimp_instance_matrix_mult.comp = shaders\assimp_instance_matrix_mult.comp
 		shaders\assimp_instance_transform.comp = shaders\assimp_instance_transform.comp
 		shaders\assimp_skinning.frag = shaders\assimp_skinning.frag
 		shaders\assimp_skinning.vert = shaders\assimp_skinning.vert
+		shaders\aveng_selection.frag = shaders\aveng_selection.frag
+		shaders\aveng_selection.vert = shaders\aveng_selection.vert
+		shaders\gizmo_line.frag = shaders\gizmo_line.frag
+		shaders\gizmo_line.vert = shaders\gizmo_line.vert
 		shaders\point_light.frag = shaders\point_light.frag
-		shaders\point_light.frag.spv = shaders\point_light.frag.spv
 		shaders\point_light.vert = shaders\point_light.vert
-		shaders\point_light.vert.spv = shaders\point_light.vert.spv
 		shaders\post_process.vert = shaders\post_process.vert
-		shaders\simple_shader.frag = shaders\simple_shader.frag
-		shaders\simple_shader.frag.spv = shaders\simple_shader.frag.spv
-		shaders\simple_shader.vert = shaders\simple_shader.vert
-		shaders\simple_shader.vert.spv = shaders\simple_shader.vert.spv
 		shaders\simple_shader_instanced.frag = shaders\simple_shader_instanced.frag
 		shaders\simple_shader_instanced.vert = shaders\simple_shader_instanced.vert
 		shaders\simple_v2_instanced.frag = shaders\simple_v2_instanced.frag
 		shaders\simple_v2_instanced.vert = shaders\simple_v2_instanced.vert
-		shaders\skeletal_animation.comp = shaders\skeletal_animation.comp
-		shaders\skeletal_animation.comp.spv = shaders\skeletal_animation.comp.spv
 	EndProjectSection
 EndProject
 Global

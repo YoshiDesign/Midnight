@@ -2,6 +2,10 @@
 
 namespace aveng {
 
+	/*
+	* Orientation is expressed either as a direction vector + up, or as Euler angles (YXZ)
+	*/
+
 	void AvengCamera::setOrthographicProjection(
 		float left, float right, float top, float bottom, float near, float far) 
 	{
@@ -26,6 +30,7 @@ namespace aveng {
 		projectionMatrix[3][2] = -(far * near) / (far - near);
 	}
 
+	// Constructs an orthonormal basis (u,v,w) and writes the view matrix directly.
 	void AvengCamera::setViewDirection(glm::vec3 position, glm::vec3 direction, glm::vec3 up) 
 	{
 
@@ -49,11 +54,13 @@ namespace aveng {
 		viewMatrix[3][2] = -glm::dot(w, position);
 	}
 
+	// Convenience wrapper
 	void AvengCamera::setViewTarget(glm::vec3 position, glm::vec3 target, glm::vec3 up) 
 	{
 		setViewDirection(position, target - position, up);
 	}
 
+	// Euler Y - X - Z rotation to basis -> view
 	void AvengCamera::setViewYXZ(glm::vec3 position, glm::vec3 rotation) 
 	{
 		const float c3 = glm::cos(rotation.z);

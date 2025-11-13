@@ -1,12 +1,13 @@
 #pragma once
 #include <memory>
-#include "Core/aveng_frame_content.h"
+#include "CoreVK/EngineDevice.h"
+#include "CoreVK/VkRenderData.h"
 #include "Core/Renderer/Renderer.h"
+#include "Core/aveng_frame_content.h"
+#include "Core/CameraProxy.h"
+#include "Core/data.h"
 #include "System/Camera/aveng_camera.h"
 #include "System/Peripheral/KeyboardController.h"
-#include "CoreVK/EngineDevice.h"
-#include "Core/data.h"
-#include "CoreVK/VkRenderData.h"
 #include "avpch.h"
 
 namespace aveng {
@@ -61,6 +62,8 @@ namespace aveng {
 		AvengWindow& window;
 		KeyboardController keyboardController{ viewerObject, game_data };
 		VkRenderData renderData;
+
+		std::shared_ptr<CameraProxy> camProxy;
 		
 		// Engine renderer (now owns all Vulkan resources)
 		Renderer renderer{ window, game_data };

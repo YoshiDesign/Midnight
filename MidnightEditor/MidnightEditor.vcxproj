@@ -167,6 +167,9 @@
     <ClCompile Include="GUI\imgui_impl_vulkan.cpp" />
     <ClCompile Include="GUI\imgui_tables.cpp" />
     <ClCompile Include="GUI\imgui_widgets.cpp" />
+    <ClCompile Include="GUI\models\CoordArrowsModel.cpp" />
+    <ClCompile Include="GUI\models\RotationArrowsModel.cpp" />
+    <ClCompile Include="GUI\models\ScaleArrowsModel.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Editor.h" />
@@ -182,6 +185,9 @@
     <ClInclude Include="GUI\imstb_rectpack.h" />
     <ClInclude Include="GUI\imstb_textedit.h" />
     <ClInclude Include="GUI\imstb_truetype.h" />
+    <ClInclude Include="GUI\models\CoordArrowsModel.h" />
+    <ClInclude Include="GUI\models\RotationArrowsModel.h" />
+    <ClInclude Include="GUI\models\ScaleArrowsModel.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

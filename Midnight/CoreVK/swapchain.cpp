@@ -7,6 +7,7 @@
 #include <limits>
 #include <set>
 #include <stdexcept>
+#include "Utils/Logger.h"
 
 
 namespace aveng {
@@ -56,75 +57,10 @@ namespace aveng {
             vkDestroyFramebuffer(device.device(), framebuffer, nullptr);
         }
 
-        vkDestroyRenderPass(device.device(), renderPass, nullptr);
+        // Destroy the primary renderpass
+        vkDestroyRenderPass(device.device(), mRenderPass, nullptr);
 
-        //// cleanup synchronization objects
-        //for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        //    vkDestroySemaphore(device.device(), renderFinishedSemaphores[i], nullptr);
-        //    vkDestroySemaphore(device.device(), imageAvailableSemaphores[i], nullptr);
-        //    vkDestroyFence(device.device(), inFlightFences[i], nullptr);
-        //}
     }
-
-    // Deprecated
-    //VkResult SwapChain::acquireNextImage(uint32_t* imageIndex) {
-
-    //    // Deprecated
-    //    VkResult result = VK_SUCCESS;
-    //    return result;
-    //}
-
-    //VkResult SwapChain::submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex) 
-    //{
-    //    
-    //    if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE) 
-    //    {
-    //        // We don't want to overwrite the current contents of the command buffer while the GPU is using it
-    //        vkWaitForFences(device.device(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
-    //    }
-    //    imagesInFlight[*imageIndex] = inFlightFences[currentFrame];
-
-    //    VkSubmitInfo submitInfo = {};
-    //    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    //    VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
-    //    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    //    submitInfo.waitSemaphoreCount = 1;
-    //    submitInfo.pWaitSemaphores = waitSemaphores;
-    //    submitInfo.pWaitDstStageMask = waitStages;
-
-    //    submitInfo.commandBufferCount = 1;
-    //    submitInfo.pCommandBuffers = buffers;
-
-    //    VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
-    //    submitInfo.signalSemaphoreCount = 1;
-    //    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    //    vkResetFences(device.device(), 1, &inFlightFences[currentFrame]);
-    //    VkResult _result = vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]);
-    //    if ( _result != VK_SUCCESS) 
-    //    {
-    //        throw std::runtime_error("failed to submit draw command buffer!");
-    //    }
-
-    //    VkPresentInfoKHR presentInfo = {};
-    //    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    //    presentInfo.waitSemaphoreCount = 1;
-    //    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    //    VkSwapchainKHR swapChains[] = { swapChain };
-    //    presentInfo.swapchainCount = 1;
-    //    presentInfo.pSwapchains = swapChains;
-    //    presentInfo.pImageIndices = imageIndex;
-
-    //    auto result = vkQueuePresentKHR(device.presentQueue(), &presentInfo);
-
-    //    // Advance to the next frame
-    //    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-    //    return result;
-    //}
 
     void SwapChain::createSwapChain() 
     {
@@ -275,9 +211,89 @@ namespace aveng {
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
 
-        if (vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+        if (vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &mRenderPass) != VK_SUCCESS) {
             throw std::runtime_error("failed to create render pass!");
         }
+    }
+
+    /**
+    * Note: You are responsible for cleaning up secondary renderpasses.
+    */
+    bool SwapChain::createSecondaryRenderpass(VkRenderPass& renderPass)
+    {
+        VkAttachmentDescription colorAtt{};
+        colorAtt.format = getSwapChainImageFormat(); // mSwapChainImageFormat
+        colorAtt.samples = VK_SAMPLE_COUNT_1_BIT;
+        /* load previous image */
+        colorAtt.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        colorAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        /* must be previous image format */
+        colorAtt.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        colorAtt.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference colorAttRef{};
+        colorAttRef.attachment = 0;
+        colorAttRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentDescription depthAtt{};
+        depthAtt.flags = 0;
+        depthAtt.format = findDepthFormat();
+        depthAtt.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAtt.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        depthAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depthAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAtt.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthAtt.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference depthAttRef{};
+        depthAttRef.attachment = 1;
+        depthAttRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpassDesc{};
+        subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDesc.colorAttachmentCount = 1;
+        subpassDesc.pColorAttachments = &colorAttRef;
+        subpassDesc.pDepthStencilAttachment = &depthAttRef;
+
+        VkSubpassDependency subpassDep{};
+        subpassDep.srcSubpass = VK_SUBPASS_EXTERNAL;
+        subpassDep.dstSubpass = 0;
+        subpassDep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDep.srcAccessMask = 0;
+        subpassDep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        VkSubpassDependency depthDep{};
+        depthDep.srcSubpass = VK_SUBPASS_EXTERNAL;
+        depthDep.dstSubpass = 0;
+        depthDep.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        depthDep.srcAccessMask = 0;
+        depthDep.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        depthDep.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        std::vector<VkSubpassDependency> dependencies = { subpassDep, depthDep };
+        std::vector<VkAttachmentDescription> attachments = { colorAtt, depthAtt };
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpassDesc;
+        renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+        renderPassInfo.pDependencies = dependencies.data();
+
+        VkResult result = vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error; could not create renderpass (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+
+        return true;
+
     }
 
     void SwapChain::createFramebuffers() 
@@ -289,7 +305,7 @@ namespace aveng {
             VkExtent2D swapChainExtent = getSwapChainExtent();
             VkFramebufferCreateInfo framebufferInfo = {};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = renderPass;
+            framebufferInfo.renderPass = mRenderPass;
             framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
             framebufferInfo.pAttachments = attachments.data();
             framebufferInfo.width = swapChainExtent.width;
@@ -438,6 +454,7 @@ namespace aveng {
 
     VkFormat SwapChain::findDepthFormat() 
     {
+        // TODO : Cool things to learn about
         return device.findSupportedFormat(
             { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
             VK_IMAGE_TILING_OPTIMAL,

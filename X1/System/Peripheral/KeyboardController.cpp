@@ -5,6 +5,16 @@
 
 namespace aveng{
 
+	/**
+	* ToDos
+	* [] glfwGetKeyScancode to create consistent key mappings when working x-platform.
+	* 
+	* Helpful Notes:
+	* - If inputs are being missed see: glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
+	*		or: Track previous vs current to detect edges (e.g. roll your own sticky keys implementation. More efficient if done well)
+	* - use glfwGetKeyName(GLFW_KEY_W, 0); to get a keyboard's layout dependent button names
+	*/
+
 	KeyboardController::KeyboardController(AvengAppObject& _viewerObject, GameData& _data) 
 		: viewerObject{ _viewerObject }, data{_data}
 	{};
@@ -12,6 +22,8 @@ namespace aveng{
 	void KeyboardController::moveCameraXZ(GLFWwindow* window, float dt) {
 		
 		glm::vec3 rotate{ 0 };
+
+		// Note: glfwGetKey polls cached state, and won't tell you about key repeat status
 
 		if (glfwGetKey(window, keys.lookUp) == GLFW_PRESS)
 		{

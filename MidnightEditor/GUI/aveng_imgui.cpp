@@ -12,8 +12,8 @@
 
 namespace aveng {
 
-    AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData)
-        : renderData{ _renderData }, gameData{ _gameData }, engineDevice{ _engineDevice }, modInstData{ _modInstData }
+    AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData)
+        : renderData{ _renderData }, gameData{ _gameData }, engineDevice{ _engineDevice }, modInstData{ _modInstData }, window{ _window }
     {
         // Initialize all the timing vectors with their proper sizes
         mFPSValues.resize(mNumFPSValues, 0.0f);
@@ -26,7 +26,7 @@ namespace aveng {
     }
 
     // Initialize the vulkan and glfw imgui implementations
-    void AvengImgui::init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount)
+    void AvengImgui::init(VkRenderPass renderPass, uint32_t imageCount)
     {
         // set up a descriptor pool stored on this instance, see header for more comments on this.
         VkDescriptorPoolSize pool_sizes[] = {
@@ -115,7 +115,24 @@ namespace aveng {
     void AvengImgui::render(int frameIndex) {
         ImGui::Render();
         ImDrawData* drawdata = ImGui::GetDrawData();
+
+        // NOTE: This could be using its own command buffer (and its own renderpass), which could help if we ever want to run the editor on a different thread
         ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdCommandBuffersGraphics[frameIndex]);
+    }
+
+    void AvengImgui::setup(float dt) {
+        mSelectedInstance.clear();
+        mSelectedInstance.resize(modInstData.miAssimpInstances.size());
+
+        /* save the selected instance for color highlight */
+        std::shared_ptr<AssimpInstance> currentSelectedInstance = nullptr;
+        if (mHighlightSelectedInstance) {
+            currentSelectedInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
+            mSelectedInstanceHighlightValue += dt * 4.0f;
+            if (mSelectedInstanceHighlightValue > 2.0f) {
+                mSelectedInstanceHighlightValue = 0.1f;
+            }
+        }
     }
 
     void AvengImgui::runGUI() {
@@ -721,56 +738,253 @@ namespace aveng {
                 }
             }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             ImGui::End();
         }
 
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // Show the player info window
-        if (show_player_controller_window) {
-            ImGui::Begin("Player Debug", &show_player_controller_window);
-            ImGui::Text("Speed:\t%f", gameData.speed);
-            ImGui::Text("Player center delta:\t%f", gameData.DPI);
-            ImGui::Text("Player roll radians:\t%f", gameData.player_z_rot);
-            ImGui::Text("Roll Cooldown:\t%f", gameData.DeltaRoll);
-            ImGui::Text("Velocity:\t%.02f, %.02f, %.02f", gameData.velocity.x, gameData.velocity.y, gameData.velocity.z);
-            ImGui::Text("Torque Direction:\t%d", gameData.pn);
-            //if (ImGui::Button("Close")) show_player_controller_window = false;
-            ImGui::End();
+    void AvengImgui::handleMouseButtonEvents(int button, int action, int mods) {
+        /* forward to ImGui */
+        ImGuiIO& io = ImGui::GetIO();
+        if (button >= 0 && button < ImGuiMouseButton_COUNT) {
+            io.AddMouseButtonEvent(button, action == GLFW_PRESS);
         }
+
+        /* hide from application if above ImGui window */
+        if (io.WantCaptureMouse && io.WantCaptureMouseUnlessPopupClose) {
+            return;
+        }
+
+        /* trigger selection when left button has been released */
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+            mMousePick = true;
+            renderData.rdInstanceEditMode = instanceEditMode::move;
+        }
+
+        /* move instance around with middle button pressed */
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS) {
+            mMouseMove = true;
+            if (glfwGetKey(renderData.rdWindow, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+                mMouseMoveVerticalShiftKey = GLFW_KEY_LEFT_SHIFT;
+                mMouseMoveVertical = true;
+            }
+            if (glfwGetKey(renderData.rdWindow, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) {
+                mMouseMoveVerticalShiftKey = GLFW_KEY_RIGHT_SHIFT;
+                mMouseMoveVertical = true;
+            }
+        }
+
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) {
+            mMouseMove = false;
+        }
+
+        /* move camera view while right button is hold   */
+        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+            mMouseLock = true;
+        }
+        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
+            mMouseLock = false;
+        }
+
+        if (mMouseLock) {
+            glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            /* enable raw mode if possible */
+            if (glfwRawMouseMotionSupported()) {
+                glfwSetInputMode(window.getGLFWwindow(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+            }
+        }
+        else {
+            glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+    }
+
+    void AvengImgui::hideMouse(bool hide) {
+        /* v1.89.8 removed the check for disabled mouse cursor in GLFW
+         * we need to ignore the mouse postion if the mouse lock is active */
+        ImGuiIO& io = ImGui::GetIO();
+
+        if (hide) {
+            io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+        }
+        else {
+            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+        }
+    }
+
+    void AvengImgui::handleMousePositionEvents(double xPos, double yPos) {
+        /* forward to ImGui */
+        ImGuiIO& io = ImGui::GetIO();
+        io.AddMousePosEvent((float)xPos, (float)yPos);
+
+        /* hide from application if above ImGui window */
+        if (io.WantCaptureMouse && io.WantCaptureMouseUnlessPopupClose) {
+            return;
+        }
+
+        /* calculate relative movement from last position */
+        int mouseMoveRelX = static_cast<int>(xPos) - mMouseXPos;
+        int mouseMoveRelY = static_cast<int>(yPos) - mMouseYPos;
+
+        if (mMouseLock) {
+            renderData.rdViewAzimuth += mouseMoveRelX / 10.0;
+            /* keep between 0 and 360 degree */
+            if (renderData.rdViewAzimuth < 0.0) {
+                renderData.rdViewAzimuth += 360.0;
+            }
+            if (renderData.rdViewAzimuth >= 360.0) {
+                renderData.rdViewAzimuth -= 360.0;
+            }
+
+            renderData.rdViewElevation -= mouseMoveRelY / 10.0;
+            /* keep between -89 and +89 degree */
+            renderData.rdViewElevation = std::clamp(renderData.rdViewElevation, -89.0f, 89.0f);
+
+        }
+        if (mMouseMove) {
+            if (modInstData.miSelectedInstance != 0) {
+                InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+
+                float mouseXScaled = mouseMoveRelX / 20.0f;
+                float mouseYScaled = mouseMoveRelY / 20.0f;
+                float sinAzimuth = std::sin(glm::radians(renderData.rdViewAzimuth));
+                float cosAzimuth = std::cos(glm::radians(renderData.rdViewAzimuth));
+
+                float modelDistance = glm::length(renderData.rdCameraWorldPosition - settings.isWorldPosition) / 50.0f;
+
+                if (mMouseMoveVertical) {
+                    switch (renderData.rdInstanceEditMode) {
+                    case instanceEditMode::move:
+                        settings.isWorldPosition.y -= mouseYScaled * modelDistance;
+                        break;
+                    case instanceEditMode::rotate:
+                        settings.isWorldRotation.y -= mouseXScaled * 5.0f;
+                        /* keep between -180 and 180 degree */
+                        if (settings.isWorldRotation.y < -180.0f) {
+                            settings.isWorldRotation.y += 360.0f;
+                        }
+                        if (settings.isWorldRotation.y >= 180.0f) {
+                            settings.isWorldRotation.y -= 360.0f;
+                        }
+                        break;
+                    case instanceEditMode::scale:
+                        /* uniform scale, do nothing here  */
+                        break;
+                    }
+                }
+                else {
+                    switch (renderData.rdInstanceEditMode) {
+                    case instanceEditMode::move:
+                        settings.isWorldPosition.x += mouseXScaled * modelDistance * cosAzimuth - mouseYScaled * modelDistance * sinAzimuth;
+                        settings.isWorldPosition.z += mouseXScaled * modelDistance * sinAzimuth + mouseYScaled * modelDistance * cosAzimuth;
+                        break;
+                    case instanceEditMode::rotate:
+                        settings.isWorldRotation.z -= (mouseXScaled * cosAzimuth - mouseYScaled * sinAzimuth) * 5.0f;
+                        settings.isWorldRotation.x += (mouseXScaled * sinAzimuth + mouseYScaled * cosAzimuth) * 5.0f;
+
+                        /* keep between -180 and 180 degree */
+                        if (settings.isWorldRotation.z < -180.0f) {
+                            settings.isWorldRotation.z += 360.0f;
+                        }
+                        if (settings.isWorldRotation.z >= 180.0f) {
+                            settings.isWorldRotation.z -= 360.0f;
+                        }
+
+                        if (settings.isWorldRotation.x < -180.0f) {
+                            settings.isWorldRotation.x += 360.0f;
+                        }
+                        if (settings.isWorldRotation.x >= 180.0f) {
+                            settings.isWorldRotation.x -= 360.0f;
+                        }
+                        break;
+                    case instanceEditMode::scale:
+                        settings.isScale -= mouseYScaled / 2.0f;
+                        settings.isScale = std::max(0.001f, settings.isScale);
+                        break;
+                    }
+                }
+
+                modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->setInstanceSettings(settings);
+            }
+        }
+
+        /* save old values */
+        mMouseXPos = static_cast<int>(xPos);
+        mMouseYPos = static_cast<int>(yPos);
+    }
+
+    bool AvengImgui::drawSelectedInstanceGizmo(int frameIndex) {
+    
+        /* draw coordinate lines */
+        mCoordArrowsLineIndexCount = 0;
+        mLineMesh->vertices.clear();
+        if (modInstData.miSelectedInstance > 0) {
+            InstanceSettings instSettings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+
+            /* draw coordiante arrows at origin of selected instance */
+            switch (renderData.rdInstanceEditMode) {
+            case instanceEditMode::move:
+                mCoordArrowsMesh = mCoordArrowsModel.getVertexData();
+                break;
+            case instanceEditMode::rotate:
+                mCoordArrowsMesh = mRotationArrowsModel.getVertexData();
+                break;
+            case instanceEditMode::scale:
+                mCoordArrowsMesh = mScaleArrowsModel.getVertexData();
+                break;
+            }
+
+            mCoordArrowsLineIndexCount += mCoordArrowsMesh.vertices.size();
+            std::for_each(mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end(),
+                [=](auto& n) {
+                n.color /= 2.0f;
+                n.position = glm::quat(glm::radians(instSettings.isWorldRotation)) * n.position;
+                n.position += instSettings.isWorldPosition;
+            });
+            mLineMesh->vertices.insert(mLineMesh->vertices.end(),
+                mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end());
+        }
+
+        if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers[frameIndex], 0)) {
+            Logger::log(1, "%s error: failed to reset line drawing command buffer\n", __FUNCTION__);
+            return false;
+        }
+
+        if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers[frameIndex])) {
+            Logger::log(1, "%s error: failed to begin line drawing command buffer\n", __FUNCTION__);
+            return false;
+        }
+
+        rpInfo.renderPass = renderData.rdLineRenderpass;
+        rpInfo.framebuffer = renderData.rdFramebuffers.at(imageIndex);
+
+        vkCmdBeginRenderPass(renderData.rdLineCommandBuffers[frameIndex], &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdSetViewport(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &viewport);
+        vkCmdSetScissor(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &scissor);
+
+        if (mCoordArrowsLineIndexCount > 0) {
+            mUploadToVBOTimer.start();
+            VertexBuffer::uploadData(engineDevice, mLineVertexBuffer, *mLineMesh);
+            renderData.rdUploadToVBOTime += mUploadToVBOTimer.stop();
+
+            vkCmdBindPipeline(renderData.rdLineCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdLinePipeline);
+
+            vkCmdBindDescriptorSets(renderData.rdLineCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                renderData.rdLinePipelineLayout, 0, 1, &renderData.rdLineDescriptorSets[frameIndex], 0, nullptr);
+
+            VkDeviceSize offset = 0;
+            vkCmdBindVertexBuffers(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &mLineVertexBuffer.buffer, &offset);
+            vkCmdSetLineWidth(renderData.rdLineCommandBuffers[frameIndex], 3.0f);
+            vkCmdDraw(renderData.rdLineCommandBuffers[frameIndex], static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
+        }
+
+        vkCmdEndRenderPass(renderData.rdLineCommandBuffers[frameIndex]);
+
+        if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[frameIndex])) {
+            Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
+            return false;
+        }
+        
     }
 
 }

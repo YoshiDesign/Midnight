@@ -2,9 +2,11 @@
 
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/VkRenderData.h"
+#include "CoreVK/VertexBuffer.h"
 #include "Core/data.h"
 #include "Core/aveng_window.h"
 #include "Utils/window_callbacks.h"
+#include "Utils/Timer.h"
 
 // libs
 #include "Utils/glm_includes.h"
@@ -12,6 +14,9 @@
 #include "GUI/imgui_impl_glfw.h"
 #include "GUI/imgui_impl_vulkan.h"
 #include "GUI/ImGuiFileDialog.h"
+#include "GUI/models/CoordArrowsModel.h"
+#include "GUI/models/RotationArrowsModel.h"
+#include "GUI/models/ScaleArrowsModel.h"
 
 #include "Core/Modeling/ModelAndInstanceData.h"
 
@@ -29,15 +34,21 @@ namespace aveng {
 	class AvengImgui {
 	public:
 
-		AvengImgui(VkRenderData& _renderData, GameData& _gameData, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData);
-		void init(AvengWindow& window, VkRenderPass renderPass, uint32_t imageCount);
+		AvengImgui(VkRenderData& _renderData, GameData& _gameData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData);
+		void init(VkRenderPass renderPass, uint32_t imageCount);
 		~AvengImgui();
+
+        void setup(float dt);
 
 		void newFrame();
 		void render(int frameIndex);
 		void runGUI();
+        bool drawSelectedInstanceGizmo(int frameIndex);
 
+        void handleMouseButtonEvents(int button, int action, int mods);
+        void handleMousePositionEvents(double xPos, double yPos);
 		void hideMouse(bool hide);
+
 
 		bool show_player_controller_window = false;
 		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -49,6 +60,43 @@ namespace aveng {
         ModelAndInstanceData& modInstData;
 		GameData& gameData;
 		EngineDevice& engineDevice;
+        AvengWindow& window;
+
+        Timer mUploadToVBOTimer{};
+
+        /*
+        * Many of these members could be organized into a struct: VkEditorData, similar to VkRenderData
+        */
+
+        bool mMouseLock = false;
+        int mMouseXPos = 0;
+        int mMouseYPos = 0;
+        bool mMousePick = false;
+        bool mMouseMove = false;
+        bool mMouseMoveVertical = false;
+        int mMouseMoveVerticalShiftKey = 0;
+
+        CoordArrowsModel mCoordArrowsModel{};
+        RotationArrowsModel mRotationArrowsModel{};
+        ScaleArrowsModel mScaleArrowsModel{};
+        VkLineMesh mCoordArrowsMesh{};
+
+        unsigned int mCoordArrowsLineIndexCount = 0;
+
+        VkRenderPass mSelectionRenderpass = VK_NULL_HANDLE;
+        VkRenderPass mLineRenderpass = VK_NULL_HANDLE;
+
+        /* color hightlight for selection etc */
+        std::vector<glm::vec2> mSelectedInstance{};
+        VkShaderStorageBufferData mSelectedInstanceBuffer{};
+        VkVertexBufferData mLineVertexBuffer{};
+
+        bool mHighlightSelectedInstance = false;
+        float mSelectedInstanceHighlightValue = 1.0f;
+
+        instanceEditMode rdInstanceEditMode = instanceEditMode::move;
+
+        std::shared_ptr<VkLineMesh> mLineMesh = nullptr;
 
         float mFramesPerSecond = 0.0f;
         /* averaging speed */

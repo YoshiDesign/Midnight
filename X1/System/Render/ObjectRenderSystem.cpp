@@ -81,15 +81,21 @@ namespace aveng {
 
 	void ObjectRenderSystem::updateCamera(float frameTime)
 	{
+		// Fetched all the way from downtown (the swapchain)
 		aspect = getAspectRatio();
-		// Updates the viewer object transform component based on key input, proportional to the time elapsed since the last frame
+
+		// Track key press to transform viewer object
 		keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
-		aveng_camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation + glm::vec3());
+
+		// Apply new viewer obj values to the camera
+		aveng_camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation);
+
+		// Recalculate perspective
 		aveng_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
 	}
 
 	/**
-	* Deprecated
+	* Just another POD struct for the UI/Editor to read from
 	*/
 	void ObjectRenderSystem::updateData(float frameTime)
 	{

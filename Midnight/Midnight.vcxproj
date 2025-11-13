@@ -178,6 +178,7 @@
     <ClCompile Include="CoreVK\EngineDevice.cpp" />
     <ClCompile Include="CoreVK\GFXPipeline.cpp" />
     <ClCompile Include="CoreVK\IndexBuffer.cpp" />
+    <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
     <ClCompile Include="CoreVK\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\Shader.cpp" />
@@ -213,6 +214,7 @@
     <ClInclude Include="CoreVK\EngineDevice.h" />
     <ClInclude Include="CoreVK\GFXPipeline.h" />
     <ClInclude Include="CoreVK\IndexBuffer.h" />
+    <ClInclude Include="CoreVK\LinePipeline.h" />
     <ClInclude Include="CoreVK\PipelineLayout.h" />
     <ClInclude Include="CoreVK\Shader.h" />
     <ClInclude Include="CoreVK\SkinningPipeline.h" />
@@ -226,6 +228,7 @@
     <ClInclude Include="Core\aveng_frame_content.h" />
     <ClInclude Include="Core\aveng_model.h" />
     <ClInclude Include="Core\aveng_window.h" />
+    <ClInclude Include="Core\CameraProxy.h" />
     <ClInclude Include="Core\data.h" />
     <ClInclude Include="Core\Modeling\AssimpAnimChannel.h" />
     <ClInclude Include="Core\Modeling\AssimpAnimClip.h" />

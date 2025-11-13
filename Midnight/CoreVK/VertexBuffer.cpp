@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "VertexBuffer.h"
+#include "Utils/Logger.h"
 
 
 namespace aveng {
@@ -24,7 +25,7 @@ namespace aveng {
         VkResult result = vmaCreateBuffer(engineDevice.allocator(), &bufferInfo, &bufferAllocInfo,
             &vertexBufferData.buffer, &vertexBufferData.bufferAlloc, nullptr);
         if (result != VK_SUCCESS) {
-            std::printf("%s error: could not allocate vertex buffer via VMA (error: %i)\n", __FUNCTION__, result);
+            Logger::log(1, "%s error: could not allocate vertex buffer via VMA (error: %i)\n", __FUNCTION__, result);
             return false;
         }
 
@@ -40,12 +41,44 @@ namespace aveng {
         result = vmaCreateBuffer(engineDevice.allocator(), &stagingBufferInfo, &stagingAllocInfo,
             &vertexBufferData.stagingBuffer, &vertexBufferData.stagingBufferAlloc, nullptr);
         if (result != VK_SUCCESS) {
-            std::printf("%s error: could not allocate vertex staging buffer via VMA (error: %i)\n",
+            Logger::log(1, "%s error: could not allocate vertex staging buffer via VMA (error: %i)\n",
                 __FUNCTION__, result);
             return false;
         }
         vertexBufferData.bufferSize = bufferSize;
         return true;
+    }
+
+    bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkLineMesh vertexData) {
+        size_t vertexDataSize = vertexData.vertices.size() * sizeof(VkLineVertex);
+
+        /* buffer too small, resize */
+        if (vertexBufferData.bufferSize < vertexDataSize) {
+            cleanup(engineDevice, vertexBufferData);
+
+            if (!init(engineDevice, vertexBufferData, vertexDataSize)) {
+                Logger::log(1, "%s error: could not create vertex buffer of size %i bytes\n",
+                    __FUNCTION__, vertexDataSize);
+                return false;
+            }
+            Logger::log(1, "%s: vertex buffer resize to %i bytes\n", __FUNCTION__, vertexDataSize);
+            vertexBufferData.bufferSize = vertexDataSize;
+        }
+
+        /* copy data to staging buffer */
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map memory (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        std::memcpy(data, vertexData.vertices.data(), vertexDataSize);
+        vmaUnmapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc);
+        vmaFlushAllocation(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, 0, vertexDataSize);
+
+        /* trigger upload */
+        return uploadToGPU(renderData, vertexBufferData);
+    
     }
 
     bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkMesh vertexData) {
@@ -56,11 +89,11 @@ namespace aveng {
             cleanup(engineDevice, vertexBufferData);
 
             if (!init(engineDevice, vertexBufferData, vertexDataSize)) {
-                std::printf("%s error: could not create vertex buffer of size %i bytes\n",
+                Logger::log(1, "%s error: could not create vertex buffer of size %i bytes\n",
                     __FUNCTION__, vertexDataSize);
                 return false;
             }
-            std::printf("%s: vertex buffer resize to %i bytes\n", __FUNCTION__, vertexDataSize);
+            Logger::log(1, "%s: vertex buffer resize to %i bytes\n", __FUNCTION__, vertexDataSize);
             vertexBufferData.bufferSize = vertexDataSize;
         }
 
@@ -68,7 +101,7 @@ namespace aveng {
         void* data;
         VkResult result = vmaMapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, &data);
         if (result != VK_SUCCESS) {
-            std::printf("%s error: could not map memory (error: %i)\n", __FUNCTION__, result);
+            Logger::log(1, "%s error: could not map memory (error: %i)\n", __FUNCTION__, result);
             return false;
         }
         std::memcpy(data, vertexData.vertices.data(), vertexDataSize);
@@ -113,11 +146,11 @@ namespace aveng {
             cleanup(engineDevice, vertexBufferData);
 
             if (!init(engineDevice, vertexBufferData, vertexDataSize)) {
-                std::printf("%s error: could not create vertex buffer of size %i bytes\n",
+                Logger::log(1, "%s error: could not create vertex buffer of size %i bytes\n",
                     __FUNCTION__, vertexDataSize);
                 return false;
             }
-            std::printf("%s: vertex buffer resize to %i bytes\n", __FUNCTION__, vertexDataSize);
+            Logger::log(1, "%s: vertex buffer resize to %i bytes\n", __FUNCTION__, vertexDataSize);
             vertexBufferData.bufferSize = vertexDataSize;
         }
 
@@ -125,7 +158,7 @@ namespace aveng {
         void* data;
         VkResult result = vmaMapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, &data);
         if (result != VK_SUCCESS) {
-            std::printf("%s error: could not map memory (error: %i)\n", __FUNCTION__, result);
+            Logger::log(1, "%s error: could not map memory (error: %i)\n", __FUNCTION__, result);
             return false;
         }
         std::memcpy(data, vertexData.data(), vertexDataSize);

@@ -150,6 +150,15 @@ namespace aveng {
 		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	};
 
+	struct VkLineVertex {
+		glm::vec3 position = glm::vec3(0.0f);
+		glm::vec3 color = glm::vec3(0.0f);
+	};
+
+	struct VkLineMesh {
+		std::vector<VkLineVertex> vertices{};
+	};
+
 	struct VkVertex {
 		glm::vec4 position = glm::vec4(0.0f);	// last float is uv.x
 		glm::vec4 color = glm::vec4(1.0f);
@@ -185,6 +194,12 @@ namespace aveng {
 
 	struct VkComputePushConstants {
 		uint32_t pkModelOffset;
+	};
+
+	enum class instanceEditMode : uint8_t {
+		move = 0,
+		rotate,
+		scale
 	};
 
 	struct VkRenderData {
@@ -229,6 +244,10 @@ namespace aveng {
 		//VkCommandPool rdComputeCommandPool = VK_NULL_HANDLE;	// Get from engine device
 		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
 		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
+		std::vector<VkCommandBuffer> rdLineCommandBuffers;		// EDITOR
+
+		VkRenderPass rdLineRenderpass;							// EDITOR
+		VkRenderPass rdSelectionRenderpass;							// EDITOR
 
 		/**
 		* Sync
@@ -258,20 +277,32 @@ namespace aveng {
 		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;
 		std::vector<VkDescriptorSet> basicLightingDescriptorSets;
 		std::vector<VkDescriptorSet> textureDescriptorSets;
+		std::vector<VkDescriptorSet> rdLineDescriptorSets;			// EDITOR
 
 		/*
 		* Pipeline
 		*/
 		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengSelectionPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengSkinningSelectionPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdLinePipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
 
 		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengAnimationPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengSelectionPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengSkinningSelectionPipeline = VK_NULL_HANDLE;
+		VkPipeline rdLinePipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
 
 		//VkDescriptorPool rdImguiDescriptorPool = VK_NULL_HANDLE;
+
+		/*
+		* Editor Data
+		*/
+		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
 	};
 }

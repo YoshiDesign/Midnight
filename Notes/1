@@ -52,7 +52,9 @@
 
 # Architecture Quirks
  - Command pools are created by the EngineDevice, stored in VkRenderData. Commands are created by the CommandBuffer class.
+ - Assume std::string is ALWAYS UTF-8 for max portability. Don't bother with UTF-16 (or WChars?)
 
+# Timeline
 11/01/25 - 
 	1. Learned how vertex/index buffers are mapped once per model, used per instance
 	2. Learned how single-shot command buffers work and that my architecture sucks.
