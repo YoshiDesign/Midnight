@@ -1,6 +1,13 @@
 /* Vulkan */
 #pragma once
 
+
+/**
+* BIG TODO : Remove anything that's a std::vector from VkRenderData.
+*			 Doing so will make things waaaaay more cache friendly.
+*			 The Renderer class can own most of the things stored in vec's.
+*/
+
 #include <memory>
 #include <vector>
 #include <string>
@@ -17,83 +24,30 @@
 
 #include "CoreVK/aveng_descriptors.h"
 #include "CoreVK/aveng_buffer.h"
+#include "CoreVK/swapchain.h"
+
+#ifndef WTF_BOOM
+#define WTF_BOOM 9002
+#endif
 
 namespace aveng {
 
-	//struct Vertex {
-	//	// These 4 items get packed into our vertex buffers
-	//	glm::vec3 position{};		// Position of the vertex
-	//	glm::vec3 color{};			// color at this vertex
-	//	glm::vec3 normal{};			// surface norms
-	//	glm::vec2 texCoord{};		// 2d texture coordinates
+	// std::span<T> super-lightweight doppleganger
+	template <typename T>
+	struct Span {
+		const T* data = nullptr;
+		size_t   size = 0;
 
-	//	/*
-	//	* Required to communicate with the vertex shader.
-	//	* Descriptions of our vertex buffers and how they are to be bound.
-	//	*/
-	//	static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
-	//	static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+		const T& operator[](size_t i) const { return data[i]; }
+		bool empty() const { return size == 0; }
+	};
 
-	//	// This is used with our hashing function to generate keys in our ordered map of vertices
-	//	bool operator==(const Vertex& other) const
-	//	{
-	//		return position == other.position && color == other.color && normal == other.normal && texCoord == other.texCoord;
-	//	}
-
-	//};
-
-	//// Animation vertex structure with bone weights - perfect 16-byte alignment
-	//struct AnimatedVertex {
-	//	glm::vec4 position{};     // position.xyz + texCoord.x in .w
-	//	glm::vec4 color{};        // color.xyz + texCoord.y in .w
-	//	glm::vec4 normal{};       // normal.xyz + unused .w (could store tangent.x, etc.)
-
-	//	// Skeletal animation data - naturally 16-byte aligned, no alignas needed!
-	//	glm::uvec4 boneNumber = glm::uvec4(0);
-	//	glm::vec4 boneWeight = glm::vec4(0.0f);
-
-	//	bool operator==(const AnimatedVertex& other) const {
-	//		return position == other.position &&
-	//			color == other.color &&
-	//			normal == other.normal &&
-	//			boneNumber == other.boneNumber &&
-	//			boneWeight == other.boneWeight;
-	//	}
-	//};
-
-	//// Transformed vertex structure (output from compute shader) - matches transformed_shader.vert
-	//struct TransformedVertex {
-	//	glm::vec3 position{};      // Already transformed position
-	//	glm::vec3 color{};         // Color data
-	//	glm::vec3 normal{};        // Already transformed normal
-	//	glm::vec2 texCoord{};      // Texture coordinates
-	//	// NO bone data - transformation already applied!
-
-	//	bool operator==(const TransformedVertex& other) const {
-	//		return position == other.position &&
-	//			color == other.color &&
-	//			normal == other.normal &&
-	//			texCoord == other.texCoord;
-	//	}
-
-	//	// Required for Vulkan pipeline to understand vertex layout
-	//	static std::vector<VkVertexInputBindingDescription> getBindingDescriptions() {
-	//		std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
-	//		bindingDescriptions[0].binding = 0;
-	//		bindingDescriptions[0].stride = sizeof(TransformedVertex);
-	//		bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	//		return bindingDescriptions;
-	//	}
-
-	//	static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-	//		std::vector<VkVertexInputAttributeDescription> attributeDescriptions{};
-	//		attributeDescriptions.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, position) });
-	//		attributeDescriptions.push_back({ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, color) });
-	//		attributeDescriptions.push_back({ 2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransformedVertex, normal) });
-	//		attributeDescriptions.push_back({ 3, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(TransformedVertex, texCoord) });
-	//		return attributeDescriptions;
-	//	}
-	//};
+	// For shared usage (editor) - Add more if/when necessary - Warning: DO NOT cause these data members to reallocate. We're not detecting/protecting against that
+	struct MatrixBuffersView {
+		Span<VkUniformBufferData>       viewProjUBOs;
+		Span<VkShaderStorageBufferData> modelRootSSBOs;
+		Span<VkShaderStorageBufferData> boneMatSSBOs;
+	};
 
 	struct LightsUbo {
 		static constexpr int MAX_LIGHTS = 100;
@@ -212,8 +166,6 @@ namespace aveng {
 			- command pools
 		*/
 
-		GLFWwindow* rdWindow = nullptr;
-
 		int rdWidth = 0;
 		int rdHeight = 0;
 
@@ -253,16 +205,17 @@ namespace aveng {
 		* Sync
 		*/
 		std::vector<VkSemaphore> rdPresentSemaphore;
-		std::vector<VkSemaphore>rdRenderSemaphore;
-		std::vector<VkSemaphore>rdGraphicSemaphore;
-		std::vector<VkSemaphore>rdComputeSemaphore;
-		std::vector<VkFence>rdRenderFence;
-		std::vector<VkFence>rdComputeFence;
+		std::vector<VkSemaphore> rdRenderSemaphore;
+		std::vector<VkSemaphore> rdGraphicSemaphore;
+		std::vector<VkSemaphore> rdComputeSemaphore;
+		std::vector<VkFence> rdRenderFence;
+		std::vector<VkFence> rdComputeFence;
 
 		/*
 		* Descriptors
 		*/
 		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
+		VkDescriptorPool editorDescriptorPool = VK_NULL_HANDLE;
 
 		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;
@@ -270,6 +223,9 @@ namespace aveng {
 		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE; // EDITOR
+		VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE; // EDITOR
+		VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE; // EDITOR
 
 		std::vector<VkDescriptorSet> rdAvengDescriptorSets;
 		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;
@@ -277,6 +233,8 @@ namespace aveng {
 		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;
 		std::vector<VkDescriptorSet> basicLightingDescriptorSets;
 		std::vector<VkDescriptorSet> textureDescriptorSets;
+		std::vector<VkDescriptorSet> rdAvengSelectionDescriptorSets;	// EDITOR
+		std::vector<VkDescriptorSet> rdAvengAnimationSelectionDescriptorSets; // EDITOR
 		std::vector<VkDescriptorSet> rdLineDescriptorSets;			// EDITOR
 
 		/*
@@ -285,7 +243,7 @@ namespace aveng {
 		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengSelectionPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengSkinningSelectionPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengAnimationSelectionPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdLinePipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
@@ -293,7 +251,7 @@ namespace aveng {
 		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengAnimationPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengSelectionPipeline = VK_NULL_HANDLE;
-		VkPipeline rdAvengSkinningSelectionPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengAnimationSelectionPipeline = VK_NULL_HANDLE;
 		VkPipeline rdLinePipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
@@ -304,5 +262,7 @@ namespace aveng {
 		* Editor Data
 		*/
 		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
+
+		MatrixBuffersView matrixBuffersView;
 	};
 }

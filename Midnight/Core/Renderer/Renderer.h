@@ -30,6 +30,7 @@
 
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
+#include "EditorData.h"
 #endif
 
 namespace aveng {
@@ -40,7 +41,7 @@ namespace aveng {
 
 	public:
 
-		Renderer(AvengWindow& window, GameData& _gameData);
+		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, GameData& _gameData, ModelAndInstanceData& mModelInstanceData);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
@@ -48,8 +49,9 @@ namespace aveng {
 
 		// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
 		VkRenderPass getSwapChainRenderPass() const { return aveng_swapchain->getRenderPass(); }
-		VkDevice getEngineDevice() { return engineDevice.device(); }
 		float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
+		SwapChain* pGetSwapChain() const { return aveng_swapchain.get(); }
+
 		bool isFrameInProgress() const { return isFrameStarted; }
 		bool createPipelineLayouts();
 		bool createPipelines();
@@ -114,7 +116,7 @@ namespace aveng {
 		VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
 		VkFormat getSwapChainImageFormat() { return aveng_swapchain->getSwapChainImageFormat(); }
 
-		bool draw(float deltaTime);
+		int draw(float deltaTime);
 		void beginFrame();
 		void endFrame();
 		void beginSwapChainRenderPass();
@@ -125,7 +127,7 @@ namespace aveng {
 		void updateFrameData(const glm::mat4& projection, const glm::mat4& view);
 #if ENABLE_EDITOR
 		void renderEditor();
-		void setupEditor(float dt);
+		void setupEditorFrame(float dt);
 #endif
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
@@ -147,12 +149,12 @@ namespace aveng {
 	private:
 		// Engine systems
 		AvengWindow& aveng_window;
-		EngineDevice engineDevice{ aveng_window };			// The Engine Service - Stack allocated
+		EngineDevice& engineDevice;
 
 		VkResult err;
 		VkResult result;
 		GameData& gameData;
-		VkRenderData renderData;
+		VkRenderData& renderData;
 
 		Timer mFrameTimer{};
 		Timer mMatrixGenerateTimer{};
@@ -188,7 +190,7 @@ namespace aveng {
 		std::vector<VkShaderStorageBufferData> mLightDataBuffers;
 
 		// Renderer owns this
-		ModelAndInstanceData mModelInstanceData{}; 
+		ModelAndInstanceData& mModelInstanceData; 
 
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 		VkPushConstants mModelData{};
@@ -198,10 +200,6 @@ namespace aveng {
 
 		std::vector<glm::mat4> mWorldPosMatrices{};
 		std::vector<NodeTransformData> mNodeTransFormData{};
-
-#ifdef ENABLE_EDITOR
-		aveng::Editor editor{ renderData, gameData, engineDevice, aveng_window, mModelInstanceData };
-#endif
 
 	};
 

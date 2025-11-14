@@ -7,6 +7,10 @@ namespace aveng {
 		: window{ window }
 	{
 
+#if ENABLE_EDITOR
+		editor.init(renderer.pGetSwapChain());
+#endif
+
 		firstFrame = true;
 
 		// Initial camera position
@@ -14,7 +18,11 @@ namespace aveng {
 		viewerObject.transform.translation.y = -2.5f;
 	}
 
-	ObjectRenderSystem::~ObjectRenderSystem() = default;
+	ObjectRenderSystem::~ObjectRenderSystem() {
+#if ENABLE_EDITOR
+		editor.cleanup();
+#endif
+	};
 
 	void ObjectRenderSystem::initialize() 
 	{
@@ -71,7 +79,13 @@ namespace aveng {
 		// Update frame data in renderer
 		renderer.updateFrameData(aveng_camera.getProjection(), aveng_camera.getView());
 
-		renderer.draw(frameTime);
+		frameIndex = renderer.draw(frameTime);
+		if (frameIndex == WTF_BOOM)
+		{
+			throw std::runtime_error("fatal error");
+		}
+
+		editor.render(frameIndex);
 
 		// Render lights -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
 		// renderer.renderLights();

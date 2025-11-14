@@ -104,5 +104,8 @@
     <ClInclude Include="GUI\models\ScaleArrowsModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="EditorData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

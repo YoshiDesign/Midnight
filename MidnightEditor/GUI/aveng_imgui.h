@@ -17,6 +17,7 @@
 #include "GUI/models/CoordArrowsModel.h"
 #include "GUI/models/RotationArrowsModel.h"
 #include "GUI/models/ScaleArrowsModel.h"
+#include "EditorData.h"
 
 #include "Core/Modeling/ModelAndInstanceData.h"
 
@@ -34,16 +35,15 @@ namespace aveng {
 	class AvengImgui {
 	public:
 
-		AvengImgui(VkRenderData& _renderData, GameData& _gameData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData);
+		AvengImgui(VkRenderData& _renderData, GameData& _gameData, EditorData& editorData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData);
 		void init(VkRenderPass renderPass, uint32_t imageCount);
 		~AvengImgui();
 
-        void setup(float dt);
+        void setupFrame(float dt);
 
 		void newFrame();
 		void render(int frameIndex);
 		void runGUI();
-        bool drawSelectedInstanceGizmo(int frameIndex);
 
         void handleMouseButtonEvents(int button, int action, int mods);
         void handleMousePositionEvents(double xPos, double yPos);
@@ -61,42 +61,10 @@ namespace aveng {
 		GameData& gameData;
 		EngineDevice& engineDevice;
         AvengWindow& window;
-
-        Timer mUploadToVBOTimer{};
-
-        /*
-        * Many of these members could be organized into a struct: VkEditorData, similar to VkRenderData
-        */
-
-        bool mMouseLock = false;
-        int mMouseXPos = 0;
-        int mMouseYPos = 0;
-        bool mMousePick = false;
-        bool mMouseMove = false;
-        bool mMouseMoveVertical = false;
-        int mMouseMoveVerticalShiftKey = 0;
-
-        CoordArrowsModel mCoordArrowsModel{};
-        RotationArrowsModel mRotationArrowsModel{};
-        ScaleArrowsModel mScaleArrowsModel{};
-        VkLineMesh mCoordArrowsMesh{};
-
-        unsigned int mCoordArrowsLineIndexCount = 0;
+        EditorData& editorData;
 
         VkRenderPass mSelectionRenderpass = VK_NULL_HANDLE;
         VkRenderPass mLineRenderpass = VK_NULL_HANDLE;
-
-        /* color hightlight for selection etc */
-        std::vector<glm::vec2> mSelectedInstance{};
-        VkShaderStorageBufferData mSelectedInstanceBuffer{};
-        VkVertexBufferData mLineVertexBuffer{};
-
-        bool mHighlightSelectedInstance = false;
-        float mSelectedInstanceHighlightValue = 1.0f;
-
-        instanceEditMode rdInstanceEditMode = instanceEditMode::move;
-
-        std::shared_ptr<VkLineMesh> mLineMesh = nullptr;
 
         float mFramesPerSecond = 0.0f;
         /* averaging speed */
@@ -133,8 +101,6 @@ namespace aveng {
         int mMatrixUploadOffset = 0;
         int mUiGenOffset = 0;
         int mUiDrawOffset = 0;
-
-        int mManyInstanceCreateNum = 1;
 
 	};
 } 

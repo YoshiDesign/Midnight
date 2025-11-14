@@ -173,6 +173,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Editor.h" />
+    <ClInclude Include="EditorData.h" />
     <ClInclude Include="GUI\aveng_imgui.h" />
     <ClInclude Include="GUI\dirent\dirent.h" />
     <ClInclude Include="GUI\imconfig.h" />

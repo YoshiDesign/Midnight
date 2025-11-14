@@ -11,7 +11,8 @@
 
 namespace aveng {
 
-	Renderer::Renderer(AvengWindow& window, GameData& _gameData) : aveng_window{ window }, gameData{_gameData}
+	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, GameData& _gameData, ModelAndInstanceData& mModelInstanceData)
+		: engineDevice{engineDevice}, aveng_window{ window }, gameData{ _gameData }, renderData{ renderData }, mModelInstanceData{ mModelInstanceData }
 	{
 
 		// Define buffer vec's that are managed by the Renderer
@@ -61,9 +62,7 @@ namespace aveng {
 
 		// Initialize PointLightSystem now that descriptor layouts are created
 		// initializePointLightSystem();
-#if ENABLE_EDITOR
-		editor.init(aveng_swapchain.get());
-#endif
+
 		/* register callbacks */
 		mModelInstanceData.miModelCheckCallbackFunction = [this](const std::string& fileName) { return hasModel(fileName); };
 		mModelInstanceData.miModelAddCallbackFunction = [this](const std::string& fileName) {/* return addModel(fileName);*/ return queueModelLoad(fileName); };
@@ -414,7 +413,7 @@ namespace aveng {
 		renderData.rdCommandBuffersCompute.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		engineDevice.initCommandBuffers(renderData.rdCommandBuffersGraphics);
-		engineDevice.initCommandBuffers(renderData.rdCommandBuffersCompute, "compute");
+		engineDevice.initCommandBuffers(renderData.rdCommandBuffersCompute);
 
 	}
 
@@ -1110,15 +1109,7 @@ namespace aveng {
 		size_t minAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
 		return ((objectSize + minAlignment - 1) / minAlignment) * minAlignment;
 	}
-#if ENABLE_EDITOR
-	void Renderer::renderEditor() {
-		editor.render(currentFrameIndex);
-	}
 
-	void Renderer::setupEditor(float dt) {
-		editor.setup(dt);
-	}
-#endif
 	void Renderer::runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset) {
 		uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
 		// VkCommandBuffer computeCommandBuffer = getCurrentCommandBufferCompute();
@@ -1192,10 +1183,10 @@ namespace aveng {
 			&boneMatrixBufferBarrier, 0, nullptr);
 	}
 
-	bool Renderer::draw(float deltaTime) {
+	int Renderer::draw(float deltaTime) {
 		/* no update on zero diff */
 		if (deltaTime == 0.0f) {
-			return true;
+			return currentFrameIndex;
 		}
 
 		renderData.rdFrameTime = mFrameTimer.stop();
@@ -1239,7 +1230,7 @@ namespace aveng {
 		mNodeTransFormData.resize(boneMatrixBufferSize);
 
 #if ENABLE_EDITOR
-		setupEditor(deltaTime);
+		...setupEditorFrame(deltaTime);
 #endif
 
 		/* we need to track the presence of animated models */
@@ -1260,22 +1251,24 @@ namespace aveng {
 					animatedModelLoaded = true; // designate
 
 					mMatrixGenerateTimer.start();
-
+					std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
 					// For each instance
 					for (unsigned int i = 0; i < numberOfInstances; ++i) {
-						// Update its animation -- Q: why are we using at() instead of indexing?? Less efficient
-						modelType.second.at(i)->updateAnimation(deltaTime);
-						std::vector<NodeTransformData> instanceNodeTransform = modelType.second.at(i)->getNodeTransformData();
+
+						auto& instance = instances[i];
+
+						instance->updateAnimation(deltaTime);
+						std::vector<NodeTransformData> instanceNodeTransform = instance->getNodeTransformData();
 
 						// Copy the NodeTransform Data to the vector of NodeTransform datas. I didn't know you can use arithmetic with iterator access patterns
 						// STORAGE BUFFER DATA - Packed with every instance's data
 						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + i * numberOfBones);
 
-						// glm::mat4 mt = modelType.second.at(i)->getWorldTransformMatrix();
-						//std::cout << "INSPECTING MAT" << std::endl;
-						//std::cout << glm::to_string(mt) << std::endl;
 						// STORAGE BUFFER DATA - Packed with every instance's data
-						mWorldPosMatrices.at(instanceToStore + i) = modelType.second.at(i)->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+						mWorldPosMatrices.at(instanceToStore + i) = instance->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+#if ENABLE_EDITOR
+						editor.setSelectedInstance(instance, instanceToStore, i);
+#endif
 					}
 
 					size_t trsMatrixSize = numberOfBones * numberOfInstances * sizeof(glm::mat4); // CPU miss
@@ -1289,9 +1282,13 @@ namespace aveng {
 				else {
 					/* non-animated models */
 					mMatrixGenerateTimer.start();
-
+					std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
 					for (unsigned int i = 0; i < numberOfInstances; ++i) {
+						auto& instance = instances[i];
 						mWorldPosMatrices.at(instanceToStore + i) = modelType.second.at(i)->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+#if ENABLE_EDITOR
+						editor.setSelectedInstance(instance, instanceToStore, i);
+#endif
 					}
 
 					renderData.rdMatrixGenerateTime += mMatrixGenerateTimer.stop();
@@ -1308,6 +1305,10 @@ namespace aveng {
 
 		// Ship the SSBO data
 		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers[currentFrameIndex], mNodeTransFormData);
+#if ENABLE_EDITOR
+		// Update the mSelectedInstance buffer with mSelectedInstance
+		// editor.updateStorageBuffers(currentFrameIndex);
+#endif
 		
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
@@ -1326,7 +1327,7 @@ namespace aveng {
 		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence[currentFrameIndex]);
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
-			return false;
+			return WTF_BOOM;
 		}
 
 		if (animatedModelLoaded) {
@@ -1334,13 +1335,13 @@ namespace aveng {
 			// computeCommandBuffer = getCurrentCommandBufferCompute();
 
 			if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex], 0)) {
-				::printf("%s error: failed to reset compute command buffer\n", __FUNCTION__);
-				return false;
+				std::printf("%s error: failed to reset compute command buffer\n", __FUNCTION__);
+				return WTF_BOOM;
 			}
 
 			if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
 				std::printf("%s error: failed to begin compute command buffer\n", __FUNCTION__);
-				return false;
+				return WTF_BOOM;
 			}
 
 			uint32_t computeShaderModelOffset = 0;
@@ -1367,7 +1368,7 @@ namespace aveng {
 
 			if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
 				std::printf("%s error: failed to end compute command buffer\n", __FUNCTION__);
-				return false;
+				return WTF_BOOM;
 			}
 
 			/* submit compute commands */
@@ -1386,7 +1387,7 @@ namespace aveng {
 			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
-				return false;
+				return WTF_BOOM;
 			};
 
 		}
@@ -1406,7 +1407,7 @@ namespace aveng {
 			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
-				return false;
+				return WTF_BOOM;
 			};
 		}
 
@@ -1419,6 +1420,7 @@ namespace aveng {
 		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers[currentFrameIndex], mWorldPosMatrices);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
+
 		if (bufferResized) {
 			std::cout << "UBO Resized - Updating Descriptor Sets" << std::endl;
 			updateDescriptorSets();
@@ -1429,18 +1431,18 @@ namespace aveng {
 		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence[currentFrameIndex]);
 		if (result != VK_SUCCESS) {
 			std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
-			return false;
+			return WTF_BOOM;
 		}
 
 		//// NOTE: This would destroy the current renderpass (if there were one)
 		if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0)) {
 			std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);
-			return false;
+			return WTF_BOOM;
 		}
 
 		if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersGraphics[currentFrameIndex])) {
 			std::printf("%s error: failed to begin command buffer\n", __FUNCTION__);
-			return false;
+			return WTF_BOOM;
 		}
 
 		beginSwapChainRenderPass();
@@ -1539,7 +1541,7 @@ namespace aveng {
 		result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence[currentFrameIndex]);
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: failed to submit draw command buffer (%i)\n", __FUNCTION__, result);
-			return false;
+			return WTF_BOOM;
 		}
 
 		/* trigger swapchain image presentation */
@@ -1561,7 +1563,7 @@ namespace aveng {
 		else {
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: failed to present swapchain image\n", __FUNCTION__);
-				return false;
+				return WTF_BOOM;
 			}
 		}
 
@@ -1814,10 +1816,6 @@ namespace aveng {
 			model->cleanup(engineDevice, renderData, aveng_swapchain->MAX_FRAMES_IN_FLIGHT);
 		}
 
-#if ENABLE_EDITOR
-		editor.cleanup();
-#endif
-
 		SyncObjects::cleanup(engineDevice, renderData, SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengPipeline);
@@ -1858,6 +1856,7 @@ namespace aveng {
 	}
 
 	bool Renderer::createMatrixUBO() {
+
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 			if (!UniformBuffer::init(engineDevice, mPerspectiveViewMatrixUBOBuffers[i])) {
 				Logger::log(1, "%s error: could not create matrix uniform buffers\n", __FUNCTION__);
@@ -1865,11 +1864,18 @@ namespace aveng {
 			}
 		}
 
+		// Populate the shared view for the editor
+		renderData.matrixBuffersView.viewProjUBOs = {
+			mPerspectiveViewMatrixUBOBuffers.data(),
+			mPerspectiveViewMatrixUBOBuffers.size()
+		};
+			
 		return true;
 	}
 
 	bool Renderer::createSSBOs() {
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {\
+
 			if (!ShaderStorageBuffer::init(engineDevice, mShaderTrsMatrixBuffers[i])) {
 				Logger::log(1, "%s error: could not create TRS matrices SSBO\n", __FUNCTION__);
 				return false;
@@ -1879,6 +1885,7 @@ namespace aveng {
 				Logger::log(1, "%s error: could not create nodel root position SSBO\n", __FUNCTION__);
 				return false;
 			}
+			
 
 			if (!ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers[i])) {
 				Logger::log(1, "%s error: could not create node transform SSBO\n", __FUNCTION__);
@@ -1889,7 +1896,18 @@ namespace aveng {
 				Logger::log(1, "%s error: could not create bone matrix SSBO\n", __FUNCTION__);
 				return false;
 			}
+
 		}
+
+		// Populate the shared view for the editor
+		renderData.matrixBuffersView.modelRootSSBOs = {
+			mShaderModelRootMatrixBuffers.data(),
+			mShaderModelRootMatrixBuffers.size()
+		};
+		renderData.matrixBuffersView.boneMatSSBOs = {
+			mShaderBoneMatrixBuffers.data(),
+			mShaderBoneMatrixBuffers.size()
+		};
 
 		return true;
 	}

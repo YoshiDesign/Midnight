@@ -12,8 +12,10 @@
 
 namespace aveng {
 
-    AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData)
-        : renderData{ _renderData }, gameData{ _gameData }, engineDevice{ _engineDevice }, modInstData{ _modInstData }, window{ _window }
+    AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, EditorData& editorData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData)
+        : renderData{ _renderData }, gameData{ _gameData }, editorData{ editorData }, engineDevice {
+        _engineDevice
+    }, modInstData{ _modInstData }, window{ _window }
     {
         // Initialize all the timing vectors with their proper sizes
         mFPSValues.resize(mNumFPSValues, 0.0f);
@@ -118,21 +120,6 @@ namespace aveng {
 
         // NOTE: This could be using its own command buffer (and its own renderpass), which could help if we ever want to run the editor on a different thread
         ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdCommandBuffersGraphics[frameIndex]);
-    }
-
-    void AvengImgui::setup(float dt) {
-        mSelectedInstance.clear();
-        mSelectedInstance.resize(modInstData.miAssimpInstances.size());
-
-        /* save the selected instance for color highlight */
-        std::shared_ptr<AssimpInstance> currentSelectedInstance = nullptr;
-        if (mHighlightSelectedInstance) {
-            currentSelectedInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
-            mSelectedInstanceHighlightValue += dt * 4.0f;
-            if (mSelectedInstanceHighlightValue > 2.0f) {
-                mSelectedInstanceHighlightValue = 0.1f;
-            }
-        }
     }
 
     void AvengImgui::runGUI() {
@@ -536,11 +523,11 @@ namespace aveng {
 
                 if (ImGui::Button("Create Multiple Instances")) {
                     std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedModel];
-                    modInstData.miInstanceAddManyCallbackFunction(currentModel, mManyInstanceCreateNum);
+                    modInstData.miInstanceAddManyCallbackFunction(currentModel, editorData.eManyInstanceCreateNum);
                     modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
                 }
                 ImGui::SameLine();
-                ImGui::SliderInt("##MassInstanceCreation", &mManyInstanceCreateNum, 1, 100, "%d", flags);
+                ImGui::SliderInt("##MassInstanceCreation", &editorData.eManyInstanceCreateNum, 1, 100, "%d", flags);
 
                 if (modelListEmtpy) {
                     ImGui::EndDisabled();
@@ -548,32 +535,43 @@ namespace aveng {
             }
 
             if (ImGui::CollapsingHeader("Instances")) {
+                bool modelListEmtpy = modInstData.miModelList.size() == 1;
+                bool nullInstanceSelected = modInstData.miSelectedInstance == 0;
                 size_t numberOfInstances = modInstData.miAssimpInstances.size();
-
-                /* Validate selected instance index and reset if invalid */
-                if (numberOfInstances > 0 && (modInstData.miSelectedInstance < 0 || modInstData.miSelectedInstance >= numberOfInstances)) {
-                    modInstData.miSelectedInstance = 0;
-                }
 
                 ImGui::Text("Number of Instances: %ld", numberOfInstances);
 
-                if (numberOfInstances == 0) {
+                if (modelListEmtpy) {
                     ImGui::BeginDisabled();
                 }
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Hightlight Instance:");
+                ImGui::SameLine();
+                ImGui::Checkbox("##HighlightInstance", &editorData.eHighlightSelectedInstance);
 
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Selected Instance  :");
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true);
                 if (ImGui::ArrowButton("##Left", ImGuiDir_Left) &&
-                    modInstData.miSelectedInstance > 0) {
+                    modInstData.miSelectedInstance > 1) {
                     modInstData.miSelectedInstance--;
                 }
+                if (modelListEmtpy || nullInstanceSelected) {
+                    ImGui::BeginDisabled();
+                }
+
                 ImGui::SameLine();
                 ImGui::PushItemWidth(30);
-                ImGui::DragInt("##SelInst", &modInstData.miSelectedInstance, 1, 0,
+                ImGui::DragInt("##SelInst", &modInstData.miSelectedInstance, 1, 1,
                     modInstData.miAssimpInstances.size() - 1, "%3d", flags);
                 ImGui::PopItemWidth();
+
+                if (modelListEmtpy || nullInstanceSelected) {
+                    ImGui::EndDisabled();
+                }
+
                 ImGui::SameLine();
                 if (ImGui::ArrowButton("##Right", ImGuiDir_Right) &&
                     modInstData.miSelectedInstance < (modInstData.miAssimpInstances.size() - 1)) {
@@ -581,26 +579,33 @@ namespace aveng {
                 }
                 ImGui::PopButtonRepeat();
 
+                if (modelListEmtpy) {
+                    ImGui::EndDisabled();
+                }
+
+                if (modelListEmtpy || nullInstanceSelected) {
+                    ImGui::BeginDisabled();
+                }
+
+                /* DragInt does not like clamp flag */
+                modInstData.miSelectedInstance = std::clamp(modInstData.miSelectedInstance, 0,
+                    static_cast<int>(modInstData.miAssimpInstances.size() - 1));
+
                 InstanceSettings settings;
                 if (numberOfInstances > 0) {
                     settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
                 }
 
-                ImGui::SameLine();
-                if (ImGui::Button("Clone Instance")) {
+                if (ImGui::Button("Center This Instance")) {
                     std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
-                    modInstData.miInstanceCloneCallbackFunction(currentInstance);
-
-                    /* reset to last position for now */
-                    modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
-
-                    /* read back settings for UI */
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+                    modInstData.miInstanceCenterCallbackFunction(currentInstance);
                 }
+
+                ImGui::SameLine();
 
                 /* we MUST retain the last model */
                 unsigned int numberOfInstancesPerModel = 0;
-                if (!modInstData.miAssimpInstances.empty()) {
+                if (modInstData.miAssimpInstances.size() > 1) {
                     std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
                     std::string currentModelName = currentInstance->getModel()->getModelFileName();
                     numberOfInstancesPerModel = modInstData.miAssimpInstancesPerModel[currentModelName].size();
@@ -616,7 +621,7 @@ namespace aveng {
                     modInstData.miInstanceDeleteCallbackFunction(currentInstance);
 
                     /* hard reset for now */
-                    if (modInstData.miSelectedInstance > 0) {
+                    if (modInstData.miSelectedInstance > 1) {
                         modInstData.miSelectedInstance -= 1;
                     }
                     settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
@@ -626,20 +631,44 @@ namespace aveng {
                     ImGui::EndDisabled();
                 }
 
-                if (numberOfInstances == 0) {
+                if (ImGui::Button("Clone Instance")) {
+                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
+                    modInstData.miInstanceCloneCallbackFunction(currentInstance);
+
+                    /* reset to last position for now */
+                    modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
+
+                    /* read back settings for UI */
+                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+                }
+
+                if (ImGui::Button("Create Multiple Clones")) {
+                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
+                    modInstData.miInstanceCloneManyCallbackFunction(currentInstance, editorData.eManyInstanceCloneNum);
+
+                    /* reset to last position for now */
+                    modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
+
+                    /* read back settings for UI */
+                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+                }
+                ImGui::SameLine();
+                ImGui::SliderInt("##MassInstanceCloning", &editorData.eManyInstanceCloneNum, 1, 100, "%d", flags);
+
+                if (modelListEmtpy || nullInstanceSelected) {
                     ImGui::EndDisabled();
                 }
 
                 /* get the new size, in case of a deletion */
-                numberOfInstances = modInstData.miAssimpInstances.size();
+                numberOfInstances = modInstData.miAssimpInstances.size() - 1;
 
                 std::string baseModelName = "None";
-                if (numberOfInstances > 0) {
+                if (numberOfInstances > 0 && !nullInstanceSelected) {
                     baseModelName = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getModel()->getModelFileName();
                 }
                 ImGui::Text("Base Model: %s", baseModelName.c_str());
 
-                if (numberOfInstances == 0) {
+                if (numberOfInstances == 0 || nullInstanceSelected) {
                     ImGui::BeginDisabled();
                 }
 
@@ -668,10 +697,14 @@ namespace aveng {
 
                 if (ImGui::Button("Reset Instance Values")) {
                     InstanceSettings defaultSettings{};
+
+                    /* save and restore index positions */
+                    int instanceIndex = settings.isInstanceIndexPosition;
                     settings = defaultSettings;
+                    settings.isInstanceIndexPosition = instanceIndex;
                 }
 
-                if (numberOfInstances == 0) {
+                if (numberOfInstances == 0 || nullInstanceSelected) {
                     ImGui::EndDisabled();
                 }
 
@@ -681,7 +714,7 @@ namespace aveng {
             }
 
             if (ImGui::CollapsingHeader("Animations")) {
-                size_t numberOfInstances = modInstData.miAssimpInstances.size();
+                size_t numberOfInstances = modInstData.miAssimpInstances.size() - 1;
 
                 InstanceSettings settings;
                 size_t numberOfClips = 0;
@@ -710,6 +743,7 @@ namespace aveng {
                         }
                         ImGui::EndCombo();
                     }
+
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Replay Speed:  ");
                     ImGui::SameLine();
@@ -757,36 +791,36 @@ namespace aveng {
 
         /* trigger selection when left button has been released */
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-            mMousePick = true;
+            editorData.eMousePick = true;
             renderData.rdInstanceEditMode = instanceEditMode::move;
         }
 
         /* move instance around with middle button pressed */
         if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS) {
-            mMouseMove = true;
-            if (glfwGetKey(renderData.rdWindow, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-                mMouseMoveVerticalShiftKey = GLFW_KEY_LEFT_SHIFT;
-                mMouseMoveVertical = true;
+            editorData.eMouseMove = true;
+            if (glfwGetKey(window.getGLFWwindow(), GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+                editorData.eMouseMoveVerticalShiftKey = GLFW_KEY_LEFT_SHIFT;
+                editorData.eMouseMoveVertical = true;
             }
-            if (glfwGetKey(renderData.rdWindow, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) {
-                mMouseMoveVerticalShiftKey = GLFW_KEY_RIGHT_SHIFT;
-                mMouseMoveVertical = true;
+            if (glfwGetKey(window.getGLFWwindow(), GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) {
+                editorData.eMouseMoveVerticalShiftKey = GLFW_KEY_RIGHT_SHIFT;
+                editorData.eMouseMoveVertical = true;
             }
         }
 
         if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) {
-            mMouseMove = false;
+            editorData.eMouseMove = false;
         }
 
         /* move camera view while right button is hold   */
         if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
-            mMouseLock = true;
+            editorData.eMouseLock = true;
         }
         if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
-            mMouseLock = false;
+            editorData.eMouseLock = false;
         }
 
-        if (mMouseLock) {
+        if (editorData.eMouseLock) {
             glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             /* enable raw mode if possible */
             if (glfwRawMouseMotionSupported()) {
@@ -822,10 +856,10 @@ namespace aveng {
         }
 
         /* calculate relative movement from last position */
-        int mouseMoveRelX = static_cast<int>(xPos) - mMouseXPos;
-        int mouseMoveRelY = static_cast<int>(yPos) - mMouseYPos;
+        int mouseMoveRelX = static_cast<int>(xPos) - editorData.eMouseXPos;
+        int mouseMoveRelY = static_cast<int>(yPos) - editorData.eMouseYPos;
 
-        if (mMouseLock) {
+        if (editorData.eMouseLock) {
             renderData.rdViewAzimuth += mouseMoveRelX / 10.0;
             /* keep between 0 and 360 degree */
             if (renderData.rdViewAzimuth < 0.0) {
@@ -840,7 +874,7 @@ namespace aveng {
             renderData.rdViewElevation = std::clamp(renderData.rdViewElevation, -89.0f, 89.0f);
 
         }
-        if (mMouseMove) {
+        if (editorData.eMouseMove) {
             if (modInstData.miSelectedInstance != 0) {
                 InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
 
@@ -851,7 +885,7 @@ namespace aveng {
 
                 float modelDistance = glm::length(renderData.rdCameraWorldPosition - settings.isWorldPosition) / 50.0f;
 
-                if (mMouseMoveVertical) {
+                if (editorData.eMouseMoveVertical) {
                     switch (renderData.rdInstanceEditMode) {
                     case instanceEditMode::move:
                         settings.isWorldPosition.y -= mouseYScaled * modelDistance;
@@ -908,83 +942,8 @@ namespace aveng {
         }
 
         /* save old values */
-        mMouseXPos = static_cast<int>(xPos);
-        mMouseYPos = static_cast<int>(yPos);
-    }
-
-    bool AvengImgui::drawSelectedInstanceGizmo(int frameIndex) {
-    
-        /* draw coordinate lines */
-        mCoordArrowsLineIndexCount = 0;
-        mLineMesh->vertices.clear();
-        if (modInstData.miSelectedInstance > 0) {
-            InstanceSettings instSettings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
-
-            /* draw coordiante arrows at origin of selected instance */
-            switch (renderData.rdInstanceEditMode) {
-            case instanceEditMode::move:
-                mCoordArrowsMesh = mCoordArrowsModel.getVertexData();
-                break;
-            case instanceEditMode::rotate:
-                mCoordArrowsMesh = mRotationArrowsModel.getVertexData();
-                break;
-            case instanceEditMode::scale:
-                mCoordArrowsMesh = mScaleArrowsModel.getVertexData();
-                break;
-            }
-
-            mCoordArrowsLineIndexCount += mCoordArrowsMesh.vertices.size();
-            std::for_each(mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end(),
-                [=](auto& n) {
-                n.color /= 2.0f;
-                n.position = glm::quat(glm::radians(instSettings.isWorldRotation)) * n.position;
-                n.position += instSettings.isWorldPosition;
-            });
-            mLineMesh->vertices.insert(mLineMesh->vertices.end(),
-                mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end());
-        }
-
-        if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers[frameIndex], 0)) {
-            Logger::log(1, "%s error: failed to reset line drawing command buffer\n", __FUNCTION__);
-            return false;
-        }
-
-        if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers[frameIndex])) {
-            Logger::log(1, "%s error: failed to begin line drawing command buffer\n", __FUNCTION__);
-            return false;
-        }
-
-        rpInfo.renderPass = renderData.rdLineRenderpass;
-        rpInfo.framebuffer = renderData.rdFramebuffers.at(imageIndex);
-
-        vkCmdBeginRenderPass(renderData.rdLineCommandBuffers[frameIndex], &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        vkCmdSetViewport(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &viewport);
-        vkCmdSetScissor(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &scissor);
-
-        if (mCoordArrowsLineIndexCount > 0) {
-            mUploadToVBOTimer.start();
-            VertexBuffer::uploadData(engineDevice, mLineVertexBuffer, *mLineMesh);
-            renderData.rdUploadToVBOTime += mUploadToVBOTimer.stop();
-
-            vkCmdBindPipeline(renderData.rdLineCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdLinePipeline);
-
-            vkCmdBindDescriptorSets(renderData.rdLineCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                renderData.rdLinePipelineLayout, 0, 1, &renderData.rdLineDescriptorSets[frameIndex], 0, nullptr);
-
-            VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &mLineVertexBuffer.buffer, &offset);
-            vkCmdSetLineWidth(renderData.rdLineCommandBuffers[frameIndex], 3.0f);
-            vkCmdDraw(renderData.rdLineCommandBuffers[frameIndex], static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
-        }
-
-        vkCmdEndRenderPass(renderData.rdLineCommandBuffers[frameIndex]);
-
-        if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[frameIndex])) {
-            Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
-            return false;
-        }
-        
+        editorData.eMouseXPos = static_cast<int>(xPos);
+        editorData.eMouseYPos = static_cast<int>(yPos);
     }
 
 }

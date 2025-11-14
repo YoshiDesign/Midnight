@@ -6,6 +6,7 @@
 #include "Core/aveng_frame_content.h"
 #include "Core/CameraProxy.h"
 #include "Core/data.h"
+#include "Editor.h"
 #include "System/Camera/aveng_camera.h"
 #include "System/Peripheral/KeyboardController.h"
 #include "avpch.h"
@@ -36,8 +37,6 @@ namespace aveng {
 		// Main render function - simplified interface
 		void render(float frameTime);
 
-		VkDevice engineDevice() { return renderer.getEngineDevice(); }
-		
 		// Application-specific updates
 		void updateCamera(float frameTime);
 
@@ -52,21 +51,28 @@ namespace aveng {
 		bool firstFrame;
 		int last_sec;
 		float aspect;
+		int frameIndex;
+
+		AvengWindow& window;				 // GLHF
+		EngineDevice engineDevice{ window }; // Summon things to this world
+		AvengCamera aveng_camera;
+		KeyboardController keyboardController{ viewerObject, game_data };
+		std::shared_ptr<CameraProxy> camProxy;
+
+		// State
+		GameData game_data;
+		VkRenderData renderData;
+		ModelAndInstanceData mModelInstanceData{};
 
 		// Application-level components
 		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
 		
-		// Application state
-		GameData game_data;
-		AvengCamera aveng_camera;
-		AvengWindow& window;
-		KeyboardController keyboardController{ viewerObject, game_data };
-		VkRenderData renderData;
-
-		std::shared_ptr<CameraProxy> camProxy;
-		
 		// Engine renderer (now owns all Vulkan resources)
-		Renderer renderer{ window, game_data };
+		Renderer renderer{ engineDevice, window, renderData, game_data, mModelInstanceData };
+
+#ifdef ENABLE_EDITOR
+		Editor editor{ renderData, renderer, game_data, engineDevice, window, mModelInstanceData };
+#endif
 
 	};
 
