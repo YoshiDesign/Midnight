@@ -18,27 +18,35 @@ namespace aveng {
     public:
         static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-        SwapChain(EngineDevice& deviceRef, VkExtent2D windowExtent);
-        SwapChain(EngineDevice& deviceRef, VkExtent2D windowExtent, std::shared_ptr<SwapChain> previous);
+        SwapChain(VkRenderData& renderData, EngineDevice& deviceRef, VkExtent2D windowExtent);
+        SwapChain(VkRenderData& renderData, EngineDevice& deviceRef, VkExtent2D windowExtent, std::shared_ptr<SwapChain> previous);
         ~SwapChain();
 
         SwapChain(const SwapChain&) = delete;
         SwapChain& operator=(const SwapChain&) = delete;
 
+        VkRenderPass        getRenderPass() { return mRenderPass; }
+
         uint32_t            width() { return swapChainExtent.width; }
         uint32_t            height() { return swapChainExtent.height; }
         size_t              imageCount() { return swapChainImages.size(); }
-        VkRenderPass        getRenderPass() { return mRenderPass; }
-        // VkRenderPass        getSecondaryRenderPass() { return mSecondaryRenderPass; }
         VkExtent2D          getSwapChainExtent() { return swapChainExtent; }
         VkFormat            getSwapChainImageFormat() { return swapChainImageFormat; }
+        // VkRenderPass        getSecondaryRenderPass() { return mSecondaryRenderPass; }
+
+        // Framebuffers
         VkFramebuffer       getFrameBuffer(int index) { return swapChainFramebuffers[index]; }
+        VkFramebuffer       getSelectionFrameBuffer(int index) { return mSelectionFramebuffers[index]; }
 
         VkImageView          createImageView(VkImage image, VkFormat format);
+        VkImageView          createSelectionImageView(VkImage image, VkFormat format);
         VkImageView          getImageView(int index) { return swapChainImageViews[index]; }
+        VkImageView          getSelectionImageView(int index) { return mSelectionImageViews[index]; }
         VkImage&             getImage(int index) { return swapChainImages[index]; }
         size_t               swapChainImagesSize() { return swapChainImages.size(); }
         std::vector<VkImageView>& getSwapChainImageViews() { return swapChainImageViews; }
+
+        float getPixelValueFromPos(unsigned int xPos, unsigned int yPos);
 
         //VkResult            submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex);
         //VkResult            acquireNextImage(uint32_t* imageIndex);
@@ -46,8 +54,9 @@ namespace aveng {
 
         VkSwapchainKHR getSwapchain() { return swapChain; }
 
-        void createTextureImageViews();
+        //void createTextureImageViews();
         bool createSecondaryRenderpass(VkRenderPass& renderPass);
+        bool createSelectionRenderpass(VkRenderPass& renderPass);
 
         float extentAspectRatio() {
             return static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height);
@@ -64,10 +73,11 @@ namespace aveng {
         void init();
         void createSwapChain();
         void createImageViews();
+        void createSelectionImageViews();
         void createDepthResources();
         void createRenderPass();
         void createFramebuffers();
-        // void createSyncObjects();
+        bool createEditorSelectionFramebuffers();
 
         // Helper functions
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
@@ -77,16 +87,19 @@ namespace aveng {
         VkFormat swapChainImageFormat;
         VkFormat swapChainDepthFormat;
         VkExtent2D swapChainExtent;
-
+        
+        std::vector<VkFramebuffer> mSelectionFramebuffers;
         std::vector<VkFramebuffer> swapChainFramebuffers;
         VkRenderPass mRenderPass;
-        //VkRenderPass mSecondaryRenderPass; // Stored in renderData
+        //VkRenderPass mSecondaryRenderPass;    // Stored in renderData
+        //VkRenderPass mLineRenderPass;         // Stored in renderData
 
-        std::vector<VkImage> depthImages;
         std::vector<VmaAllocation> depthImageAllocations;
+        std::vector<VkImage> depthImages;
         std::vector<VkImageView> depthImageViews;
         std::vector<VkImage> swapChainImages;
         std::vector<VkImageView> swapChainImageViews;
+        std::vector<VkImageView> mSelectionImageViews;
 
         EngineDevice& device;
         VkExtent2D windowExtent;
@@ -99,6 +112,7 @@ namespace aveng {
         //std::vector<VkFence> inFlightFences;
         //std::vector<VkFence> imagesInFlight;
         size_t currentFrame = 0;
+        VkRenderData& renderData;
 
     };
 

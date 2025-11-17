@@ -145,6 +145,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ProjectReference Include="..\MidnightEditor\MidnightEditor.vcxproj">
+      <Project>{198730c9-2101-46bf-b07d-222bfb728ef3}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Midnight\Midnight.vcxproj">
       <Project>{77f66662-a85b-4904-af4d-659851d2333f}</Project>
     </ProjectReference>

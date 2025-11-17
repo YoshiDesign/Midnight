@@ -1,14 +1,28 @@
-#include "Core/Renderer/Renderer.h"
-#include "Editor.h"
 
+#include "Editor.h"
 
 namespace aveng {
 
 	Editor::Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData)
 		: renderData{ _renderData }, renderer{_renderer}, gameData{ _gameData }, engineDevice{ _engineDevice }, window{ window }, mModelInstanceData{ modelInstanceData }
 	{
-		editorData.eSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+		// Initial camera position
+		editorViewerObject.transform.translation.z = -15.5f;
+		editorViewerObject.transform.translation.y = -2.5f;
+
+		renderData.rdLineDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdAvengSelectionDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdAvengAnimationSelectionDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+		/* valid, but emtpy */
+		mLineMesh = std::make_shared<VkLineMesh>();
+		Logger::log(1, "%s: line mesh storage initialized\n", __FUNCTION__);
+
+		// renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdLineCommandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+		mModelInstanceData.miInstanceCenterCallbackFunctionEditor = [this](std::shared_ptr<AssimpInstance> instance) { renderer.centerInstance(instance); };
 
 		if (!createCommandBuffers())
 		{
@@ -35,12 +49,59 @@ namespace aveng {
 		cleanup();
 	}
 
-	void Editor::render(int frameIndex)
+	void Editor::updateCamera(float frameTime)
 	{
+		if (renderData.camera == 1) {
+			// Fetched all the way from downtown (the swapchain)
+			aspect = getAspectRatio();
+
+			// Track key press to transform viewer object
+			keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
+
+			// Apply new viewer obj values to the camera
+			editor_camera.setViewYXZ(editorViewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), editorViewerObject.transform.rotation);
+
+			// Recalculate perspective
+			editor_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
+
+			renderData.cameraProxy.projection = editor_camera.getProjection();
+			renderData.cameraProxy.view = editor_camera.getView();
+		}
+	}
+
+	void Editor::render(unsigned int frameIndex, float frameTime)
+	{
+		currentFrameIndex = frameIndex;
+		updateCamera(frameTime);
+
+		setupSelectionHighlight(frameTime);
+		setSelectedInstance();
+		updateStorageBuffers();
+		drawInstanceGizmo();
+		drawSelectedModels();
+
 		aveng_imgui.newFrame();
 		aveng_imgui.runGUI();
-		drawSelectedInstanceGizmo(frameIndex);
 		aveng_imgui.render(frameIndex);
+	}
+
+	void Editor::waitFrames()
+	{
+		/* we must wait for the image to be created before we can pick  */
+		if (editorData.eMousePick) {
+			/* wait for queue to be idle */
+			vkQueueWaitIdle(engineDevice.graphicsQueue());
+
+			float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos);
+
+			if (selectedInstanceId >= 0.0f) {
+				mModelInstanceData.miSelectedInstance = static_cast<int>(selectedInstanceId);
+			}
+			else {
+				mModelInstanceData.miSelectedInstance = 0;
+			}
+			editorData.eMousePick = false;
+		}
 	}
 
 	void Editor::init(SwapChain* swapchain) 
@@ -48,48 +109,88 @@ namespace aveng {
 		// The primary renderpass, just in case
 		// VkRenderPass renderPass = swapchain->getRenderPass();
 
-		// Create the secondary renderpass used by the line rendering pipeline
+		// Create the secondary renderpass used by the line rendering pipeline (for Gizmos)
 		if (!swapchain->createSecondaryRenderpass(renderData.rdLineRenderpass))
 		{
 			Logger::log(1, "%s error; could not create secondary renderpass\n", __FUNCTION__);
 			throw std::runtime_error("noob");
 		}
 
-		// Create the secondary renderpass used by the selection highlight
-		if (!swapchain->createSecondaryRenderpass(renderData.rdSelectionRenderpass))
+		// Create the selection renderpass used for selection highlighting
+		if (!swapchain->createSelectionRenderpass(renderData.rdSelectionRenderpass))
 		{
-			Logger::log(1, "%s error; could not create secondary renderpass\n", __FUNCTION__);
-			throw std::runtime_error("noob");
+			Logger::log(1, "%s error; could not create selection renderpass\n", __FUNCTION__);
+			throw std::runtime_error("editor fail 0");
 		}
 
-		std::string vertexShaderFile = "shader/line.vert.spv";
-		std::string fragmentShaderFile = "shader/line.frag.spv";
-		if (!LinePipeline::init(engineDevice, renderData.rdLineRenderpass, renderData.rdLinePipelineLayout, renderData.rdLinePipeline,
-			vertexShaderFile, fragmentShaderFile)) {
+		createPipelineLayouts();
+
+		std::string vertexShaderFile = "shaders/line.vert.spv";
+		std::string fragmentShaderFile = "shaders/line.frag.spv";
+		if (!LinePipeline::init(engineDevice, renderData.rdLineRenderpass, renderData.rdLinePipelineLayout,
+			renderData.rdLinePipeline, vertexShaderFile, fragmentShaderFile)) {
 			Logger::log(1, "%s error: could not init Assimp line drawing shader pipeline\n", __FUNCTION__);
-			throw std::runtime_error("noob");
+			throw std::runtime_error("editor fail 1");
 		}
 
-		vertexShaderFile = "shader/aveng_selection.vert.spv";
-		fragmentShaderFile = "shader/aveng_selection.frag.spv";
-		if (!SkinningPipeline::init(engineDevice, renderData.rdSelectionRenderpass, renderData.rdAvengSelectionPipelineLayout,
-			renderData.rdAvengSelectionPipeline, vertexShaderFile, fragmentShaderFile)) {
-			Logger::log(1, "%s error: could not init Aveng Selection shader pipeline\n", __FUNCTION__);
-			throw std::runtime_error("noob");
+		vertexShaderFile = "shaders/aveng_selection.vert.spv";
+		fragmentShaderFile = "shaders/aveng_selection.frag.spv";
+		if (!SkinningPipeline::init(engineDevice, renderData.rdAvengSelectionPipelineLayout,
+			renderData.rdAvengSelectionPipeline, renderData.rdSelectionRenderpass, 2,
+			vertexShaderFile, fragmentShaderFile)) {
+			Logger::log(1, "%s error: could not init aveng Selection shader pipeline\n", __FUNCTION__);
+			throw std::runtime_error("editor fail 2");
 		}
 
-		vertexShaderFile = "shader/aveng_skinning_selection.vert.spv";
-		fragmentShaderFile = "shader/aveng_skinning_selection.frag.spv";
-		if (!SkinningPipeline::init(engineDevice, renderData.rdSelectionRenderpass, renderData.rdAvengAnimationSelectionPipelineLayout,
-			renderData.rdAvengAnimationSelectionPipeline, vertexShaderFile, fragmentShaderFile)) {
-			Logger::log(1, "%s error: could not init Assimp Skinning Selection shader pipeline\n", __FUNCTION__);
-			throw std::runtime_error("noob");
+		vertexShaderFile = "shaders/aveng_skinning_selection.vert.spv";
+		fragmentShaderFile = "shaders/aveng_skinning_selection.frag.spv";
+		if (!SkinningPipeline::init(engineDevice, renderData.rdAvengAnimationSelectionPipelineLayout,
+			renderData.rdAvengAnimationSelectionPipeline, renderData.rdSelectionRenderpass, 2,
+			vertexShaderFile, fragmentShaderFile)) {
+			Logger::log(1, "%s error: could not init aveng Skinning Selection shader pipeline\n", __FUNCTION__);
+			throw std::runtime_error("editor fail 3");
 		}
 
 		aveng_imgui.init(
 			swapchain->getRenderPass(),
 			swapchain->imageCount()
 		);
+	}
+
+	bool Editor::createPipelineLayouts() {
+
+		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants) } };
+
+		/* selection, non-animated */
+		std::vector<VkDescriptorSetLayout> selectionLayouts = {
+		  renderData.rdAvengTextureDescriptorLayout,
+		  renderData.rdAvengSelectionDescriptorLayout };
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengSelectionPipelineLayout, selectionLayouts, pushConstants)) {
+			Logger::log(1, "%s error: could not init Assimp selection pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+
+		/* selection, animated */
+		std::vector<VkDescriptorSetLayout> skinningSelectionLayouts = {
+		  renderData.rdAvengTextureDescriptorLayout,
+		  renderData.rdAvengAnimationSelectionDescriptorLayout };
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengAnimationSelectionPipelineLayout, skinningSelectionLayouts, pushConstants)) {
+			Logger::log(1, "%s error: could not init Assimp skinning selection pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+
+		/* line drawing */
+		std::vector<VkDescriptorSetLayout> lineLayouts = {
+		  renderData.rdLineDescriptorLayout };
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdLinePipelineLayout, lineLayouts)) {
+			Logger::log(1, "%s error: could not init Assimp line drawing pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+	
+		return true;
 	}
 
 	bool Editor::createCommandBuffers()
@@ -105,22 +206,26 @@ namespace aveng {
 	bool Editor::createSSBOs()
 	{
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			if (!ShaderStorageBuffer::init(engineDevice, editorData.eSelectedInstanceBuffers[i])) {
+			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers[i])) {
 				Logger::log(1, "%s error: could not create selection SSBO\n", __FUNCTION__);
 				return false;
 			}
 		}
 	}
 
-	void AvengImgui::setupFrame(float dt) {
+
+	/*
+	* Set the currently selected instance (for highlight)
+	*/
+	void Editor::setupSelectionHighlight(float dt) {
 		editorData.eSelectedInstance.clear();
-		editorData.eSelectedInstance.resize(modInstData.miAssimpInstances.size());
+		editorData.eSelectedInstance.resize(mModelInstanceData.miAssimpInstances.size());
 
 		// Potential Improvement: Use a non - owning pointer or a reference to the shared_ptr in the container :
 		// E.g.
 		// AssimpInstance * currentSelectedInstance = nullptr;
 		// if (mRenderData.rdHighlightSelectedInstance) {
-		//     auto& sp = mModelInstData.miAssimpInstances[mModelInstData.miSelectedInstance]; // reference, no refcount change
+		//     auto& sp = mModelInstData.miAssimpInstances[mModelInstData.miSelectedEditorInstance]; // reference, no refcount change
 		//     currentSelectedInstance = sp.get(); // raw, non-owning
 		// }
 		/*
@@ -132,7 +237,7 @@ namespace aveng {
 		/* save the selected instance for color highlight */
 		editorData.eCurrentSelectedInstance = nullptr;
 		if (editorData.eHighlightSelectedInstance) {
-			editorData.eCurrentSelectedInstance = modInstData.miAssimpInstances[modInstData.miSelectedInstance];
+			editorData.eCurrentSelectedInstance = mModelInstanceData.miAssimpInstances[mModelInstanceData.miSelectedEditorInstance];
 			editorData.eSelectHighlightValue += dt * 4.0f;
 			if (editorData.eSelectHighlightValue > 2.0f) {
 				editorData.eSelectHighlightValue = 0.1f;
@@ -140,29 +245,55 @@ namespace aveng {
 		}
 	}
 
-	void Editor::setSelectedInstance(const std::shared_ptr<AssimpInstance>& instance, size_t instanceToStore, unsigned int i)
+	void Editor::setSelectedInstance()
 	{
 
-		if (editorData.eCurrentSelectedInstance == instance) {
-			mSelectedInstance.at(instanceToStore + i).x = editorData.eSelectHighlightValue;
-		}
-		else {
-			mSelectedInstance.at(instanceToStore + i).x = 1.0f;
-		}
+		/*
+		* Note: We're not focusing on animated vs non-animated models
+		*/
 
-		if (editorData.eMousePick) {
-			InstanceSettings instSettings = instance->getInstanceSettings();
-			mSelectedInstance.at(instanceToStore + i).y = static_cast<float>(instSettings.isInstanceIndexPosition);
+		size_t instanceToStore = 0;
+		for (const auto& model : mModelInstanceData.miModelList) {
+			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
+			{
+				// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
+				if (numberOfInstances > 0) 
+				{
+					int index = 0;
+					// for (unsigned int i = 0; i < numberOfInstances; ++i) {
+					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
+
+						// Set the buffer's x
+						if (editorData.eCurrentSelectedInstance == instance) 
+						{
+							mSelectedInstance.at(instanceToStore + index).x = editorData.eSelectHighlightValue; // The blinking color
+						}
+						else {
+							mSelectedInstance.at(instanceToStore + index).x = 1.0f; // color is unchanged
+						}
+
+						// Set the buffer's y
+						if (editorData.eMousePick) 
+						{
+							InstanceSettings instSettings = instance->getInstanceSettings();
+							mSelectedInstance.at(instanceToStore + index).y = static_cast<float>(instSettings.isInstanceIndexPosition);
+						}
+						index++;
+					}
+				}
+				instanceToStore += numberOfInstances;
+			}
 		}
 	}
 
-	bool Editor::drawSelectedInstanceGizmo(int frameIndex) {
+	bool Editor::drawInstanceGizmo() {
 
 		/* draw coordinate lines */
 		mCoordArrowsLineIndexCount = 0;
 		mLineMesh->vertices.clear();
-		if (mModelInstanceData.miSelectedInstance > 0) {
-			InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(mModelInstanceData.miSelectedInstance)->getInstanceSettings();
+		if (mModelInstanceData.miSelectedEditorInstance > 0) {
+			InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(mModelInstanceData.miSelectedEditorInstance)->getInstanceSettings();
 
 			/* draw coordiante arrows at origin of selected instance */
 			switch (renderData.rdInstanceEditMode) {
@@ -188,53 +319,71 @@ namespace aveng {
 				mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end());
 		}
 
-		if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers[frameIndex], 0)) {
+		if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex], 0)) {
 			Logger::log(1, "%s error: failed to reset line drawing command buffer\n", __FUNCTION__);
 			return false;
 		}
 
-		if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers[frameIndex])) {
+		if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers[currentFrameIndex])) {
 			Logger::log(1, "%s error: failed to begin line drawing command buffer\n", __FUNCTION__);
 			return false;
 		}
 
-		rpInfo.renderPass = renderData.rdLineRenderpass;
-		rpInfo.framebuffer = getFrameBuffer(imageIndex);
-
-		vkCmdBeginRenderPass(renderData.rdLineCommandBuffers[frameIndex], &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-		vkCmdSetViewport(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &viewport);
-		vkCmdSetScissor(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &scissor);
+		// Begin
+		renderer.beginSwapChainRenderPass(
+			renderData.rdLineCommandBuffers[currentFrameIndex],
+			renderer.getFramebuffer(),
+			renderData.rdLineRenderpass);
 
 		if (mCoordArrowsLineIndexCount > 0) {
 			mUploadToVBOTimer.start();
 			VertexBuffer::uploadData(engineDevice, mLineVertexBuffer, *mLineMesh);
 			renderData.rdUploadToVBOTime += mUploadToVBOTimer.stop();
 
-			vkCmdBindPipeline(renderData.rdLineCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdLinePipeline);
+			vkCmdBindPipeline(renderData.rdLineCommandBuffers[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdLinePipeline);
 
-			vkCmdBindDescriptorSets(renderData.rdLineCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
-				renderData.rdLinePipelineLayout, 0, 1, &renderData.rdLineDescriptorSets[frameIndex], 0, nullptr);
+			vkCmdBindDescriptorSets(renderData.rdLineCommandBuffers[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+				renderData.rdLinePipelineLayout, 0, 1, &renderData.rdLineDescriptorSets[currentFrameIndex], 0, nullptr);
 
 			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(renderData.rdLineCommandBuffers[frameIndex], 0, 1, &mLineVertexBuffer.buffer, &offset);
-			vkCmdSetLineWidth(renderData.rdLineCommandBuffers[frameIndex], 3.0f);
-			vkCmdDraw(renderData.rdLineCommandBuffers[frameIndex], static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
+			vkCmdBindVertexBuffers(renderData.rdLineCommandBuffers[currentFrameIndex], 0, 1, &mLineVertexBuffer.buffer, &offset);
+			vkCmdSetLineWidth(renderData.rdLineCommandBuffers[currentFrameIndex], 3.0f);
+			vkCmdDraw(renderData.rdLineCommandBuffers[currentFrameIndex], static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
 		}
 
-		vkCmdEndRenderPass(renderData.rdLineCommandBuffers[frameIndex]);
-
-		if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[frameIndex])) {
+		// Fin
+		renderer.endSwapChainRenderPass(renderData.rdLineCommandBuffers[currentFrameIndex]);
+		
+		if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex])) {
 			Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
 			return false;
 		}
 
 	}
 
-	void Editor::updateStorageBuffers(int frameIndex)
+	void Editor::drawSelectedModels()
 	{
+		renderer.drawModels(
+			renderData.rdCommandBuffersGraphics[currentFrameIndex],
+			renderData.rdAvengSelectionPipeline,
+			renderData.rdAvengAnimationSelectionPipeline,
+			renderData.rdAvengSelectionPipelineLayout,
+			renderData.rdAvengAnimationSelectionPipelineLayout,
+			renderData.rdAvengSelectionDescriptorSets[currentFrameIndex],
+			renderData.rdAvengAnimationSelectionDescriptorSets[currentFrameIndex]);
+	}
+
+	void Editor::updateStorageBuffers()
+	{
+		// Upload the vec2 to make our selected instance highlight/blink
 		bool bufferResized = false;
-		bufferResized |= ShaderStorageBuffer::uploadSsboData(engineDevice, editorData.eSelectedInstanceBuffers[frameIndex], mSelectedInstance);
+		bufferResized |= ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers[currentFrameIndex], mSelectedInstance);
+		if (bufferResized) {
+			std::cout << "StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
+			updateDescriptorSets();
+			renderer.updateDescriptorSets();
+		}
+
 	}
 
 	bool Editor::createDescriptorLayouts()
@@ -377,6 +526,7 @@ namespace aveng {
 		}
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
 			{
 				/* line-drawing */
 				VkDescriptorSetAllocateInfo lineAllocateInfo{};
@@ -424,6 +574,8 @@ namespace aveng {
 			}
 		}
 
+		updateDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
 		return true;
 
 	}
@@ -436,6 +588,14 @@ namespace aveng {
 		Logger::log(1, "%s: updating descriptor sets\n", __FUNCTION__);
 		for (int i = 0; i < iters; i++)
 		{
+
+			int index = i;
+
+			// This implies we're updating descriptors during rendering. On init, we perform MAX_FRAMES_IN_FLIGHT iterations
+			if (iters == 1) {
+				index = currentFrameIndex;
+			}
+
 			{
 				/* selection shader, non-animated  */
 				VkDescriptorBufferInfo matrixInfo{};
@@ -449,7 +609,7 @@ namespace aveng {
 				worldPosInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo selectionInfo{};
-				selectionInfo.buffer = editorData.eSelectedInstanceBuffers[i].buffer;
+				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
 				selectionInfo.offset = 0;
 				selectionInfo.range = VK_WHOLE_SIZE;
 
@@ -502,7 +662,7 @@ namespace aveng {
 				worldPosInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo selectionInfo{};
-				selectionInfo.buffer = editorData.eSelectedInstanceBuffers[i].buffer;
+				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
 				selectionInfo.offset = 0;
 				selectionInfo.range = VK_WHOLE_SIZE;
 
@@ -584,7 +744,7 @@ namespace aveng {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
-			ShaderStorageBuffer::cleanup(engineDevice, editorData.eSelectedInstanceBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdSelectedInstanceBuffers[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengSelectionDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengAnimationSelectionDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdLineDescriptorSets[i]);
@@ -595,6 +755,7 @@ namespace aveng {
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdLineDescriptorLayout, nullptr);
 
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdLineRenderpass, nullptr);
+		vkDestroyRenderPass(engineDevice.device(), renderData.rdSelectionRenderpass, nullptr);
 	}
 	
 }

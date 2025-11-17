@@ -22,16 +22,10 @@
 #include "Core/aveng_scene_loader.h"
 #include "Core/aveng_window.h"
 #include "Core/aveng_model.h"
-#include "Core/CameraProxy.h"
 #include "Core/app_object.h"
 #include "Core/data.h"
 #include "Utils/Timer.h"
 #include "Utils/glm_includes.h"
-
-#ifdef ENABLE_EDITOR
-#include "Editor.h"
-#include "EditorData.h"
-#endif
 
 namespace aveng {
 
@@ -56,8 +50,6 @@ namespace aveng {
 		bool createPipelineLayouts();
 		bool createPipelines();
 
-		std::shared_ptr<CameraProxy> getMainCamera();
-
 		// Add public method:
 		bool queueModelLoad(const std::string& filepath);
 		void processPendingModelLoads();  // Call this before/after frames
@@ -78,14 +70,14 @@ namespace aveng {
 		bool createSSBOs();
 		bool createMatrixUBO();
 
-		// Just use the returned values directly if working in renderer.cpp
+		// Just use the returned values directly if working in renderer.cpp. This is for clients
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
 		{
 			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
 			return renderData.rdCommandBuffersGraphics[currentFrameIndex];
 		}
 
-		// Just use the returned values directly if working in renderer.cpp
+		// Just use the returned values directly if working in renderer.cpp. This is for clients
 		VkCommandBuffer getCurrentCommandBufferCompute() const
 		{
 			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
@@ -94,9 +86,13 @@ namespace aveng {
 
 		int getFrameIndex() const
 		{
+			std::cout << "IsFrameStarted\t" << isFrameStarted << std::endl;
+			// Note: This assertion saved you from serious headache. Assertions are great, use them
 			assert(isFrameStarted && "Cannot get the frame index when frame is not in progress.");
 			return currentFrameIndex;
 		}
+
+		VkFramebuffer getFramebuffer() { return aveng_swapchain->getFrameBuffer(currentImageIndex); }
 
 		bool createDescriptorLayouts();
 		bool createDescriptorSets();
@@ -115,20 +111,27 @@ namespace aveng {
 		uint32_t getImageCount() const { return aveng_swapchain->imageCount(); }
 		VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
 		VkFormat getSwapChainImageFormat() { return aveng_swapchain->getSwapChainImageFormat(); }
+		float getPixelValueFromPos(unsigned int mMouseXPos, unsigned int mMouseYPos) { return aveng_swapchain->getPixelValueFromPos(mMouseXPos, mMouseYPos); };
 
 		int draw(float deltaTime);
-		void beginFrame();
-		void endFrame();
-		void beginSwapChainRenderPass();
-		void endSwapChainRenderPass();
+		bool drawModels(
+			VkCommandBuffer commandBuffer, 
+			VkPipeline basicPipeline, 
+			VkPipeline animationPipeline, 
+			VkPipelineLayout basicLayout, 
+			VkPipelineLayout animationLayout, 
+			VkDescriptorSet basicDescriptorSet,
+			VkDescriptorSet animationDescriptorSet);
+
+		void beginFrame(); // Synchronization
+		void endFrame(); // Synchronization
+		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer, VkRenderPass renderpass);
+		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
 		// New methods for descriptor/buffer management
 		void initializePointLightSystem();
-		void updateFrameData(const glm::mat4& projection, const glm::mat4& view);
-#if ENABLE_EDITOR
-		void renderEditor();
-		void setupEditorFrame(float dt);
-#endif
+		void updateCamera();
+
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
 		// const std::vector<AvengAppObject>& getAppObjects() const { return sceneLoader.getAppObjects(); };
@@ -140,13 +143,12 @@ namespace aveng {
 
 		// void loadScenes(const char* filepath);
 		
-		// Pipeline management methods
-		bool reloadPipelineConfig(const std::string& configPath = "");
-		std::vector<std::string> getAvailablePipelines() const;
-
 		void cleanup();
 
 	private:
+
+		bool firstFrame = true;
+
 		// Engine systems
 		AvengWindow& aveng_window;
 		EngineDevice& engineDevice;

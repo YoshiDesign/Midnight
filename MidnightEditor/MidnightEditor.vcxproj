@@ -190,6 +190,11 @@
     <ClInclude Include="GUI\models\RotationArrowsModel.h" />
     <ClInclude Include="GUI\models\ScaleArrowsModel.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Midnight\Midnight.vcxproj">
+      <Project>{77f66662-a85b-4904-af4d-659851d2333f}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

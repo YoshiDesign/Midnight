@@ -2,23 +2,17 @@
 
 #include "SkinningPipeline.h"
 #include "Shader.h"
+#include "Utils/Logger.h"
 
 namespace aveng {
-    bool SkinningPipeline::init(
-        EngineDevice& engineDevice, 
-        VkRenderPass& renderpass,
-        VkPipelineLayout& pipelineLayout, 
-        VkPipeline& pipeline, 
-        std::string vertexShaderFilename, 
-        std::string fragmentShaderFilename) 
-    {
-
+    bool SkinningPipeline::init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline,
+        VkRenderPass renderpass, uint32_t numColorAttachments, std::string vertexShaderFilename, std::string fragmentShaderFilename) {
         /* shader */
         VkShaderModule vertexModule = Shader::loadShader(engineDevice.device(), vertexShaderFilename);
         VkShaderModule fragmentModule = Shader::loadShader(engineDevice.device(), fragmentShaderFilename);
 
         if (vertexModule == VK_NULL_HANDLE || fragmentModule == VK_NULL_HANDLE) {
-            std::printf("%s error: could not load shaders\n", __FUNCTION__);
+            Logger::log(1, "%s error: could not load shaders\n", __FUNCTION__);
             Shader::cleanup(engineDevice.device(), vertexModule);
             Shader::cleanup(engineDevice.device(), fragmentModule);
             return false;
@@ -117,17 +111,21 @@ namespace aveng {
         multisamplingInfo.sampleShadingEnable = VK_FALSE;
         multisamplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-        VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        colorBlendAttachment.blendEnable = VK_FALSE;
+        std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments{};
+        for (int i = 0; i < numColorAttachments; ++i) {
+            VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            colorBlendAttachment.blendEnable = VK_FALSE;
+            colorBlendAttachments.emplace_back(colorBlendAttachment);
+        }
 
         VkPipelineColorBlendStateCreateInfo colorBlendingInfo{};
         colorBlendingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         colorBlendingInfo.logicOpEnable = VK_FALSE;
         colorBlendingInfo.logicOp = VK_LOGIC_OP_COPY;
-        colorBlendingInfo.attachmentCount = 1;
-        colorBlendingInfo.pAttachments = &colorBlendAttachment;
+        colorBlendingInfo.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
+        colorBlendingInfo.pAttachments = colorBlendAttachments.data();
         colorBlendingInfo.blendConstants[0] = 0.0f;
         colorBlendingInfo.blendConstants[1] = 0.0f;
         colorBlendingInfo.blendConstants[2] = 0.0f;
@@ -169,7 +167,7 @@ namespace aveng {
 
         VkResult result = vkCreateGraphicsPipelines(engineDevice.device(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline);
         if (result != VK_SUCCESS) {
-            std::printf("%s error: could not create rendering pipeline (error: %i)\n", __FUNCTION__, result);
+            Logger::log(1, "%s error: could not create rendering pipeline (error: %i)\n", __FUNCTION__, result);
             Shader::cleanup(engineDevice.device(), vertexModule);
             Shader::cleanup(engineDevice.device(), fragmentModule);
             vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);

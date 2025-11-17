@@ -4,7 +4,6 @@
 #include "CoreVK/VkRenderData.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/aveng_frame_content.h"
-#include "Core/CameraProxy.h"
 #include "Core/data.h"
 #include "Editor.h"
 #include "System/Camera/aveng_camera.h"
@@ -40,24 +39,26 @@ namespace aveng {
 		// Application-specific updates
 		void updateCamera(float frameTime);
 
+		VkDevice getEngineDevice() { return engineDevice.device(); }
+		void setCamera(int cam) { renderData.camera = cam; }; // Tmp
 		// Renderer& pRenderer() { return renderer; }
 		// SystemContext& context() { return systemData.systemContext(); };
 
 	private:
 
 		void updateData(float frameTime);
-		void updatePostProcessing(float frameTime);
 
 		bool firstFrame;
 		int last_sec;
 		float aspect;
 		int frameIndex;
 
+		int curCamera = 1; // Tmp
+
 		AvengWindow& window;				 // GLHF
 		EngineDevice engineDevice{ window }; // Summon things to this world
-		AvengCamera aveng_camera;
+		AvengCamera player_camera;
 		KeyboardController keyboardController{ viewerObject, game_data };
-		std::shared_ptr<CameraProxy> camProxy;
 
 		// State
 		GameData game_data;

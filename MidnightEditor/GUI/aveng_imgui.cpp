@@ -403,12 +403,12 @@ namespace aveng {
                 std::string selectedModelName;
 
                 /* Validate selected model index and reset if invalid */
-                if (!modelListEmtpy && (modInstData.miSelectedModel < 0 || modInstData.miSelectedModel >= modInstData.miModelList.size())) {
-                    modInstData.miSelectedModel = 0;
+                if (!modelListEmtpy && (modInstData.miSelectedModelEditor < 0 || modInstData.miSelectedModelEditor >= modInstData.miModelList.size())) {
+                    modInstData.miSelectedModelEditor = 0;
                 }
 
                 if (!modelListEmtpy) {
-                    selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModel)->getModelFileName().c_str();
+                    selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str();
                 }
 
                 if (modelListEmtpy) {
@@ -423,10 +423,10 @@ namespace aveng {
                     // avoid access the empty model vector
                     selectedModelName.c_str())) {
                     for (int i = 0; i < modInstData.miModelList.size(); ++i) {
-                        const bool isSelected = (modInstData.miSelectedModel == i);
+                        const bool isSelected = (modInstData.miSelectedModelEditor == i);
                         if (ImGui::Selectable(modInstData.miModelList.at(i)->getModelFileName().c_str(), isSelected)) {
-                            modInstData.miSelectedModel = i;
-                            selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModel)->getModelFileName().c_str();
+                            modInstData.miSelectedModelEditor = i;
+                            selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str();
                         }
 
                         if (isSelected) {
@@ -487,22 +487,22 @@ namespace aveng {
                 }
 
                 if (ImGui::BeginPopupModal("Delete Model?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                    ImGui::Text("Delete Model '%s'?", modInstData.miModelList.at(modInstData.miSelectedModel)->getModelFileName().c_str());
+                    ImGui::Text("Delete Model '%s'?", modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str());
 
                     /* cheating a bit to get buttons more to the center */
                     ImGui::Indent();
                     ImGui::Indent();
                     if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                        modInstData.miModelDeleteCallbackFunction(modInstData.miModelList.at(modInstData.miSelectedModel)->getModelFileName().c_str());
+                        modInstData.miModelDeleteCallbackFunction(modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str());
 
                         /* decrement selected model index to point to model that is in list before the deleted one */
-                        if (modInstData.miSelectedModel > 0) {
-                            modInstData.miSelectedModel -= 1;
+                        if (modInstData.miSelectedModelEditor > 0) {
+                            modInstData.miSelectedModelEditor -= 1;
                         }
 
-                        /* reset model instance to first instnace - if we have instances */
+                        /* reset model instance to first instance - if we have instances */
                         if (!modInstData.miAssimpInstances.empty()) {
-                            modInstData.miSelectedInstance = 0;
+                            modInstData.miSelectedEditorInstance = 0;
                         }
                         ImGui::CloseCurrentPopup();
                     }
@@ -515,16 +515,16 @@ namespace aveng {
 
                 ImGui::SameLine();
                 if (ImGui::Button("Create Instance")) {
-                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedModel];
+                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedModelEditor];
                     modInstData.miInstanceAddCallbackFunction(currentModel);
                     /* select new instance */
-                    modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
+                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
                 }
 
                 if (ImGui::Button("Create Multiple Instances")) {
-                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedModel];
+                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedModelEditor];
                     modInstData.miInstanceAddManyCallbackFunction(currentModel, editorData.eManyInstanceCreateNum);
-                    modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
+                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
                 }
                 ImGui::SameLine();
                 ImGui::SliderInt("##MassInstanceCreation", &editorData.eManyInstanceCreateNum, 1, 100, "%d", flags);
@@ -536,7 +536,7 @@ namespace aveng {
 
             if (ImGui::CollapsingHeader("Instances")) {
                 bool modelListEmtpy = modInstData.miModelList.size() == 1;
-                bool nullInstanceSelected = modInstData.miSelectedInstance == 0;
+                bool nullInstanceSelected = modInstData.miSelectedEditorInstance == 0;
                 size_t numberOfInstances = modInstData.miAssimpInstances.size();
 
                 ImGui::Text("Number of Instances: %ld", numberOfInstances);
@@ -555,8 +555,8 @@ namespace aveng {
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true);
                 if (ImGui::ArrowButton("##Left", ImGuiDir_Left) &&
-                    modInstData.miSelectedInstance > 1) {
-                    modInstData.miSelectedInstance--;
+                    modInstData.miSelectedEditorInstance > 1) {
+                    modInstData.miSelectedEditorInstance--;
                 }
                 if (modelListEmtpy || nullInstanceSelected) {
                     ImGui::BeginDisabled();
@@ -564,18 +564,20 @@ namespace aveng {
 
                 ImGui::SameLine();
                 ImGui::PushItemWidth(30);
-                ImGui::DragInt("##SelInst", &modInstData.miSelectedInstance, 1, 1,
+                ImGui::DragInt("##SelInst", &modInstData.miSelectedEditorInstance, 1, 1,
                     modInstData.miAssimpInstances.size() - 1, "%3d", flags);
                 ImGui::PopItemWidth();
 
-                if (modelListEmtpy || nullInstanceSelected) {
+                if (modelListEmtpy || nullInstanceSelected) 
+                {
                     ImGui::EndDisabled();
                 }
 
                 ImGui::SameLine();
                 if (ImGui::ArrowButton("##Right", ImGuiDir_Right) &&
-                    modInstData.miSelectedInstance < (modInstData.miAssimpInstances.size() - 1)) {
-                    modInstData.miSelectedInstance++;
+                    modInstData.miSelectedEditorInstance < (modInstData.miAssimpInstances.size() - 1)) 
+                {
+                    modInstData.miSelectedEditorInstance++;
                 }
                 ImGui::PopButtonRepeat();
 
@@ -588,17 +590,18 @@ namespace aveng {
                 }
 
                 /* DragInt does not like clamp flag */
-                modInstData.miSelectedInstance = std::clamp(modInstData.miSelectedInstance, 0,
+                modInstData.miSelectedEditorInstance = std::clamp(modInstData.miSelectedEditorInstance, 0,
                     static_cast<int>(modInstData.miAssimpInstances.size() - 1));
 
                 InstanceSettings settings;
                 if (numberOfInstances > 0) {
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
                 }
 
                 if (ImGui::Button("Center This Instance")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
-                    modInstData.miInstanceCenterCallbackFunction(currentInstance);
+                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                    // Callback Function - Center Selected Instance
+                    modInstData.miInstanceCenterCallbackFunctionEditor(currentInstance);
                 }
 
                 ImGui::SameLine();
@@ -606,7 +609,7 @@ namespace aveng {
                 /* we MUST retain the last model */
                 unsigned int numberOfInstancesPerModel = 0;
                 if (modInstData.miAssimpInstances.size() > 1) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
+                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
                     std::string currentModelName = currentInstance->getModel()->getModelFileName();
                     numberOfInstancesPerModel = modInstData.miAssimpInstancesPerModel[currentModelName].size();
                 }
@@ -617,14 +620,15 @@ namespace aveng {
 
                 ImGui::SameLine();
                 if (ImGui::Button("Delete Instance")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
+                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                    // Callback Function - Delete Instance
                     modInstData.miInstanceDeleteCallbackFunction(currentInstance);
 
                     /* hard reset for now */
-                    if (modInstData.miSelectedInstance > 1) {
-                        modInstData.miSelectedInstance -= 1;
+                    if (modInstData.miSelectedEditorInstance > 1) {
+                        modInstData.miSelectedEditorInstance -= 1;
                     }
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
                 }
 
                 if (numberOfInstancesPerModel < 2) {
@@ -632,25 +636,27 @@ namespace aveng {
                 }
 
                 if (ImGui::Button("Clone Instance")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
+                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                    // Callback Function - Clone Instance
                     modInstData.miInstanceCloneCallbackFunction(currentInstance);
 
                     /* reset to last position for now */
-                    modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
+                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
 
                     /* read back settings for UI */
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
                 }
 
                 if (ImGui::Button("Create Multiple Clones")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance);
+                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                    // Callback function - Clone Many
                     modInstData.miInstanceCloneManyCallbackFunction(currentInstance, editorData.eManyInstanceCloneNum);
 
                     /* reset to last position for now */
-                    modInstData.miSelectedInstance = modInstData.miAssimpInstances.size() - 1;
+                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
 
                     /* read back settings for UI */
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
                 }
                 ImGui::SameLine();
                 ImGui::SliderInt("##MassInstanceCloning", &editorData.eManyInstanceCloneNum, 1, 100, "%d", flags);
@@ -664,7 +670,7 @@ namespace aveng {
 
                 std::string baseModelName = "None";
                 if (numberOfInstances > 0 && !nullInstanceSelected) {
-                    baseModelName = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getModel()->getModelFileName();
+                    baseModelName = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getModelFileName();
                 }
                 ImGui::Text("Base Model: %s", baseModelName.c_str());
 
@@ -709,7 +715,7 @@ namespace aveng {
                 }
 
                 if (numberOfInstances > 0) {
-                    modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->setInstanceSettings(settings);
+                    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
                 }
             }
 
@@ -719,12 +725,12 @@ namespace aveng {
                 InstanceSettings settings;
                 size_t numberOfClips = 0;
                 if (numberOfInstances > 0) {
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
-                    numberOfClips = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getModel()->getAnimClips().size();
+                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                    numberOfClips = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getAnimClips().size();
                 }
 
                 if (numberOfInstances > 0 && numberOfClips > 0) {
-                    std::vector<std::shared_ptr<AssimpAnimClip>> animClips = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getModel()->getAnimClips();
+                    std::vector<std::shared_ptr<AssimpAnimClip>> animClips = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getAnimClips();
 
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Animation Clip:");
@@ -768,7 +774,7 @@ namespace aveng {
                 }
 
                 if (numberOfInstances > 0) {
-                    modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->setInstanceSettings(settings);
+                    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
                 }
             }
 
@@ -859,24 +865,24 @@ namespace aveng {
         int mouseMoveRelX = static_cast<int>(xPos) - editorData.eMouseXPos;
         int mouseMoveRelY = static_cast<int>(yPos) - editorData.eMouseYPos;
 
-        if (editorData.eMouseLock) {
-            renderData.rdViewAzimuth += mouseMoveRelX / 10.0;
-            /* keep between 0 and 360 degree */
-            if (renderData.rdViewAzimuth < 0.0) {
-                renderData.rdViewAzimuth += 360.0;
-            }
-            if (renderData.rdViewAzimuth >= 360.0) {
-                renderData.rdViewAzimuth -= 360.0;
-            }
+        //if (editorData.eMouseLock) {
+        //    renderData.rdViewAzimuth += mouseMoveRelX / 10.0;
+        //    /* keep between 0 and 360 degree */
+        //    if (renderData.rdViewAzimuth < 0.0) {
+        //        renderData.rdViewAzimuth += 360.0;
+        //    }
+        //    if (renderData.rdViewAzimuth >= 360.0) {
+        //        renderData.rdViewAzimuth -= 360.0;
+        //    }
 
-            renderData.rdViewElevation -= mouseMoveRelY / 10.0;
-            /* keep between -89 and +89 degree */
-            renderData.rdViewElevation = std::clamp(renderData.rdViewElevation, -89.0f, 89.0f);
+        //    renderData.rdViewElevation -= mouseMoveRelY / 10.0;
+        //    /* keep between -89 and +89 degree */
+        //    renderData.rdViewElevation = std::clamp(renderData.rdViewElevation, -89.0f, 89.0f);
 
-        }
+        //}
         if (editorData.eMouseMove) {
-            if (modInstData.miSelectedInstance != 0) {
-                InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->getInstanceSettings();
+            if (modInstData.miSelectedEditorInstance != 0) {
+                InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
 
                 float mouseXScaled = mouseMoveRelX / 20.0f;
                 float mouseYScaled = mouseMoveRelY / 20.0f;
@@ -937,7 +943,7 @@ namespace aveng {
                     }
                 }
 
-                modInstData.miAssimpInstances.at(modInstData.miSelectedInstance)->setInstanceSettings(settings);
+                modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
             }
         }
 

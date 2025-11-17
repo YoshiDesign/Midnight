@@ -1,12 +1,12 @@
 #pragma once
 #include "CoreVK/VkRenderData.h"
+#include "Core/Modeling/AssimpInstance.h"
 
 namespace aveng {
 
     struct EditorData {
         /* color hightlight for selection etc */
         std::vector<glm::vec2> eSelectedInstance{}; // Shader Uniform Data
-        std::vector<VkShaderStorageBufferData> eSelectedInstanceBuffers; // Storage Buffer
 
         bool eHighlightSelectedInstance = false;
         float eSelectHighlightValue = 1.0f;

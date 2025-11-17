@@ -110,7 +110,7 @@ namespace aveng {
         bool initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers, const char* type = "graphics");
         bool beginSingleShotCommand(VkCommandBuffer& commandBuffer); // Reuses a reset command buffer (faster)
         bool beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo);
-        bool submitSingleShotBuffer(VkCommandBuffer commandBuffer);
+        bool submitSingleShotBuffer(VkCommandBuffer commandBuffer); // Note: Uses the graphics queue
         bool resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags = 0);
         bool endCommandBuffer(VkCommandBuffer& commandBuffer);
         void endSingleTimeCommands(VkCommandBuffer& commandBuffer);

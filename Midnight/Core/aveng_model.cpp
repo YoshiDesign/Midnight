@@ -39,7 +39,7 @@ namespace aveng {
 		std::vector<tinyobj::material_t> materials;
 	};
 
-	AvengModel::AvengModel(EngineDevice& device, VkRenderData& renderData, const std::string& filepath) 
+	AvengModel::AvengModel(EngineDevice& device) 
 		: engineDevice{ device },
 		  mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
 		  mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),

@@ -12,13 +12,13 @@
 
 namespace aveng {
 
-    SwapChain::SwapChain(EngineDevice& deviceRef, VkExtent2D extent)
-        : device{ deviceRef }, windowExtent{ extent } {
+    SwapChain::SwapChain(VkRenderData& renderData, EngineDevice& deviceRef, VkExtent2D extent)
+        : device{ deviceRef }, windowExtent{ extent }, renderData{ renderData } {
         init();
     }
 
-    SwapChain::SwapChain(EngineDevice& deviceRef, VkExtent2D extent, std::shared_ptr<SwapChain> previous)
-        : device{ deviceRef }, windowExtent{ extent }, oldSwapChain{previous} {
+    SwapChain::SwapChain(VkRenderData& renderData, EngineDevice& deviceRef, VkExtent2D extent, std::shared_ptr<SwapChain> previous)
+        : device{ deviceRef }, windowExtent{ extent }, oldSwapChain{previous}, renderData{ renderData } {
         init();
 
         // clean up old swap chain
@@ -29,19 +29,25 @@ namespace aveng {
     {
         createSwapChain();
         createImageViews();
+        createSelectionImageViews();
         createRenderPass();
         createDepthResources();
         createFramebuffers();
-        // createSyncObjects();
+        createEditorSelectionFramebuffers();
     }
 
     SwapChain::~SwapChain() {
 
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(device.device(), imageView, nullptr);
+            
+        }
+        for (auto imageView : mSelectionImageViews) {
+            vkDestroyImageView(device.device(), imageView, nullptr);
         }
 
         swapChainImageViews.clear();
+        mSelectionImageViews.clear();
 
         if (swapChain != nullptr) {
             vkDestroySwapchainKHR(device.device(), swapChain, nullptr);
@@ -53,8 +59,14 @@ namespace aveng {
             vmaDestroyImage(device.allocator(), depthImages[i], depthImageAllocations[i]);
         }
 
+        // Primary Framebuffers
         for (auto framebuffer : swapChainFramebuffers) {
             vkDestroyFramebuffer(device.device(), framebuffer, nullptr);
+        }
+
+        // Selection Framebuffers
+        for (auto& fb : mSelectionFramebuffers) {
+            vkDestroyFramebuffer(device.device(), fb, nullptr);
         }
 
         // Destroy the primary renderpass
@@ -155,20 +167,79 @@ namespace aveng {
         }
     }
 
-    void SwapChain::createRenderPass() {
-        VkAttachmentDescription depthAttachment{};
-        depthAttachment.format = findDepthFormat();
-        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    /**
+    * Note that we're using swapChainImages.size() because this simply alludes to the number of
+    * images that the swapchain uses for rendering.
+    * You can create multiple VkImageViews for the same VkImage
+    */
+    void SwapChain::createSelectionImageViews() {
+        std::cout << "DEBUG" << std::endl;
+        mSelectionImageViews.resize(swapChainImages.size());
+        for (size_t i = 0; i < swapChainImages.size(); i++)
+        {
+            std::cout << "Creating SwapChain Selection Img View " << i << std::endl;
+            mSelectionImageViews[i] = createSelectionImageView(swapChainImages[i], swapChainImageFormat);
+        }
+    }
 
-        VkAttachmentReference depthAttachmentRef{};
-        depthAttachmentRef.attachment = 1;
-        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    VkImageView SwapChain::createSelectionImageView(VkImage image, VkFormat format)
+    {
+        VkExtent3D selectionImageExtent = {
+            width(),
+            height(),
+            1
+        };
+
+        renderData.rdSelectionFormat = VK_FORMAT_R32_SFLOAT;
+
+        VkImageCreateInfo selecImageInfo{};
+        selecImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        selecImageInfo.imageType = VK_IMAGE_TYPE_2D;
+        selecImageInfo.format = renderData.rdSelectionFormat;
+        selecImageInfo.extent = selectionImageExtent;
+        selecImageInfo.mipLevels = 1;
+        selecImageInfo.arrayLayers = 1;
+        selecImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        selecImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        selecImageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+        VmaAllocationCreateInfo selectionAllocInfo{};
+        selectionAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        selectionAllocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        VkResult result = vmaCreateImage(device.allocator(), &selecImageInfo, &selectionAllocInfo,
+            &renderData.rdSelectionImage, &renderData.rdSelectionImageAlloc, nullptr);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not allocate selection buffer memory (error: %i)\n", __FUNCTION__, result);
+            throw std::runtime_error("Fail");
+        }
+
+        VkImageViewCreateInfo selectionImageViewinfo{};
+        selectionImageViewinfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        selectionImageViewinfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        selectionImageViewinfo.image = renderData.rdSelectionImage;
+        selectionImageViewinfo.format = renderData.rdSelectionFormat;
+        selectionImageViewinfo.subresourceRange.baseMipLevel = 0;
+        selectionImageViewinfo.subresourceRange.levelCount = 1;
+        selectionImageViewinfo.subresourceRange.baseArrayLayer = 0;
+        selectionImageViewinfo.subresourceRange.layerCount = 1;
+        selectionImageViewinfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+        result = vkCreateImageView(device.device(), &selectionImageViewinfo,
+            nullptr, &renderData.rdSelectionImageView);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not create selection buffer image view (error: %i)\n", __FUNCTION__, result);
+            throw std::runtime_error("Fail");
+        }
+        // TMP
+        VkImageView imageView = renderData.rdSelectionImageView;
+        return imageView;
+    }
+
+    /**
+     * Primary Renderpass
+     */
+    void SwapChain::createRenderPass() {
 
         VkAttachmentDescription colorAttachment = {};
         colorAttachment.format = getSwapChainImageFormat();
@@ -184,22 +255,36 @@ namespace aveng {
         colorAttachmentRef.attachment = 0;
         colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;   // very optimal
 
+        VkAttachmentDescription depthAttachment{};
+        depthAttachment.format = findDepthFormat();
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference depthAttachmentRef{};
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
         VkSubpassDescription subpass = {};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
         subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
-        VkSubpassDependency dependency = {};
+        VkSubpassDependency dependency = {}; // Dependencies are like pipeline barriers within a renderpass to protect the swapchain image
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.srcAccessMask = 0;
         dependency.srcStageMask =
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         dependency.dstSubpass = 0;
         dependency.dstStageMask =
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         dependency.dstAccessMask =
-            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT; // This configuration assumes simple one-way writes
 
         std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
         VkRenderPassCreateInfo renderPassInfo = {};
@@ -217,7 +302,10 @@ namespace aveng {
     }
 
     /**
-    * Note: You are responsible for cleaning up secondary renderpasses.
+    * Secondary renderpasses are assumed to have data ready for Vulkan to continue rendering to.
+    * Vulkan assumes the attachments are already valid when the renderpass begins. (LOAD_OP_LOAD)
+    * 
+    * The data in the attachment is presumably useful and will be kept for later use (STORE_OP_STORE)
     */
     bool SwapChain::createSecondaryRenderpass(VkRenderPass& renderPass)
     {
@@ -296,6 +384,99 @@ namespace aveng {
 
     }
 
+    bool SwapChain::createSelectionRenderpass(VkRenderPass& renderPass)
+    {
+    
+        VkAttachmentDescription colorAtt{};
+        colorAtt.format = getSwapChainImageFormat();
+        colorAtt.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAtt.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAtt.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAtt.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference colorAttRef{};
+        colorAttRef.attachment = 0;
+        colorAttRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        /* separate selection buffer */
+        VkAttachmentDescription selectionColorAtt{};
+        selectionColorAtt.format = renderData.rdSelectionFormat;
+        selectionColorAtt.samples = VK_SAMPLE_COUNT_1_BIT;
+        selectionColorAtt.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        selectionColorAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        selectionColorAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        selectionColorAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        selectionColorAtt.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        selectionColorAtt.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference selectionColorAttRef{};
+        selectionColorAttRef.attachment = 1;
+        selectionColorAttRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentDescription depthAtt{};
+        depthAtt.flags = 0;
+        depthAtt.format = swapChainDepthFormat; // renderData.rdDepthFormat;
+        depthAtt.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAtt.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depthAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAtt.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthAtt.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference depthAttRef{};
+        depthAttRef.attachment = 2;
+        depthAttRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        std::vector<VkAttachmentReference> attachmentRefs = { colorAttRef, selectionColorAttRef };
+
+        VkSubpassDescription subpassDesc{};
+        subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDesc.colorAttachmentCount = static_cast<uint32_t>(attachmentRefs.size());
+        subpassDesc.pColorAttachments = attachmentRefs.data();
+        subpassDesc.pDepthStencilAttachment = &depthAttRef;
+
+        VkSubpassDependency subpassDep{};
+        subpassDep.srcSubpass = VK_SUBPASS_EXTERNAL;
+        subpassDep.dstSubpass = 0;
+        subpassDep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDep.srcAccessMask = 0;
+        subpassDep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        VkSubpassDependency depthDep{};
+        depthDep.srcSubpass = VK_SUBPASS_EXTERNAL;
+        depthDep.dstSubpass = 0;
+        depthDep.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        depthDep.srcAccessMask = 0;
+        depthDep.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        depthDep.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        std::vector<VkSubpassDependency> dependencies = { subpassDep, depthDep };
+        std::vector<VkAttachmentDescription> attachments = { colorAtt, selectionColorAtt, depthAtt };
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpassDesc;
+        renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+        renderPassInfo.pDependencies = dependencies.data();
+
+        VkResult result = vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &renderPass);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error; could not create selection renderpass (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+
+        return true;
+    
+    }
+
     void SwapChain::createFramebuffers() 
     {
         swapChainFramebuffers.resize(imageCount());
@@ -316,6 +497,156 @@ namespace aveng {
                 throw std::runtime_error("failed to create framebuffer!");
             }
         }
+    }
+
+    bool SwapChain::createEditorSelectionFramebuffers()
+    {
+        mSelectionFramebuffers.resize(swapChainImagesSize());
+
+        for (unsigned int i = 0; i < swapChainImagesSize(); ++i) {
+            std::vector<VkImageView> attachments = { swapChainImageViews[i],
+              mSelectionImageViews[i], depthImageViews[i]};
+
+            VkFramebufferCreateInfo FboInfo{};
+            FboInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            FboInfo.renderPass = renderData.rdSelectionRenderpass;
+            FboInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+            FboInfo.pAttachments = attachments.data();
+            FboInfo.width = width();
+            FboInfo.height = height();
+            FboInfo.layers = 1;
+
+            VkResult result = vkCreateFramebuffer(device.device(), &FboInfo, nullptr, &mSelectionFramebuffers[i]);
+            if (result != VK_SUCCESS) {
+                Logger::log(1, "%s error: failed to create selection framebuffer %i (error: %i)\n", __FUNCTION__, i, result);
+                return false;
+            }
+        }
+        return true;
+    
+    }
+
+    float SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos) {
+        /* random default value to detect errors */
+        float pixelColor = -444.0f;
+
+        VkImage readbackImage;
+        VmaAllocation readbackImageAlloc;
+
+        /* create local image */
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = width();
+        imageInfo.extent.height = height();
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = VK_FORMAT_R32_SFLOAT;
+        imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        VmaAllocationCreateInfo imageAllocInfo{};
+        imageAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        imageAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+        VkResult result = vmaCreateImage(device.allocator(), &imageInfo, &imageAllocInfo, &readbackImage, &readbackImageAlloc, nullptr);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not allocate read back image image via VMA (error: %i)\n", __FUNCTION__, result);
+            return pixelColor;
+        }
+
+        VkCommandBuffer readbackCommandBuffer = device.createSingleShotBuffer();
+
+        VkImageSubresourceRange layoutTransferRange{};
+        layoutTransferRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        layoutTransferRange.baseMipLevel = 0;
+        layoutTransferRange.levelCount = 1;
+        layoutTransferRange.baseArrayLayer = 0;
+        layoutTransferRange.layerCount = 1;
+
+        /* transition destination (local) image to transfer destination layout */
+        VkImageMemoryBarrier layoutTransferBarrier{};
+        layoutTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        layoutTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        layoutTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        layoutTransferBarrier.image = readbackImage;
+        layoutTransferBarrier.subresourceRange = layoutTransferRange;
+        layoutTransferBarrier.srcAccessMask = 0;
+        layoutTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        /* transition source (selection) image to transfer source optimal layout */
+        VkImageMemoryBarrier srcLayoutTransferBarrier{};
+        srcLayoutTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        srcLayoutTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        srcLayoutTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        srcLayoutTransferBarrier.image = renderData.rdSelectionImage;                   // The image resource we're getting our data from
+        srcLayoutTransferBarrier.subresourceRange = layoutTransferRange;
+        srcLayoutTransferBarrier.srcAccessMask = 0;
+        srcLayoutTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        /* copy selection image to local image */
+        VkImageCopy imageCopyRegion{};
+        imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopyRegion.srcSubresource.layerCount = 1;
+        imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopyRegion.dstSubresource.layerCount = 1;
+        imageCopyRegion.extent.width = width();
+        imageCopyRegion.extent.height = height();
+        imageCopyRegion.extent.depth = 1;   // Full on
+
+        /* transition destination (local) image to general layout to allow mapping */
+        VkImageMemoryBarrier destLayoutTransferBarrier{};
+        destLayoutTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        destLayoutTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        destLayoutTransferBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        destLayoutTransferBarrier.image = readbackImage;
+        destLayoutTransferBarrier.subresourceRange = layoutTransferRange;
+        destLayoutTransferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        destLayoutTransferBarrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+
+        vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &layoutTransferBarrier);
+        vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &srcLayoutTransferBarrier);
+        vkCmdCopyImage(readbackCommandBuffer, renderData.rdSelectionImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            readbackImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopyRegion);
+        vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &destLayoutTransferBarrier);
+
+        bool commandResult = device.submitSingleShotBuffer(readbackCommandBuffer); // Note: Uses the graphics queue
+  
+        if (!commandResult) {
+            Logger::log(1, "%s error: could not submit readback transfer commands\n", __FUNCTION__);
+            return pixelColor;
+        }
+
+        /* get image layout */
+        VkImageSubresource subResource{};
+        subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        VkSubresourceLayout subResourceLayout{};
+
+        vkGetImageSubresourceLayout(device.device(), readbackImage, &subResource, &subResourceLayout);
+
+        /* map and read data */
+        const float* data;
+        result = vmaMapMemory(device.allocator(), readbackImageAlloc, (void**)&data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map readback image memory (error: %i)\n", __FUNCTION__, result);
+            return pixelColor;
+        }
+
+        data += yPos * subResourceLayout.rowPitch / sizeof(float) + xPos;
+        pixelColor = *data;
+
+        vmaUnmapMemory(device.allocator(), readbackImageAlloc);
+
+        /* destroy local image, no longer needed */
+        vmaDestroyImage(device.allocator(), readbackImage, readbackImageAlloc);
+
+        return pixelColor;
     }
 
     void SwapChain::createDepthResources() 
@@ -367,31 +698,6 @@ namespace aveng {
             }
         }
     }
-
-    //void SwapChain::createSyncObjects() 
-    //{
-    //    imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    //    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    //    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-    //    imagesInFlight.resize(imageCount(), VK_NULL_HANDLE);
-
-    //    VkSemaphoreCreateInfo semaphoreInfo = {};
-    //    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    //    VkFenceCreateInfo fenceInfo = {};
-    //    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    //    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Fences begin in a signaled state or our renderer would wait indefinitely once it begins
-
-    //    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    //        if (vkCreateSemaphore(device.device(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) !=
-    //            VK_SUCCESS ||
-    //            vkCreateSemaphore(device.device(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) !=
-    //            VK_SUCCESS ||
-    //            vkCreateFence(device.device(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
-    //            throw std::runtime_error("failed to create synchronization objects for a frame!");
-    //        }
-    //    }
-    //}
 
     VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) 
     {

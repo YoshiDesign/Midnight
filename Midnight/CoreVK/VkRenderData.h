@@ -24,7 +24,6 @@
 
 #include "CoreVK/aveng_descriptors.h"
 #include "CoreVK/aveng_buffer.h"
-#include "CoreVK/swapchain.h"
 
 #ifndef WTF_BOOM
 #define WTF_BOOM 9002
@@ -40,13 +39,6 @@ namespace aveng {
 
 		const T& operator[](size_t i) const { return data[i]; }
 		bool empty() const { return size == 0; }
-	};
-
-	// For shared usage (editor) - Add more if/when necessary - Warning: DO NOT cause these data members to reallocate. We're not detecting/protecting against that
-	struct MatrixBuffersView {
-		Span<VkUniformBufferData>       viewProjUBOs;
-		Span<VkShaderStorageBufferData> modelRootSSBOs;
-		Span<VkShaderStorageBufferData> boneMatSSBOs;
 	};
 
 	struct LightsUbo {
@@ -128,6 +120,11 @@ namespace aveng {
 		bool usesPBRColors = false;
 	};
 
+	struct AvengCameraProxy {
+		glm::mat4 projection;
+		glm::mat4 view;
+	};
+
 /* data format to be uploaded to compute shader */
 	struct NodeTransformData {
 		glm::vec4 translation = glm::vec4(0.0f);
@@ -156,6 +153,26 @@ namespace aveng {
 		scale
 	};
 
+	//struct secondaryRenderpassInfo {
+	//	colorAttachment color;
+	//};
+
+	//struct colorAttachment {
+	//	VkAttachmentLoadOp loadOp;
+	//	VkAttachmentStoreOp storeOp;
+	//	VkAttachmentLoadOp stencilLoadOp;
+	//	VkAttachmentStoreOp	stencilStoreOp;
+	//	VkImageLayout initialLayout;
+	//};
+
+
+	// For shared usage (editor) - Add more if/when necessary - Warning: DO NOT cause these data members to reallocate. We're not detecting/protecting against that
+	struct MatrixBuffersView {
+		Span<VkUniformBufferData>       viewProjUBOs;
+		Span<VkShaderStorageBufferData> modelRootSSBOs;
+		Span<VkShaderStorageBufferData> boneMatSSBOs;
+	};
+
 	struct VkRenderData {
 
 		/**
@@ -165,6 +182,13 @@ namespace aveng {
 			- queues
 			- command pools
 		*/
+
+		// Tmp
+		int camera = 1; // which camera we're using
+		AvengCameraProxy cameraProxy{
+			glm::mat4(1.f),
+			glm::mat4(1.f)
+		}; // Matrices from the camera that's in use
 
 		int rdWidth = 0;
 		int rdHeight = 0;
@@ -196,10 +220,10 @@ namespace aveng {
 		//VkCommandPool rdComputeCommandPool = VK_NULL_HANDLE;	// Get from engine device
 		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
 		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
-		std::vector<VkCommandBuffer> rdLineCommandBuffers;		// EDITOR
+		std::vector<VkCommandBuffer> rdLineCommandBuffers;		// Editor and Renderer
 
-		VkRenderPass rdLineRenderpass;							// EDITOR
-		VkRenderPass rdSelectionRenderpass;							// EDITOR
+		VkRenderPass rdLineRenderpass = VK_NULL_HANDLE;							// EDITOR
+		VkRenderPass rdSelectionRenderpass = VK_NULL_HANDLE;							// EDITOR
 
 		/**
 		* Sync
@@ -257,12 +281,18 @@ namespace aveng {
 		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
 
 		//VkDescriptorPool rdImguiDescriptorPool = VK_NULL_HANDLE;
+		std::vector<VkShaderStorageBufferData> rdSelectedInstanceBuffers; // Storage Buffer
 
 		/*
 		* Editor Data
 		*/
 		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
 
-		MatrixBuffersView matrixBuffersView;
+		MatrixBuffersView matrixBuffersView; // Proxy for editor
+
+		VkImage rdSelectionImage = VK_NULL_HANDLE;
+		VkImageView rdSelectionImageView = VK_NULL_HANDLE;
+		VkFormat rdSelectionFormat = VK_FORMAT_UNDEFINED;
+		VmaAllocation rdSelectionImageAlloc = VK_NULL_HANDLE;
 	};
 }

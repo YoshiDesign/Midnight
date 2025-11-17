@@ -42,7 +42,7 @@ namespace aveng {
 
 		// Deprecated
 		// AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath);
-		AvengModel(EngineDevice& device, VkRenderData& renderData, const std::string& filepath);
+		AvengModel(EngineDevice& device);
 
 		~AvengModel();
 
@@ -66,9 +66,7 @@ namespace aveng {
 		bool hasAnimations();
 		unsigned int getTriangleCount();
 
-		void draw(VkCommandBuffer commandBuffer);
 		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex);
-		void drawInstancedOLD(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance);
 
 		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames);
 	

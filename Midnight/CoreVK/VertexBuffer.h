@@ -14,8 +14,10 @@ namespace aveng {
         static bool uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkMesh vertexData);
         static bool uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkLineMesh vertexData);
         static bool uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, std::vector<glm::vec3> vetrexData);
-
         static void cleanup(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData);
+    private:
+        static bool uploadToGPU(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData);
+
     };
 
 }

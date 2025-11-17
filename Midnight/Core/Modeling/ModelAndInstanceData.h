@@ -27,14 +27,21 @@ namespace aveng {
 	using instanceCloneCallback = std::function<void(std::shared_ptr<AssimpInstance>)>;
 	using instanceCloneManyCallback = std::function<void(std::shared_ptr<AssimpInstance>, int)>;
 
-	using instanceCenterCallback = std::function<void(std::shared_ptr<AssimpInstance>)>;
+	using instanceCenterCallbackEditor = std::function<void(std::shared_ptr<AssimpInstance>)>;
 
 	struct ModelAndInstanceData {
-		std::vector<std::shared_ptr<AvengModel>> miModelList{};
-		int miSelectedModel = 0;
 
+		// A list of the unique models currently loaded
+		std::vector<std::shared_ptr<AvengModel>> miModelList{};
+		int miSelectedModelEditor = 0;
+
+		// A list of all instances being rendered
 		std::vector<std::shared_ptr<AssimpInstance>> miAssimpInstances{};
+
+		// The same list, in { "modelFilename" : [instances] } format
 		std::unordered_map<std::string, std::vector<std::shared_ptr<AssimpInstance>>> miAssimpInstancesPerModel{};
+
+		int miSelectedEditorInstance = 0;
 		int miSelectedInstance = 0;
 
 		/* we can only delete models in Vulkan outside the command buffers,
@@ -55,7 +62,7 @@ namespace aveng {
 		instanceCloneCallback miInstanceCloneCallbackFunction;
 		instanceCloneManyCallback miInstanceCloneManyCallbackFunction;
 
-		instanceCenterCallback miInstanceCenterCallbackFunction;
+		instanceCenterCallbackEditor miInstanceCenterCallbackFunctionEditor;
 	};
 
 }

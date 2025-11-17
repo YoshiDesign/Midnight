@@ -77,11 +77,12 @@ namespace aveng {
         vmaFlushAllocation(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, 0, vertexDataSize);
 
         /* trigger upload */
-        return uploadToGPU(renderData, vertexBufferData);
+        return uploadToGPU(engineDevice, vertexBufferData);
     
     }
 
     bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkMesh vertexData) {
+
         unsigned int vertexDataSize = vertexData.vertices.size() * sizeof(VkVertex);
 
         /* buffer too small, resize */
@@ -108,32 +109,7 @@ namespace aveng {
         vmaUnmapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc);
         vmaFlushAllocation(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, 0, vertexDataSize);
 
-        VkBufferMemoryBarrier vertexBufferBarrier{};
-        vertexBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        vertexBufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-        vertexBufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-        vertexBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        vertexBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        vertexBufferBarrier.buffer = vertexBufferData.stagingBuffer;
-        vertexBufferBarrier.offset = 0;
-        vertexBufferBarrier.size = vertexBufferData.bufferSize;
-
-        VkBufferCopy stagingBufferCopy{};
-        stagingBufferCopy.srcOffset = 0;
-        stagingBufferCopy.dstOffset = 0;
-        stagingBufferCopy.size = vertexBufferData.bufferSize;
-
-        /* trigger data transfer via command buffer */
-        VkCommandBuffer commandBuffer = engineDevice.createSingleShotBuffer();
-
-        vkCmdCopyBuffer(commandBuffer, vertexBufferData.stagingBuffer,
-            vertexBufferData.buffer, 1, &stagingBufferCopy);
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &vertexBufferBarrier, 0, nullptr);
-
-        if (!engineDevice.submitSingleShotBuffer(commandBuffer)) {
-            return false;
-        }
+        return uploadToGPU(engineDevice, vertexBufferData);
 
         return true;
     }
@@ -165,6 +141,12 @@ namespace aveng {
         vmaUnmapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc);
         vmaFlushAllocation(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, 0, vertexDataSize);
 
+        return uploadToGPU(engineDevice, vertexBufferData);
+
+        return true;
+    }
+
+    bool VertexBuffer::uploadToGPU(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData) {
         VkBufferMemoryBarrier vertexBufferBarrier{};
         vertexBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         vertexBufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
@@ -181,7 +163,7 @@ namespace aveng {
         stagingBufferCopy.size = vertexBufferData.bufferSize;
 
         /* trigger data transfer via command buffer */
-        VkCommandBuffer commandBuffer = engineDevice.createSingleShotBuffer();
+        VkCommandBuffer commandBuffer = engineDevice.createSingleShotBuffer();;
 
         vkCmdCopyBuffer(commandBuffer, vertexBufferData.stagingBuffer,
             vertexBufferData.buffer, 1, &stagingBufferCopy);

@@ -22,6 +22,7 @@ namespace aveng {
 		mShaderTrsMatrixBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderBoneMatrixBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mLightDataBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT); // This one can be used as needed by the renderer and the editor.
 
 		// Define descriptor set vec's
 		renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
@@ -44,7 +45,7 @@ namespace aveng {
 
 		//sceneLoader.load(default_scene_file, engineDevice);
 
-		// Initialize our descriptor sets, map buffers to device memory.
+		// Initialize our descriptor layouts & sets, map buffers to device memory.
 		setupDescriptors();
 
 		// Create pipelines now that descriptor layouts are ready
@@ -74,10 +75,9 @@ namespace aveng {
 		mModelInstanceData.miInstanceCloneCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { cloneInstance(instance); };
 		mModelInstanceData.miInstanceCloneManyCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance, int numClones) { cloneInstances(instance, numClones); };
 
-		// TODO - This might belong in the Editor
 		{
-			/* create an empty null model and an instance from it */
-			std::shared_ptr<AvengModel> nullModel = std::make_shared<AvengModel>();
+			/* Null model instance - Utility */
+			std::shared_ptr<AvengModel> nullModel = std::make_shared<AvengModel>(engineDevice);
 			mModelInstanceData.miModelList.emplace_back(nullModel);
 			std::shared_ptr<AssimpInstance> nullInstance = std::make_shared<AssimpInstance>(nullModel);
 			mModelInstanceData.miAssimpInstancesPerModel[nullModel->getModelFileName()].emplace_back(nullInstance);
@@ -133,9 +133,9 @@ namespace aveng {
 	}
 
 	bool Renderer::addModel(const std::string& modelFileName) {
-		// This check now protects against programming errors
+		
 		if (isFrameStarted) {
-			std::printf("ERROR: addModel called during frame! This should never happen.\n");
+			std::printf("ERROR: addModel called mid-frame!\n");
 			throw std::runtime_error("Internal error: model loading during frame");
 		}
 
@@ -144,7 +144,7 @@ namespace aveng {
 			return false;
 		}
 
-		std::shared_ptr<AvengModel> model = std::make_shared<AvengModel>(engineDevice, renderData, modelFileName);
+		std::shared_ptr<AvengModel> model = std::make_shared<AvengModel>(engineDevice);
 		if (!model->loadModelV2(renderData, modelFileName)) {
 			std::printf("%s error: could not load model file '%s'\n", __FUNCTION__, modelFileName.c_str());
 			return false;
@@ -152,6 +152,12 @@ namespace aveng {
 
 		mModelInstanceData.miModelList.emplace_back(model);
 		addInstance(model);
+
+		// Maybe
+		//if (mModelInstanceData.miAssimpInstances.size() == 2) {
+		//	std::shared_ptr<AssimpInstance> firstInstance = mModelInstanceData.miAssimpInstances.at(1);
+		//	centerInstance(firstInstance);
+		//}
 
 		return true;
 	}
@@ -197,8 +203,6 @@ namespace aveng {
 		updateTriangleCount();
 	}
 
-	// In Renderer.cpp:
-
 	bool Renderer::queueModelLoad(const std::string& filepath) {
 		mModelInstanceData.mPendingModelLoads.push_back(filepath);
 		std::printf("Queued model load (will load after current frame)\n");
@@ -214,6 +218,11 @@ namespace aveng {
 		assert(!isFrameStarted && "Cannot process model loads during frame!");
 
 		for (const auto& filepath : mModelInstanceData.mPendingModelLoads) {
+			if (hasModel(filepath))
+			{
+				return;
+			}
+
 			std::printf("Processing queued model load: %s\n", filepath.c_str());
 			// if (!addModel(pending.filepath)) {
 			if (!addModel(filepath)) {
@@ -369,10 +378,6 @@ namespace aveng {
 	void Renderer::recreateSwapChain()
 	{
 
-		/**
-		* TODO - Re-initialize the Editor's swapchain too
-		*/
-
 		// Get current window size
 		auto extent = aveng_window.getExtent();
 
@@ -386,16 +391,16 @@ namespace aveng {
 		// Wait until the current swap chain isn't being used before we attempt to construct the next one.
 		vkDeviceWaitIdle(engineDevice.device());
 	
-		aveng_swapchain = nullptr;
+		aveng_swapchain = nullptr; // This implies that the old swapchain is always VK_NULL_HANDLE(?)
 
 		if (aveng_swapchain == nullptr) {
 			// Create the new swapchain object
-			aveng_swapchain = std::make_unique<SwapChain>(engineDevice, extent);
+			aveng_swapchain = std::make_unique<SwapChain>(renderData, engineDevice, extent);
 		}
 		else {
 			// 
 			std::shared_ptr<SwapChain> oldSwapChain = std::move(aveng_swapchain);
-			aveng_swapchain = std::make_unique<SwapChain>(engineDevice, extent, oldSwapChain);
+			aveng_swapchain = std::make_unique<SwapChain>(renderData, engineDevice, extent, oldSwapChain);
 
 			if (!oldSwapChain->compareSwapFormats(*aveng_swapchain.get()))
 			{
@@ -440,7 +445,6 @@ namespace aveng {
 	// Return a command buffer for the current frame index
 	void Renderer::beginFrame()
 	{
-		assert(!isFrameStarted && "Can't call beginFrame while already in progress.");
 
 		/* wait for both fences before getting the new framebuffer image */
 		std::vector<VkFence> waitFences = { renderData.rdComputeFence[currentFrameIndex], renderData.rdRenderFence[currentFrameIndex] };
@@ -479,8 +483,6 @@ namespace aveng {
 			throw std::runtime_error("Failed to acquire swap chain image.");
 		}
 
-		isFrameStarted = true;
-
 		// This is the first point during a new frame where the command buffer is first captured.
 		assert(renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics()
 			&& "Incorrect Command Buffer in use");
@@ -496,76 +498,10 @@ namespace aveng {
 	}
 
 	// 
-	void  Renderer::endFrame()
+	void Renderer::endFrame()
 	{
 		assert(isFrameStarted && "Can't call endFrame while frame is not in progress.");
-
-		endSwapChainRenderPass();
-		if (vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex]) != VK_SUCCESS)
-		{
-			throw std::runtime_error("Failed to record command buffer.");
-		}
-
-		// Submit to graphics queue while handling cpu and gpu sync, executing the command buffers. NOTE: Why are we passing the image index in a pointer?
-		//auto result = aveng_swapchain->submitCommandBuffers(&commandBuffer, &currentImageIndex); DEPRECATED
-
-		/* submit command buffer */
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore[currentFrameIndex], renderData.rdPresentSemaphore[currentFrameIndex]};
-		std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-
-		/* compute shader: contine if in vertex input ready
-		 * vertex shader: wait for color attachment output ready */
-		submitInfo.pWaitDstStageMask = waitStages.data();
-
-		submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
-		submitInfo.pWaitSemaphores = waitSemaphores.data();
-
-		std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore[currentFrameIndex], renderData.rdGraphicSemaphore[currentFrameIndex]};
-
-		submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
-		submitInfo.pSignalSemaphores = signalSemaphores.data();
-
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &renderData.rdCommandBuffersGraphics[currentFrameIndex];
-
-		result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence[currentFrameIndex]);
-		if (result != VK_SUCCESS) {
-			std::printf("%s error: failed to submit draw command buffer (%i)\n", __FUNCTION__, result);
-			throw std::runtime_error("failed to submit draw command buffer");
-		}
-
-		/* trigger swapchain image presentation */
-		VkPresentInfoKHR presentInfo{};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &renderData.rdRenderSemaphore[currentFrameIndex];
-
-		VkSwapchainKHR swapchain = aveng_swapchain->getSwapchain();
-
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &swapchain;
-
-		presentInfo.pImageIndices = &currentImageIndex;
-
-		result = vkQueuePresentKHR(engineDevice.presentQueue(), &presentInfo);
-
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || aveng_window.wasWindowResized())
-		{
-			/*
-			* Possible TODO: `vkResetFences(device, 1, &inFlightFences[currentFrame]);` if VK_ERROR_OUT_OF_DATE_KHR
-			* Forgetting to do this could create a deadlock
-			*/
-			aveng_window.resetWindowResizedFlag();
-			recreateSwapChain();
-		}
-		else if (result != VK_SUCCESS)
-		{
-			throw std::runtime_error("Failed to present swap chain image.");
-		}
-
+		std::cout << "ENDING FRAME!!!!" << std::endl;
 		isFrameStarted = false;
 		// Advance to the next image
 		currentFrameIndex = (currentFrameIndex + 1) % SwapChain::MAX_FRAMES_IN_FLIGHT;
@@ -573,12 +509,11 @@ namespace aveng {
 	}
 
 
-	void  Renderer::beginSwapChainRenderPass()
+	void Renderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer, VkRenderPass renderpass)
 	{
 
 		assert(isFrameStarted && "Can't call beginSwapChain if frame is not in progress.");
-		assert(
-			renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics() &&
+		assert(renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics() &&
 			"Can't begin render pass on command buffer from a different frame");
 
 		// Clear Color for now
@@ -587,8 +522,8 @@ namespace aveng {
 		// Render pass info
 		VkRenderPassBeginInfo renderPassInfo{};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = aveng_swapchain->getRenderPass();
-		renderPassInfo.framebuffer = aveng_swapchain->getFrameBuffer(currentImageIndex);
+		renderPassInfo.renderPass = renderpass;
+		renderPassInfo.framebuffer = frameBuffer;
 
 		// The area where shader loading and storing takes place.
 		renderPassInfo.renderArea.offset = { 0,0 };
@@ -603,7 +538,7 @@ namespace aveng {
 		// VK_SUBPASS_CONTENTS_INLINE signals that subsequent renderpass commands come directly from the primary command buffer.
 		// No secondary buffers are currently being utilized.
 		// For this reason we cannot Mix both Inline command buffers AND secondary command buffers in this render pass's execution.
-		vkCmdBeginRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		// Configure the viewport and scissor
 		VkViewport viewport{};
@@ -614,18 +549,17 @@ namespace aveng {
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		VkRect2D scissor{ {0, 0}, aveng_swapchain->getSwapChainExtent() };
-		vkCmdSetViewport(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0, 1, &viewport);
-		vkCmdSetScissor(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0, 1, &scissor);
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
 	}
 
-	void Renderer::endSwapChainRenderPass()
+	void Renderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer)
 	{
 		assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
-		assert(
-			renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics() &&
+		assert(commandBuffer == getCurrentCommandBufferGraphics() &&
 			"Can't end render pass on command buffer from a different frame");
-		vkCmdEndRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]); 
+		vkCmdEndRenderPass(commandBuffer); 
 	}
 	 
 	bool Renderer::setupDescriptors()
@@ -658,9 +592,9 @@ namespace aveng {
 
 		createDescriptorSets();
 
-		updateDescriptorSets(2);
+		updateDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
-		updateComputeDescriptorSets(2);
+		updateComputeDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		
 		// TODO
 		// updateLightingDescriptorSets();
@@ -711,7 +645,14 @@ namespace aveng {
 			assimpSsboBind.pImmutableSamplers = nullptr;
 			assimpSsboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpUboBind, assimpSsboBind };
+			VkDescriptorSetLayoutBinding assimpSsboBind2{}; // Selected Instance Data
+			assimpSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			assimpSsboBind2.binding = 2;
+			assimpSsboBind2.descriptorCount = 1;
+			assimpSsboBind2.pImmutableSamplers = nullptr;
+			assimpSsboBind2.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpUboBind, assimpSsboBind, assimpSsboBind2 };
 
 			VkDescriptorSetLayoutCreateInfo assimpCreateInfo{};
 			assimpCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -749,7 +690,14 @@ namespace aveng {
 			assimpSkinningSsboBind2.pImmutableSamplers = nullptr;
 			assimpSkinningSsboBind2.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpSkinningBindings = { assimpUboBind, assimpSkinningSsboBind, assimpSkinningSsboBind2 };
+			VkDescriptorSetLayoutBinding assimpSkinningSsboBind3{};
+			assimpSkinningSsboBind3.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			assimpSkinningSsboBind3.binding = 3;
+			assimpSkinningSsboBind3.descriptorCount = 1;
+			assimpSkinningSsboBind3.pImmutableSamplers = nullptr;
+			assimpSkinningSsboBind3.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+			std::vector<VkDescriptorSetLayoutBinding> assimpSkinningBindings = { assimpUboBind, assimpSkinningSsboBind, assimpSkinningSsboBind2, assimpSkinningSsboBind3 };
 
 			VkDescriptorSetLayoutCreateInfo assimpSkinningCreateInfo{};
 			assimpSkinningCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1040,18 +988,20 @@ namespace aveng {
 
 		VkRenderPass renderPass = aveng_swapchain->getRenderPass();
 
+		// Note: The non-animated shaders are utilized by the Animation pipeline
 		std::string vertexShaderFile = "shaders/assimp.vert.spv";
 		std::string fragmentShaderFile = "shaders/assimp.frag.spv";
-		if (!SkinningPipeline::init(engineDevice, renderPass, renderData.rdAvengPipelineLayout,
-			renderData.rdAvengPipeline, vertexShaderFile, fragmentShaderFile)) {
+		if (!SkinningPipeline::init(engineDevice, renderData.rdAvengPipelineLayout,
+			renderData.rdAvengPipeline, renderPass, 1, vertexShaderFile, fragmentShaderFile)) {
 			std::printf("%s error: could not init Assimp shader pipeline\n", __FUNCTION__);
 			return false;
 		}
 
+		// Animation Pipeline
 		vertexShaderFile = "shaders/assimp_skinning.vert.spv";
 		fragmentShaderFile = "shaders/assimp_skinning.frag.spv";
-		if (!SkinningPipeline::init(engineDevice, renderPass, renderData.rdAvengAnimationPipelineLayout,
-			renderData.rdAvengAnimationPipeline, vertexShaderFile, fragmentShaderFile)) {
+		if (!SkinningPipeline::init(engineDevice,  renderData.rdAvengAnimationPipelineLayout,
+			renderData.rdAvengAnimationPipeline, renderPass, 1, vertexShaderFile, fragmentShaderFile)) {
 			std::printf("%s error: could not init Assimp Skinning shader pipeline\n", __FUNCTION__);
 			return false;
 		}
@@ -1072,6 +1022,7 @@ namespace aveng {
 		//	return false;
 		//}
 
+		// Compute Pipeline - Calculates bone transformations throughout animation (writes the updated TRS matrix)
 		std::string computeShaderFile = "shaders/assimp_instance_transform.comp.spv";
 		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout,
 			renderData.rdAvengComputeTransformPipeline, computeShaderFile)) {
@@ -1079,6 +1030,7 @@ namespace aveng {
 			return false;
 		}
 
+		// Compute Pipeline - multiplies the TRS matrix by each bone to compute their next position
 		computeShaderFile = "shaders/assimp_instance_matrix_mult.comp.spv";
 		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout,
 			renderData.rdAvengComputeMatrixMultPipeline, computeShaderFile)) {
@@ -1096,12 +1048,6 @@ namespace aveng {
 
 		return true;
 	}
-
-	std::shared_ptr<CameraProxy> Renderer::getMainCamera()
-	{
-		return std::shared_ptr<CameraProxy>();
-	}
-
 
 	size_t Renderer::calculateDynamicUBOStride() const
 	{
@@ -1133,7 +1079,7 @@ namespace aveng {
 		/*std::printf("Compute dispatch called: bones=%d, instanceGroups=%d\n",
 			numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));*/
 
-		/* memroy barrier between the compute shaders
+		/* memory barrier between the compute shaders
 		 * wait for TRS buffer to be written  */
 		VkBufferMemoryBarrier trsBufferBarrier{};
 		trsBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -1166,7 +1112,7 @@ namespace aveng {
 
 		vkCmdDispatch (renderData.rdCommandBuffersCompute[currentFrameIndex], numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
 
-		/* memroy barrier after compute shader
+		/* memory barrier after compute shader
 		 * wait for bone matrix buffer to be written  */
 		VkBufferMemoryBarrier boneMatrixBufferBarrier{};
 		boneMatrixBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -1184,9 +1130,14 @@ namespace aveng {
 	}
 
 	int Renderer::draw(float deltaTime) {
+
+		assert(!isFrameStarted && "Frame was not ended before a new one began.");
+
+		isFrameStarted = true;
 		/* no update on zero diff */
-		if (deltaTime == 0.0f) {
-			return currentFrameIndex;
+		if (deltaTime == 0.0f && !firstFrame) {
+			isFrameStarted = false;
+			return 0;
 		}
 
 		renderData.rdFrameTime = mFrameTimer.stop();
@@ -1202,14 +1153,13 @@ namespace aveng {
 		beginFrame();
 		if (!isFrameStarted) {
 			std::printf("beginFrame failed/skipped (swapchain recreation), skipping frame\n");
-			return true;  // Skip this frame gracefully
+			return 0;  // Skip this frame gracefully
 		}
 
 		/* calculate the size of the node matrix buffer over all animated instances */
 		size_t boneMatrixBufferSize = 0;
-		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
-			size_t numberOfInstances = modelType.second.size();
-			std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+		for (const auto& model : mModelInstanceData.miModelList) {
+			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 
 				/* animated models */
@@ -1218,7 +1168,6 @@ namespace aveng {
 
 					/* buffer size must always be a multiple of "local_size_y" instances to avoid undefined behavior */
 					boneMatrixBufferSize += numberOfBones * ((numberOfInstances - 1) / 32 + 1) * 32;
-					//std::printf("boneMatrixBufferSize: %zu bytes\n", boneMatrixBufferSize);
 				}
 			}
 		}
@@ -1228,10 +1177,6 @@ namespace aveng {
 		mWorldPosMatrices.resize(mModelInstanceData.miAssimpInstances.size());
 		mNodeTransFormData.clear();
 		mNodeTransFormData.resize(boneMatrixBufferSize);
-
-#if ENABLE_EDITOR
-		...setupEditorFrame(deltaTime);
-#endif
 
 		/* we need to track the presence of animated models */
 		bool animatedModelLoaded = false;
@@ -1251,24 +1196,25 @@ namespace aveng {
 					animatedModelLoaded = true; // designate
 
 					mMatrixGenerateTimer.start();
-					std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
-					// For each instance
-					for (unsigned int i = 0; i < numberOfInstances; ++i) {
+					// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
 
-						auto& instance = instances[i];
+					int instIndex = 0;
+					// For each instance
+					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
+					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
+
+						//auto& instance = instances[i];
 
 						instance->updateAnimation(deltaTime);
 						std::vector<NodeTransformData> instanceNodeTransform = instance->getNodeTransformData();
 
 						// Copy the NodeTransform Data to the vector of NodeTransform datas. I didn't know you can use arithmetic with iterator access patterns
 						// STORAGE BUFFER DATA - Packed with every instance's data
-						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + i * numberOfBones);
+						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + instIndex * numberOfBones);
 
 						// STORAGE BUFFER DATA - Packed with every instance's data
-						mWorldPosMatrices.at(instanceToStore + i) = instance->getWorldTransformMatrix(); // model Root Matrix SSBO data 
-#if ENABLE_EDITOR
-						editor.setSelectedInstance(instance, instanceToStore, i);
-#endif
+						mWorldPosMatrices.at(instanceToStore + instIndex) = instance->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+						instIndex++;
 					}
 
 					size_t trsMatrixSize = numberOfBones * numberOfInstances * sizeof(glm::mat4); // CPU miss
@@ -1282,13 +1228,13 @@ namespace aveng {
 				else {
 					/* non-animated models */
 					mMatrixGenerateTimer.start();
-					std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
-					for (unsigned int i = 0; i < numberOfInstances; ++i) {
-						auto& instance = instances[i];
-						mWorldPosMatrices.at(instanceToStore + i) = modelType.second.at(i)->getWorldTransformMatrix(); // model Root Matrix SSBO data 
-#if ENABLE_EDITOR
-						editor.setSelectedInstance(instance, instanceToStore, i);
-#endif
+					int instIndex = 0;
+					//std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
+					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
+					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
+						//auto& instance = instances[i];
+						mWorldPosMatrices.at(instanceToStore + instIndex) = modelType.second.at(instIndex)->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+						instIndex++;
 					}
 
 					renderData.rdMatrixGenerateTime += mMatrixGenerateTimer.stop();
@@ -1305,11 +1251,7 @@ namespace aveng {
 
 		// Ship the SSBO data
 		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers[currentFrameIndex], mNodeTransFormData);
-#if ENABLE_EDITOR
-		// Update the mSelectedInstance buffer with mSelectedInstance
-		// editor.updateStorageBuffers(currentFrameIndex);
-#endif
-		
+
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
 		/* resize SSBO if needed */
@@ -1445,70 +1387,22 @@ namespace aveng {
 			return WTF_BOOM;
 		}
 
-		beginSwapChainRenderPass();
+		beginSwapChainRenderPass(
+			renderData.rdCommandBuffersGraphics[currentFrameIndex],
+			aveng_swapchain->getFrameBuffer(currentImageIndex), 
+			aveng_swapchain->getRenderPass()
+		);
 
-		/* draw the models */
-		uint32_t worldPosOffset = 0;
-		uint32_t skinMatOffset = 0;
-		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
-			size_t numberOfInstances = modelType.second.size();
-			std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+		drawModels(
+			renderData.rdCommandBuffersGraphics[currentFrameIndex], 
+			renderData.rdAvengPipeline, 
+			renderData.rdAvengAnimationPipeline, 
+			renderData.rdAvengPipelineLayout, 
+			renderData.rdAvengAnimationPipelineLayout, 
+			renderData.rdAvengDescriptorSets[currentFrameIndex], 
+			renderData.rdAvengAnimationDescriptorSets[currentFrameIndex]);
 
-			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
-
-				/* animated models */
-				if (model->hasAnimations() && !model->getBoneList().empty()) {
-					uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
-
-					vkCmdBindPipeline(renderData.rdCommandBuffersGraphics[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengAnimationPipeline);
-
-					vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
-						renderData.rdAvengAnimationPipelineLayout, 1, 1, &renderData.rdAvengAnimationDescriptorSets[currentFrameIndex], 0, nullptr);
-
-					mUploadToUBOTimer.start();
-					mModelData.pkModelStride = numberOfBones;
-					mModelData.pkWorldPosOffset = worldPosOffset;
-					mModelData.pkSkinMatOffset = skinMatOffset;
-					vkCmdPushConstants(renderData.rdCommandBuffersGraphics[currentFrameIndex], renderData.rdAvengAnimationPipelineLayout,
-						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
-					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
-
-					model->drawInstancedV2(renderData, numberOfInstances, currentFrameIndex);
-
-					worldPosOffset += numberOfInstances;
-					skinMatOffset += numberOfInstances * numberOfBones;
-				}
-				else {
-					/* non-animated models */
-
-					vkCmdBindPipeline(renderData.rdCommandBuffersGraphics[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengPipeline);
-
-					vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
-						renderData.rdAvengPipelineLayout, 1, 1, &renderData.rdAvengDescriptorSets[currentFrameIndex], 0, nullptr);
-
-					mUploadToUBOTimer.start();
-					mModelData.pkModelStride = 0;
-					mModelData.pkWorldPosOffset = worldPosOffset;
-					mModelData.pkSkinMatOffset = 0;
-					vkCmdPushConstants(renderData.rdCommandBuffersGraphics[currentFrameIndex], renderData.rdAvengPipelineLayout,
-						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
-					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
-
-					model->drawInstancedV2(renderData, numberOfInstances, currentFrameIndex);
-
-					worldPosOffset += numberOfInstances;
-				}
-			}
-		}
-
-		//renderLights();
-
-#ifdef ENABLE_EDITOR
-		renderEditor();
-#endif
-
-		// endFrame();
-		vkCmdEndRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+		endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
 
 		VkResult result = vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
 		if (result != VK_SUCCESS) {
@@ -1567,10 +1461,79 @@ namespace aveng {
 			}
 		}
 
-		isFrameStarted = false;
-		// Advance to the next image
-		currentFrameIndex = (currentFrameIndex + 1) % SwapChain::MAX_FRAMES_IN_FLIGHT;
-		
+	}
+
+	/**
+	* Note: This method is just for subscribers to be able to utilize model draws.
+	* For one less stack frame, you could copy/paste this code directly 
+	* into the renderer.draw() method
+	*/
+	bool Renderer::drawModels(
+		VkCommandBuffer commandBuffer,
+		VkPipeline basicPipeline,
+		VkPipeline animationPipeline,
+		VkPipelineLayout basicLayout,
+		VkPipelineLayout animationLayout,
+		VkDescriptorSet basicDescriptorSet,
+		VkDescriptorSet animationDescriptorSet)
+	{
+		/* draw the models */
+		uint32_t worldPosOffset = 0;
+		uint32_t skinMatOffset = 0;
+		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) 
+		{
+			size_t numberOfInstances = modelType.second.size();
+			std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+
+			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
+			{
+
+				/* animated models */
+				if (model->hasAnimations() && !model->getBoneList().empty()) 
+				{
+					uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
+
+					vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, animationPipeline);
+
+					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						animationLayout, 1, 1, &animationDescriptorSet, 0, nullptr);
+
+					mUploadToUBOTimer.start();
+					mModelData.pkModelStride = numberOfBones;
+					mModelData.pkWorldPosOffset = worldPosOffset;
+					mModelData.pkSkinMatOffset = skinMatOffset;
+					vkCmdPushConstants(commandBuffer, animationLayout,
+						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
+					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+					model->drawInstancedV2(renderData, numberOfInstances, currentFrameIndex);
+					worldPosOffset += numberOfInstances;
+					skinMatOffset += numberOfInstances * numberOfBones;
+
+				} else {
+					/* non-animated models */
+
+					vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
+
+					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						basicLayout, 1, 1, &basicDescriptorSet, 0, nullptr);
+
+					mUploadToUBOTimer.start();
+					mModelData.pkModelStride = 0;
+					mModelData.pkWorldPosOffset = worldPosOffset;
+					mModelData.pkSkinMatOffset = 0;
+					vkCmdPushConstants(commandBuffer, basicLayout,
+						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
+					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+					model->drawInstancedV2(renderData, numberOfInstances, currentFrameIndex);
+					worldPosOffset += numberOfInstances;
+
+				}
+			}
+		}
+
+		return true;
 	}
 
 	void Renderer::updateDescriptorSets(int iters) {
@@ -1583,7 +1546,7 @@ namespace aveng {
 
 			int index = i;
 
-			// This implies we're updating descriptors during rendering. On init, we perform 2 iterations
+			// This implies we're updating descriptors during rendering. On init, we perform MAX_FRAMES_IN_FLIGHT iterations
 			if (iters == 1) {
 				index = currentFrameIndex;
 			}
@@ -1600,6 +1563,11 @@ namespace aveng {
 				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[index].buffer;
 				worldPosInfo.offset = 0;
 				worldPosInfo.range = VK_WHOLE_SIZE;
+
+				VkDescriptorBufferInfo selectionInfo{};
+				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
+				selectionInfo.offset = 0;
+				selectionInfo.range = VK_WHOLE_SIZE;
 
 				VkWriteDescriptorSet matrixWriteDescriptorSet{};
 				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1640,6 +1608,11 @@ namespace aveng {
 				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[index].buffer;
 				worldPosInfo.offset = 0;
 				worldPosInfo.range = VK_WHOLE_SIZE;
+
+				VkDescriptorBufferInfo selectionInfo{};
+				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
+				selectionInfo.offset = 0;
+				selectionInfo.range = VK_WHOLE_SIZE;
 
 				VkWriteDescriptorSet matrixWriteDescriptorSet{};
 				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1776,11 +1749,12 @@ namespace aveng {
 
 	}
 
-	void Renderer::updateFrameData(const glm::mat4& projection, const glm::mat4& view)
+	void Renderer::updateCamera()
 	{
-		mMatrices.projectionMatrix = projection;
-		mMatrices.viewMatrix = view;
-		// ambient light as well but it's static for now
+		// TODO - Make sure these don't contain garbage values before assigned
+		mMatrices.projectionMatrix = renderData.cameraProxy.projection;
+		mMatrices.viewMatrix = renderData.cameraProxy.view;
+		// Maybe ambient light as well
 	}
 
 	bool Renderer::createSyncObjects() {
@@ -1835,6 +1809,7 @@ namespace aveng {
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderModelRootMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdSelectedInstanceBuffers[i]);
 		
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);

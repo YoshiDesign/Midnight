@@ -38,6 +38,9 @@ namespace aveng {
 		std::chrono::time_point<std::chrono::steady_clock> loopStartTime = std::chrono::steady_clock::now();
 		std::chrono::time_point<std::chrono::steady_clock> loopEndTime = std::chrono::steady_clock::now();
 
+		// Temporary
+		objectRenderSystem.setCamera(1);
+
 		// Render Loop
 		while (!aveng_window.shouldClose()) {
 
@@ -54,7 +57,7 @@ namespace aveng {
 		}
 
 		// Block until all GPU operations quit.
-		vkDeviceWaitIdle(objectRenderSystem.engineDevice());
+		vkDeviceWaitIdle(objectRenderSystem.getEngineDevice());
 	}
 
 	/*

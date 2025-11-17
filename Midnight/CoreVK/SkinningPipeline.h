@@ -10,7 +10,8 @@
 namespace aveng {
     class SkinningPipeline {
     public:
-        static bool init(EngineDevice& engineDevice, VkRenderPass& renderpass, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline, std::string vertexShaderFilename, std::string fragmentShaderFilename);
+        static bool init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline,
+            VkRenderPass renderpass, uint32_t numColorAttachments, std::string vertexShaderFilename, std::string fragmentShaderFilename);
         static void cleanup(EngineDevice& engineDevice, VkPipeline& pipeline);
     };
 }

@@ -228,7 +228,6 @@
     <ClInclude Include="Core\aveng_frame_content.h" />
     <ClInclude Include="Core\aveng_model.h" />
     <ClInclude Include="Core\aveng_window.h" />
-    <ClInclude Include="Core\CameraProxy.h" />
     <ClInclude Include="Core\data.h" />
     <ClInclude Include="Core\Modeling\AssimpAnimChannel.h" />
     <ClInclude Include="Core\Modeling\AssimpAnimClip.h" />
