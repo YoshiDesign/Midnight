@@ -27,13 +27,16 @@ namespace aveng {
 
     void SwapChain::init()
     {
+        /**
+        * Note: The editor is responsible for ensuring the order of swapchain resource creation.
+        * Selection image views are the only current exception. The renderer might utilize them too.
+        */
         createSwapChain();
         createImageViews();
         createSelectionImageViews();
         createRenderPass();
         createDepthResources();
         createFramebuffers();
-        createEditorSelectionFramebuffers();
     }
 
     SwapChain::~SwapChain() {
@@ -60,7 +63,7 @@ namespace aveng {
         }
 
         // Primary Framebuffers
-        for (auto framebuffer : swapChainFramebuffers) {
+        for (auto framebuffer : mSwapChainFramebuffers) {
             vkDestroyFramebuffer(device.device(), framebuffer, nullptr);
         }
 
@@ -259,7 +262,7 @@ namespace aveng {
         depthAttachment.format = findDepthFormat();
         depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
         depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -269,32 +272,40 @@ namespace aveng {
         depthAttachmentRef.attachment = 1;
         depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        VkSubpassDescription subpass = {};
-        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &colorAttachmentRef;
-        subpass.pDepthStencilAttachment = &depthAttachmentRef;
+        VkSubpassDescription subpassDesc = {};
+        subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDesc.colorAttachmentCount = 1;
+        subpassDesc.pColorAttachments = &colorAttachmentRef;
+        subpassDesc.pDepthStencilAttachment = &depthAttachmentRef;
 
-        VkSubpassDependency dependency = {}; // Dependencies are like pipeline barriers within a renderpass to protect the swapchain image
-        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependency.srcAccessMask = 0;
-        dependency.srcStageMask =
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dependency.dstSubpass = 0;
-        dependency.dstStageMask =
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dependency.dstAccessMask =
-            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT; // This configuration assumes simple one-way writes
+        // Dependencies are like pipeline barriers within a renderpass to protect the swapchain image
+        VkSubpassDependency subpassDep{};
+        subpassDep.srcSubpass = VK_SUBPASS_EXTERNAL;
+        subpassDep.dstSubpass = 0;
+        subpassDep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDep.srcAccessMask = 0;
+        subpassDep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-        std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
-        VkRenderPassCreateInfo renderPassInfo = {};
+        VkSubpassDependency depthDep{};
+        depthDep.srcSubpass = VK_SUBPASS_EXTERNAL;
+        depthDep.dstSubpass = 0;
+        depthDep.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        depthDep.srcAccessMask = 0;
+        depthDep.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        depthDep.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        std::vector<VkSubpassDependency> dependencies = { subpassDep, depthDep };
+        std::vector<VkAttachmentDescription> attachments = { colorAttachment, depthAttachment };
+
+        VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
-        renderPassInfo.pSubpasses = &subpass;
-        renderPassInfo.dependencyCount = 1;
-        renderPassInfo.pDependencies = &dependency;
+        renderPassInfo.pSubpasses = &subpassDesc;
+        renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+        renderPassInfo.pDependencies = dependencies.data();
 
         if (vkCreateRenderPass(device.device(), &renderPassInfo, nullptr, &mRenderPass) != VK_SUCCESS) {
             throw std::runtime_error("failed to create render pass!");
@@ -390,7 +401,7 @@ namespace aveng {
         VkAttachmentDescription colorAtt{};
         colorAtt.format = getSwapChainImageFormat();
         colorAtt.samples = VK_SAMPLE_COUNT_1_BIT;
-        colorAtt.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAtt.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;      // Note to self: LOAD_OP_CLEAR is a great indicator that this renderpass will occur before any other renderpasses
         colorAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         colorAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -479,7 +490,7 @@ namespace aveng {
 
     void SwapChain::createFramebuffers() 
     {
-        swapChainFramebuffers.resize(imageCount());
+        mSwapChainFramebuffers.resize(imageCount());
         for (size_t i = 0; i < imageCount(); i++) {
             std::array<VkImageView, 2> attachments = { swapChainImageViews[i], depthImageViews[i] };
 
@@ -493,7 +504,7 @@ namespace aveng {
             framebufferInfo.height = swapChainExtent.height;
             framebufferInfo.layers = 1;
 
-            if (vkCreateFramebuffer(device.device(), &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+            if (vkCreateFramebuffer(device.device(), &framebufferInfo, nullptr, &mSwapChainFramebuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create framebuffer!");
             }
         }

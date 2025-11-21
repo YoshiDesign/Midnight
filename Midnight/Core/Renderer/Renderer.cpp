@@ -549,6 +549,8 @@ namespace aveng {
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 		VkRect2D scissor{ {0, 0}, aveng_swapchain->getSwapChainExtent() };
+
+		// 
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
@@ -1376,7 +1378,7 @@ namespace aveng {
 			return WTF_BOOM;
 		}
 
-		//// NOTE: This would destroy the current renderpass (if there were one)
+		// NOTE: This would prevent the current renderpass (if there were one)
 		if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0)) {
 			std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);
 			return WTF_BOOM;
@@ -1387,22 +1389,25 @@ namespace aveng {
 			return WTF_BOOM;
 		}
 
-		beginSwapChainRenderPass(
-			renderData.rdCommandBuffersGraphics[currentFrameIndex],
-			aveng_swapchain->getFrameBuffer(currentImageIndex), 
-			aveng_swapchain->getRenderPass()
-		);
+		// Note: This will never be true in release >.>
+		if (!mRenderpassBypass) {
+			beginSwapChainRenderPass(
+				renderData.rdCommandBuffersGraphics[currentFrameIndex],
+				aveng_swapchain->getFrameBuffer(currentImageIndex),
+				aveng_swapchain->getRenderPass()
+			);
+			
+			drawModels(
+				renderData.rdCommandBuffersGraphics[currentFrameIndex],
+				renderData.rdAvengPipeline,
+				renderData.rdAvengAnimationPipeline,
+				renderData.rdAvengPipelineLayout,
+				renderData.rdAvengAnimationPipelineLayout,
+				renderData.rdAvengDescriptorSets[currentFrameIndex],
+				renderData.rdAvengAnimationDescriptorSets[currentFrameIndex]);
 
-		drawModels(
-			renderData.rdCommandBuffersGraphics[currentFrameIndex], 
-			renderData.rdAvengPipeline, 
-			renderData.rdAvengAnimationPipeline, 
-			renderData.rdAvengPipelineLayout, 
-			renderData.rdAvengAnimationPipelineLayout, 
-			renderData.rdAvengDescriptorSets[currentFrameIndex], 
-			renderData.rdAvengAnimationDescriptorSets[currentFrameIndex]);
-
-		endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+			endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+		}
 
 		VkResult result = vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
 		if (result != VK_SUCCESS) {
@@ -1464,9 +1469,9 @@ namespace aveng {
 	}
 
 	/**
-	* Note: This method is just for subscribers to be able to utilize model draws.
+	* Note: This method is just for clients to be able to utilize model draws (e.g. the Editor).
 	* For one less stack frame, you could copy/paste this code directly 
-	* into the renderer.draw() method
+	* into the renderer.draw() method. Args are super lightweight though
 	*/
 	bool Renderer::drawModels(
 		VkCommandBuffer commandBuffer,

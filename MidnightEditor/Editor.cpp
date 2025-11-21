@@ -72,18 +72,47 @@ namespace aveng {
 	void Editor::render(unsigned int frameIndex, float frameTime)
 	{
 		currentFrameIndex = frameIndex;
-		updateCamera(frameTime);
-
-		setupSelectionHighlight(frameTime);
-		setSelectedInstance();
-		updateStorageBuffers();
-		drawInstanceGizmo();
-		drawSelectedModels();
+		isFrameStarted = true;
 
 		aveng_imgui.newFrame();
 		aveng_imgui.runGUI();
 		aveng_imgui.render(frameIndex);
+
+		updateCamera(frameTime);
+		setupSelectionHighlight(frameTime);
+		setSelectedInstance();
+		updateStorageBuffers();
+
+		if (editorData.eMousePick == true) 
+		{
+			// Disable the renderer's primary renderpass in
+			// favor of the editor's selection renderpass
+			renderer.setRenderpassBypass(false);
+
+			drawInstanceGizmo();
+
+			renderer.beginSwapChainRenderPass(
+				renderData.rdCommandBuffersGraphics[currentFrameIndex], // NOTE: This is the primary graphics command buffer
+				renderer.getSelectionFramebuffer(),
+				renderer.getSwapChainRenderPass());						// Note: Primary renderpass
+
+			drawSelectedModels();
+
+			renderer.endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+		}
+		else {
+			renderer.setRenderpassBypass(false);
+		}
+
+		isFrameStarted = false;
 	}
+	//void Editor::endSelectionRenderPass(VkCommandBuffer commandBuffer)
+	//{
+	//	assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
+	//	assert(commandBuffer == renderer.getCurrentCommandBufferGraphics() &&
+	//		"Can't end render pass on command buffer from a different frame");
+	//	vkCmdEndRenderPass(commandBuffer);
+	//}
 
 	void Editor::waitFrames()
 	{
@@ -122,6 +151,8 @@ namespace aveng {
 			Logger::log(1, "%s error; could not create selection renderpass\n", __FUNCTION__);
 			throw std::runtime_error("editor fail 0");
 		}
+
+		swapchain->createEditorSelectionFramebuffers();
 
 		createPipelineLayouts();
 
@@ -329,7 +360,7 @@ namespace aveng {
 			return false;
 		}
 
-		// Begin
+		// Begin - We can safely piggy back on the renderer's beginSwapChainRenderPass method - it's polymorphic
 		renderer.beginSwapChainRenderPass(
 			renderData.rdLineCommandBuffers[currentFrameIndex],
 			renderer.getFramebuffer(),
@@ -351,14 +382,22 @@ namespace aveng {
 			vkCmdDraw(renderData.rdLineCommandBuffers[currentFrameIndex], static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
 		}
 
-		// Fin
-		renderer.endSwapChainRenderPass(renderData.rdLineCommandBuffers[currentFrameIndex]);
+		// Fin - Specific end for Line renderpasses
+		endSwapChainLineRenderPass(renderData.rdLineCommandBuffers[currentFrameIndex]);
 		
 		if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex])) {
 			Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
 			return false;
 		}
 
+	}
+
+	void Editor::endSwapChainLineRenderPass(VkCommandBuffer commandBuffer)
+	{
+		assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
+		assert(commandBuffer == getCurrentCommandBufferLines() &&
+			"Can't end render pass on command buffer from a different frame");
+		vkCmdEndRenderPass(commandBuffer);
 	}
 
 	void Editor::drawSelectedModels()

@@ -35,7 +35,7 @@ namespace aveng {
         // VkRenderPass        getSecondaryRenderPass() { return mSecondaryRenderPass; }
 
         // Framebuffers
-        VkFramebuffer       getFrameBuffer(int index) { return swapChainFramebuffers[index]; }
+        VkFramebuffer       getFrameBuffer(int index) { return mSwapChainFramebuffers[index]; }
         VkFramebuffer       getSelectionFrameBuffer(int index) { return mSelectionFramebuffers[index]; }
 
         VkImageView          createImageView(VkImage image, VkFormat format);
@@ -69,6 +69,8 @@ namespace aveng {
                    swapChain.swapChainImageFormat == swapChainImageFormat;
         }
 
+        bool createEditorSelectionFramebuffers();
+
     private:
         void init();
         void createSwapChain();
@@ -77,7 +79,6 @@ namespace aveng {
         void createDepthResources();
         void createRenderPass();
         void createFramebuffers();
-        bool createEditorSelectionFramebuffers();
 
         // Helper functions
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
@@ -89,7 +90,7 @@ namespace aveng {
         VkExtent2D swapChainExtent;
         
         std::vector<VkFramebuffer> mSelectionFramebuffers;
-        std::vector<VkFramebuffer> swapChainFramebuffers;
+        std::vector<VkFramebuffer> mSwapChainFramebuffers;
         VkRenderPass mRenderPass;
         //VkRenderPass mSecondaryRenderPass;    // Stored in renderData
         //VkRenderPass mLineRenderPass;         // Stored in renderData

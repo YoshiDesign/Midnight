@@ -93,6 +93,9 @@ namespace aveng {
 		}
 
 		VkFramebuffer getFramebuffer() { return aveng_swapchain->getFrameBuffer(currentImageIndex); }
+		VkFramebuffer getSelectionFramebuffer() { return aveng_swapchain->getSelectionFrameBuffer(currentImageIndex); }
+
+		void setRenderpassBypass(bool _state) { mRenderpassBypass = _state; }
 
 		bool createDescriptorLayouts();
 		bool createDescriptorSets();
@@ -148,6 +151,7 @@ namespace aveng {
 	private:
 
 		bool firstFrame = true;
+		bool mRenderpassBypass = false;
 
 		// Engine systems
 		AvengWindow& aveng_window;

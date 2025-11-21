@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include "GUI/aveng_imgui.h"
 #include "CoreVK/swapchain.h"
 #include "CoreVK/EngineDevice.h"
@@ -13,10 +14,10 @@
 #include "EditorData.h"
 
 /**
-* Note: At the moment, this class shares the currentFrameIndex held bythe renderer.
-* This can be decoupled if this class owns all of its own descriptor sets, buffers and resources.
+* Note: At the moment, this class shares the currentFrameIndex held by the renderer.
+* This can be decoupled if this class owns all of its own descriptor sets, buffers and resources (which it currently does!).
+* It will still, however, rely on the correct swapchain (renderPass target) image index.
 */
-
 
 namespace aveng {
 
@@ -44,7 +45,19 @@ namespace aveng {
 		bool createSSBOs();
 		void updateDescriptorSets(int iters = 1);
 
+		void endSwapChainLineRenderPass(VkCommandBuffer commandBuffer);
+		void endSelectionRenderPass(VkCommandBuffer commandBuffer);
+
 		void updateStorageBuffers();
+
+		// Just use the returned values directly if working in renderer.cpp. This is for clients
+		VkCommandBuffer getCurrentCommandBufferLines() const
+		{
+			std::cout << "getCurrentCommandBufferLines: " << currentFrameIndex << std::endl;
+			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
+			return renderData.rdCommandBuffersCompute[currentFrameIndex];
+		}
+
 
 	private:
 
@@ -52,6 +65,7 @@ namespace aveng {
 		unsigned int currentFrameIndex = 0; // Updated at render() from the renderer
 		AvengCamera editor_camera{};
 		float aspect;
+		bool isFrameStarted;
 
 		/* color hightlight for selection etc */
 		std::vector<glm::vec2> mSelectedInstance{};
@@ -69,7 +83,6 @@ namespace aveng {
 		unsigned int mCoordArrowsLineIndexCount = 0;
 
 		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
-
 		std::shared_ptr<VkLineMesh> mLineMesh = nullptr;
 
 		VkResult result;
