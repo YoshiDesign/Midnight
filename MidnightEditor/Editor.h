@@ -61,6 +61,8 @@ namespace aveng {
 
 	private:
 
+		bool submitCommandBuffers();
+
 		Timer mUploadToVBOTimer{};
 		unsigned int currentFrameIndex = 0; // Updated at render() from the renderer
 		AvengCamera editor_camera{};

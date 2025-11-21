@@ -221,6 +221,7 @@ namespace aveng {
 		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
 		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
 		std::vector<VkCommandBuffer> rdLineCommandBuffers;		// Editor and Renderer
+		std::vector<VkCommandBuffer> rdGUICommandBuffers;		// Editor and Renderer
 
 		VkRenderPass rdLineRenderpass = VK_NULL_HANDLE;							// EDITOR
 		VkRenderPass rdSelectionRenderpass = VK_NULL_HANDLE;							// EDITOR

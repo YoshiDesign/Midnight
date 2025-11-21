@@ -21,6 +21,7 @@ namespace aveng {
 
 		// renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdLineCommandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdGUICommandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		mModelInstanceData.miInstanceCenterCallbackFunctionEditor = [this](std::shared_ptr<AssimpInstance> instance) { renderer.centerInstance(instance); };
 
@@ -231,6 +232,44 @@ namespace aveng {
 		{
 			return false;
 		}
+		return true;
+	}
+
+	bool Editor::submitCommandBuffers()
+	{
+		//VkResult result = vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+		//if (result != VK_SUCCESS) {
+		//	std::printf("%s error: could not end render pass (error: %i)\n", __FUNCTION__, result);
+		//	throw std::runtime_error("error: could not end render pass");
+		//}
+
+		///* submit command buffer */
+		//VkSubmitInfo submitInfo{};
+		//submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		//std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore[currentFrameIndex], renderData.rdPresentSemaphore[currentFrameIndex] };
+		//std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+		///* compute shader: contine if in vertex input ready
+		// * vertex shader: wait for color attachment output ready */
+		//submitInfo.pWaitDstStageMask = waitStages.data();
+
+		//submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
+		//submitInfo.pWaitSemaphores = waitSemaphores.data();
+
+		//std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore[currentFrameIndex], renderData.rdGraphicSemaphore[currentFrameIndex] };
+
+		//submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
+		//submitInfo.pSignalSemaphores = signalSemaphores.data();
+
+		//submitInfo.commandBufferCount = 1;
+		//submitInfo.pCommandBuffers = &renderData.rdCommandBuffersGraphics[currentFrameIndex];
+
+		//result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence[currentFrameIndex]);
+		//if (result != VK_SUCCESS) {
+		//	std::printf("%s error: failed to submit draw command buffer (%i)\n", __FUNCTION__, result);
+		//	return WTF_BOOM;
+		//}
 		return true;
 	}
 
