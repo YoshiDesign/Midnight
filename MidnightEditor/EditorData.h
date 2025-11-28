@@ -9,6 +9,7 @@ namespace aveng {
         std::vector<glm::vec2> eSelectedInstance{}; // Shader Uniform Data
 
         bool eHighlightSelectedInstance = false;
+        bool eHasSelection = false;
         float eSelectHighlightValue = 1.0f;
 
         int eManyInstanceCreateNum = 1;
@@ -20,6 +21,8 @@ namespace aveng {
         bool eMouseLock = false;
         int eMouseXPos = 0;
         int eMouseYPos = 0;
+        int eMouseLastClickX = 0;
+        int eMouseLastClickY = 0;
         bool eMouseMove = false;
         bool eMouseMoveVertical = false;
         int eMouseMoveVerticalShiftKey = 0;

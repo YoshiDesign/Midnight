@@ -223,12 +223,10 @@ namespace aveng {
 	}
 
 	void Renderer::processPendingModelLoads() {
+
 		if (mModelInstanceData.mPendingModelLoads.empty()) {
 			return;
 		}
-
-		// Make sure no frame is in progress
-		assert(!isFrameStarted && "Cannot process model loads during frame!");
 
 		for (const auto& filepath : mModelInstanceData.mPendingModelLoads) {
 			if (hasModel(filepath))
@@ -240,6 +238,11 @@ namespace aveng {
 			// if (!addModel(pending.filepath)) {
 			if (!addModel(filepath)) {
 				std::printf("Failed to load queued model: %s\n", filepath.c_str());
+			}
+			else {
+				/* select new model and new instance */
+				mModelInstanceData.miSelectedModelEditor = mModelInstanceData.miModelList.size() - 1;
+				mModelInstanceData.miSelectedEditorInstance = mModelInstanceData.miAssimpInstances.size() - 1;
 			}
 		}
 
@@ -1291,11 +1294,11 @@ namespace aveng {
 
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		/* resize SSBO if needed - resize ALL frames together to keep them synchronized */
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers[i], boneMatrixBufferSize * sizeof(glm::mat4));
-			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderBoneMatrixBuffers[i], boneMatrixBufferSize * sizeof(glm::mat4));
-		}
+		/* resize SSBO if needed */
+		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));
+			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderBoneMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));
+		//}
 
 		// Note: this occurs if ANY buffer has a new size
 		if (bufferResized) {
@@ -1304,98 +1307,96 @@ namespace aveng {
 			updateComputeDescriptorSets();
 		}
 
-			/* record compute commands */
-			result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence[currentFrameIndex]);
-			if (result != VK_SUCCESS) {
-				std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
+		/* record compute commands */
+		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence[currentFrameIndex]);
+		if (result != VK_SUCCESS) {
+			std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
+			return WTF_BOOM;
+		}
+
+		if (animatedModelLoaded) {
+
+			/*
+			* Command Buffer recording for the Compute queue
+			*/
+
+			if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex], 0)) {
+				std::printf("%s error: failed to reset compute command buffer\n", __FUNCTION__);
 				return WTF_BOOM;
 			}
 
-			if (animatedModelLoaded) {
+			if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
+				std::printf("%s error: failed to begin compute command buffer\n", __FUNCTION__);
+				return WTF_BOOM;
+			}
 
-				/*
-				* Command Buffer recording for the Compute queue
-				*/
+			uint32_t computeShaderModelOffset = 0;
+			for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
+				size_t numberOfInstances = modelType.second.size();
+				std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+				if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 
-				if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex], 0)) {
-					std::printf("%s error: failed to reset compute command buffer\n", __FUNCTION__);
-					return WTF_BOOM;
-				}
+					/* compute shader for animated models only */
+					if (model->hasAnimations() && !model->getBoneList().empty()) {
+						size_t numberOfBones = model->getBoneList().size();
 
-				if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
-					std::printf("%s error: failed to begin compute command buffer\n", __FUNCTION__);
-					return WTF_BOOM;
-				}
+						//std::printf("[runComputeShaders] Buffer sizes - NodeTransform: %zu, TRSMatrix: %zu, BoneMatrix: %zu\n",
+						//	mNodeTransformBuffers[currentFrameIndex].bufferSize,
+						//	mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize,
+						//	mShaderBoneMatrixBuffers[currentFrameIndex].bufferSize);
 
-				uint32_t computeShaderModelOffset = 0;
-				for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
-					size_t numberOfInstances = modelType.second.size();
-					std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
-					if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
+						runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
 
-						/* compute shader for animated models only */
-						if (model->hasAnimations() && !model->getBoneList().empty()) {
-							size_t numberOfBones = model->getBoneList().size();
-
-							//std::printf("[runComputeShaders] Buffer sizes - NodeTransform: %zu, TRSMatrix: %zu, BoneMatrix: %zu\n",
-							//	mNodeTransformBuffers[currentFrameIndex].bufferSize,
-							//	mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize,
-							//	mShaderBoneMatrixBuffers[currentFrameIndex].bufferSize);
-
-							runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
-
-							computeShaderModelOffset += numberOfInstances * numberOfBones;
-						}
+						computeShaderModelOffset += numberOfInstances * numberOfBones;
 					}
 				}
-
-				// End command recording for Compute Queue
-				if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
-					std::printf("%s error: failed to end compute command buffer\n", __FUNCTION__);
-					return WTF_BOOM;
-				}
-
-				/* submit compute commands */
-				VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-				VkSubmitInfo computeSubmitInfo{};
-				computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-				computeSubmitInfo.commandBufferCount = 1;
-				computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute[currentFrameIndex];
-				computeSubmitInfo.signalSemaphoreCount = 1;
-				computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
-				computeSubmitInfo.waitSemaphoreCount = 1;
-				computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
-				computeSubmitInfo.pWaitDstStageMask = &waitStage;
-
-				result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
-				if (result != VK_SUCCESS) {
-					std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
-					return WTF_BOOM;
-				};
-
-			}
-			else {
-				/* do an empty submit if we don't have animated models to satisfy fence and semaphor */
-				VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-				VkSubmitInfo computeSubmitInfo{};
-				computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-				computeSubmitInfo.signalSemaphoreCount = 1;
-				computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
-				computeSubmitInfo.waitSemaphoreCount = 1;
-				computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
-				computeSubmitInfo.pWaitDstStageMask = &waitStage;
-
-				// Compute submission and fence signaling
-				result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
-				if (result != VK_SUCCESS) {
-					std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
-					return WTF_BOOM;
-				};
 			}
 
-			// handleMovementKeys();
+			// End command recording for Compute Queue
+			if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
+				std::printf("%s error: failed to end compute command buffer\n", __FUNCTION__);
+				return WTF_BOOM;
+			}
+
+			/* submit compute commands */
+			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+			VkSubmitInfo computeSubmitInfo{};
+			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			computeSubmitInfo.commandBufferCount = 1;
+			computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute[currentFrameIndex];
+			computeSubmitInfo.signalSemaphoreCount = 1;
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
+			computeSubmitInfo.waitSemaphoreCount = 1;
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
+			computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
+			if (result != VK_SUCCESS) {
+				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
+				return WTF_BOOM;
+			};
+
+		}
+		else {
+			/* do an empty submit if we don't have animated models to satisfy fence and semaphor */
+			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+			VkSubmitInfo computeSubmitInfo{};
+			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			computeSubmitInfo.signalSemaphoreCount = 1;
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
+			computeSubmitInfo.waitSemaphoreCount = 1;
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
+			computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+			// Compute submission and fence signaling
+			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
+			if (result != VK_SUCCESS) {
+				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
+				return WTF_BOOM;
+			};
+		}
 
 		/* we need to update descriptors after the upload if buffer size changed */
 		mUploadToUBOTimer.start();
@@ -1422,6 +1423,9 @@ namespace aveng {
 
 	void Renderer::beginGraphicsCommands(int frameIndex)
 	{
+
+		assert(renderData.rdCommandBuffersGraphics[frameIndex] == getCurrentCommandBufferGraphics() &&
+			"Wrong CB for Graphics");
 
 		if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersGraphics[frameIndex], 0)) {
 			std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);

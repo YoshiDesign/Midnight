@@ -144,7 +144,7 @@ namespace aveng {
             ImGui::Checkbox("Player Debug", &show_player_controller_window);
 
             ImGui::Text(
-                "Point Lights: %d", gameData.numPointLights);
+                "Last Click At: (%d, %d)", editorData.eMouseLastClickX, editorData.eMouseLastClickY);
             ImGui::Text(
                 "App Mode: %d", gameData.currentAppMode);
             ImGui::Text(
@@ -402,14 +402,10 @@ namespace aveng {
 
             if (ImGui::CollapsingHeader("Models")) {
                 /* state is changed during model deletion, so save it first */
-                bool modelListEmtpy = modInstData.miModelList.empty();
-                std::string selectedModelName;
+                bool modelListEmtpy = modInstData.miModelList.size() == 1;
+                std::string selectedModelName = "None";
 
                 /* Validate selected model index and reset if invalid */
-                if (!modelListEmtpy && (modInstData.miSelectedModelEditor < 0 || modInstData.miSelectedModelEditor >= modInstData.miModelList.size())) {
-                    modInstData.miSelectedModelEditor = 0;
-                }
-
                 if (!modelListEmtpy) {
                     selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str();
                 }
@@ -475,6 +471,7 @@ namespace aveng {
                         else {
                             /* Model is queued but not loaded yet - selection will be updated after processing */
                             std::printf("Model queued for loading: %s\n", filePathName.c_str());
+
                         }
                     }
                     ImGuiFileDialog::Instance()->Close();
@@ -499,14 +496,21 @@ namespace aveng {
                         modInstData.miModelDeleteCallbackFunction(modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str());
 
                         /* decrement selected model index to point to model that is in list before the deleted one */
-                        if (modInstData.miSelectedModelEditor > 0) {
+                        if (modInstData.miSelectedModelEditor > 1) {
                             modInstData.miSelectedModelEditor -= 1;
                         }
 
                         /* reset model instance to first instance - if we have instances */
                         if (!modInstData.miAssimpInstances.empty()) {
-                            modInstData.miSelectedEditorInstance = 0;
+                            modInstData.miSelectedEditorInstance = 1;
                         }
+
+                        /* if we have only the null instance left, disable selection */
+                        if (modInstData.miAssimpInstances.size() == 1) {
+                            modInstData.miSelectedEditorInstance = 0;
+                            editorData.eHighlightSelectedInstance = false;
+                        }
+
                         ImGui::CloseCurrentPopup();
                     }
                     ImGui::SameLine();
@@ -787,6 +791,10 @@ namespace aveng {
     }
 
     void AvengImgui::handleMouseButtonEvents(int button, int action, int mods) {
+
+        editorData.eMouseLastClickX = editorData.eMouseXPos;
+        editorData.eMouseLastClickY = editorData.eMouseYPos;
+
         /* forward to ImGui */
         ImGuiIO& io = ImGui::GetIO();
         if (button >= 0 && button < ImGuiMouseButton_COUNT) {
@@ -884,11 +892,14 @@ namespace aveng {
             renderData.rdViewElevation = std::clamp(renderData.rdViewElevation, -89.0f, 89.0f);
 
         }
+
         if (editorData.eMouseMove) {
+            std::cout << "True" << std::endl;
             if (modInstData.miSelectedEditorInstance != 0) {
+                std::cout << "miSelectedEditorInstance != 0" << std::endl;
                 InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
 
-                float mouseXScaled = mouseMoveRelX / 20.0f;
+                float mouseXScaled = mouseMoveRelX / 20.0f; // This divosor makes the movement more subtle
                 float mouseYScaled = mouseMoveRelY / 20.0f;
                 float sinAzimuth = std::sin(glm::radians(renderData.rdViewAzimuth));
                 float cosAzimuth = std::cos(glm::radians(renderData.rdViewAzimuth));

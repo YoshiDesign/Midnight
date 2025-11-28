@@ -25,19 +25,21 @@ namespace aveng {
 	public:
 		Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData);
 		~Editor();
+
+
 		void init(SwapChain* swapchain);
-		void render(unsigned int frameIndex, float frameTime);
+		void update(float frameTime);
+		void renderGUI(unsigned int frameIndex, float frameTime);
+		void updateCamera(float frameTime);
+		void drawSelectedModels(int frameIndex);
 		void cleanup();
+
+		bool hasSelection() { return editorData.eHasSelection; }
+
 		void readPixelDataPos();
-		void updateData(float frameTime);
-
-		bool hasSelection() { return editorData.eMousePick; }
-
 		void setupSelectionHighlight(float dt);
 		void setSelectedInstance();
 		bool drawInstanceGizmo();
-		void drawSelectedModels(int frameIndex);
-		void updateCamera(float frameTime);
 		float getAspectRatio();
 
 		void beginGUICommands(int frameIdx);
@@ -54,7 +56,7 @@ namespace aveng {
 		bool createCommandBuffers();
 		bool createPipelineLayouts();
 		bool createSSBOs();
-		void updateDescriptorSets();
+		void updateDescriptorSets(int set = 1000);
 
 		void endSwapChainLineRenderPass(VkCommandBuffer commandBuffer);
 
@@ -78,9 +80,12 @@ namespace aveng {
 
 		bool mHighlightSelectedInstance = false;
 		float mSelectedInstanceHighlightValue = 1.0f;
+
+		// Gizmo Arrows
 		CoordArrowsModel mCoordArrowsModel{};
 		RotationArrowsModel mRotationArrowsModel{};
 		ScaleArrowsModel mScaleArrowsModel{};
+		// 
 		VkLineMesh mCoordArrowsMesh{};
 		unsigned int mCoordArrowsLineIndexCount = 0;
 		std::shared_ptr<VkLineMesh> mLineMesh = nullptr;

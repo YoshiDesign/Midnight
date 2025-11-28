@@ -34,11 +34,15 @@ namespace aveng {
             mLocalSwapAxisMatrix = glm::mat4(1.0f);
         }
 
+        // Update Root Rotation
         mLocalRotationMatrix = glm::mat4_cast(glm::quat(glm::radians(mInstanceSettings.isWorldRotation)));
 
+        // Update Root Translation
         mLocalTranslationMatrix = glm::translate(glm::mat4(1.0f), mInstanceSettings.isWorldPosition);
 
+        // Do the math
         mLocalTransformMatrix = mLocalTranslationMatrix * mLocalRotationMatrix * mLocalSwapAxisMatrix * mLocalScaleMatrix;
+        // Final answer
         mInstanceRootMatrix = mLocalTransformMatrix * mModelRootMatrix;
     }
 

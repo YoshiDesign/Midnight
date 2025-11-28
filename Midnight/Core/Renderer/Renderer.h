@@ -96,12 +96,12 @@ namespace aveng {
 
 		void setRenderpassBypass(bool _state) { mRenderpassBypass = _state; }
 
-	bool createDescriptorLayouts();
-	bool createDescriptorSets();
-	bool setupDescriptors();
-	void updateDescriptorSets();
-	void updateComputeDescriptorSets();
-	void updateLightingDescriptorSets();
+		bool createDescriptorLayouts();
+		bool createDescriptorSets();
+		bool setupDescriptors();
+		void updateDescriptorSets();
+		void updateComputeDescriptorSets();
+		void updateLightingDescriptorSets();
 
 		bool createSyncObjects();
 		

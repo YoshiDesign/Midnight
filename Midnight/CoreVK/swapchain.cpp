@@ -737,7 +737,7 @@ namespace aveng {
 
         /* destroy local image, no longer needed */
         vmaDestroyImage(device.allocator(), readbackImage, readbackImageAlloc);
-
+        std::cout << "Got pixelColor" << std::endl;
         return pixelColor;
     }
 

@@ -42,7 +42,7 @@ namespace aveng {
 		std::unordered_map<std::string, std::vector<std::shared_ptr<AssimpInstance>>> miAssimpInstancesPerModel{};
 
 		int miSelectedEditorInstance = 0;
-		int miSelectedInstance = 0;
+
 
 		/* we can only delete models in Vulkan outside the command buffers,
 		 * so let's use a separate pending list */

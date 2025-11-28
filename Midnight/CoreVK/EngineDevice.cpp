@@ -917,7 +917,7 @@ namespace aveng {
     }
 
     bool EngineDevice::submitSingleShotBuffer(VkCommandBuffer commandBuffer) {
-        std::printf( "%s: submitting single shot command buffer\n", __FUNCTION__);
+        // std::printf( "%s: submitting single shot command buffer\n", __FUNCTION__);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             std::printf("%s error: failed to end command buffer (error)\n", __FUNCTION__); // VkResult result = vkEndCommandBuffer(commandBuffer); print with %i
@@ -964,7 +964,7 @@ namespace aveng {
         vkDestroyFence(_device, bufferFence, nullptr);
         cleanupCommandBuffer(_commandPoolGraphics, commandBuffer);
 
-        std::printf("%s: single shot command buffer successfully submitted\n", __FUNCTION__);
+        //std::printf("%s: single shot command buffer successfully submitted\n", __FUNCTION__);
         return true;
     }
 

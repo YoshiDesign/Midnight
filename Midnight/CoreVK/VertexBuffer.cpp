@@ -50,6 +50,9 @@ namespace aveng {
         return true;
     }
 
+    /*
+    * VkLineVertex VBO
+    */
     bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkLineMesh vertexData) {
         size_t vertexDataSize = vertexData.vertices.size() * sizeof(VkLineVertex);
 

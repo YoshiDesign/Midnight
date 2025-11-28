@@ -87,7 +87,7 @@ namespace aveng {
 		gameData.currentAppMode = AppMode::Game;
 	}
 
-	void Editor::render(unsigned int frameIndex, float frameTime)
+	void Editor::renderGUI(unsigned int frameIndex, float frameTime)
 	{
 		currentFrameIndex = frameIndex;
 
@@ -96,12 +96,14 @@ namespace aveng {
 		aveng_imgui.runGUI();
 		aveng_imgui.render(frameIndex);
 
-		updateCamera(frameTime);
+	}
 
+	void Editor::update(float frameTime) {
+
+		updateCamera(frameTime);
 		setupSelectionHighlight(frameTime);
 		setSelectedInstance();
 		updateStorageBuffers();
-
 	}
 
 	void Editor::beginGUICommands(int frameIdx)
@@ -140,12 +142,12 @@ namespace aveng {
 	{
 		/* we must wait for the image to be created before we can pick  */
 		if (editorData.eMousePick) {
-
+			std::cout << "Reading Pixel Data" << std::endl;
 			/* wait for queue to be idle */
 			vkQueueWaitIdle(engineDevice.graphicsQueue());
-			std::cout << "Mouse (From Editor): (" << editorData.eMouseXPos << ", " << editorData.eMouseYPos << ")" << std::endl;
+
 			/* VALIDATION: Check coordinates are non-negative */
-			if (editorData.eMouseXPos < 0 || editorData.eMouseYPos < 0) {
+			if (editorData.eMouseLastClickX < 0 || editorData.eMouseLastClickY < 0) {
 				Logger::log(1, "%s: Invalid negative coordinates (%d, %d)\n", 
 					__FUNCTION__, editorData.eMouseXPos, editorData.eMouseYPos);
 				editorData.eMousePick = false;
@@ -155,28 +157,28 @@ namespace aveng {
 			/* VALIDATION: Check coordinates are within viewport bounds */
 			uint32_t viewportWidth = renderer.pGetSwapChain()->width();
 			uint32_t viewportHeight = renderer.pGetSwapChain()->height();
-			if (static_cast<unsigned int>(editorData.eMouseXPos) >= viewportWidth || 
-				static_cast<unsigned int>(editorData.eMouseYPos) >= viewportHeight) {
+			if (static_cast<unsigned int>(editorData.eMouseLastClickX) >= viewportWidth ||
+				static_cast<unsigned int>(editorData.eMouseLastClickY) >= viewportHeight) {
 				Logger::log(1, "%s: Coordinates out of bounds (%d, %d), viewport is (%u x %u)\n",
-					__FUNCTION__, editorData.eMouseXPos, editorData.eMouseYPos, viewportWidth, viewportHeight);
+					__FUNCTION__, editorData.eMouseLastClickX, editorData.eMouseLastClickY, viewportWidth, viewportHeight);
 				editorData.eMousePick = false;
 				return;
 			}
-			
-			std::cout << "Positions Unsigned:" << static_cast<unsigned int>(editorData.eMouseXPos) << ", " << static_cast<unsigned int>(editorData.eMouseYPos) << std::endl;
-			std::cout << "Positions Signed:" << static_cast<int>(editorData.eMouseXPos) << ", " << static_cast<int>(editorData.eMouseYPos) << std::endl;
 
-			float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos, currentFrameIndex);
-			std::cout << "End Selection: " << selectedInstanceId << std::endl;
+
+
+			float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseLastClickX, editorData.eMouseLastClickY, currentFrameIndex);
+			// std::cout << "End Selection: " << selectedInstanceId << std::endl;
 			if (selectedInstanceId >= 0.0f) {
 				mModelInstanceData.miSelectedEditorInstance = static_cast<int>(selectedInstanceId);
+				editorData.eHasSelection = true;
 			}
 			else {
+				// std::cout << "Deselecting instance " << mModelInstanceData.miSelectedEditorInstance << std::endl;
 				mModelInstanceData.miSelectedEditorInstance = 0;
-				editorData.eMousePick = false;
+				editorData.eHasSelection = false;
 			}
-			
-			
+			editorData.eMousePick = false;
 		}
 	}
 
@@ -373,7 +375,7 @@ namespace aveng {
 					}
 
 					// Set the buffer's y
-					if (editorData.eMousePick) 
+					if (editorData.eHasSelection) 
 					{
 						InstanceSettings instSettings = instance->getInstanceSettings();
 						editorData.eSelectedInstance.at(instanceToStore + index).y = static_cast<float>(instSettings.isInstanceIndexPosition);
@@ -393,7 +395,7 @@ namespace aveng {
 		/* draw coordinate lines */
 		mCoordArrowsLineIndexCount = 0;
 		mLineMesh->vertices.clear();
-		if (mModelInstanceData.miSelectedEditorInstance > 0) { // Make sure it's not the null instance. In other words, don't draw the gizmo's if the selected instance is the null instance (no selections)
+		if (mModelInstanceData.miSelectedEditorInstance > 0) { // Instance 0 is the null instance
 			InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(mModelInstanceData.miSelectedEditorInstance)->getInstanceSettings();
 
 			/* draw coordiante arrows at origin of selected instance */
@@ -420,23 +422,24 @@ namespace aveng {
 				mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end());
 		}
 
-		if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex], 0)) {
-			Logger::log(1, "%s error: failed to reset line drawing command buffer\n", __FUNCTION__);
-			return false;
-		}
-
-		if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers[currentFrameIndex])) {
-			Logger::log(1, "%s error: failed to begin line drawing command buffer\n", __FUNCTION__);
-			return false;
-		}
-
-		// Begin - We can safely piggy back on the renderer's beginSwapChainRenderPass method - it's polymorphic
-		renderer.beginSwapChainRenderPass(
-			renderData.rdLineCommandBuffers[currentFrameIndex],
-			renderer.getCurrentFramebuffer(),
-			renderData.rdLineRenderpass);
 
 		if (mCoordArrowsLineIndexCount > 0) {
+
+			if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex], 0)) {
+				Logger::log(1, "%s error: failed to reset line drawing command buffer\n", __FUNCTION__);
+				return false;
+			}
+
+			if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers[currentFrameIndex])) {
+				Logger::log(1, "%s error: failed to begin line drawing command buffer\n", __FUNCTION__);
+				return false;
+			}
+
+			// Begin - We can safely piggy back on the renderer's beginSwapChainRenderPass method - it's polymorphic
+			renderer.beginSwapChainRenderPass(
+				renderData.rdLineCommandBuffers[currentFrameIndex],
+				renderer.getCurrentFramebuffer(),
+				renderData.rdLineRenderpass);
 
 			mUploadToVBOTimer.start();
 			VertexBuffer::uploadData(engineDevice, mLineVertexBuffer, *mLineMesh);
@@ -471,7 +474,7 @@ namespace aveng {
 	// Just use the returned values directly if working in renderer.cpp. This is for clients
 	VkCommandBuffer Editor::getCurrentCommandBufferLines() const
 	{
-		std::cout << "getCurrentCommandBufferLines: " << currentFrameIndex << std::endl;
+		//std::cout << "getCurrentCommandBufferLines: " << currentFrameIndex << std::endl;
 		assert(renderer.isFrameInProgress() && "Cannot get command buffer. The frame is not in progress.");
 		return renderData.rdLineCommandBuffers[currentFrameIndex];
 	}
@@ -500,7 +503,7 @@ namespace aveng {
 
 	void Editor::updateStorageBuffers()
 	{
-		// Upload the vec2 to make our selected instance highlight/blink
+		// Upload the vector of vec2's to make our selected instance highlight/blink
 		bool bufferResized = false;
 		bufferResized |= ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers[currentFrameIndex], editorData.eSelectedInstance);
 		
@@ -513,7 +516,7 @@ namespace aveng {
 				}
 			}
 			
-			std::cout << "StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
+			std::cout << "[Editor] StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
 			updateDescriptorSets();
 			renderer.updateDescriptorSets();
 		}
@@ -714,32 +717,37 @@ namespace aveng {
 
 	}
 
-	void Editor::updateDescriptorSets()
+	void Editor::updateDescriptorSets(int set)
 	{
-		Logger::log(1, "%s: updating descriptor sets\n", __FUNCTION__);
+		int updateIndex;
+		// Logger::log(1, "%s: updating descriptor sets\n", __FUNCTION__);
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
+			updateIndex = i;
+			if (set != 1000) {
+				updateIndex = set;
+			}
 			{
 				/* selection shader, non-animated  */
 				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[i].buffer;
+				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[updateIndex].buffer;
 				matrixInfo.offset = 0;
 				matrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo worldPosInfo{};
-				worldPosInfo.buffer = renderData.matrixBuffersView.modelRootSSBOs[i].buffer;
+				worldPosInfo.buffer = renderData.matrixBuffersView.modelRootSSBOs[updateIndex].buffer;
 				worldPosInfo.offset = 0;
 				worldPosInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo selectionInfo{};
-				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
+				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[updateIndex].buffer;
 				selectionInfo.offset = 0;
 				selectionInfo.range = VK_WHOLE_SIZE;
 
 				VkWriteDescriptorSet matrixWriteDescriptorSet{};
 				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				matrixWriteDescriptorSet.dstSet = renderData.rdAvengSelectionDescriptorSets[i];
+				matrixWriteDescriptorSet.dstSet = renderData.rdAvengSelectionDescriptorSets[updateIndex];
 				matrixWriteDescriptorSet.dstBinding = 0;
 				matrixWriteDescriptorSet.descriptorCount = 1;
 				matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
@@ -747,7 +755,7 @@ namespace aveng {
 				VkWriteDescriptorSet posWriteDescriptorSet{};
 				posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				posWriteDescriptorSet.dstSet = renderData.rdAvengSelectionDescriptorSets[i];
+				posWriteDescriptorSet.dstSet = renderData.rdAvengSelectionDescriptorSets[updateIndex];
 				posWriteDescriptorSet.dstBinding = 1;
 				posWriteDescriptorSet.descriptorCount = 1;
 				posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
@@ -755,7 +763,7 @@ namespace aveng {
 				VkWriteDescriptorSet selectionWriteDescriptorSet{};
 				selectionWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				selectionWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				selectionWriteDescriptorSet.dstSet = renderData.rdAvengSelectionDescriptorSets[i];
+				selectionWriteDescriptorSet.dstSet = renderData.rdAvengSelectionDescriptorSets[updateIndex];
 				selectionWriteDescriptorSet.dstBinding = 2;
 				selectionWriteDescriptorSet.descriptorCount = 1;
 				selectionWriteDescriptorSet.pBufferInfo = &selectionInfo;
@@ -770,29 +778,29 @@ namespace aveng {
 			{
 				/* selection shader, animated  */
 				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[i].buffer;
+				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[updateIndex].buffer;
 				matrixInfo.offset = 0;
 				matrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo boneMatrixInfo{};
-				boneMatrixInfo.buffer = renderData.matrixBuffersView.boneMatSSBOs[i].buffer;
+				boneMatrixInfo.buffer = renderData.matrixBuffersView.boneMatSSBOs[updateIndex].buffer;
 				boneMatrixInfo.offset = 0;
 				boneMatrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo worldPosInfo{};
-				worldPosInfo.buffer = renderData.matrixBuffersView.modelRootSSBOs[i].buffer;
+				worldPosInfo.buffer = renderData.matrixBuffersView.modelRootSSBOs[updateIndex].buffer;
 				worldPosInfo.offset = 0;
 				worldPosInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo selectionInfo{};
-				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
+				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[updateIndex].buffer;
 				selectionInfo.offset = 0;
 				selectionInfo.range = VK_WHOLE_SIZE;
 
 				VkWriteDescriptorSet matrixWriteDescriptorSet{};
 				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				matrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[i];
+				matrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[updateIndex];
 				matrixWriteDescriptorSet.dstBinding = 0;
 				matrixWriteDescriptorSet.descriptorCount = 1;
 				matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
@@ -800,7 +808,7 @@ namespace aveng {
 				VkWriteDescriptorSet boneMatrixWriteDescriptorSet{};
 				boneMatrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				boneMatrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[i];
+				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[updateIndex];
 				boneMatrixWriteDescriptorSet.dstBinding = 1;
 				boneMatrixWriteDescriptorSet.descriptorCount = 1;
 				boneMatrixWriteDescriptorSet.pBufferInfo = &boneMatrixInfo;
@@ -808,7 +816,7 @@ namespace aveng {
 				VkWriteDescriptorSet posWriteDescriptorSet{};
 				posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				posWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[i];
+				posWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[updateIndex];
 				posWriteDescriptorSet.dstBinding = 2;
 				posWriteDescriptorSet.descriptorCount = 1;
 				posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
@@ -816,7 +824,7 @@ namespace aveng {
 				VkWriteDescriptorSet selectionWriteDescriptorSet{};
 				selectionWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				selectionWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				selectionWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[i];
+				selectionWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[updateIndex];
 				selectionWriteDescriptorSet.dstBinding = 3;
 				selectionWriteDescriptorSet.descriptorCount = 1;
 				selectionWriteDescriptorSet.pBufferInfo = &selectionInfo;
@@ -832,14 +840,14 @@ namespace aveng {
 			{
 				/* line-drawing shader */
 				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[i].buffer;
+				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[updateIndex].buffer;
 				matrixInfo.offset = 0;
 				matrixInfo.range = VK_WHOLE_SIZE;
 
 				VkWriteDescriptorSet matrixWriteDescriptorSet{};
 				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				matrixWriteDescriptorSet.dstSet = renderData.rdLineDescriptorSets[i];
+				matrixWriteDescriptorSet.dstSet = renderData.rdLineDescriptorSets[updateIndex];
 				matrixWriteDescriptorSet.dstBinding = 0;
 				matrixWriteDescriptorSet.descriptorCount = 1;
 				matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
