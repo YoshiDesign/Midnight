@@ -1,8 +1,6 @@
 #include "avpch.h"
 #include "XOne.h"
 #include "Game/Math/aveng_math.h"
-#include "Core/data.h"
-#include "Core/aveng_frame_content.h"
 #include "Utils/window_callbacks.h"
 #include "Game/Player/GameplayFunctions.h"
 
@@ -27,19 +25,8 @@ namespace aveng {
 	void XOne::run()
 	{
 
-		// Currently only used for clear color
-		FrameContent frame_content = { glm::vec3{1, 1, 1}, glm::vec3{0.01f, 0.01f, 0.01f} };
-
-		// Set callback functions for keys bound to the window
-		glfwSetKeyCallback(aveng_window.getGLFWwindow(), WindowCallbacks::testKeyCallback);
-
-		//camera.setViewTarget(glm::vec3(-1.f, -2.f, -20.f), glm::vec3(0.f, 0.f, 3.5f));
-
 		std::chrono::time_point<std::chrono::steady_clock> loopStartTime = std::chrono::steady_clock::now();
 		std::chrono::time_point<std::chrono::steady_clock> loopEndTime = std::chrono::steady_clock::now();
-
-		// Temporary
-		objectRenderSystem.setCamera(1);
 
 		// Render Loop
 		while (!aveng_window.shouldClose()) {

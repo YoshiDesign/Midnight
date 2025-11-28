@@ -63,6 +63,7 @@ namespace aveng {
 	// Euler Y - X - Z rotation to basis -> view
 	void AvengCamera::setViewYXZ(glm::vec3 position, glm::vec3 rotation) 
 	{
+
 		const float c3 = glm::cos(rotation.z);
 		const float s3 = glm::sin(rotation.z);
 		const float c2 = glm::cos(rotation.x);

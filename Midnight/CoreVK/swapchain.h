@@ -1,8 +1,5 @@
 #pragma once
 
-#include "EngineDevice.h"
-
-// vulkan headers
 #include <vulkan/vulkan.h>
 #include "AMD/vk_mem_alloc.h"
 #include "CoreVK/VkRenderData.h"
@@ -13,6 +10,8 @@
 #include <vector>
 
 namespace aveng {
+
+    class EngineDevice;
 
     class SwapChain {
     public:
@@ -25,34 +24,33 @@ namespace aveng {
         SwapChain(const SwapChain&) = delete;
         SwapChain& operator=(const SwapChain&) = delete;
 
-        VkRenderPass        getRenderPass() { return mRenderPass; }
+        VkFormat        findDepthFormat();
+        VkSwapchainKHR  getSwapchain() { return swapChain; }
+        uint32_t        width() { return swapChainExtent.width; }
+        uint32_t        height() { return swapChainExtent.height; }
+        size_t          imageCount() { return swapChainImages.size(); }
+        VkExtent2D      getSwapChainExtent() { return swapChainExtent; }
+        VkFormat        getSwapChainImageFormat() { return swapChainImageFormat; }
 
-        uint32_t            width() { return swapChainExtent.width; }
-        uint32_t            height() { return swapChainExtent.height; }
-        size_t              imageCount() { return swapChainImages.size(); }
-        VkExtent2D          getSwapChainExtent() { return swapChainExtent; }
-        VkFormat            getSwapChainImageFormat() { return swapChainImageFormat; }
-        // VkRenderPass        getSecondaryRenderPass() { return mSecondaryRenderPass; }
+        VkRenderPass    getRenderPass() { return mRenderPass; }
+        // VkRenderPass getSecondaryRenderPass() { return mSecondaryRenderPass; } // This can be acquired from renderData
 
-        // Framebuffers
-        VkFramebuffer       getFrameBuffer(int index) { return mSwapChainFramebuffers[index]; }
-        VkFramebuffer       getSelectionFrameBuffer(int index) { return mSelectionFramebuffers[index]; }
-
-        VkImageView          createImageView(VkImage image, VkFormat format);
-        VkImageView          createSelectionImageView(VkImage image, VkFormat format);
-        VkImageView          getImageView(int index) { return swapChainImageViews[index]; }
-        VkImageView          getSelectionImageView(int index) { return mSelectionImageViews[index]; }
-        VkImage&             getImage(int index) { return swapChainImages[index]; }
-        size_t               swapChainImagesSize() { return swapChainImages.size(); }
+        // Framebuffers & Views
         std::vector<VkImageView>& getSwapChainImageViews() { return swapChainImageViews; }
+        VkImageView     getImageView(int index) { return swapChainImageViews[index]; }
+        VkFramebuffer   getFrameBuffer(int index) { return mSwapChainFramebuffers[index]; }
+        VkFramebuffer   getSelectionFrameBuffer(int index) { return mSelectionFramebuffers[index]; }
+        VkImageView     getSelectionImageView(int index) { return mSelectionImageViews[index]; }
 
-        float getPixelValueFromPos(unsigned int xPos, unsigned int yPos);
+        VkImageView     createImageView(VkImage image, VkFormat format);
+        void            createSelectionImageView(size_t index);
+        VkImage&        getImage(int index) { return swapChainImages[index]; }
+        size_t          swapChainImagesSize() { return swapChainImages.size(); }
 
-        //VkResult            submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex);
-        //VkResult            acquireNextImage(uint32_t* imageIndex);
-        VkFormat            findDepthFormat();
-
-        VkSwapchainKHR getSwapchain() { return swapChain; }
+        /*
+        * Read the value of a pixel which contains the selected instance ID
+        */
+        float getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t frameIndex);
 
         //void createTextureImageViews();
         bool createSecondaryRenderpass(VkRenderPass& renderPass);
@@ -92,8 +90,8 @@ namespace aveng {
         std::vector<VkFramebuffer> mSelectionFramebuffers;
         std::vector<VkFramebuffer> mSwapChainFramebuffers;
         VkRenderPass mRenderPass;
-        //VkRenderPass mSecondaryRenderPass;    // Stored in renderData
-        //VkRenderPass mLineRenderPass;         // Stored in renderData
+        //VkRenderPass mSecondaryRenderPass;            // Stored in renderData
+        //VkRenderPass rdSelectionRenderpass;           // Stored in renderData
 
         std::vector<VmaAllocation> depthImageAllocations;
         std::vector<VkImage> depthImages;
@@ -107,14 +105,8 @@ namespace aveng {
 
         VkSwapchainKHR swapChain;
         std::shared_ptr<SwapChain> oldSwapChain;
-
-        //std::vector<VkSemaphore> imageAvailableSemaphores;
-        //std::vector<VkSemaphore> renderFinishedSemaphores;
-        //std::vector<VkFence> inFlightFences;
-        //std::vector<VkFence> imagesInFlight;
-        size_t currentFrame = 0;
         VkRenderData& renderData;
 
     };
 
-}  // namespace lve
+} 

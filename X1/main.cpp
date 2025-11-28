@@ -6,7 +6,7 @@
 
 int main(void)
 {
-	std::vector<int> int_vec; // Wat?
+
 	aveng::XOne app{};
 
 	try {

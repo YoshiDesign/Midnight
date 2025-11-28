@@ -11,8 +11,8 @@
  * certain commands, or by directly specifying them as parameters to certain commands.
  * 
  */
-
 #include "aveng_buffer.h"
+
 
  // std
 #include <cassert>
@@ -40,28 +40,28 @@ namespace aveng {
     /*
      * Legacy Constructor - Calls to engineDevice.createBuffer (existing - backward compatible)
      */
-    AvengBuffer::AvengBuffer(
-        EngineDevice& device,
-        VkDeviceSize instanceSize,
-        uint32_t instanceCount,
-        VkBufferUsageFlags usageFlags,
-        VkMemoryPropertyFlags memoryPropertyFlags,
-        VkDeviceSize minOffsetAlignment
-    )
-        : engineDevice{ device },
-        instanceSize{ instanceSize },
-        instanceCount{ instanceCount },
-        usageFlags{ usageFlags },
-        memoryPropertyFlags{ memoryPropertyFlags },
-        usingVMA{ false }
-    {
+    //AvengBuffer::AvengBuffer(
+    //    EngineDevice& device,
+    //    VkDeviceSize instanceSize,
+    //    uint32_t instanceCount,
+    //    VkBufferUsageFlags usageFlags,
+    //    VkMemoryPropertyFlags memoryPropertyFlags,
+    //    VkDeviceSize minOffsetAlignment
+    //)
+    //    : engineDevice{ device },
+    //    instanceSize{ instanceSize },
+    //    instanceCount{ instanceCount },
+    //    usageFlags{ usageFlags },
+    //    memoryPropertyFlags{ memoryPropertyFlags },
+    //    usingVMA{ false }
+    //{
 
-        alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
-        bufferSize = alignmentSize * instanceCount;
+    //    alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
+    //    bufferSize = alignmentSize * instanceCount;
 
-        // Call to engineDevice - traditional allocation
-        device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory);
-    }
+    //    // Call to engineDevice - traditional allocation
+    //    device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory);
+    //}
 
     /*
     * VMA Constructor - Uses VMA for memory allocation

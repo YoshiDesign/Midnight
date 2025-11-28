@@ -114,7 +114,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ENABLE_EDITOR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\Libraries\glfw-3.4.bin.WIN64\include;$(SolutionDir)Midnight;$(VULKAN_SDK)\Include;$(SolutionDir)X1;$(SolutionDir)MidnightEditor;$(SolutionDir)vendor</AdditionalIncludeDirectories>
@@ -128,7 +128,8 @@
     </Link>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp-vc143-mtd.lib</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

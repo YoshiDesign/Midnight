@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/aveng_window.h"
-#include "Core/data.h"
+#include "Game/data.h"
 #include "avpch.h"
 
 #define MAX_PIPELINES 2

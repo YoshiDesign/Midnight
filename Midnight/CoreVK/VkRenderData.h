@@ -31,7 +31,8 @@
 
 namespace aveng {
 
-	// std::span<T> super-lightweight doppleganger
+	// std::span<T> super-lightweight doppleganger. Used to create a window into our data
+	// so the Editor can report what on things
 	template <typename T>
 	struct Span {
 		const T* data = nullptr;
@@ -225,6 +226,7 @@ namespace aveng {
 
 		VkRenderPass rdLineRenderpass = VK_NULL_HANDLE;							// EDITOR
 		VkRenderPass rdSelectionRenderpass = VK_NULL_HANDLE;							// EDITOR
+		VkRenderPass rdImguiRenderpass = VK_NULL_HANDLE;							// EDITOR
 
 		/**
 		* Sync
@@ -284,16 +286,16 @@ namespace aveng {
 		//VkDescriptorPool rdImguiDescriptorPool = VK_NULL_HANDLE;
 		std::vector<VkShaderStorageBufferData> rdSelectedInstanceBuffers; // Storage Buffer
 
-		/*
-		* Editor Data
-		*/
-		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
+	/*
+	* Editor Data
+	*/
+	instanceEditMode rdInstanceEditMode = instanceEditMode::move;
 
-		MatrixBuffersView matrixBuffersView; // Proxy for editor
+	MatrixBuffersView matrixBuffersView; // Proxy for editor
 
-		VkImage rdSelectionImage = VK_NULL_HANDLE;
-		VkImageView rdSelectionImageView = VK_NULL_HANDLE;
-		VkFormat rdSelectionFormat = VK_FORMAT_UNDEFINED;
-		VmaAllocation rdSelectionImageAlloc = VK_NULL_HANDLE;
+	std::vector<VkImage> rdSelectionImages;
+	std::vector<VkImageView> rdSelectionImageViews;
+	VkFormat rdSelectionFormat = VK_FORMAT_UNDEFINED;
+	std::vector<VmaAllocation> rdSelectionImageAllocs;
 	};
 }

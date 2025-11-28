@@ -1,5 +1,5 @@
 #include "GameplayFunctions.h"
-#include "Core/data.h"
+#include "Game/data.h"
 #include <iostream>
 #define LOG(x, y) std::cout << x << "\t" << y << std::endl
 

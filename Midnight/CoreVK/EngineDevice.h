@@ -1,16 +1,10 @@
 #pragma once
-
-#include "../Core/aveng_window.h"
 #include "AMD/vk_mem_alloc.h"
 #include <string>
 #include <vector>
 
-/**
-* NOTE: This object-oriented architecture of ours comes with several limitations
-* DO NOT INCLUDE VkRenderData here or you'll cause a circular dependency.
-*/
-
 namespace aveng {
+    class AvengWindow;
 
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;

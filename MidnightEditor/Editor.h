@@ -1,16 +1,11 @@
 #pragma once
 #include <cassert>
 #include "GUI/aveng_imgui.h"
-#include "CoreVK/swapchain.h"
-#include "CoreVK/EngineDevice.h"
-#include "CoreVK/SkinningPipeline.h"
-#include "CoreVK/LinePipeline.h"
-#include "Core/Renderer/Renderer.h"
-#include "Core/aveng_window.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
-#include "Core/data.h"
+#include "Game/data.h"
 #include "System/Camera/aveng_camera.h"
 #include "System/Peripheral/KeyboardController.h"
+#include "System/Input/EventPayloads.h"
 #include "EditorData.h"
 
 /**
@@ -21,6 +16,11 @@
 
 namespace aveng {
 
+	class SwapChain;
+	class EngineDevice;
+	class AvengWindow;
+	class Renderer;
+
 	class Editor {
 	public:
 		Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData);
@@ -28,46 +28,48 @@ namespace aveng {
 		void init(SwapChain* swapchain);
 		void render(unsigned int frameIndex, float frameTime);
 		void cleanup();
-		void waitFrames();
+		void readPixelDataPos();
+		void updateData(float frameTime);
+
+		bool hasSelection() { return editorData.eMousePick; }
 
 		void setupSelectionHighlight(float dt);
 		void setSelectedInstance();
 		bool drawInstanceGizmo();
-		void drawSelectedModels();
+		void drawSelectedModels(int frameIndex);
 		void updateCamera(float frameTime);
-		float getAspectRatio() { return renderer.getAspectRatio(); }
-		void setCamera(int cam) { renderData.camera = cam; } // Tmp
+		float getAspectRatio();
+
+		void beginGUICommands(int frameIdx);
+		void endGUICommands(int frameIdx);
+		void endGUIRenderPass(VkCommandBuffer commandBuffer);
+		VkCommandBuffer getCurrentCommandBufferGUI() { return renderData.rdGUICommandBuffers[currentFrameIndex]; }
+
+		void startGame();
+
+		const glm::vec2 mouseXY() { return { editorData.eMouseXPos, editorData.eMouseYPos }; }
 
 		bool createDescriptorLayouts();
 		bool createDescriptorSets();
 		bool createCommandBuffers();
 		bool createPipelineLayouts();
 		bool createSSBOs();
-		void updateDescriptorSets(int iters = 1);
+		void updateDescriptorSets();
 
 		void endSwapChainLineRenderPass(VkCommandBuffer commandBuffer);
-		void endSelectionRenderPass(VkCommandBuffer commandBuffer);
+
+		void handleMouseClick(const MouseButtonEvent& e);
+		void handleMouseMove(const MouseMoveEvent& e);
 
 		void updateStorageBuffers();
-
-		// Just use the returned values directly if working in renderer.cpp. This is for clients
-		VkCommandBuffer getCurrentCommandBufferLines() const
-		{
-			std::cout << "getCurrentCommandBufferLines: " << currentFrameIndex << std::endl;
-			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
-			return renderData.rdCommandBuffersCompute[currentFrameIndex];
-		}
-
+		VkCommandBuffer getCurrentCommandBufferLines() const;
 
 	private:
-
-		bool submitCommandBuffers();
 
 		Timer mUploadToVBOTimer{};
 		unsigned int currentFrameIndex = 0; // Updated at render() from the renderer
 		AvengCamera editor_camera{};
 		float aspect;
-		bool isFrameStarted;
 
 		/* color hightlight for selection etc */
 		std::vector<glm::vec2> mSelectedInstance{};
@@ -76,16 +78,13 @@ namespace aveng {
 
 		bool mHighlightSelectedInstance = false;
 		float mSelectedInstanceHighlightValue = 1.0f;
-
 		CoordArrowsModel mCoordArrowsModel{};
 		RotationArrowsModel mRotationArrowsModel{};
 		ScaleArrowsModel mScaleArrowsModel{};
 		VkLineMesh mCoordArrowsMesh{};
-
 		unsigned int mCoordArrowsLineIndexCount = 0;
-
-		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
 		std::shared_ptr<VkLineMesh> mLineMesh = nullptr;
+		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
 
 		VkResult result;
 		VkRenderData& renderData;
@@ -95,7 +94,7 @@ namespace aveng {
 		AvengWindow& window;
 		Renderer& renderer;
 		EditorData editorData;
-		AvengAppObject editorViewerObject{ AvengAppObject::createAppObject(1000) };
+		AvengAppObject editorViewerObject{ AvengAppObject::createAppObject(1001) };
 		KeyboardController keyboardController{ editorViewerObject, gameData };
 		AvengImgui aveng_imgui{ renderData, gameData, editorData, window, engineDevice, mModelInstanceData };
 	};

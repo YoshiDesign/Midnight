@@ -2,7 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-#include "../data.h"  // For TransformedVertex
+#include "Game/data.h"  // For TransformedVertex
 #include "../aveng_model.h"
 #include "CoreVK/VkRenderData.h"
 

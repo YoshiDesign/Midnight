@@ -5,24 +5,18 @@
 #include <array>
 #include <memory>
 #include <vector>
-
-#include "data.h"
-#include "CoreVK/swapchain.h"
-#include "CoreVK/EngineDevice.h"
-#include "CoreVK/aveng_buffer.h"
-#include "CoreVK/VertexBuffer.h"
-#include "CoreVK/IndexBuffer.h"
 #include "CoreVK/aveng_descriptors.h"
 #include "Core/Modeling/AssimpNode.h"
 #include "Core/Modeling/AssimpMesh.h"
 #include "Core/Modeling/AssimpAnimClip.h"
 #include "CoreVK/VkRenderData.h"
 #include "Core/Modeling/Tools.h"
-#include "CoreVK/AvengStorageBuffer.h"
 
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
+
+class EngineDevice;
 
 namespace aveng {
 
@@ -66,7 +60,7 @@ namespace aveng {
 		bool hasAnimations();
 		unsigned int getTriangleCount();
 
-		void drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex);
+		void drawInstancedV2(VkRenderData& renderData, VkPipelineLayout basicLayout, VkPipelineLayout animationLayout, uint32_t instanceCount, int frameIndex);
 
 		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames);
 	

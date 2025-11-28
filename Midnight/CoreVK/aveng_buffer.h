@@ -1,6 +1,6 @@
 #pragma once
-
-#include "../CoreVK/EngineDevice.h"
+// #include "AMD/vk_mem_alloc.h"
+#include "CoreVK/EngineDevice.h"
 
 namespace aveng {
 
@@ -12,14 +12,14 @@ namespace aveng {
     class AvengBuffer {
     public:
         // Traditional constructor (existing - backward compatible)
-        AvengBuffer(
-            EngineDevice& device,
-            VkDeviceSize instanceSize,
-            uint32_t instanceCount,
-            VkBufferUsageFlags usageFlags,
-            VkMemoryPropertyFlags memoryPropertyFlags,
-            VkDeviceSize minOffsetAlignment = 1
-        );
+        //AvengBuffer(
+        //    EngineDevice& device,
+        //    VkDeviceSize instanceSize,
+        //    uint32_t instanceCount,
+        //    VkBufferUsageFlags usageFlags,
+        //    VkMemoryPropertyFlags memoryPropertyFlags,
+        //    VkDeviceSize minOffsetAlignment = 1
+        //);
 
         // New VMA constructor
         AvengBuffer(

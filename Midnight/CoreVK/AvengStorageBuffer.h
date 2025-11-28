@@ -1,14 +1,14 @@
 #pragma once
-/* Vulkan shader storage buffer object */
-#pragma once
-#include <memory>
-#include <vector>
-#include <cstdint>
+
 #include <vulkan/vulkan.h>
 #include "Utils/glm_includes.h"
 #include "Utils/Logger.h"
 #include "CoreVK/VkRenderData.h"
+#include "CoreVK/EngineDevice.h"
 #include "CoreVK/aveng_buffer.h"
+#include <memory>
+#include <vector>
+#include <cstdint>
 
 namespace aveng {
     class ShaderStorageBuffer {

@@ -2,7 +2,8 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "Utils/glm_includes.h"
-#include "CoreVK/EngineDevice.h"
+
+class EngineDevice;
 
 #include "VkRenderData.h"
 namespace aveng {

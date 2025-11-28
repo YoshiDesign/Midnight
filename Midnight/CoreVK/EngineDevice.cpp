@@ -1,5 +1,6 @@
 #include "EngineDevice.h"
-
+static_assert(sizeof(aveng::EngineDevice) > 0, "EngineDevice is incomplete here");
+#include "Core/aveng_window.h"
 #define VMA_IMPLEMENTATION
 #include "AMD/vk_mem_alloc.h"
 #include <cstdio>
@@ -289,6 +290,9 @@ namespace aveng {
         VkPhysicalDeviceFeatures deviceFeatures = {};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
         deviceFeatures.fillModeNonSolid = VK_TRUE;  // Enable wireframe/line rendering
+#ifdef ENABLE_EDITOR
+        deviceFeatures.wideLines = VK_TRUE;
+#endif
 
         // Config - Core
         VkDeviceCreateInfo createInfo = {};
@@ -383,6 +387,14 @@ namespace aveng {
 
         VkPhysicalDeviceFeatures supportedFeatures;
         vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+        //if (!supportedFeatures.wideLines) {
+        //    // Fall back or at least log a warning
+        //    std::printf("Physical device does not support wide lines (> 1.0f)\n");
+        //}
+        //else {
+        //    std::printf("Wide lines are supported!\n");
+        //}
 
         VkPhysicalDeviceProperties deviceProperties;
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
@@ -893,7 +905,8 @@ namespace aveng {
     bool EngineDevice::beginSingleShotCommand(VkCommandBuffer& commandBuffer) {
         VkCommandBufferBeginInfo cmdBeginInfo{};
         cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // Tells the driver: "This recorded command buffer will be submitted only once before it’s reset/re-recorded."
+        // The driver can then skip on writing some internal metadata and Optimize resource lifetimes assuming the commands won’t be replayed. Overall, The single-shot cmd buffer is a normal tactic.
 
         VkResult result = vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo);
         if (result != VK_SUCCESS) {

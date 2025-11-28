@@ -3,31 +3,22 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
-#include "CoreVK/aveng_descriptors.h"
-#include "CoreVK/PointLightSystem.h"
-#include "CoreVK/EngineDevice.h"
-#include "CoreVK/aveng_buffer.h"
-#include "CoreVK/GFXPipeline.h"
+
+//#include "CoreVK/PointLightSystem.h"
+//#include "Core/aveng_scene_loader.h"
+
 #include "CoreVK/swapchain.h"
 #include "CoreVK/VkRenderData.h"
-#include "CoreVK/AvengStorageBuffer.h"
-#include "CoreVK/AvengUniformBuffer.h"
-#include "CoreVK/PipelineLayout.h"
-#include "CoreVK/SkinningPipeline.h"
-#include "CoreVK/ComputePipeline.h"
-#include "CoreVK/LinePipeline.h"
-#include "CoreVK/SyncObjects.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
-#include "Core/Modeling/AssimpInstance.h"
-#include "Core/aveng_scene_loader.h"
-#include "Core/aveng_window.h"
-#include "Core/aveng_model.h"
-#include "Core/app_object.h"
-#include "Core/data.h"
 #include "Utils/Timer.h"
 #include "Utils/glm_includes.h"
 
 namespace aveng {
+
+	class EngineDevice;
+	class AssimpInstance;
+	class AvengModel;
+	class AvengWindow;
 
 	class Renderer {
 
@@ -35,16 +26,28 @@ namespace aveng {
 
 	public:
 
-		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, GameData& _gameData, ModelAndInstanceData& mModelInstanceData);
+		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
 
-		// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
+	// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
+	SwapChain* pGetSwapChain() const { return aveng_swapchain.get(); }
+	uint32_t* pGetCurrentImageIndex() { return &currentImageIndex; }
+	VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
+	float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
+	float getPixelValueFromPos(unsigned int mMouseXPos, unsigned int mMouseYPos, uint32_t frameIndex) { return aveng_swapchain->getPixelValueFromPos(mMouseXPos, mMouseYPos, frameIndex); };
+	uint32_t getImageCount() const { return aveng_swapchain->imageCount(); }
+
 		VkRenderPass getSwapChainRenderPass() const { return aveng_swapchain->getRenderPass(); }
-		float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
-		SwapChain* pGetSwapChain() const { return aveng_swapchain.get(); }
+		VkRenderPass getSelectionRenderPass() const { return renderData.rdSelectionRenderpass; }
+		VkRenderPass getLineRenderPass() const { return renderData.rdLineRenderpass; }
+
+		VkSwapchainKHR getVkSwapchain() const { return aveng_swapchain->getSwapchain(); }
+		VkFormat getSwapChainImageFormat() { return aveng_swapchain->getSwapChainImageFormat(); }
+		VkFramebuffer getCurrentFramebuffer() { return aveng_swapchain->getFrameBuffer(currentImageIndex); }
+		VkFramebuffer getCurrentSelectionFramebuffer() { return aveng_swapchain->getSelectionFrameBuffer(currentImageIndex); }
 
 		bool isFrameInProgress() const { return isFrameStarted; }
 		bool createPipelineLayouts();
@@ -54,7 +57,7 @@ namespace aveng {
 		bool queueModelLoad(const std::string& filepath);
 		void processPendingModelLoads();  // Call this before/after frames
 
-		// These 8 functions might get moved to ObjectRenderSystem
+		// These functions might get moved to ObjectRenderSystem
 		bool hasModel(const std::string& modelFileName);
 		std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
 		bool addModel(const std::string& modelFileName);
@@ -86,35 +89,25 @@ namespace aveng {
 
 		int getFrameIndex() const
 		{
-			std::cout << "IsFrameStarted\t" << isFrameStarted << std::endl;
 			// Note: This assertion saved you from serious headache. Assertions are great, use them
 			assert(isFrameStarted && "Cannot get the frame index when frame is not in progress.");
 			return currentFrameIndex;
 		}
 
-		VkFramebuffer getFramebuffer() { return aveng_swapchain->getFrameBuffer(currentImageIndex); }
-		VkFramebuffer getSelectionFramebuffer() { return aveng_swapchain->getSelectionFrameBuffer(currentImageIndex); }
-
 		void setRenderpassBypass(bool _state) { mRenderpassBypass = _state; }
 
-		bool createDescriptorLayouts();
-		bool createDescriptorSets();
-		bool setupDescriptors();
-		void updateDescriptorSets(int iters = 1);
-		void updateComputeDescriptorSets(int iters = 1);
-		void updateLightingDescriptorSets();
+	bool createDescriptorLayouts();
+	bool createDescriptorSets();
+	bool setupDescriptors();
+	void updateDescriptorSets();
+	void updateComputeDescriptorSets();
+	void updateLightingDescriptorSets();
 
 		bool createSyncObjects();
 		
 		// Descriptor set accessors
 		//VkDescriptorSet getGlobalDescriptorSet(int frameIndex) const { return globalDescriptorSets[frameIndex]; }
 		//VkDescriptorSet getLightsDescriptorSet(int frameIndex) const { return lightsDescriptorSets[frameIndex]; }
-
-		// SwapChain getters
-		uint32_t getImageCount() const { return aveng_swapchain->imageCount(); }
-		VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
-		VkFormat getSwapChainImageFormat() { return aveng_swapchain->getSwapChainImageFormat(); }
-		float getPixelValueFromPos(unsigned int mMouseXPos, unsigned int mMouseYPos) { return aveng_swapchain->getPixelValueFromPos(mMouseXPos, mMouseYPos); };
 
 		int draw(float deltaTime);
 		bool drawModels(
@@ -124,31 +117,38 @@ namespace aveng {
 			VkPipelineLayout basicLayout, 
 			VkPipelineLayout animationLayout, 
 			VkDescriptorSet basicDescriptorSet,
-			VkDescriptorSet animationDescriptorSet);
+			VkDescriptorSet animationDescriptorSet,
+			int frameIndex);
 
-		void beginFrame(); // Synchronization
+		bool beginFrame(); // Synchronization
 		void endFrame(); // Synchronization
-		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer, VkRenderPass renderpass);
+		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer, VkRenderPass renderpass, bool selection = false);
 		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
 		// New methods for descriptor/buffer management
-		void initializePointLightSystem();
+		// void initializePointLightSystem();
 		void updateCamera();
 
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
-		// const std::vector<AvengAppObject>& getAppObjects() const { return sceneLoader.getAppObjects(); };
-
-		void renderLights();
+		//void renderLights();
 		int getLightCount() const { return u_LightsData.numLights; }
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();
 
 		// void loadScenes(const char* filepath);
+
+		// Newest methods:
+		void beginGraphicsCommands(int currentFrameIndex);
+		void endGraphicsCommands(int currentFrameIndex);
+		void recreateSwapChain();
 		
 		void cleanup();
 
 	private:
+
+		VkRenderData& renderData;
+		size_t boneMatrixBufferSize;
 
 		bool firstFrame = true;
 		bool mRenderpassBypass = false;
@@ -159,8 +159,6 @@ namespace aveng {
 
 		VkResult err;
 		VkResult result;
-		GameData& gameData;
-		VkRenderData& renderData;
 
 		Timer mFrameTimer{};
 		Timer mMatrixGenerateTimer{};
@@ -175,16 +173,16 @@ namespace aveng {
 
 		//AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
-		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
+		// PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 		
 		// Dynamic texture array support
 		uint32_t currentImageIndex{ 0 };
-		int currentFrameIndex; // Not tied to the image index
+		int currentFrameIndex{ 0 }; // Not tied to the image index
 		bool isFrameStarted{ false };
 
 		void createCommandBuffers();
 		void freeCommandBuffers();
-		void recreateSwapChain();
+		
 		size_t calculateDynamicUBOStride() const;
 
 		// Descriptors and Buffers

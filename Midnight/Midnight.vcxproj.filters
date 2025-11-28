@@ -114,6 +114,9 @@
     <ClCompile Include="CoreVK\LinePipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Core\Renderer\AvengFrame.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1139,13 +1142,7 @@
     <ClInclude Include="Core\app_object.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\aveng_frame_content.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Core\AvengComponent.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\data.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CoreVK\PointLightSystem.h">
@@ -1230,6 +1227,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CoreVK\LinePipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Renderer\AvengFrame.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,5 +1,16 @@
 
 #include "Editor.h"
+#include "Utils/Logger.h"
+#include "CoreVK/EngineDevice.h"
+#include "CoreVK/swapchain.h"
+#include "CoreVK/SkinningPipeline.h"
+#include "CoreVK/LinePipeline.h"
+#include "CoreVK/PipelineLayout.h"
+#include "Core/aveng_window.h"
+#include "Core/Renderer/Renderer.h"
+#include "CoreVK/VertexBuffer.h"
+#include "CoreVK/AvengStorageBuffer.h"
+#include <cassert>
 
 namespace aveng {
 
@@ -18,10 +29,6 @@ namespace aveng {
 		/* valid, but emtpy */
 		mLineMesh = std::make_shared<VkLineMesh>();
 		Logger::log(1, "%s: line mesh storage initialized\n", __FUNCTION__);
-
-		// renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		renderData.rdLineCommandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		renderData.rdGUICommandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		mModelInstanceData.miInstanceCenterCallbackFunctionEditor = [this](std::shared_ptr<AssimpInstance> instance) { renderer.centerInstance(instance); };
 
@@ -52,85 +59,124 @@ namespace aveng {
 
 	void Editor::updateCamera(float frameTime)
 	{
-		if (renderData.camera == 1) {
-			// Fetched all the way from downtown (the swapchain)
-			aspect = getAspectRatio();
 
-			// Track key press to transform viewer object
-			keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
+		// Fetched all the way from downtown (the swapchain)
+		aspect = getAspectRatio();
 
-			// Apply new viewer obj values to the camera
-			editor_camera.setViewYXZ(editorViewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), editorViewerObject.transform.rotation);
+		// Track key press to transform viewer object
+		keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
 
-			// Recalculate perspective
-			editor_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
+		// Apply new viewer obj values to the camera
+		editor_camera.setViewYXZ(editorViewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), editorViewerObject.transform.rotation);
 
-			renderData.cameraProxy.projection = editor_camera.getProjection();
-			renderData.cameraProxy.view = editor_camera.getView();
-		}
+		// Recalculate perspective
+		editor_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
+
+		// Update the data which the renderer reads from
+		renderData.cameraProxy.projection = editor_camera.getProjection();
+		renderData.cameraProxy.view = editor_camera.getView();
+		
+	}
+
+	float Editor::getAspectRatio() {
+		return renderer.getAspectRatio();
+	}
+
+	void Editor::startGame()
+	{
+		gameData.currentAppMode = AppMode::Game;
 	}
 
 	void Editor::render(unsigned int frameIndex, float frameTime)
 	{
 		currentFrameIndex = frameIndex;
-		isFrameStarted = true;
 
+		// This needs to occur within a valid renderpass
 		aveng_imgui.newFrame();
 		aveng_imgui.runGUI();
 		aveng_imgui.render(frameIndex);
 
 		updateCamera(frameTime);
+
 		setupSelectionHighlight(frameTime);
 		setSelectedInstance();
 		updateStorageBuffers();
 
-		if (editorData.eMousePick == true) 
-		{
-			// Disable the renderer's primary renderpass in
-			// favor of the editor's selection renderpass
-			renderer.setRenderpassBypass(false);
-
-			drawInstanceGizmo();
-
-			renderer.beginSwapChainRenderPass(
-				renderData.rdCommandBuffersGraphics[currentFrameIndex], // NOTE: This is the primary graphics command buffer
-				renderer.getSelectionFramebuffer(),
-				renderer.getSwapChainRenderPass());						// Note: Primary renderpass
-
-			drawSelectedModels();
-
-			renderer.endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
-		}
-		else {
-			renderer.setRenderpassBypass(false);
-		}
-
-		isFrameStarted = false;
 	}
-	//void Editor::endSelectionRenderPass(VkCommandBuffer commandBuffer)
-	//{
-	//	assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
-	//	assert(commandBuffer == renderer.getCurrentCommandBufferGraphics() &&
-	//		"Can't end render pass on command buffer from a different frame");
-	//	vkCmdEndRenderPass(commandBuffer);
-	//}
 
-	void Editor::waitFrames()
+	void Editor::beginGUICommands(int frameIdx)
+	{
+
+		if (!engineDevice.resetCommandBuffer(renderData.rdGUICommandBuffers[frameIdx], 0)) {
+			std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);
+			throw std::runtime_error("Failed to begin Graphics Command Buffer 1");
+		}
+
+		if (!engineDevice.beginSingleShotCommand(renderData.rdGUICommandBuffers[frameIdx])) {
+			std::printf("%s error: failed to begin command buffer\n", __FUNCTION__);
+			throw std::runtime_error("Failed to begin Graphics Command Buffer 0");
+		}
+
+	}
+
+	void Editor::endGUICommands(int frameIdx)
+	{
+		VkResult result = vkEndCommandBuffer(renderData.rdGUICommandBuffers[frameIdx]);
+		if (result != VK_SUCCESS) {
+			std::printf("%s error: could not end render pass (error: %i)\n", __FUNCTION__, result);
+			throw std::runtime_error("error: could not end render pass");
+		}
+	}
+
+	void Editor::endGUIRenderPass(VkCommandBuffer commandBuffer)
+	{
+		// assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
+		assert(commandBuffer == getCurrentCommandBufferGUI() &&
+			"Can't end render pass on command buffer from a different frame");
+		vkCmdEndRenderPass(commandBuffer);
+	}
+
+	void Editor::readPixelDataPos()
 	{
 		/* we must wait for the image to be created before we can pick  */
 		if (editorData.eMousePick) {
+
 			/* wait for queue to be idle */
 			vkQueueWaitIdle(engineDevice.graphicsQueue());
+			std::cout << "Mouse (From Editor): (" << editorData.eMouseXPos << ", " << editorData.eMouseYPos << ")" << std::endl;
+			/* VALIDATION: Check coordinates are non-negative */
+			if (editorData.eMouseXPos < 0 || editorData.eMouseYPos < 0) {
+				Logger::log(1, "%s: Invalid negative coordinates (%d, %d)\n", 
+					__FUNCTION__, editorData.eMouseXPos, editorData.eMouseYPos);
+				editorData.eMousePick = false;
+				return;
+			}
 
-			float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos);
+			/* VALIDATION: Check coordinates are within viewport bounds */
+			uint32_t viewportWidth = renderer.pGetSwapChain()->width();
+			uint32_t viewportHeight = renderer.pGetSwapChain()->height();
+			if (static_cast<unsigned int>(editorData.eMouseXPos) >= viewportWidth || 
+				static_cast<unsigned int>(editorData.eMouseYPos) >= viewportHeight) {
+				Logger::log(1, "%s: Coordinates out of bounds (%d, %d), viewport is (%u x %u)\n",
+					__FUNCTION__, editorData.eMouseXPos, editorData.eMouseYPos, viewportWidth, viewportHeight);
+				editorData.eMousePick = false;
+				return;
+			}
+			
+			std::cout << "Positions Unsigned:" << static_cast<unsigned int>(editorData.eMouseXPos) << ", " << static_cast<unsigned int>(editorData.eMouseYPos) << std::endl;
+			std::cout << "Positions Signed:" << static_cast<int>(editorData.eMouseXPos) << ", " << static_cast<int>(editorData.eMouseYPos) << std::endl;
 
+			float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos, currentFrameIndex);
+			std::cout << "End Selection: " << selectedInstanceId << std::endl;
 			if (selectedInstanceId >= 0.0f) {
-				mModelInstanceData.miSelectedInstance = static_cast<int>(selectedInstanceId);
+				mModelInstanceData.miSelectedEditorInstance = static_cast<int>(selectedInstanceId);
 			}
 			else {
-				mModelInstanceData.miSelectedInstance = 0;
+				mModelInstanceData.miSelectedEditorInstance = 0;
+				editorData.eMousePick = false;
 			}
-			editorData.eMousePick = false;
+			
+			
 		}
 	}
 
@@ -148,6 +194,13 @@ namespace aveng {
 
 		// Create the selection renderpass used for selection highlighting
 		if (!swapchain->createSelectionRenderpass(renderData.rdSelectionRenderpass))
+		{
+			Logger::log(1, "%s error; could not create selection renderpass\n", __FUNCTION__);
+			throw std::runtime_error("editor fail 0");
+		}
+
+		// Create the selection renderpass used for selection highlighting
+		if (!swapchain->createSecondaryRenderpass(renderData.rdImguiRenderpass))
 		{
 			Logger::log(1, "%s error; could not create selection renderpass\n", __FUNCTION__);
 			throw std::runtime_error("editor fail 0");
@@ -184,7 +237,7 @@ namespace aveng {
 		}
 
 		aveng_imgui.init(
-			swapchain->getRenderPass(),
+			renderData.rdImguiRenderpass,
 			swapchain->imageCount()
 		);
 	}
@@ -232,44 +285,13 @@ namespace aveng {
 		{
 			return false;
 		}
-		return true;
-	}
 
-	bool Editor::submitCommandBuffers()
-	{
-		//VkResult result = vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
-		//if (result != VK_SUCCESS) {
-		//	std::printf("%s error: could not end render pass (error: %i)\n", __FUNCTION__, result);
-		//	throw std::runtime_error("error: could not end render pass");
-		//}
+		renderData.rdGUICommandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		if (!engineDevice.initCommandBuffers(renderData.rdGUICommandBuffers))
+		{
+			return false;
+		}
 
-		///* submit command buffer */
-		//VkSubmitInfo submitInfo{};
-		//submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		//std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore[currentFrameIndex], renderData.rdPresentSemaphore[currentFrameIndex] };
-		//std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-
-		///* compute shader: contine if in vertex input ready
-		// * vertex shader: wait for color attachment output ready */
-		//submitInfo.pWaitDstStageMask = waitStages.data();
-
-		//submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
-		//submitInfo.pWaitSemaphores = waitSemaphores.data();
-
-		//std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore[currentFrameIndex], renderData.rdGraphicSemaphore[currentFrameIndex] };
-
-		//submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
-		//submitInfo.pSignalSemaphores = signalSemaphores.data();
-
-		//submitInfo.commandBufferCount = 1;
-		//submitInfo.pCommandBuffers = &renderData.rdCommandBuffersGraphics[currentFrameIndex];
-
-		//result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence[currentFrameIndex]);
-		//if (result != VK_SUCCESS) {
-		//	std::printf("%s error: failed to submit draw command buffer (%i)\n", __FUNCTION__, result);
-		//	return WTF_BOOM;
-		//}
 		return true;
 	}
 
@@ -283,13 +305,10 @@ namespace aveng {
 		}
 	}
 
-
 	/*
 	* Set the currently selected instance (for highlight)
 	*/
 	void Editor::setupSelectionHighlight(float dt) {
-		editorData.eSelectedInstance.clear();
-		editorData.eSelectedInstance.resize(mModelInstanceData.miAssimpInstances.size());
 
 		// Potential Improvement: Use a non - owning pointer or a reference to the shared_ptr in the container :
 		// E.g.
@@ -304,6 +323,10 @@ namespace aveng {
 		* once and lock only when you need it (ideally when selection changes, not per frame).
 		*/
 
+		editorData.eSelectedInstance.clear();
+		// Q: Why is eSelectedInstance the size of all instances? A: As we iterate over instances, the selected one is set at that same index
+		editorData.eSelectedInstance.resize(mModelInstanceData.miAssimpInstances.size());
+
 		/* save the selected instance for color highlight */
 		editorData.eCurrentSelectedInstance = nullptr;
 		if (editorData.eHighlightSelectedInstance) {
@@ -315,12 +338,19 @@ namespace aveng {
 		}
 	}
 
+	void Editor::handleMouseClick(const MouseButtonEvent& e) {
+		aveng_imgui.handleMouseButtonEvents(e.button, e.action, e.mods);
+	}
+
+	void Editor::handleMouseMove(const MouseMoveEvent& e) {
+		aveng_imgui.handleMousePositionEvents(e.x, e.y, e.rmbDown);
+	}
+
+	/*
+	* Find the instance that was selected
+	*/
 	void Editor::setSelectedInstance()
 	{
-
-		/*
-		* Note: We're not focusing on animated vs non-animated models
-		*/
 
 		size_t instanceToStore = 0;
 		for (const auto& model : mModelInstanceData.miModelList) {
@@ -328,30 +358,29 @@ namespace aveng {
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
 			{
 				// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
-				if (numberOfInstances > 0) 
-				{
-					int index = 0;
-					// for (unsigned int i = 0; i < numberOfInstances; ++i) {
-					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
+				//if (numberOfInstances > 0) 
+				//{
+				int index = 0;
+				// for (unsigned int i = 0; i < numberOfInstances; ++i) {
+				for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
 
-						// Set the buffer's x
-						if (editorData.eCurrentSelectedInstance == instance) 
-						{
-							mSelectedInstance.at(instanceToStore + index).x = editorData.eSelectHighlightValue; // The blinking color
-						}
-						else {
-							mSelectedInstance.at(instanceToStore + index).x = 1.0f; // color is unchanged
-						}
-
-						// Set the buffer's y
-						if (editorData.eMousePick) 
-						{
-							InstanceSettings instSettings = instance->getInstanceSettings();
-							mSelectedInstance.at(instanceToStore + index).y = static_cast<float>(instSettings.isInstanceIndexPosition);
-						}
-						index++;
+					// Set the buffer's x
+					if (editorData.eCurrentSelectedInstance == instance) 
+					{
+						editorData.eSelectedInstance.at(instanceToStore + index).x = editorData.eSelectHighlightValue; // The blinking color
+					} else {
+						editorData.eSelectedInstance.at(instanceToStore + index).x = 1.0f; // color is unchanged
 					}
+
+					// Set the buffer's y
+					if (editorData.eMousePick) 
+					{
+						InstanceSettings instSettings = instance->getInstanceSettings();
+						editorData.eSelectedInstance.at(instanceToStore + index).y = static_cast<float>(instSettings.isInstanceIndexPosition);
+					}
+					index++;
 				}
+				//}
 				instanceToStore += numberOfInstances;
 			}
 		}
@@ -359,10 +388,12 @@ namespace aveng {
 
 	bool Editor::drawInstanceGizmo() {
 
+		if (!hasSelection()) return false;
+
 		/* draw coordinate lines */
 		mCoordArrowsLineIndexCount = 0;
 		mLineMesh->vertices.clear();
-		if (mModelInstanceData.miSelectedEditorInstance > 0) {
+		if (mModelInstanceData.miSelectedEditorInstance > 0) { // Make sure it's not the null instance. In other words, don't draw the gizmo's if the selected instance is the null instance (no selections)
 			InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(mModelInstanceData.miSelectedEditorInstance)->getInstanceSettings();
 
 			/* draw coordiante arrows at origin of selected instance */
@@ -402,10 +433,11 @@ namespace aveng {
 		// Begin - We can safely piggy back on the renderer's beginSwapChainRenderPass method - it's polymorphic
 		renderer.beginSwapChainRenderPass(
 			renderData.rdLineCommandBuffers[currentFrameIndex],
-			renderer.getFramebuffer(),
+			renderer.getCurrentFramebuffer(),
 			renderData.rdLineRenderpass);
 
 		if (mCoordArrowsLineIndexCount > 0) {
+
 			mUploadToVBOTimer.start();
 			VertexBuffer::uploadData(engineDevice, mLineVertexBuffer, *mLineMesh);
 			renderData.rdUploadToVBOTime += mUploadToVBOTimer.stop();
@@ -419,44 +451,68 @@ namespace aveng {
 			vkCmdBindVertexBuffers(renderData.rdLineCommandBuffers[currentFrameIndex], 0, 1, &mLineVertexBuffer.buffer, &offset);
 			vkCmdSetLineWidth(renderData.rdLineCommandBuffers[currentFrameIndex], 3.0f);
 			vkCmdDraw(renderData.rdLineCommandBuffers[currentFrameIndex], static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
+
+			// Fin - Specific end for Line renderpasses
+			endSwapChainLineRenderPass(renderData.rdLineCommandBuffers[currentFrameIndex]);
+
+			if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex])) {
+				Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
+				return false;
+			}
+
+			return true;
+
 		}
 
-		// Fin - Specific end for Line renderpasses
-		endSwapChainLineRenderPass(renderData.rdLineCommandBuffers[currentFrameIndex]);
-		
-		if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex])) {
-			Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
-			return false;
-		}
+		return false;
 
+	}
+
+	// Just use the returned values directly if working in renderer.cpp. This is for clients
+	VkCommandBuffer Editor::getCurrentCommandBufferLines() const
+	{
+		std::cout << "getCurrentCommandBufferLines: " << currentFrameIndex << std::endl;
+		assert(renderer.isFrameInProgress() && "Cannot get command buffer. The frame is not in progress.");
+		return renderData.rdLineCommandBuffers[currentFrameIndex];
 	}
 
 	void Editor::endSwapChainLineRenderPass(VkCommandBuffer commandBuffer)
 	{
-		assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
+		assert(renderer.isFrameInProgress() && "Can't call endSwapChain if frame is not in progress.");
 		assert(commandBuffer == getCurrentCommandBufferLines() &&
 			"Can't end render pass on command buffer from a different frame");
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
-	void Editor::drawSelectedModels()
+	void Editor::drawSelectedModels(int frameIndex)
 	{
+		//
 		renderer.drawModels(
-			renderData.rdCommandBuffersGraphics[currentFrameIndex],
+			renderData.rdCommandBuffersGraphics[frameIndex],
 			renderData.rdAvengSelectionPipeline,
 			renderData.rdAvengAnimationSelectionPipeline,
 			renderData.rdAvengSelectionPipelineLayout,
 			renderData.rdAvengAnimationSelectionPipelineLayout,
-			renderData.rdAvengSelectionDescriptorSets[currentFrameIndex],
-			renderData.rdAvengAnimationSelectionDescriptorSets[currentFrameIndex]);
+			renderData.rdAvengSelectionDescriptorSets[frameIndex],
+			renderData.rdAvengAnimationSelectionDescriptorSets[frameIndex],
+			frameIndex);
 	}
 
 	void Editor::updateStorageBuffers()
 	{
 		// Upload the vec2 to make our selected instance highlight/blink
 		bool bufferResized = false;
-		bufferResized |= ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers[currentFrameIndex], mSelectedInstance);
+		bufferResized |= ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers[currentFrameIndex], editorData.eSelectedInstance);
+		
+		// If one frame's buffer resized, resize ALL frames to keep them synchronized
 		if (bufferResized) {
+			size_t newBufferSize = renderData.rdSelectedInstanceBuffers[currentFrameIndex].bufferSize;
+			for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+				if (i != currentFrameIndex) {
+					ShaderStorageBuffer::checkForResize(engineDevice, renderData.rdSelectedInstanceBuffers[i], newBufferSize);
+				}
+			}
+			
 			std::cout << "StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
 			updateDescriptorSets();
 			renderer.updateDescriptorSets();
@@ -652,37 +708,26 @@ namespace aveng {
 			}
 		}
 
-		updateDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		updateDescriptorSets();
 
 		return true;
 
 	}
 
-	void Editor::updateDescriptorSets(int iters)
+	void Editor::updateDescriptorSets()
 	{
-		if (iters > SwapChain::MAX_FRAMES_IN_FLIGHT) {
-			throw std::runtime_error("editor is attempting to write too many descriptor sets.");
-		}
 		Logger::log(1, "%s: updating descriptor sets\n", __FUNCTION__);
-		for (int i = 0; i < iters; i++)
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
-
-			int index = i;
-
-			// This implies we're updating descriptors during rendering. On init, we perform MAX_FRAMES_IN_FLIGHT iterations
-			if (iters == 1) {
-				index = currentFrameIndex;
-			}
-
 			{
 				/* selection shader, non-animated  */
 				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[i].buffer; // mPerspectiveViewMatrixUBO[i].buffer
+				matrixInfo.buffer = renderData.matrixBuffersView.viewProjUBOs[i].buffer;
 				matrixInfo.offset = 0;
 				matrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo worldPosInfo{};
-				worldPosInfo.buffer = renderData.matrixBuffersView.modelRootSSBOs[i].buffer; // mShaderModelRootMatrixBuffers[i].buffer;
+				worldPosInfo.buffer = renderData.matrixBuffersView.modelRootSSBOs[i].buffer;
 				worldPosInfo.offset = 0;
 				worldPosInfo.range = VK_WHOLE_SIZE;
 
@@ -730,7 +775,7 @@ namespace aveng {
 				matrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo boneMatrixInfo{};
-				boneMatrixInfo.buffer = renderData.matrixBuffersView.boneMatSSBOs[i].buffer; // mShaderBoneMatrixBuffer.buffer;
+				boneMatrixInfo.buffer = renderData.matrixBuffersView.boneMatSSBOs[i].buffer;
 				boneMatrixInfo.offset = 0;
 				boneMatrixInfo.range = VK_WHOLE_SIZE;
 

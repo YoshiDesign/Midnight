@@ -1,5 +1,4 @@
 #include "AvengStorageBuffer.h"
-#include "CoreVK/EngineDevice.h"
 
 namespace aveng {
     bool ShaderStorageBuffer::init(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize) {

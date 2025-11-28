@@ -1,5 +1,6 @@
 #include "swapchain.h"
-
+#include "CoreVK/EngineDevice.h"
+#include "Utils/Logger.h"
 #include <array>
 #include <cstdlib>
 #include <cstring>
@@ -7,8 +8,6 @@
 #include <limits>
 #include <set>
 #include <stdexcept>
-#include "Utils/Logger.h"
-
 
 namespace aveng {
 
@@ -49,8 +48,22 @@ namespace aveng {
             vkDestroyImageView(device.device(), imageView, nullptr);
         }
 
+        // Cleanup selection images from renderData
+        for (size_t i = 0; i < renderData.rdSelectionImages.size(); i++) {
+            if (renderData.rdSelectionImageViews[i] != VK_NULL_HANDLE) {
+                vkDestroyImageView(device.device(), renderData.rdSelectionImageViews[i], nullptr);
+            }
+            if (renderData.rdSelectionImages[i] != VK_NULL_HANDLE) {
+                vmaDestroyImage(device.allocator(), renderData.rdSelectionImages[i], 
+                                renderData.rdSelectionImageAllocs[i]);
+            }
+        }
+
         swapChainImageViews.clear();
         mSelectionImageViews.clear();
+        renderData.rdSelectionImages.clear();
+        renderData.rdSelectionImageViews.clear();
+        renderData.rdSelectionImageAllocs.clear();
 
         if (swapChain != nullptr) {
             vkDestroySwapchainKHR(device.device(), swapChain, nullptr);
@@ -173,19 +186,25 @@ namespace aveng {
     /**
     * Note that we're using swapChainImages.size() because this simply alludes to the number of
     * images that the swapchain uses for rendering.
-    * You can create multiple VkImageViews for the same VkImage
+    * Creates one selection image per swapchain frame for proper synchronization.
     */
     void SwapChain::createSelectionImageViews() {
         std::cout << "DEBUG" << std::endl;
-        mSelectionImageViews.resize(swapChainImages.size());
-        for (size_t i = 0; i < swapChainImages.size(); i++)
+        size_t imageCount = swapChainImages.size();
+        renderData.rdSelectionImages.resize(imageCount);
+        renderData.rdSelectionImageViews.resize(imageCount);
+        renderData.rdSelectionImageAllocs.resize(imageCount);
+        mSelectionImageViews.resize(imageCount);
+        
+        for (size_t i = 0; i < imageCount; i++)
         {
             std::cout << "Creating SwapChain Selection Img View " << i << std::endl;
-            mSelectionImageViews[i] = createSelectionImageView(swapChainImages[i], swapChainImageFormat);
+            createSelectionImageView(i);
+            mSelectionImageViews[i] = renderData.rdSelectionImageViews[i];
         }
     }
 
-    VkImageView SwapChain::createSelectionImageView(VkImage image, VkFormat format)
+    void SwapChain::createSelectionImageView(size_t index)
     {
         VkExtent3D selectionImageExtent = {
             width(),
@@ -211,16 +230,16 @@ namespace aveng {
         selectionAllocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         VkResult result = vmaCreateImage(device.allocator(), &selecImageInfo, &selectionAllocInfo,
-            &renderData.rdSelectionImage, &renderData.rdSelectionImageAlloc, nullptr);
+            &renderData.rdSelectionImages[index], &renderData.rdSelectionImageAllocs[index], nullptr);
         if (result != VK_SUCCESS) {
-            Logger::log(1, "%s error: could not allocate selection buffer memory (error: %i)\n", __FUNCTION__, result);
+            Logger::log(1, "%s error: could not allocate selection buffer memory for index %zu (error: %i)\n", __FUNCTION__, index, result);
             throw std::runtime_error("Fail");
         }
 
         VkImageViewCreateInfo selectionImageViewinfo{};
         selectionImageViewinfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         selectionImageViewinfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        selectionImageViewinfo.image = renderData.rdSelectionImage;
+        selectionImageViewinfo.image = renderData.rdSelectionImages[index];
         selectionImageViewinfo.format = renderData.rdSelectionFormat;
         selectionImageViewinfo.subresourceRange.baseMipLevel = 0;
         selectionImageViewinfo.subresourceRange.levelCount = 1;
@@ -229,14 +248,47 @@ namespace aveng {
         selectionImageViewinfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
         result = vkCreateImageView(device.device(), &selectionImageViewinfo,
-            nullptr, &renderData.rdSelectionImageView);
+            nullptr, &renderData.rdSelectionImageViews[index]);
         if (result != VK_SUCCESS) {
-            Logger::log(1, "%s error: could not create selection buffer image view (error: %i)\n", __FUNCTION__, result);
+            Logger::log(1, "%s error: could not create selection buffer image view for index %zu (error: %i)\n", __FUNCTION__, index, result);
             throw std::runtime_error("Fail");
         }
-        // TMP
-        VkImageView imageView = renderData.rdSelectionImageView;
-        return imageView;
+
+        // /* Transition newly created image from UNDEFINED to COLOR_ATTACHMENT_OPTIMAL */
+         VkCommandBuffer transitionCmd = device.createSingleShotBuffer();
+
+         VkImageSubresourceRange range{};
+         range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+         range.baseMipLevel = 0;
+         range.levelCount = 1;
+         range.baseArrayLayer = 0;
+         range.layerCount = 1;
+
+         VkImageMemoryBarrier barrier{};
+         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+         barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+         barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+         barrier.image = renderData.rdSelectionImages[index];
+         barrier.subresourceRange = range;
+         barrier.srcAccessMask = 0;
+         barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+         vkCmdPipelineBarrier(
+             transitionCmd,
+             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+             0,
+             0, nullptr,
+             0, nullptr,
+             1, &barrier
+         );
+
+         if (!device.submitSingleShotBuffer(transitionCmd)) {
+             Logger::log(1, "%s error: could not transition selection image %zu to COLOR_ATTACHMENT_OPTIMAL\n", __FUNCTION__, index);
+             throw std::runtime_error("Failed to transition selection image layout");
+         }
     }
 
     /**
@@ -263,7 +315,7 @@ namespace aveng {
         depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
         depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Was previously LOAD_OP_DONT_CARE
         depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -397,6 +449,8 @@ namespace aveng {
 
     bool SwapChain::createSelectionRenderpass(VkRenderPass& renderPass)
     {
+
+        std::cout << "Creating Selection Renderpass with format: " << renderData.rdSelectionFormat << std::endl;
     
         VkAttachmentDescription colorAtt{};
         colorAtt.format = getSwapChainImageFormat();
@@ -512,11 +566,11 @@ namespace aveng {
 
     bool SwapChain::createEditorSelectionFramebuffers()
     {
-        mSelectionFramebuffers.resize(swapChainImagesSize());
+        mSelectionFramebuffers.resize(swapChainImageViews.size());
 
-        for (unsigned int i = 0; i < swapChainImagesSize(); ++i) {
+        for (unsigned int i = 0; i < swapChainImageViews.size(); ++i) {
             std::vector<VkImageView> attachments = { swapChainImageViews[i],
-              mSelectionImageViews[i], depthImageViews[i]};
+              renderData.rdSelectionImageViews[i], depthImageViews[i]};
 
             VkFramebufferCreateInfo FboInfo{};
             FboInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -537,9 +591,23 @@ namespace aveng {
     
     }
 
-    float SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos) {
+    float SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t frameIndex) {
         /* random default value to detect errors */
         float pixelColor = -444.0f;
+
+        /* VALIDATION: Bounds check coordinates */
+        if (xPos >= width() || yPos >= height()) {
+            Logger::log(1, "%s error: coordinates out of bounds (%u, %u), max is (%u, %u)\n",
+                __FUNCTION__, xPos, yPos, width() - 1, height() - 1);
+            return pixelColor;
+        }
+
+        /* VALIDATION: Bounds check frame index */
+        if (frameIndex >= renderData.rdSelectionImages.size()) {
+            Logger::log(1, "%s error: frame index %u out of bounds, max is %zu\n",
+                __FUNCTION__, frameIndex, renderData.rdSelectionImages.size() - 1);
+            return pixelColor;
+        }
 
         VkImage readbackImage;
         VmaAllocation readbackImageAlloc;
@@ -593,7 +661,7 @@ namespace aveng {
         srcLayoutTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         srcLayoutTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         srcLayoutTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        srcLayoutTransferBarrier.image = renderData.rdSelectionImage;                   // The image resource we're getting our data from
+        srcLayoutTransferBarrier.image = renderData.rdSelectionImages[frameIndex];      // The image resource we're getting our data from (frame-specific)
         srcLayoutTransferBarrier.subresourceRange = layoutTransferRange;
         srcLayoutTransferBarrier.srcAccessMask = 0;
         srcLayoutTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -622,10 +690,23 @@ namespace aveng {
             0, 0, nullptr, 0, nullptr, 1, &layoutTransferBarrier);
         vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
             0, 0, nullptr, 0, nullptr, 1, &srcLayoutTransferBarrier);
-        vkCmdCopyImage(readbackCommandBuffer, renderData.rdSelectionImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        vkCmdCopyImage(readbackCommandBuffer, renderData.rdSelectionImages[frameIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             readbackImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopyRegion);
         vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
             0, 0, nullptr, 0, nullptr, 1, &destLayoutTransferBarrier);
+
+        /* transition selection image back to COLOR_ATTACHMENT_OPTIMAL for next frame */
+        VkImageMemoryBarrier restoreSelectionLayoutBarrier{};
+        restoreSelectionLayoutBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        restoreSelectionLayoutBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        restoreSelectionLayoutBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        restoreSelectionLayoutBarrier.image = renderData.rdSelectionImages[frameIndex];
+        restoreSelectionLayoutBarrier.subresourceRange = layoutTransferRange;
+        restoreSelectionLayoutBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        restoreSelectionLayoutBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &restoreSelectionLayoutBarrier);
 
         bool commandResult = device.submitSingleShotBuffer(readbackCommandBuffer); // Note: Uses the graphics queue
   

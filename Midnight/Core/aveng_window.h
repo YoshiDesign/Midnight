@@ -1,13 +1,16 @@
 #pragma once
+
+#include "System/Input/EventPayloads.h"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <string>
 
 namespace aveng {
+	class InputSystem;
 
 	class AvengWindow {
 		std::string windowName;
-		GLFWwindow* window;
+		GLFWwindow* mWindow;
 
 		bool framebufferResized = false;
 		int width;
@@ -22,6 +25,8 @@ namespace aveng {
 		AvengWindow(const AvengWindow&) = delete;
 		AvengWindow& operator=(const AvengWindow&) = delete;
 
+		GLFWwindow* getGLFWwindow() const { return mWindow; }
+
 		bool shouldClose();
 
 		VkExtent2D getExtent() { return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) }; }
@@ -32,12 +37,20 @@ namespace aveng {
 
 		void createWindowSurface(VkInstance instance, VkSurfaceKHR* surface) const;
 
-		GLFWwindow* getGLFWwindow() const { return window; }
+		void onMouseMove(double x, double y);
+
+		void onMouseButton(int button, int action, int mods, double x = 0, double y = 0);
+
+		void onKey(int key, int scancode, int action, int mods);
+
+		void setInputSystem(InputSystem* input) { inputSystem = input; }
 
 	private:
 		static void framebufferResizedCallback(GLFWwindow* window, int width, int height);
 		void initWindow();
 
+		InputSystem* inputSystem = nullptr;
+
 	};
 
-} // NS
+}

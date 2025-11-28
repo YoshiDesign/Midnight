@@ -1,3 +1,13 @@
+#include "aveng_model.h"
+#include "CoreVK/VertexBuffer.h"
+#include "CoreVK/IndexBuffer.h"
+#include "CoreVK/AvengStorageBuffer.h"
+#include "CoreVK/EngineDevice.h"
+#include "CoreVK/swapchain.h"
+#include "Utils/glm_includes.h"
+#include "Utils/aveng_utils.h"
+#include "Utils/Logger.h"
+
 #include <cmath>
 #include <cassert>
 #include <cstring>
@@ -6,13 +16,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <unordered_map>
-#include "aveng_model.h"
-#include "Utils/aveng_utils.h"
-#include "Utils/Logger.h"
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader/tiny_obj_loader.h>
-#include "Utils/glm_includes.h"
-#include "data.h"
 
 namespace std {
 
@@ -48,7 +54,7 @@ namespace aveng {
 
 	AvengModel::~AvengModel() {}
 
-	void AvengModel::drawInstancedV2(VkRenderData& renderData, uint32_t instanceCount, int frameIndex) {
+	void AvengModel::drawInstancedV2(VkRenderData& renderData, VkPipelineLayout basicLayout, VkPipelineLayout animationLayout, uint32_t instanceCount, int frameIndex) {
 		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
 			VkMesh& mesh = mModelMeshes.at(i);
 
@@ -65,10 +71,10 @@ namespace aveng {
 			/* switch between animated and non-animated pipeline layout */
 			VkPipelineLayout renderLayout;
 			if (hasAnimations()) {
-				renderLayout = renderData.rdAvengAnimationPipelineLayout;
+				renderLayout = animationLayout;
 			}
 			else {
-				renderLayout = renderData.rdAvengPipelineLayout;
+				renderLayout = basicLayout;
 			}
 
 			if (diffuseTex.image != VK_NULL_HANDLE) {

@@ -1,7 +1,8 @@
-#include <cstring>
-
 #include "VertexBuffer.h"
+#include "CoreVK/EngineDevice.h"
 #include "Utils/Logger.h"
+
+#include <cstring>
 
 
 namespace aveng {

@@ -1,4 +1,5 @@
 #include "ObjectRenderSystem.h"
+#include "Core/aveng_window.h"
 #include "Utils/window_callbacks.h"
 
 namespace aveng {
@@ -6,6 +7,9 @@ namespace aveng {
 	ObjectRenderSystem::ObjectRenderSystem(AvengWindow& window)
 		: window{ window }
 	{
+
+		window.setInputSystem(&inputSystem);
+		inputSystem.setMode(AppMode::Editor);
 
 #if ENABLE_EDITOR
 		editor.init(renderer.pGetSwapChain());
@@ -69,49 +73,44 @@ namespace aveng {
 
 	void ObjectRenderSystem::render(float frameTime)
 	{
-		// Check for queued models
-		renderer.processPendingModelLoads();
-		
-		//
-		updateCamera(frameTime);
 
-		// TODO
-		updateData(frameTime);
+		// updateCamera(frameTime);
 
-		// TODO - This is still being used to deliver view/proj data
-		//renderer.updateCamera(player_camera.getProjection(), player_camera.getView());
-		renderer.updateCamera();
+		// TODO? 
+		// updateData(frameTime);
+		if (inputSystem.getMode() == AppMode::Game) {
+			// Update game state
+			updateCamera(frameTime);
+			holyShip.update(frameTime);
+		}
 
-		renderer.draw(frameTime);
+		frame.render(frameTime);
 
-#if ENABLE_EDITOR
-		editor.render(renderer.getFrameIndex(), frameTime);
-#endif
 		// Render lights -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
 		// renderer.renderLights();
-	
-		// Update the current frame index
-		renderer.endFrame();
+
 	}
 
+	// This is the game's camera updates, not the editor's. It's more convenient to do this here at the moment
 	void ObjectRenderSystem::updateCamera(float frameTime)
 	{
-		if (renderData.camera == 2) {
-			// Fetched all the way from downtown (the swapchain)
-			aspect = getAspectRatio();
 
-			// Track key press to transform viewer object
-			keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
+		// Fetched all the way from downtown (the swapchain)
+		aspect = getAspectRatio();
 
-			// Apply new viewer obj values to the camera
-			player_camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation);
+		// Track key press to transform viewer object
+		keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
 
-			// Recalculate perspective
-			player_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
+		// Apply new viewer obj values to the camera
+		player_camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation);
 
-			renderData.cameraProxy.projection = player_camera.getProjection();
-			renderData.cameraProxy.view = player_camera.getView();
-		}
+		// Recalculate perspective
+		player_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
+
+		// Update the renderer's camera data
+		renderData.cameraProxy.projection = player_camera.getProjection();
+		renderData.cameraProxy.view = player_camera.getView();
+
 	}
 
 	/**
@@ -120,15 +119,15 @@ namespace aveng {
 	void ObjectRenderSystem::updateData(float frameTime)
 	{
 
-		game_data.num_objs = 2;
-		game_data.cur_pipe = WindowCallbacks::getCurPipeline();
-		game_data.dt = frameTime;
-		game_data.camera_modPI = viewerObject.transform.modPI;
+		gameData.num_objs = 2;
+		gameData.cur_pipe = WindowCallbacks::getCurPipeline();
+		gameData.dt = frameTime;
+		gameData.camera_modPI = viewerObject.transform.modPI;
 
-		game_data.cameraView = player_camera.getCameraView();
-		game_data.cameraPos = viewerObject.transform.translation;
-		game_data.cameraRot = viewerObject.transform.rotation;
-		game_data.fly_mode = WindowCallbacks::flightMode;
+		gameData.cameraView = player_camera.getCameraView();
+		gameData.cameraPos = viewerObject.transform.translation;
+		gameData.cameraRot = viewerObject.transform.rotation;
+		gameData.fly_mode = WindowCallbacks::flightMode;
 
 	}
 

@@ -5,7 +5,6 @@
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
-#include "Core/data.h"
 namespace aveng {
 
 	// Ctor

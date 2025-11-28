@@ -1,14 +1,17 @@
+#include "aveng_imgui.h"
+
 #include <string>
 #include <limits>
 #include <filesystem>
 
-#include "aveng_imgui.h"
-#include "avpch.h"
+#include "CoreVK/EngineDevice.h"
+#include "Core/aveng_window.h"
 #include "Core/aveng_model.h"
 #include "Core/Modeling/AssimpAnimClip.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/Modeling/InstanceSettings.h"
-
+#include "CoreVK/VertexBuffer.h"
+#include "avpch.h"
 
 namespace aveng {
 
@@ -119,7 +122,7 @@ namespace aveng {
         ImDrawData* drawdata = ImGui::GetDrawData();
 
         // NOTE: This could be using its own command buffer (and its own renderpass), which could help if we ever want to run the editor on a different thread
-        ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdCommandBuffersGraphics[frameIndex]);
+        ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdGUICommandBuffers[frameIndex]);
     }
 
     void AvengImgui::runGUI() {
@@ -143,7 +146,7 @@ namespace aveng {
             ImGui::Text(
                 "Point Lights: %d", gameData.numPointLights);
             ImGui::Text(
-                "Flight Mode: %d", gameData.fly_mode);
+                "App Mode: %d", gameData.currentAppMode);
             ImGui::Text(
                 "Camera View:\t\t(%.03lf, %.03lf, %.03lf)", gameData.cameraView.x, gameData.cameraView.y, gameData.cameraView.z);
             ImGui::Text(
@@ -537,7 +540,7 @@ namespace aveng {
             if (ImGui::CollapsingHeader("Instances")) {
                 bool modelListEmtpy = modInstData.miModelList.size() == 1;
                 bool nullInstanceSelected = modInstData.miSelectedEditorInstance == 0;
-                size_t numberOfInstances = modInstData.miAssimpInstances.size();
+                size_t numberOfInstances = modInstData.miAssimpInstances.size() - 1;
 
                 ImGui::Text("Number of Instances: %ld", numberOfInstances);
 
@@ -851,7 +854,8 @@ namespace aveng {
         }
     }
 
-    void AvengImgui::handleMousePositionEvents(double xPos, double yPos) {
+    void AvengImgui::handleMousePositionEvents(double xPos, double yPos, bool rmbDown) {
+        //std::cout << "Handling mouse Position Event (Editor) " << std::endl;
         /* forward to ImGui */
         ImGuiIO& io = ImGui::GetIO();
         io.AddMousePosEvent((float)xPos, (float)yPos);
@@ -865,21 +869,21 @@ namespace aveng {
         int mouseMoveRelX = static_cast<int>(xPos) - editorData.eMouseXPos;
         int mouseMoveRelY = static_cast<int>(yPos) - editorData.eMouseYPos;
 
-        //if (editorData.eMouseLock) {
-        //    renderData.rdViewAzimuth += mouseMoveRelX / 10.0;
-        //    /* keep between 0 and 360 degree */
-        //    if (renderData.rdViewAzimuth < 0.0) {
-        //        renderData.rdViewAzimuth += 360.0;
-        //    }
-        //    if (renderData.rdViewAzimuth >= 360.0) {
-        //        renderData.rdViewAzimuth -= 360.0;
-        //    }
+        if (editorData.eMouseLock) {
+            renderData.rdViewAzimuth += mouseMoveRelX / 10.0;
+            /* keep between 0 and 360 degree */
+            if (renderData.rdViewAzimuth < 0.0) {
+                renderData.rdViewAzimuth += 360.0;
+            }
+            if (renderData.rdViewAzimuth >= 360.0) {
+                renderData.rdViewAzimuth -= 360.0;
+            }
 
-        //    renderData.rdViewElevation -= mouseMoveRelY / 10.0;
-        //    /* keep between -89 and +89 degree */
-        //    renderData.rdViewElevation = std::clamp(renderData.rdViewElevation, -89.0f, 89.0f);
+            renderData.rdViewElevation -= mouseMoveRelY / 10.0;
+            /* keep between -89 and +89 degree */
+            renderData.rdViewElevation = std::clamp(renderData.rdViewElevation, -89.0f, 89.0f);
 
-        //}
+        }
         if (editorData.eMouseMove) {
             if (modInstData.miSelectedEditorInstance != 0) {
                 InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
@@ -950,6 +954,7 @@ namespace aveng {
         /* save old values */
         editorData.eMouseXPos = static_cast<int>(xPos);
         editorData.eMouseYPos = static_cast<int>(yPos);
+        //std::cout << "Mouse: (" << editorData.eMouseXPos << ", " << editorData.eMouseYPos << ")" << std::endl;
     }
 
 }

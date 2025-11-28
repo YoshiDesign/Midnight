@@ -1,4 +1,15 @@
 #include "Renderer.h"
+#include "CoreVK/EngineDevice.h"
+#include "CoreVK/SkinningPipeline.h"
+#include "CoreVK/ComputePipeline.h"
+#include "CoreVK/LinePipeline.h"
+#include "CoreVK/AvengStorageBuffer.h"
+#include "CoreVK/AvengUniformBuffer.h"
+#include "CoreVK/PipelineLayout.h"
+#include "CoreVK/SyncObjects.h"
+#include "Core/Modeling/AssimpInstance.h"
+#include "Core/aveng_window.h"
+#include "Core/aveng_model.h"
 #include <filesystem>
 #include <stdexcept>
 #include <iostream>
@@ -11,8 +22,8 @@
 
 namespace aveng {
 
-	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, GameData& _gameData, ModelAndInstanceData& mModelInstanceData)
-		: engineDevice{engineDevice}, aveng_window{ window }, gameData{ _gameData }, renderData{ renderData }, mModelInstanceData{ mModelInstanceData }
+	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData)
+		: engineDevice{engineDevice}, aveng_window{ window }, renderData{ renderData }, mModelInstanceData{ mModelInstanceData }
 	{
 
 		// Define buffer vec's that are managed by the Renderer
@@ -43,22 +54,23 @@ namespace aveng {
 			throw std::runtime_error("Failed to create SSBOs");
 		}
 
-		//sceneLoader.load(default_scene_file, engineDevice);
-
 		// Initialize our descriptor layouts & sets, map buffers to device memory.
 		setupDescriptors();
 
 		// Create pipelines now that descriptor layouts are ready
 		if (!createPipelineLayouts()) {
 			std::cerr << "error [Renderer 1]!" << std::endl;
+			throw std::runtime_error("Failed to create Pipeline Layouts");
 		}
 
 		if (!createPipelines()) {
 			std::cerr << "error [Renderer 2]!" << std::endl;
+			throw std::runtime_error("Failed to create Pipelines");
 		}
 
 		if (!createSyncObjects()) {
 			std::cerr << "error [Renderer 3]!" << std::endl;
+			throw std::runtime_error("Failed to create sync objects");
 		}
 
 		// Initialize PointLightSystem now that descriptor layouts are created
@@ -79,6 +91,7 @@ namespace aveng {
 			/* Null model instance - Utility */
 			std::shared_ptr<AvengModel> nullModel = std::make_shared<AvengModel>(engineDevice);
 			mModelInstanceData.miModelList.emplace_back(nullModel);
+			std::cout << "Null Filename: " << nullModel->getModelFileName() << std::endl;
 			std::shared_ptr<AssimpInstance> nullInstance = std::make_shared<AssimpInstance>(nullModel);
 			mModelInstanceData.miAssimpInstancesPerModel[nullModel->getModelFileName()].emplace_back(nullInstance);
 			mModelInstanceData.miAssimpInstances.emplace_back(nullInstance);
@@ -417,8 +430,10 @@ namespace aveng {
 		renderData.rdCommandBuffersGraphics.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdCommandBuffersCompute.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
+		// Allocate command buffers from the Graphics Command Pool
 		engineDevice.initCommandBuffers(renderData.rdCommandBuffersGraphics);
-		engineDevice.initCommandBuffers(renderData.rdCommandBuffersCompute);
+		// Allocate command buffers from the Compute Command Pool - WARN - The 2nd arg was missing!
+		engineDevice.initCommandBuffers(renderData.rdCommandBuffersCompute, "compute");
 
 	}
 
@@ -443,10 +458,12 @@ namespace aveng {
 	}
 
 	// Return a command buffer for the current frame index
-	void Renderer::beginFrame()
+	bool Renderer::beginFrame()
 	{
+		assert(!isFrameStarted && "Frame was not ended before a new one began.");
+		isFrameStarted = true;
 
-		/* wait for both fences before getting the new framebuffer image */
+		// Wait for both fences to be signaled before getting the new framebuffer image
 		std::vector<VkFence> waitFences = { renderData.rdComputeFence[currentFrameIndex], renderData.rdRenderFence[currentFrameIndex] };
 		VkResult result = vkWaitForFences(
 			engineDevice.device(),
@@ -460,12 +477,12 @@ namespace aveng {
 			std::printf("%s error: waiting for fences failed (error: %i)\n", __FUNCTION__, result);
 			throw std::runtime_error("waiting for fences failed");
 		}
-		//currentImageIndex = 0;
+		
 		// Acquire an image from the swap chain
 		result = vkAcquireNextImageKHR(
 			engineDevice.device(),
 			aveng_swapchain->getSwapchain(),
-			UINT64_MAX, //std::numeric_limits<uint64_t>::max(), // Is this more portable?
+			UINT64_MAX, //std::numeric_limits<uint64_t>::max(), // Which is more portable?
 			renderData.rdPresentSemaphore[currentFrameIndex],  // Can be an unsignaled semaphore, fence, or both
 			VK_NULL_HANDLE,
 			&currentImageIndex
@@ -475,7 +492,7 @@ namespace aveng {
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
 			recreateSwapChain();
-			return;
+			return false;
 		}
 		// This could potentially occur during window resize events
 		if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -486,33 +503,23 @@ namespace aveng {
 		// This is the first point during a new frame where the command buffer is first captured.
 		assert(renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics()
 			&& "Incorrect Command Buffer in use");
-
-		//VkCommandBufferBeginInfo beginInfo{};
-		//beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		//if (vkBeginCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex], &beginInfo) != VK_SUCCESS)
-		//{
-		//	throw std::runtime_error("Command Buffer failed to begin recording.");
-		//}
-
+		return true;
 	}
-
-	// 
+	 
 	void Renderer::endFrame()
 	{
 		assert(isFrameStarted && "Can't call endFrame while frame is not in progress.");
-		std::cout << "ENDING FRAME!!!!" << std::endl;
+		// Trivial sync flag
 		isFrameStarted = false;
 		// Advance to the next image
 		currentFrameIndex = (currentFrameIndex + 1) % SwapChain::MAX_FRAMES_IN_FLIGHT;
-
 	}
 
-
-	void Renderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer, VkRenderPass renderpass)
+	void Renderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer, VkRenderPass renderpass, bool selection)
 	{
 
 		assert(isFrameStarted && "Can't call beginSwapChain if frame is not in progress.");
+		// This method is used to begin multiple renderpasses, so this check is irrelevant sometimes
 		assert(renderData.rdCommandBuffersGraphics[currentFrameIndex] == getCurrentCommandBufferGraphics() &&
 			"Can't begin render pass on command buffer from a different frame");
 
@@ -529,9 +536,23 @@ namespace aveng {
 		renderPassInfo.renderArea.offset = { 0,0 };
 		renderPassInfo.renderArea.extent = aveng_swapchain->getSwapChainExtent();
 
-		std::array<VkClearValue, 2> clearValues{};
-		clearValues[0].color = { rgb.r, rgb.g, rgb.b, 1.0f };
-		clearValues[1].depthStencil = { 1.0f, 0 };
+		std::vector<VkClearValue> colorClearValues;
+		VkClearValue colorClearValue;
+		colorClearValue.color = { { rgb.r, rgb.g, rgb.b, 1.0f } };
+		colorClearValues.emplace_back(colorClearValue);
+		if (selection) {
+			VkClearValue selectionClearValue;
+			selectionClearValue.color = { { -1.0f } };
+			colorClearValues.emplace_back(selectionClearValue);
+		}
+
+		VkClearValue depthValue;
+		depthValue.depthStencil.depth = 1.0f;
+
+		std::vector<VkClearValue> clearValues;
+		clearValues.insert(clearValues.end(), colorClearValues.begin(), colorClearValues.end());
+		clearValues.emplace_back(depthValue);
+
 		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 		renderPassInfo.pClearValues = clearValues.data();
 
@@ -592,11 +613,11 @@ namespace aveng {
 
 		createDescriptorLayouts();
 
-		createDescriptorSets();
+	createDescriptorSets();
 
-		updateDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT);
+	updateDescriptorSets();
 
-		updateComputeDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT);
+	updateComputeDescriptorSets();
 		
 		// TODO
 		// updateLightingDescriptorSets();
@@ -876,8 +897,8 @@ namespace aveng {
 		return true;
 	}
 
-	void Renderer::initializePointLightSystem()
-	{
+	//void Renderer::initializePointLightSystem()
+	//{
 		//if (!renderData.rdAvengBasicLightingDescriptorLayout) {
 		//	throw std::runtime_error("Descriptor set layouts must be created before initializing PointLightSystem (call setupDescriptors first)");
 		//}
@@ -888,10 +909,10 @@ namespace aveng {
 		//pointLightSystem.initialize(getSwapChainRenderPass());
 
 		//std::cout << "PointLightSystem initialized" << std::endl;
-	}
+	//}
 
-	void Renderer::renderLights()
-	{
+	//void Renderer::renderLights()
+	//{
 		//if (u_LightsData.numLights <= 0) {
 		//	return; // Nothing to render
 		//}
@@ -916,7 +937,7 @@ namespace aveng {
 
 		//// Use instanced rendering: 6 vertices per light, numLights instances
 		//vkCmdDraw(renderData.rdCommandBuffersGraphics[currentFrameIndex], 6, u_LightsData.numLights, 0, 0);
-	}
+	//}
 
 	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
 	{
@@ -928,14 +949,12 @@ namespace aveng {
 		u_LightsData.lightPositions[u_LightsData.numLights] = glm::vec4(position, radius);
 		u_LightsData.lightColors[u_LightsData.numLights] = glm::vec4(color, intensity);
 		u_LightsData.numLights++;
-
-		gameData.numPointLights++;
-		
+	
 	}
 
 	void Renderer::clearLights()
 	{
-		gameData.numPointLights = 0;
+
 		u_LightsData.numLights = 0;
 		// Zero out the light arrays for clean state
 		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));
@@ -1131,12 +1150,17 @@ namespace aveng {
 			&boneMatrixBufferBarrier, 0, nullptr);
 	}
 
+	/**
+	* By the time this method is called:
+	* - Fences have all been waited on and signaled.
+	* - The latest swapchain image has been received
+	* - isFrameStarted = true
+	* - Primary Graphics Command buffer is reset and in a recording state.
+	* - Primary graphics renderpass has begun
+	*/
 	int Renderer::draw(float deltaTime) {
 
-		assert(!isFrameStarted && "Frame was not ended before a new one began.");
-
-		isFrameStarted = true;
-		/* no update on zero diff */
+		/* no update on zero diff. This caused an issue */
 		if (deltaTime == 0.0f && !firstFrame) {
 			isFrameStarted = false;
 			return 0;
@@ -1152,14 +1176,15 @@ namespace aveng {
 		renderData.rdMatrixGenerateTime = 0.0f;
 		renderData.rdUIGenerateTime = 0.0f;
 
-		beginFrame();
+		// beginFrame(); // This is now managed by Frame
+
 		if (!isFrameStarted) {
 			std::printf("beginFrame failed/skipped (swapchain recreation), skipping frame\n");
 			return 0;  // Skip this frame gracefully
 		}
 
 		/* calculate the size of the node matrix buffer over all animated instances */
-		size_t boneMatrixBufferSize = 0;
+		boneMatrixBufferSize = 0;
 		for (const auto& model : mModelInstanceData.miModelList) {
 			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
@@ -1187,7 +1212,7 @@ namespace aveng {
 
 		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) { //
 			size_t numberOfInstances = modelType.second.size(); // second is the vector of <shared_ptr> AssimpInstance
-			if (numberOfInstances > 0) {
+			if (numberOfInstances > 0 && modelType.second.at(0)->getModel()->getTriangleCount()) {
 				std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
 
 				/* animated models */
@@ -1253,12 +1278,24 @@ namespace aveng {
 
 		// Ship the SSBO data
 		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers[currentFrameIndex], mNodeTransFormData);
+	
+		// If node transform buffer resized, resize ALL frames to keep them synchronized
+		if (bufferResized) {
+			size_t newBufferSize = mNodeTransformBuffers[currentFrameIndex].bufferSize;
+			for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+				if (i != currentFrameIndex) {
+					ShaderStorageBuffer::checkForResize(engineDevice, mNodeTransformBuffers[i], newBufferSize);
+				}
+			}
+		}
 
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		/* resize SSBO if needed */
-		bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));// sizeof(glm::mat4));
-		bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderBoneMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));// sizeof(glm::mat4));
+		/* resize SSBO if needed - resize ALL frames together to keep them synchronized */
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers[i], boneMatrixBufferSize * sizeof(glm::mat4));
+			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderBoneMatrixBuffers[i], boneMatrixBufferSize * sizeof(glm::mat4));
+		}
 
 		// Note: this occurs if ANY buffer has a new size
 		if (bufferResized) {
@@ -1267,203 +1304,143 @@ namespace aveng {
 			updateComputeDescriptorSets();
 		}
 
-		/* record compute commands */
-		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence[currentFrameIndex]);
-		if (result != VK_SUCCESS) {
-			std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
-			return WTF_BOOM;
-		}
-
-		if (animatedModelLoaded) {
-
-			// computeCommandBuffer = getCurrentCommandBufferCompute();
-
-			if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex], 0)) {
-				std::printf("%s error: failed to reset compute command buffer\n", __FUNCTION__);
+			/* record compute commands */
+			result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence[currentFrameIndex]);
+			if (result != VK_SUCCESS) {
+				std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
 				return WTF_BOOM;
 			}
 
-			if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
-				std::printf("%s error: failed to begin compute command buffer\n", __FUNCTION__);
-				return WTF_BOOM;
-			}
+			if (animatedModelLoaded) {
 
-			uint32_t computeShaderModelOffset = 0;
-			for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
-				size_t numberOfInstances = modelType.second.size();
-				std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
-				if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
+				/*
+				* Command Buffer recording for the Compute queue
+				*/
 
-					/* compute shader for animated models only */
-					if (model->hasAnimations() && !model->getBoneList().empty()) {
-						size_t numberOfBones = model->getBoneList().size();
+				if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex], 0)) {
+					std::printf("%s error: failed to reset compute command buffer\n", __FUNCTION__);
+					return WTF_BOOM;
+				}
 
-						//std::printf("[runComputeShaders] Buffer sizes - NodeTransform: %zu, TRSMatrix: %zu, BoneMatrix: %zu\n",
-						//	mNodeTransformBuffers[currentFrameIndex].bufferSize,
-						//	mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize,
-						//	mShaderBoneMatrixBuffers[currentFrameIndex].bufferSize);
+				if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
+					std::printf("%s error: failed to begin compute command buffer\n", __FUNCTION__);
+					return WTF_BOOM;
+				}
 
-						runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
+				uint32_t computeShaderModelOffset = 0;
+				for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
+					size_t numberOfInstances = modelType.second.size();
+					std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+					if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 
-						computeShaderModelOffset += numberOfInstances * numberOfBones;
+						/* compute shader for animated models only */
+						if (model->hasAnimations() && !model->getBoneList().empty()) {
+							size_t numberOfBones = model->getBoneList().size();
+
+							//std::printf("[runComputeShaders] Buffer sizes - NodeTransform: %zu, TRSMatrix: %zu, BoneMatrix: %zu\n",
+							//	mNodeTransformBuffers[currentFrameIndex].bufferSize,
+							//	mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize,
+							//	mShaderBoneMatrixBuffers[currentFrameIndex].bufferSize);
+
+							runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
+
+							computeShaderModelOffset += numberOfInstances * numberOfBones;
+						}
 					}
 				}
+
+				// End command recording for Compute Queue
+				if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
+					std::printf("%s error: failed to end compute command buffer\n", __FUNCTION__);
+					return WTF_BOOM;
+				}
+
+				/* submit compute commands */
+				VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+				VkSubmitInfo computeSubmitInfo{};
+				computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				computeSubmitInfo.commandBufferCount = 1;
+				computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute[currentFrameIndex];
+				computeSubmitInfo.signalSemaphoreCount = 1;
+				computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
+				computeSubmitInfo.waitSemaphoreCount = 1;
+				computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
+				computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+				result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
+				if (result != VK_SUCCESS) {
+					std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
+					return WTF_BOOM;
+				};
+
+			}
+			else {
+				/* do an empty submit if we don't have animated models to satisfy fence and semaphor */
+				VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+				VkSubmitInfo computeSubmitInfo{};
+				computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				computeSubmitInfo.signalSemaphoreCount = 1;
+				computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
+				computeSubmitInfo.waitSemaphoreCount = 1;
+				computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
+				computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+				// Compute submission and fence signaling
+				result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
+				if (result != VK_SUCCESS) {
+					std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
+					return WTF_BOOM;
+				};
 			}
 
-			if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
-				std::printf("%s error: failed to end compute command buffer\n", __FUNCTION__);
-				return WTF_BOOM;
-			}
-
-			/* submit compute commands */
-			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-			VkSubmitInfo computeSubmitInfo{};
-			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			computeSubmitInfo.commandBufferCount = 1;
-			computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute[currentFrameIndex];
-			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
-			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
-			computeSubmitInfo.pWaitDstStageMask = &waitStage;
-
-			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
-			if (result != VK_SUCCESS) {
-				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
-				return WTF_BOOM;
-			};
-
-		}
-		else {
-			/* do an empty submit if we don't have animated models to satisfy fence and semaphor */
-			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-			VkSubmitInfo computeSubmitInfo{};
-			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
-			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
-			computeSubmitInfo.pWaitDstStageMask = &waitStage;
-
-			// No Validation errors on first frame
-			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
-			if (result != VK_SUCCESS) {
-				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
-				return WTF_BOOM;
-			};
-		}
-
-		// handleMovementKeys();
+			// handleMovementKeys();
 
 		/* we need to update descriptors after the upload if buffer size changed */
 		mUploadToUBOTimer.start();
-		// TODO - We'll skip this upload if the camera's data hasn't changed.
+		// TODO - Skip this upload if the camera's data hasn't changed (the view isn't moving).
 		UniformBuffer::uploadData(engineDevice, mPerspectiveViewMatrixUBOBuffers[currentFrameIndex], mMatrices);
 		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers[currentFrameIndex], mWorldPosMatrices);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-
+		// If one frame's buffer resized, resize ALL frames to keep them synchronized
 		if (bufferResized) {
-			std::cout << "UBO Resized - Updating Descriptor Sets" << std::endl;
+			size_t newBufferSize = mShaderModelRootMatrixBuffers[currentFrameIndex].bufferSize;
+			for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+				if (i != currentFrameIndex) {
+					ShaderStorageBuffer::checkForResize(engineDevice, mShaderModelRootMatrixBuffers[i], newBufferSize);
+				}
+			}
+		
+			std::cout << "Model Root SSBO Resized - Updating Descriptor Sets" << std::endl;
 			updateDescriptorSets();
 			updateComputeDescriptorSets();
 		}
 
-		/* start with graphics rendering */
-		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence[currentFrameIndex]);
-		if (result != VK_SUCCESS) {
-			std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
-			return WTF_BOOM;
-		}
+	}
 
-		// NOTE: This would prevent the current renderpass (if there were one)
-		if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex], 0)) {
+	void Renderer::beginGraphicsCommands(int frameIndex)
+	{
+
+		if (!engineDevice.resetCommandBuffer(renderData.rdCommandBuffersGraphics[frameIndex], 0)) {
 			std::printf("%s error: failed to reset command buffer\n", __FUNCTION__);
-			return WTF_BOOM;
+			throw std::runtime_error("Failed to begin Graphics Command Buffer 1");
 		}
 
-		if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersGraphics[currentFrameIndex])) {
+		if (!engineDevice.beginSingleShotCommand(renderData.rdCommandBuffersGraphics[frameIndex])) {
 			std::printf("%s error: failed to begin command buffer\n", __FUNCTION__);
-			return WTF_BOOM;
+			throw std::runtime_error("Failed to begin Graphics Command Buffer 0");
 		}
 
-		// Note: This will never be true in release >.>
-		if (!mRenderpassBypass) {
-			beginSwapChainRenderPass(
-				renderData.rdCommandBuffersGraphics[currentFrameIndex],
-				aveng_swapchain->getFrameBuffer(currentImageIndex),
-				aveng_swapchain->getRenderPass()
-			);
-			
-			drawModels(
-				renderData.rdCommandBuffersGraphics[currentFrameIndex],
-				renderData.rdAvengPipeline,
-				renderData.rdAvengAnimationPipeline,
-				renderData.rdAvengPipelineLayout,
-				renderData.rdAvengAnimationPipelineLayout,
-				renderData.rdAvengDescriptorSets[currentFrameIndex],
-				renderData.rdAvengAnimationDescriptorSets[currentFrameIndex]);
+	}
 
-			endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
-		}
-
-		VkResult result = vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+	void Renderer::endGraphicsCommands(int frameIndex)
+	{
+		VkResult result = vkEndCommandBuffer(renderData.rdCommandBuffersGraphics[frameIndex]);
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: could not end render pass (error: %i)\n", __FUNCTION__, result);
 			throw std::runtime_error("error: could not end render pass");
-		}
-
-		/* submit command buffer */
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore[currentFrameIndex], renderData.rdPresentSemaphore[currentFrameIndex] };
-		std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-
-		/* compute shader: contine if in vertex input ready
-		 * vertex shader: wait for color attachment output ready */
-		submitInfo.pWaitDstStageMask = waitStages.data();
-
-		submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
-		submitInfo.pWaitSemaphores = waitSemaphores.data();
-
-		std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore[currentFrameIndex], renderData.rdGraphicSemaphore[currentFrameIndex] };
-
-		submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
-		submitInfo.pSignalSemaphores = signalSemaphores.data();
-
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &renderData.rdCommandBuffersGraphics[currentFrameIndex];
-
-		result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence[currentFrameIndex]);
-		if (result != VK_SUCCESS) {
-			std::printf("%s error: failed to submit draw command buffer (%i)\n", __FUNCTION__, result);
-			return WTF_BOOM;
-		}
-
-		/* trigger swapchain image presentation */
-		VkPresentInfoKHR presentInfo{};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &renderData.rdRenderSemaphore[currentFrameIndex];
-
-		VkSwapchainKHR swapchain = aveng_swapchain->getSwapchain();
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &swapchain;
-
-		presentInfo.pImageIndices = &currentImageIndex;
-
-		result = vkQueuePresentKHR(engineDevice.presentQueue(), &presentInfo);
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-			recreateSwapChain();
-		}
-		else {
-			if (result != VK_SUCCESS) {
-				std::printf("%s error: failed to present swapchain image\n", __FUNCTION__);
-				return WTF_BOOM;
-			}
 		}
 
 	}
@@ -1480,8 +1457,10 @@ namespace aveng {
 		VkPipelineLayout basicLayout,
 		VkPipelineLayout animationLayout,
 		VkDescriptorSet basicDescriptorSet,
-		VkDescriptorSet animationDescriptorSet)
+		VkDescriptorSet animationDescriptorSet,
+		int frameIndex)
 	{
+
 		/* draw the models */
 		uint32_t worldPosOffset = 0;
 		uint32_t skinMatOffset = 0;
@@ -1511,7 +1490,7 @@ namespace aveng {
 						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
 					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-					model->drawInstancedV2(renderData, numberOfInstances, currentFrameIndex);
+					model->drawInstancedV2(renderData, basicLayout, animationLayout, numberOfInstances, frameIndex);
 					worldPosOffset += numberOfInstances;
 					skinMatOffset += numberOfInstances * numberOfBones;
 
@@ -1531,7 +1510,8 @@ namespace aveng {
 						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
 					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-					model->drawInstancedV2(renderData, numberOfInstances, currentFrameIndex);
+					// Note: We pass the animation layout here even though its implicitly basic
+					model->drawInstancedV2(renderData, basicLayout, animationLayout, numberOfInstances, frameIndex);
 					worldPosOffset += numberOfInstances;
 
 				}
@@ -1541,31 +1521,20 @@ namespace aveng {
 		return true;
 	}
 
-	void Renderer::updateDescriptorSets(int iters) {
-		if (iters > SwapChain::MAX_FRAMES_IN_FLIGHT) {
-			throw std::runtime_error("Attempting to write too many descriptor sets.");
-		}
+	void Renderer::updateDescriptorSets() {
 		Logger::log(1, "%s: updating descriptor sets\n", __FUNCTION__);
-		for (int i = 0; i < iters; i++)
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
-
-			int index = i;
-
-			// This implies we're updating descriptors during rendering. On init, we perform MAX_FRAMES_IN_FLIGHT iterations
-			if (iters == 1) {
-				index = currentFrameIndex;
-			}
-			
 			/* we must update the descriptor sets whenever the buffer size has changed */
 			{
 				/* non-animated shader */
 				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[index].buffer;
+				matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[i].buffer;
 				matrixInfo.offset = 0;
 				matrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo worldPosInfo{};
-				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[index].buffer;
+				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[i].buffer;
 				worldPosInfo.offset = 0;
 				worldPosInfo.range = VK_WHOLE_SIZE;
 
@@ -1577,7 +1546,7 @@ namespace aveng {
 				VkWriteDescriptorSet matrixWriteDescriptorSet{};
 				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				matrixWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[index];
+				matrixWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[i];
 				matrixWriteDescriptorSet.dstBinding = 0;
 				matrixWriteDescriptorSet.descriptorCount = 1;
 				matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
@@ -1585,7 +1554,7 @@ namespace aveng {
 				VkWriteDescriptorSet posWriteDescriptorSet{};
 				posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				posWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[index];
+				posWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[i];
 				posWriteDescriptorSet.dstBinding = 1;
 				posWriteDescriptorSet.descriptorCount = 1;
 				posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
@@ -1600,17 +1569,17 @@ namespace aveng {
 			{
 				/* animated shader */
 				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[index].buffer;
+				matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[i].buffer;
 				matrixInfo.offset = 0;
 				matrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo boneMatrixInfo{};
-				boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[index].buffer;
+				boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[i].buffer;
 				boneMatrixInfo.offset = 0;
 				boneMatrixInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo worldPosInfo{};
-				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[index].buffer;
+				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[i].buffer;
 				worldPosInfo.offset = 0;
 				worldPosInfo.range = VK_WHOLE_SIZE;
 
@@ -1622,7 +1591,7 @@ namespace aveng {
 				VkWriteDescriptorSet matrixWriteDescriptorSet{};
 				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				matrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[index];
+				matrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[i];
 				matrixWriteDescriptorSet.dstBinding = 0;
 				matrixWriteDescriptorSet.descriptorCount = 1;
 				matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
@@ -1630,7 +1599,7 @@ namespace aveng {
 				VkWriteDescriptorSet boneMatrixWriteDescriptorSet{};
 				boneMatrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				boneMatrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[index];
+				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[i];
 				boneMatrixWriteDescriptorSet.dstBinding = 1;
 				boneMatrixWriteDescriptorSet.descriptorCount = 1;
 				boneMatrixWriteDescriptorSet.pBufferInfo = &boneMatrixInfo;
@@ -1638,7 +1607,7 @@ namespace aveng {
 				VkWriteDescriptorSet posWriteDescriptorSet{};
 				posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				posWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[index];
+				posWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[i];
 				posWriteDescriptorSet.dstBinding = 2;
 				posWriteDescriptorSet.descriptorCount = 1;
 				posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
@@ -1667,35 +1636,27 @@ namespace aveng {
 		
 	}
 
-	void Renderer::updateComputeDescriptorSets(int iters) {
+	void Renderer::updateComputeDescriptorSets() {
 
 		Logger::log(1, "%s: updating compute descriptor sets\n", __FUNCTION__);
-		for (int i = 0; i < iters; i++)
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
-
-			int index = i;
-
-			// This implies we're updating descriptors during rendering. On init, we perform 2 iterations
-			if (iters == 1) {
-				index = currentFrameIndex;
-			}
-
 			{
 				/* transform compute shader */
 				VkDescriptorBufferInfo transformInfo{};
-				transformInfo.buffer = mNodeTransformBuffers[index].buffer;
+				transformInfo.buffer = mNodeTransformBuffers[i].buffer;
 				transformInfo.offset = 0;
 				transformInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo trsInfo{};
-				trsInfo.buffer = mShaderTrsMatrixBuffers[index].buffer;
+				trsInfo.buffer = mShaderTrsMatrixBuffers[i].buffer;
 				trsInfo.offset = 0;
 				trsInfo.range = VK_WHOLE_SIZE;
 
 				VkWriteDescriptorSet transformWriteDescriptorSet{};
 				transformWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				transformWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				transformWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[index];
+				transformWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[i];
 				transformWriteDescriptorSet.dstBinding = 0;
 				transformWriteDescriptorSet.descriptorCount = 1;
 				transformWriteDescriptorSet.pBufferInfo = &transformInfo;
@@ -1703,7 +1664,7 @@ namespace aveng {
 				VkWriteDescriptorSet trsWriteDescriptorSet{};
 				trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[index];
+				trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[i];
 				trsWriteDescriptorSet.dstBinding = 1;
 				trsWriteDescriptorSet.descriptorCount = 1;
 				trsWriteDescriptorSet.pBufferInfo = &trsInfo;
@@ -1718,19 +1679,19 @@ namespace aveng {
 			{
 				/* matrix multiplication compute shader, global data */
 				VkDescriptorBufferInfo trsInfo{};
-				trsInfo.buffer = mShaderTrsMatrixBuffers[index].buffer;
+				trsInfo.buffer = mShaderTrsMatrixBuffers[i].buffer;
 				trsInfo.offset = 0;
 				trsInfo.range = VK_WHOLE_SIZE;
 
 				VkDescriptorBufferInfo boneMatrixInfo{};
-				boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[index].buffer;
+				boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[i].buffer;
 				boneMatrixInfo.offset = 0;
 				boneMatrixInfo.range = VK_WHOLE_SIZE;
 
 				VkWriteDescriptorSet trsWriteDescriptorSet{};
 				trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[index];
+				trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[i];
 				trsWriteDescriptorSet.dstBinding = 0;
 				trsWriteDescriptorSet.descriptorCount = 1;
 				trsWriteDescriptorSet.pBufferInfo = &trsInfo;
@@ -1738,7 +1699,7 @@ namespace aveng {
 				VkWriteDescriptorSet boneMatrixWriteDescriptorSet{};
 				boneMatrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				boneMatrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[index];
+				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[i];
 				boneMatrixWriteDescriptorSet.dstBinding = 1;
 				boneMatrixWriteDescriptorSet.descriptorCount = 1;
 				boneMatrixWriteDescriptorSet.pBufferInfo = &boneMatrixInfo;

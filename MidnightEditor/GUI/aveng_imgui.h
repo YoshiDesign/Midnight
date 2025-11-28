@@ -1,12 +1,8 @@
 #pragma once
-
-#include "CoreVK/EngineDevice.h"
 #include "CoreVK/VkRenderData.h"
-#include "CoreVK/VertexBuffer.h"
-#include "Core/data.h"
-#include "Core/aveng_window.h"
 #include "Utils/window_callbacks.h"
 #include "Utils/Timer.h"
+#include "Game/data.h"
 
 // libs
 #include "Utils/glm_includes.h"
@@ -24,6 +20,9 @@
 // std
 #include <stdexcept>
 
+class EngineDevice;
+class AvengWindow;
+
 namespace aveng {
 
 	static void check_vk_result(VkResult err) {
@@ -39,16 +38,13 @@ namespace aveng {
 		void init(VkRenderPass renderPass, uint32_t imageCount);
 		~AvengImgui();
 
-        void setupFrame(float dt);
-
 		void newFrame();
 		void render(int frameIndex);
 		void runGUI();
 
         void handleMouseButtonEvents(int button, int action, int mods);
-        void handleMousePositionEvents(double xPos, double yPos);
+        void handleMousePositionEvents(double xPos, double yPos, bool rmbDown);
 		void hideMouse(bool hide);
-
 
 		bool show_player_controller_window = false;
 		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

@@ -33,13 +33,22 @@
     <ClCompile Include="Game\Player\GameplayFunctions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\VulkanXTools.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="System\Peripheral\Controller.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="System\Peripheral\KeyboardController.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="System\InputSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="System\Input\GameInputController.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="System\Input\EditorInputController.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -78,6 +87,27 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="System\Peripheral\KeyboardController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="System\InputSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Input\GameInputController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Input\EditorInputController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Input\IInputController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Input\EventPayloads.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Game.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\data.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

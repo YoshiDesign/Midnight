@@ -1,16 +1,20 @@
 #pragma once
-#include <memory>
 #include "CoreVK/EngineDevice.h"
-#include "CoreVK/VkRenderData.h"
 #include "Core/Renderer/Renderer.h"
-#include "Core/aveng_frame_content.h"
-#include "Core/data.h"
-#include "Editor.h"
+#include "Core/Renderer/AvengFrame.h"
 #include "System/Camera/aveng_camera.h"
+#include "CoreVK/VkRenderData.h"
+#include "System/InputSystem.h"
 #include "System/Peripheral/KeyboardController.h"
+#include "Game/data.h"
+#ifdef ENABLE_EDITOR
+#include "Editor.h"
+#endif
 #include "avpch.h"
 
 namespace aveng {
+
+	class AvengWindow;
 
 	// Use engine types
 	using LightsUbo = aveng::LightsUbo;
@@ -40,9 +44,6 @@ namespace aveng {
 		void updateCamera(float frameTime);
 
 		VkDevice getEngineDevice() { return engineDevice.device(); }
-		void setCamera(int cam) { renderData.camera = cam; }; // Tmp
-		// Renderer& pRenderer() { return renderer; }
-		// SystemContext& context() { return systemData.systemContext(); };
 
 	private:
 
@@ -58,21 +59,27 @@ namespace aveng {
 		AvengWindow& window;				 // GLHF
 		EngineDevice engineDevice{ window }; // Summon things to this world
 		AvengCamera player_camera;
-		KeyboardController keyboardController{ viewerObject, game_data };
-
-		// State
-		GameData game_data;
+		
+		// Game & State
+		GameData gameData;
+		Game holyShip{ gameData };
 		VkRenderData renderData;
 		ModelAndInstanceData mModelInstanceData{};
 
 		// Application-level components
 		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
-		
-		// Engine renderer (now owns all Vulkan resources)
-		Renderer renderer{ engineDevice, window, renderData, game_data, mModelInstanceData };
+		KeyboardController keyboardController{ viewerObject, gameData };
+
+		// Engine & Renderer
+		Renderer renderer{ engineDevice, window, renderData, mModelInstanceData };
 
 #ifdef ENABLE_EDITOR
-		Editor editor{ renderData, renderer, game_data, engineDevice, window, mModelInstanceData };
+		Editor editor{ renderData, renderer, gameData, engineDevice, window, mModelInstanceData };
+		AvengFrame frame{renderer, renderData, gameData, engineDevice, mModelInstanceData, &editor };
+		InputSystem inputSystem{ holyShip, &editor };
+#else
+		AvengFrame frame{ renderer, renderData, engineDevice,  mModelInstanceData };
+		InputSystem inputSystem{ holyShip };
 #endif
 
 	};
