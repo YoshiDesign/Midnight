@@ -55,6 +55,12 @@ namespace aveng {
 			throw std::runtime_error("Frame Failure 0");
 		}
 
+		//if (pEditor->hasClicked()) {
+		//	std::cout << "2 -----------[EDITOR DEBUG BEGIN]---------" << std::endl;
+		//	pEditor->debug();
+		//	std::cout << "3 -----------[EDITOR DEBUG END]---------" << std::endl;
+		//}
+
 		renderer.updateCamera();
 		/**
 		* Update Model Buffer Data - Does not record commands
@@ -79,7 +85,9 @@ namespace aveng {
 			* Update Model Buffer Data - Does not record commands
 			* Side-effects: Buffers resizes cause descriptor sets to update (again)
 			*/
+
 			pEditor->update(deltaTime);
+
 		}
 #endif 
 
@@ -130,12 +138,13 @@ namespace aveng {
 #ifdef ENABLE_EDITOR
 		}
 #endif
+
 		// End model drawing renderpass (normal or selection-enabled)
 		renderer.endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
 		renderer.endGraphicsCommands(currentFrameIndex);
 
 #ifdef ENABLE_EDITOR
-
+		
 		pEditor->beginGUICommands(currentFrameIndex);
 
 		// Begin the ImGUI renderpass
@@ -146,6 +155,7 @@ namespace aveng {
 		);
 
 		if (gameData.currentAppMode == AppMode::Editor) {
+
 			// This is where the editor updates its current frame index - TODO - Maybe this index is better passed into it as an arg here
 			pEditor->renderGUI(currentFrameIndex, deltaTime);
 		}
@@ -164,6 +174,7 @@ namespace aveng {
 
 			// NOTE: drawInstanceGizmo begins / ends its own renderpass
 			if (pEditor->drawInstanceGizmo()) {
+
 				// Next in queue - Line drawing commands
 				commandBuffers.push_back(renderData.rdLineCommandBuffers[currentFrameIndex]);
 			
@@ -202,7 +213,9 @@ namespace aveng {
 
 #ifdef ENABLE_EDITOR
 		if (gameData.currentAppMode == AppMode::Editor) {
+
 			// Get the selected instance ID after the frag shader writes it to the Selection FrameBuffer texture
+			// Side-Effect : Sets editor's clicked flag to false
 			pEditor->readPixelDataPos();
 		}
 #endif
@@ -229,6 +242,7 @@ namespace aveng {
 		}
 
 		renderer.endFrame();
+
 
 	}
 }

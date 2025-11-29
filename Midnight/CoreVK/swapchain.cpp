@@ -189,7 +189,7 @@ namespace aveng {
     * Creates one selection image per swapchain frame for proper synchronization.
     */
     void SwapChain::createSelectionImageViews() {
-        std::cout << "DEBUG" << std::endl;
+
         size_t imageCount = swapChainImages.size();
         renderData.rdSelectionImages.resize(imageCount);
         renderData.rdSelectionImageViews.resize(imageCount);
@@ -591,7 +591,7 @@ namespace aveng {
     
     }
 
-    float SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t frameIndex) {
+    float SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t imageIndex) {
         /* random default value to detect errors */
         float pixelColor = -444.0f;
 
@@ -603,11 +603,13 @@ namespace aveng {
         }
 
         /* VALIDATION: Bounds check frame index */
-        if (frameIndex >= renderData.rdSelectionImages.size()) {
+        if (imageIndex >= renderData.rdSelectionImages.size()) {
             Logger::log(1, "%s error: frame index %u out of bounds, max is %zu\n",
-                __FUNCTION__, frameIndex, renderData.rdSelectionImages.size() - 1);
+                __FUNCTION__, imageIndex, renderData.rdSelectionImages.size() - 1);
             return pixelColor;
         }
+
+        std::cout << "Reading pixel from: \t(" << xPos << ", " << yPos << ")" << std::endl;
 
         VkImage readbackImage;
         VmaAllocation readbackImageAlloc;
@@ -661,7 +663,7 @@ namespace aveng {
         srcLayoutTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         srcLayoutTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         srcLayoutTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        srcLayoutTransferBarrier.image = renderData.rdSelectionImages[frameIndex];      // The image resource we're getting our data from (frame-specific)
+        srcLayoutTransferBarrier.image = renderData.rdSelectionImages[imageIndex];      // The image resource we're getting our data from (frame-specific)
         srcLayoutTransferBarrier.subresourceRange = layoutTransferRange;
         srcLayoutTransferBarrier.srcAccessMask = 0;
         srcLayoutTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -690,17 +692,18 @@ namespace aveng {
             0, 0, nullptr, 0, nullptr, 1, &layoutTransferBarrier);
         vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
             0, 0, nullptr, 0, nullptr, 1, &srcLayoutTransferBarrier);
-        vkCmdCopyImage(readbackCommandBuffer, renderData.rdSelectionImages[frameIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        vkCmdCopyImage(readbackCommandBuffer, renderData.rdSelectionImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             readbackImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopyRegion);
         vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
             0, 0, nullptr, 0, nullptr, 1, &destLayoutTransferBarrier);
 
         /* transition selection image back to COLOR_ATTACHMENT_OPTIMAL for next frame */
+        // This is more robust in our architecture because we use a double buffering approach
         VkImageMemoryBarrier restoreSelectionLayoutBarrier{};
         restoreSelectionLayoutBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         restoreSelectionLayoutBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         restoreSelectionLayoutBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        restoreSelectionLayoutBarrier.image = renderData.rdSelectionImages[frameIndex];
+        restoreSelectionLayoutBarrier.image = renderData.rdSelectionImages[imageIndex];
         restoreSelectionLayoutBarrier.subresourceRange = layoutTransferRange;
         restoreSelectionLayoutBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         restoreSelectionLayoutBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -737,7 +740,7 @@ namespace aveng {
 
         /* destroy local image, no longer needed */
         vmaDestroyImage(device.allocator(), readbackImage, readbackImageAlloc);
-        std::cout << "Got pixelColor" << std::endl;
+        std::cout << "Got pixelColor: " << pixelColor << std::endl;
         return pixelColor;
     }
 

@@ -32,13 +32,13 @@ namespace aveng {
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
 
-	// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
-	SwapChain* pGetSwapChain() const { return aveng_swapchain.get(); }
-	uint32_t* pGetCurrentImageIndex() { return &currentImageIndex; }
-	VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
-	float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
-	float getPixelValueFromPos(unsigned int mMouseXPos, unsigned int mMouseYPos, uint32_t frameIndex) { return aveng_swapchain->getPixelValueFromPos(mMouseXPos, mMouseYPos, frameIndex); };
-	uint32_t getImageCount() const { return aveng_swapchain->imageCount(); }
+		// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
+		SwapChain* pGetSwapChain() const { return aveng_swapchain.get(); }
+		uint32_t* pGetCurrentImageIndex() { return &currentImageIndex; }
+		VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
+		float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
+		float getPixelValueFromPos(unsigned int mMouseXPos, unsigned int mMouseYPos) { return aveng_swapchain->getPixelValueFromPos(mMouseXPos, mMouseYPos, currentImageIndex); };
+		uint32_t getImageCount() const { return aveng_swapchain->imageCount(); }
 
 		VkRenderPass getSwapChainRenderPass() const { return aveng_swapchain->getRenderPass(); }
 		VkRenderPass getSelectionRenderPass() const { return renderData.rdSelectionRenderpass; }

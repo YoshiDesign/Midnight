@@ -33,7 +33,7 @@ namespace aveng {
 
 		// A list of the unique models currently loaded
 		std::vector<std::shared_ptr<AvengModel>> miModelList{};
-		int miSelectedModelEditor = 0;
+		int miSelectedEditorModel = 0;
 
 		// A list of all instances being rendered
 		std::vector<std::shared_ptr<AssimpInstance>> miAssimpInstances{};

@@ -407,7 +407,7 @@ namespace aveng {
 
                 /* Validate selected model index and reset if invalid */
                 if (!modelListEmtpy) {
-                    selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str();
+                    selectedModelName = modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str();
                 }
 
                 if (modelListEmtpy) {
@@ -421,11 +421,11 @@ namespace aveng {
                 if (ImGui::BeginCombo("##ModelCombo",
                     // avoid access the empty model vector
                     selectedModelName.c_str())) {
-                    for (int i = 0; i < modInstData.miModelList.size(); ++i) {
-                        const bool isSelected = (modInstData.miSelectedModelEditor == i);
+                    for (int i = 1; i < modInstData.miModelList.size(); ++i) {
+                        const bool isSelected = (modInstData.miSelectedEditorModel == i);
                         if (ImGui::Selectable(modInstData.miModelList.at(i)->getModelFileName().c_str(), isSelected)) {
-                            modInstData.miSelectedModelEditor = i;
-                            selectedModelName = modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str();
+                            modInstData.miSelectedEditorModel = i;
+                            selectedModelName = modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str();
                         }
 
                         if (isSelected) {
@@ -487,17 +487,17 @@ namespace aveng {
                 }
 
                 if (ImGui::BeginPopupModal("Delete Model?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                    ImGui::Text("Delete Model '%s'?", modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str());
+                    ImGui::Text("Delete Model '%s'?", modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str());
 
                     /* cheating a bit to get buttons more to the center */
                     ImGui::Indent();
                     ImGui::Indent();
                     if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                        modInstData.miModelDeleteCallbackFunction(modInstData.miModelList.at(modInstData.miSelectedModelEditor)->getModelFileName().c_str());
+                        modInstData.miModelDeleteCallbackFunction(modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str());
 
                         /* decrement selected model index to point to model that is in list before the deleted one */
-                        if (modInstData.miSelectedModelEditor > 1) {
-                            modInstData.miSelectedModelEditor -= 1;
+                        if (modInstData.miSelectedEditorModel > 1) {
+                            modInstData.miSelectedEditorModel -= 1;
                         }
 
                         /* reset model instance to first instance - if we have instances */
@@ -522,14 +522,14 @@ namespace aveng {
 
                 ImGui::SameLine();
                 if (ImGui::Button("Create Instance")) {
-                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedModelEditor];
+                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedEditorModel];
                     modInstData.miInstanceAddCallbackFunction(currentModel);
                     /* select new instance */
                     modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
                 }
 
                 if (ImGui::Button("Create Multiple Instances")) {
-                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedModelEditor];
+                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedEditorModel];
                     modInstData.miInstanceAddManyCallbackFunction(currentModel, editorData.eManyInstanceCreateNum);
                     modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
                 }
@@ -808,7 +808,8 @@ namespace aveng {
 
         /* trigger selection when left button has been released */
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-            editorData.eMousePick = true;
+            std::cout << "ImGUI: Mouse Click!!" << std::endl;
+            editorData.eMousePick = true; // The mouse was clicked
             renderData.rdInstanceEditMode = instanceEditMode::move;
         }
 

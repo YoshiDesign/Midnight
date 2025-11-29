@@ -147,7 +147,7 @@ namespace aveng {
 			vkQueueWaitIdle(engineDevice.graphicsQueue());
 
 			/* VALIDATION: Check coordinates are non-negative */
-			if (editorData.eMouseLastClickX < 0 || editorData.eMouseLastClickY < 0) {
+			if (editorData.eMouseXPos < 0 || editorData.eMouseYPos < 0) {
 				Logger::log(1, "%s: Invalid negative coordinates (%d, %d)\n", 
 					__FUNCTION__, editorData.eMouseXPos, editorData.eMouseYPos);
 				editorData.eMousePick = false;
@@ -157,27 +157,34 @@ namespace aveng {
 			/* VALIDATION: Check coordinates are within viewport bounds */
 			uint32_t viewportWidth = renderer.pGetSwapChain()->width();
 			uint32_t viewportHeight = renderer.pGetSwapChain()->height();
-			if (static_cast<unsigned int>(editorData.eMouseLastClickX) >= viewportWidth ||
-				static_cast<unsigned int>(editorData.eMouseLastClickY) >= viewportHeight) {
+			if (static_cast<unsigned int>(editorData.eMouseXPos) >= viewportWidth ||
+				static_cast<unsigned int>(editorData.eMouseYPos) >= viewportHeight) {
 				Logger::log(1, "%s: Coordinates out of bounds (%d, %d), viewport is (%u x %u)\n",
-					__FUNCTION__, editorData.eMouseLastClickX, editorData.eMouseLastClickY, viewportWidth, viewportHeight);
+					__FUNCTION__, editorData.eMouseXPos, editorData.eMouseYPos, viewportWidth, viewportHeight);
 				editorData.eMousePick = false;
 				return;
 			}
 
-
-
-			float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseLastClickX, editorData.eMouseLastClickY, currentFrameIndex);
+			float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos);
 			// std::cout << "End Selection: " << selectedInstanceId << std::endl;
 			if (selectedInstanceId >= 0.0f) {
+				// selectedInstanceId += 1.0f;
+				std::cout << "True: >= 0.0f - SelectedID\t" << selectedInstanceId << std::endl;
 				mModelInstanceData.miSelectedEditorInstance = static_cast<int>(selectedInstanceId);
 				editorData.eHasSelection = true;
 			}
 			else {
+				std::cout << "False: SelectedID\t" << selectedInstanceId << std::endl;
 				// std::cout << "Deselecting instance " << mModelInstanceData.miSelectedEditorInstance << std::endl;
 				mModelInstanceData.miSelectedEditorInstance = 0;
 				editorData.eHasSelection = false;
 			}
+
+			//if (hasClicked()) {
+			//	std::cout << "--------[Begin Debug]-------------------------" << std::endl;
+			//	debug();
+			//	std::cout << "-------------------[FIN]---------------------" << std::endl;
+			//}
 			editorData.eMousePick = false;
 		}
 	}
@@ -325,11 +332,12 @@ namespace aveng {
 		* once and lock only when you need it (ideally when selection changes, not per frame).
 		*/
 
+		// Selection Data
 		editorData.eSelectedInstance.clear();
 		// Q: Why is eSelectedInstance the size of all instances? A: As we iterate over instances, the selected one is set at that same index
 		editorData.eSelectedInstance.resize(mModelInstanceData.miAssimpInstances.size());
 
-		/* save the selected instance for color highlight */
+		// The actual instance we're selecting
 		editorData.eCurrentSelectedInstance = nullptr;
 		if (editorData.eHighlightSelectedInstance) {
 			editorData.eCurrentSelectedInstance = mModelInstanceData.miAssimpInstances[mModelInstanceData.miSelectedEditorInstance];
@@ -355,30 +363,41 @@ namespace aveng {
 	{
 
 		size_t instanceToStore = 0;
+		// Loop through every model and its instances
 		for (const auto& model : mModelInstanceData.miModelList) {
 			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+
+			// If this model has geometry (it's not a "null" instance)
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
 			{
+				
 				// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
 				//if (numberOfInstances > 0) 
 				//{
+				// Iterate through its instances
 				int index = 0;
 				// for (unsigned int i = 0; i < numberOfInstances; ++i) {
 				for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
 
-					// Set the buffer's x
+					// This is our currently selected instance
 					if (editorData.eCurrentSelectedInstance == instance) 
 					{
+						// std::cout << "We have a selected instance" << std::endl;
+						// []eSelectedInstance.x gets the blinking color value
 						editorData.eSelectedInstance.at(instanceToStore + index).x = editorData.eSelectHighlightValue; // The blinking color
 					} else {
+						// []eSelectedInstance.x gets a standard value
 						editorData.eSelectedInstance.at(instanceToStore + index).x = 1.0f; // color is unchanged
 					}
 
-					// Set the buffer's y
-					if (editorData.eHasSelection) 
+					//// Set the buffer's y
+					if (editorData.eMousePick || editorData.eHasSelection) 
 					{
+
 						InstanceSettings instSettings = instance->getInstanceSettings();
+						// This isInstanceIndexPosition should match the shader's gl_InstanceIndex
 						editorData.eSelectedInstance.at(instanceToStore + index).y = static_cast<float>(instSettings.isInstanceIndexPosition);
+						// std::cout << "Instance " << instanceToStore + index << "'s index position : " << instSettings.isInstanceIndexPosition << std::endl;
 					}
 					index++;
 				}

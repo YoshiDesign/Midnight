@@ -241,7 +241,7 @@ namespace aveng {
 			}
 			else {
 				/* select new model and new instance */
-				mModelInstanceData.miSelectedModelEditor = mModelInstanceData.miModelList.size() - 1;
+				mModelInstanceData.miSelectedEditorModel = mModelInstanceData.miModelList.size() - 1;
 				mModelInstanceData.miSelectedEditorInstance = mModelInstanceData.miAssimpInstances.size() - 1;
 			}
 		}
@@ -367,7 +367,14 @@ namespace aveng {
 	}
 
 	void Renderer::assignInstanceIndices() {
+		std::cout << "ASSINGING INDICES:" << std::endl;
 		for (size_t i = 0; i < mModelInstanceData.miAssimpInstances.size(); ++i) {
+			std::cout 
+				<< "modInstanceData.miAssimpInstances[" 
+				<< i <<  "] " 
+				<< mModelInstanceData.miAssimpInstances.at(i)->getModel()->getModelFileName() 
+				<< std::endl;
+
 			InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(i)->getInstanceSettings();
 			instSettings.isInstanceIndexPosition = i;
 			mModelInstanceData.miAssimpInstances.at(i)->setInstanceSettings(instSettings);
@@ -1487,11 +1494,17 @@ namespace aveng {
 						animationLayout, 1, 1, &animationDescriptorSet, 0, nullptr);
 
 					mUploadToUBOTimer.start();
+
+					// The number of bones in the model
 					mModelData.pkModelStride = numberOfBones;
+					// An index to the first location of this model's instances.
 					mModelData.pkWorldPosOffset = worldPosOffset;
+					// An index to the first location of this model's bones.
 					mModelData.pkSkinMatOffset = skinMatOffset;
+
 					vkCmdPushConstants(commandBuffer, animationLayout,
 						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
+
 					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
 					model->drawInstancedV2(renderData, basicLayout, animationLayout, numberOfInstances, frameIndex);

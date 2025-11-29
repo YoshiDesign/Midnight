@@ -35,6 +35,15 @@ namespace aveng {
 		void cleanup();
 
 		bool hasSelection() { return editorData.eHasSelection; }
+		bool hasClicked() { return editorData.eMousePick; }
+		void debug() {
+			std::cout << "miSelectedEditorModel: " << mModelInstanceData.miSelectedEditorModel << std::endl;
+			std::cout << "miSelectedEditorInstance: " << mModelInstanceData.miSelectedEditorInstance << std::endl;
+			std::cout << "has selection: " << editorData.eHasSelection << std::endl;
+			std::cout << "eHighlightSelectedInstance: " << editorData.eHighlightSelectedInstance << std::endl;
+			std::cout << "eCurrentSelectedInstance: " << editorData.eCurrentSelectedInstance << std::endl;
+			std::cout << "eSelectedInstance[EditorInstance].y: " << editorData.eSelectedInstance[mModelInstanceData.miSelectedEditorInstance].y << std::endl;
+		}
 
 		void readPixelDataPos();
 		void setupSelectionHighlight(float dt);

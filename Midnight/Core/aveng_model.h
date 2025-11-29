@@ -107,8 +107,8 @@ namespace aveng {
 		std::vector<VkDescriptorSet> mMatrixMultPerModelDescriptorSets;
 		VkDescriptorSetLayout mComputeMatrixMultPerModelDescriptorSetLayout;
 
-		std::string mModelFilenamePath;
-		std::string mModelFilename;
+		std::string mModelFilenamePath{"nullpath"};
+		std::string mModelFilename{"nullname"};
 
 	};
 

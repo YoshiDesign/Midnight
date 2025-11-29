@@ -12,7 +12,7 @@ layout (location = 3) out float selectInfo;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
-  uint worldPosOffset;
+  uint worldPosOffset;  // The index of each model's first instance
   uint skinMatrixOffset;
 };
 
