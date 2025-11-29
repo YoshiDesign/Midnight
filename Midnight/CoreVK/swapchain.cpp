@@ -40,16 +40,15 @@ namespace aveng {
 
     SwapChain::~SwapChain() {
 
+        std::cout << "DESTROYING SWAPCHAIN!!" << std::endl;
+
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(device.device(), imageView, nullptr);
             
         }
-        for (auto imageView : mSelectionImageViews) {
-            vkDestroyImageView(device.device(), imageView, nullptr);
-        }
 
         // Cleanup selection images from renderData
-        for (size_t i = 0; i < renderData.rdSelectionImages.size(); i++) {
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
             if (renderData.rdSelectionImageViews[i] != VK_NULL_HANDLE) {
                 vkDestroyImageView(device.device(), renderData.rdSelectionImageViews[i], nullptr);
             }
@@ -60,7 +59,7 @@ namespace aveng {
         }
 
         swapChainImageViews.clear();
-        mSelectionImageViews.clear();
+        // mSelectionImageViews.clear();
         renderData.rdSelectionImages.clear();
         renderData.rdSelectionImageViews.clear();
         renderData.rdSelectionImageAllocs.clear();
@@ -70,6 +69,7 @@ namespace aveng {
             swapChain = nullptr;
         }
 
+        std::cout << "Destroying Depth Images" << std::endl;
         for (int i = 0; i < depthImages.size(); i++) {
             vkDestroyImageView(device.device(), depthImageViews[i], nullptr);
             vmaDestroyImage(device.allocator(), depthImages[i], depthImageAllocations[i]);
@@ -191,16 +191,16 @@ namespace aveng {
     void SwapChain::createSelectionImageViews() {
 
         size_t imageCount = swapChainImages.size();
-        renderData.rdSelectionImages.resize(imageCount);
+        renderData.rdSelectionImages.resize(imageCount);        // TODO - make all 3 of these local to SwapChain to trim down VkRenderData
         renderData.rdSelectionImageViews.resize(imageCount);
         renderData.rdSelectionImageAllocs.resize(imageCount);
-        mSelectionImageViews.resize(imageCount);
+        // mSelectionImageViews.resize(imageCount);
         
         for (size_t i = 0; i < imageCount; i++)
         {
             std::cout << "Creating SwapChain Selection Img View " << i << std::endl;
             createSelectionImageView(i);
-            mSelectionImageViews[i] = renderData.rdSelectionImageViews[i];
+            // mSelectionImageViews[i] = renderData.rdSelectionImageViews[i];
         }
     }
 
@@ -594,6 +594,13 @@ namespace aveng {
     float SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t imageIndex) {
         /* random default value to detect errors */
         float pixelColor = -444.0f;
+
+        // This would be true while the swapchain is being recreated.
+        if (renderData.rdSelectionImages.empty() ||
+            imageIndex >= renderData.rdSelectionImages.size()) {
+            Logger::log(1, "%s error: selection images unavailable or invalid index\n", __FUNCTION__);
+            return pixelColor;
+        }
 
         /* VALIDATION: Bounds check coordinates */
         if (xPos >= width() || yPos >= height()) {

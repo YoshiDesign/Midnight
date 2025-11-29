@@ -243,6 +243,5 @@ namespace aveng {
 
 		renderer.endFrame();
 
-
 	}
 }

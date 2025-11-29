@@ -401,6 +401,8 @@ namespace aveng {
 	void Renderer::recreateSwapChain()
 	{
 
+		std::cout << "Recreating SwapChain!!!" << std::endl;
+
 		// Get current window size
 		auto extent = aveng_window.getExtent();
 
@@ -414,7 +416,7 @@ namespace aveng {
 		// Wait until the current swap chain isn't being used before we attempt to construct the next one.
 		vkDeviceWaitIdle(engineDevice.device());
 	
-		aveng_swapchain = nullptr; // This implies that the old swapchain is always VK_NULL_HANDLE(?)
+		aveng_swapchain = nullptr; // This implies that the old swapchain is always VK_NULL_HANDLE - The `else` condition never executes here.
 
 		if (aveng_swapchain == nullptr) {
 			// Create the new swapchain object

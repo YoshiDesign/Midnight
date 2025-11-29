@@ -37,10 +37,10 @@ namespace aveng {
 
         // Framebuffers & Views
         std::vector<VkImageView>& getSwapChainImageViews() { return swapChainImageViews; }
-        VkImageView     getImageView(int index) { return swapChainImageViews[index]; }
-        VkFramebuffer   getFrameBuffer(int index) { return mSwapChainFramebuffers[index]; }
-        VkFramebuffer   getSelectionFrameBuffer(int index) { return mSelectionFramebuffers[index]; }
-        VkImageView     getSelectionImageView(int index) { return mSelectionImageViews[index]; }
+        VkImageView     getImageView(int index) { return swapChainImageViews[index]; } // SwapChain
+        VkImageView     getSelectionImageView(int index) { return renderData.rdSelectionImageViews[index]; } // VkRenderData
+        VkFramebuffer   getFrameBuffer(int index) { return mSwapChainFramebuffers[index]; } // SwapChain
+        VkFramebuffer   getSelectionFrameBuffer(int index) { return mSelectionFramebuffers[index]; } // SwapChain
 
         VkImageView     createImageView(VkImage image, VkFormat format);
         void            createSelectionImageView(size_t index);
