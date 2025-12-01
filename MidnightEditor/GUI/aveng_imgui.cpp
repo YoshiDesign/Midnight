@@ -596,7 +596,7 @@ namespace aveng {
                     ImGui::BeginDisabled();
                 }
 
-                /* DragInt does not like clamp flag */
+                // Clamp here for DragInt
                 modInstData.miSelectedEditorInstance = std::clamp(modInstData.miSelectedEditorInstance, 0,
                     static_cast<int>(modInstData.miAssimpInstances.size() - 1));
 

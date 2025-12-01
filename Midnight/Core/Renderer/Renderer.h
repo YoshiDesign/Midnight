@@ -142,6 +142,7 @@ namespace aveng {
 		void beginGraphicsCommands(int currentFrameIndex);
 		void endGraphicsCommands(int currentFrameIndex);
 		void recreateSwapChain();
+		bool isRecreatingSwapChain() { return recreatingSwapchain; }
 		
 		void cleanup();
 
@@ -152,6 +153,7 @@ namespace aveng {
 
 		bool firstFrame = true;
 		bool mRenderpassBypass = false;
+		bool recreatingSwapchain = false;
 
 		// Engine systems
 		AvengWindow& aveng_window;

@@ -86,7 +86,7 @@ namespace aveng {
 			* Side-effects: Buffers resizes cause descriptor sets to update (again)
 			*/
 
-			pEditor->update(deltaTime);
+			pEditor->update(deltaTime, currentFrameIndex);
 
 		}
 #endif 
@@ -157,7 +157,7 @@ namespace aveng {
 		if (gameData.currentAppMode == AppMode::Editor) {
 
 			// This is where the editor updates its current frame index - TODO - Maybe this index is better passed into it as an arg here
-			pEditor->renderGUI(currentFrameIndex, deltaTime);
+			pEditor->renderGUI(deltaTime);
 		}
 
 		// End ImGUI renderpass & Command recording

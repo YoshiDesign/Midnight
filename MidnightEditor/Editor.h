@@ -28,8 +28,8 @@ namespace aveng {
 
 
 		void init(SwapChain* swapchain);
-		void update(float frameTime);
-		void renderGUI(unsigned int frameIndex, float frameTime);
+		void update(float frameTime, unsigned int frameIndex);
+		void renderGUI(float frameTime);
 		void updateCamera(float frameTime);
 		void drawSelectedModels(int frameIndex);
 		void cleanup();
@@ -42,7 +42,16 @@ namespace aveng {
 			std::cout << "has selection: " << editorData.eHasSelection << std::endl;
 			std::cout << "eHighlightSelectedInstance: " << editorData.eHighlightSelectedInstance << std::endl;
 			std::cout << "eCurrentSelectedInstance: " << editorData.eCurrentSelectedInstance << std::endl;
-			std::cout << "eSelectedInstance[EditorInstance].y: " << editorData.eSelectedInstance[mModelInstanceData.miSelectedEditorInstance].y << std::endl;
+			std::cout << "eSelectedInstance.size(): " << editorData.eSelectedInstance.size() << std::endl;
+
+			if (mModelInstanceData.miSelectedEditorInstance < editorData.eSelectedInstance.size()) {
+				std::cout << "eSelectedInstance[EditorInstance].y: " << editorData.eSelectedInstance[mModelInstanceData.miSelectedEditorInstance].y << std::endl;
+			}
+			else {
+				std::cout << "eSelectedInstance[EditorInstance].y: OUT OF BOUNDS (index: "
+					<< mModelInstanceData.miSelectedEditorInstance << ", size: "
+					<< editorData.eSelectedInstance.size() << ")" << std::endl;
+			}
 		}
 
 		void readPixelDataPos();

@@ -36,6 +36,7 @@ namespace aveng {
         createRenderPass();
         createDepthResources();
         createFramebuffers();
+        createEditorSelectionFramebuffers();
     }
 
     SwapChain::~SwapChain() {

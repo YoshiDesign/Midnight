@@ -261,23 +261,40 @@ namespace aveng {
 	}
 
 	void Renderer::addInstances(std::shared_ptr<AvengModel> model, int numInstances) {
-		size_t animClipNum = model->getAnimClips().size();
-		for (int i = 0; i < numInstances; ++i) {
-			int xPos = std::rand() % 50 - 25;
-			int zPos = std::rand() % 50 - 25;
-			int rotation = std::rand() % 360 - 180;
-			int clipNr = std::rand() % animClipNum;
+		if (model->hasAnimations()) {
+			size_t animClipNum = model->getAnimClips().size();
+			for (int i = 0; i < numInstances; ++i) {
+				int xPos = std::rand() % 50 - 25;
+				int zPos = std::rand() % 50 - 25;
+				int rotation = std::rand() % 360 - 180;
+				int clipNr = std::rand() % animClipNum;
 
-			std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model, glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
-			if (animClipNum > 0) {
-				InstanceSettings instSettings = newInstance->getInstanceSettings();
-				instSettings.isAnimClipNr = clipNr;
-				newInstance->setInstanceSettings(instSettings);
+				std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model, glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
+				if (animClipNum > 0) {
+					InstanceSettings instSettings = newInstance->getInstanceSettings();
+					instSettings.isAnimClipNr = clipNr;
+					newInstance->setInstanceSettings(instSettings);
+				}
+
+				mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
+				mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
 			}
-
-			mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
-			mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
 		}
+		else {
+
+			for (int i = 0; i < numInstances; ++i) {
+				int xPos = std::rand() % 50 - 25;
+				int zPos = std::rand() % 50 - 25;
+				int rotation = std::rand() % 360 - 180;
+
+				std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model, glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
+
+				mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
+				mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
+			}
+		
+		}
+		
 		assignInstanceIndices();
 		updateTriangleCount();
 	}
@@ -403,6 +420,8 @@ namespace aveng {
 
 		std::cout << "Recreating SwapChain!!!" << std::endl;
 
+		recreatingSwapchain = true;
+
 		// Get current window size
 		auto extent = aveng_window.getExtent();
 
@@ -419,6 +438,7 @@ namespace aveng {
 		aveng_swapchain = nullptr; // This implies that the old swapchain is always VK_NULL_HANDLE - The `else` condition never executes here.
 
 		if (aveng_swapchain == nullptr) {
+			std::cout << "Creating Swapchain!!!" << std::endl;
 			// Create the new swapchain object
 			aveng_swapchain = std::make_unique<SwapChain>(renderData, engineDevice, extent);
 		}
@@ -433,6 +453,8 @@ namespace aveng {
 			}
 
 		}
+
+		recreatingSwapchain = false;
 
 	}
 
@@ -503,6 +525,7 @@ namespace aveng {
 		// This error will occur after window resize
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
+			std::cout << "VK_ERROR_OUT_OF_DATE_KHR - Recreating Swapchain" << std::endl;
 			recreateSwapChain();
 			return false;
 		}
@@ -1222,22 +1245,23 @@ namespace aveng {
 		size_t instanceToStore = 0;
 		size_t animatedInstancesToStore = 0; // This will be the total number of bones across all model instances.
 
-		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) { //
-			size_t numberOfInstances = modelType.second.size(); // second is the vector of <shared_ptr> AssimpInstance
-			if (numberOfInstances > 0 && modelType.second.at(0)->getModel()->getTriangleCount()) {
-				std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+		for (const auto& model : mModelInstanceData.miModelList) { //
 
+			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size(); // second is the vector of <shared_ptr> AssimpInstance
+
+			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 				/* animated models */
 				if (model->hasAnimations() && !model->getBoneList().empty()) {
 
 					// Collect the number of bones
 					size_t numberOfBones = model->getBoneList().size();
-					animatedModelLoaded = true; // designate
+					animatedModelLoaded = true;
 
 					mMatrixGenerateTimer.start();
 					// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
 
 					int instIndex = 0;
+					
 					// For each instance
 					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
 					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
@@ -1247,7 +1271,7 @@ namespace aveng {
 						instance->updateAnimation(deltaTime);
 						std::vector<NodeTransformData> instanceNodeTransform = instance->getNodeTransformData();
 
-						// Copy the NodeTransform Data to the vector of NodeTransform datas. I didn't know you can use arithmetic with iterator access patterns
+						// Copy the NodeTransform Data to the vector of NodeTransform datas. I didn't know you can use arithmetic with iterator access patterns. Nice
 						// STORAGE BUFFER DATA - Packed with every instance's data
 						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + instIndex * numberOfBones);
 
@@ -1272,7 +1296,7 @@ namespace aveng {
 					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
 					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
 						//auto& instance = instances[i];
-						mWorldPosMatrices.at(instanceToStore + instIndex) = modelType.second.at(instIndex)->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+						mWorldPosMatrices.at(instanceToStore + instIndex) = instance->getWorldTransformMatrix(); // model Root Matrix SSBO data 
 						instIndex++;
 					}
 
