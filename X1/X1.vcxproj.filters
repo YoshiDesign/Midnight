@@ -42,12 +42,6 @@
     <ClCompile Include="System\InputSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="System\Input\GameInputController.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="System\Input\EditorInputController.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Game\Game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -92,15 +86,6 @@
     <ClInclude Include="System\InputSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="System\Input\GameInputController.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="System\Input\EditorInputController.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="System\Input\IInputController.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="System\Input\EventPayloads.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -108,6 +93,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\data.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Interface\IInputHandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

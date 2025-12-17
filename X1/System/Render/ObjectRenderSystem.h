@@ -1,4 +1,5 @@
 #pragma once
+#include "System/Interface/IInputHandler.h"
 #include "CoreVK/EngineDevice.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
@@ -24,7 +25,7 @@ namespace aveng {
 	class ObjectRenderSystem {
 	public:
 		//ObjectRenderSystem();
-		ObjectRenderSystem(AvengWindow& _window);
+		explicit ObjectRenderSystem(AvengWindow& _window);
 		~ObjectRenderSystem();
 		ObjectRenderSystem& operator=(const ObjectRenderSystem&) = delete;
 		ObjectRenderSystem(const ObjectRenderSystem&) = delete;
@@ -46,6 +47,8 @@ namespace aveng {
 		VkDevice getEngineDevice() { return engineDevice.device(); }
 
 	private:
+
+		AppMode mode_ = AppMode::Editor;
 
 		void updateData(float frameTime);
 
@@ -72,14 +75,18 @@ namespace aveng {
 
 		// Engine & Renderer
 		Renderer renderer{ engineDevice, window, renderData, mModelInstanceData };
+		GameInput gameInput;
 
 #ifdef ENABLE_EDITOR
+		EditorInput editorInput;
+		EditorGameRouter inputRouter;
+		InputSystem inputSystem;
+
 		Editor editor{ renderData, renderer, gameData, engineDevice, window, mModelInstanceData };
 		AvengFrame frame{renderer, renderData, gameData, engineDevice, mModelInstanceData, &editor };
-		InputSystem inputSystem{ holyShip, &editor };
 #else
-		AvengFrame frame{ renderer, renderData, engineDevice,  mModelInstanceData };
-		InputSystem inputSystem{ holyShip };
+		InputSystem inputSystem;
+		AvengFrame frame{ renderer, renderData, gameData, engineDevice, mModelInstanceData, nullptr };
 #endif
 
 	};

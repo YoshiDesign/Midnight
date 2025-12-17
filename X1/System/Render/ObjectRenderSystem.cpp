@@ -6,10 +6,17 @@ namespace aveng {
 
 	ObjectRenderSystem::ObjectRenderSystem(AvengWindow& window)
 		: window{ window }
+		, gameInput{holyShip}
+#ifdef ENABLE_EDITOR
+		, editorInput{&editor}
+		, inputRouter{ mode_, editorInput, gameInput }
+		, inputSystem{ inputRouter }
+#else
+		, inputSystem{ gameInput }
+#endif
 	{
 
 		window.setInputSystem(&inputSystem);
-		inputSystem.setMode(AppMode::Editor);
 
 #if ENABLE_EDITOR
 		editor.init(renderer.pGetSwapChain());
@@ -78,11 +85,11 @@ namespace aveng {
 
 		// TODO? 
 		// updateData(frameTime);
-		if (inputSystem.getMode() == AppMode::Game) {
-			// Update game state
-			updateCamera(frameTime);
-			holyShip.update(frameTime);
-		}
+		//if (inputSystem.getMode() == AppMode::Game) {
+		//	// Update game state
+		//	updateCamera(frameTime);
+		//	holyShip.update(frameTime);
+		//}
 
 		frame.render(frameTime);
 
