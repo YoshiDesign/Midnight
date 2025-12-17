@@ -33,6 +33,7 @@ namespace aveng {
 		void updateCamera(float frameTime);
 		void drawSelectedModels(int frameIndex);
 		void cleanup();
+		void destroyTrash();
 
 		bool hasSelection() { return editorData.eHasSelection; }
 		bool hasClicked() { return editorData.eMousePick; }
@@ -74,7 +75,7 @@ namespace aveng {
 		bool createCommandBuffers();
 		bool createPipelineLayouts();
 		bool createSSBOs();
-		void updateDescriptorSets(int set = 1000);
+		void updateDescriptorSets(int frameIndex);
 
 		void endSwapChainLineRenderPass(VkCommandBuffer commandBuffer);
 
@@ -90,6 +91,9 @@ namespace aveng {
 		unsigned int currentFrameIndex = 0; // Updated at render() from the renderer
 		AvengCamera editor_camera{};
 		float aspect;
+
+		// GC stuff
+		std::vector<PendingBufferDestroy> buffer_trash;
 
 		/* color hightlight for selection etc */
 		std::vector<glm::vec2> mSelectedInstance{};

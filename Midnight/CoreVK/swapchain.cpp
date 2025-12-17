@@ -603,14 +603,14 @@ namespace aveng {
             return pixelColor;
         }
 
-        /* VALIDATION: Bounds check coordinates */
+        /* Bounds check coordinates */
         if (xPos >= width() || yPos >= height()) {
             Logger::log(1, "%s error: coordinates out of bounds (%u, %u), max is (%u, %u)\n",
                 __FUNCTION__, xPos, yPos, width() - 1, height() - 1);
             return pixelColor;
         }
 
-        /* VALIDATION: Bounds check frame index */
+        /* Bounds check frame index */
         if (imageIndex >= renderData.rdSelectionImages.size()) {
             Logger::log(1, "%s error: frame index %u out of bounds, max is %zu\n",
                 __FUNCTION__, imageIndex, renderData.rdSelectionImages.size() - 1);

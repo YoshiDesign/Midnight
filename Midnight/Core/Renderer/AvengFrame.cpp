@@ -55,6 +55,9 @@ namespace aveng {
 			throw std::runtime_error("Frame Failure 0");
 		}
 
+		// GC
+		renderer.destroyTrash();
+
 		//if (pEditor->hasClicked()) {
 		//	std::cout << "2 -----------[EDITOR DEBUG BEGIN]---------" << std::endl;
 		//	pEditor->debug();
@@ -71,7 +74,9 @@ namespace aveng {
 #ifdef ENABLE_EDITOR
 		if (gameData.currentAppMode == AppMode::Editor) {
 
-			if (hasEditorSelection()) {
+			pEditor->destroyTrash();
+
+			// if (hasEditorSelection()) {
 				// The editor always updates its descriptors before each frame
 
 				// Validation errors are occuring once here during the pipeline transition
@@ -79,7 +84,7 @@ namespace aveng {
 				// another cmd buffer executing in the background. This loop should only update
 				// One frame's descriptor set(s) at a time
 				pEditor->updateDescriptorSets(currentFrameIndex);
-			}
+			//}
 
 			/**
 			* Update Model Buffer Data - Does not record commands
@@ -95,7 +100,7 @@ namespace aveng {
 		renderer.beginGraphicsCommands(currentFrameIndex);
 
 #ifdef ENABLE_EDITOR
-		if (gameData.currentAppMode == AppMode::Editor && hasEditorSelection())
+		if (gameData.currentAppMode == AppMode::Editor)
 		{
 			// Begin model + selection renderpass
 			renderer.beginSwapChainRenderPass(
@@ -117,7 +122,7 @@ namespace aveng {
 #ifdef ENABLE_EDITOR
 		}
 
-		if (gameData.currentAppMode == AppMode::Editor && hasEditorSelection()) {
+		if (gameData.currentAppMode == AppMode::Editor) {
 
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
 			pEditor->drawSelectedModels(currentFrameIndex); 
@@ -170,7 +175,7 @@ namespace aveng {
 
 #ifdef ENABLE_EDITOR
 
-		if (gameData.currentAppMode == AppMode::Editor && hasEditorSelection()) {
+		if (gameData.currentAppMode == AppMode::Editor) {
 
 			// NOTE: drawInstanceGizmo begins / ends its own renderpass
 			if (pEditor->drawInstanceGizmo()) {

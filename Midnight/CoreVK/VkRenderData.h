@@ -86,7 +86,7 @@ namespace aveng {
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
 
-		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+		VkDescriptorSet descriptorSet = VK_NULL_HANDLE; // Unused
 	};
 
 	struct VkShaderStorageBufferData {
@@ -94,7 +94,12 @@ namespace aveng {
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
 
-		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+		VkDescriptorSet descriptorSet = VK_NULL_HANDLE; // Unused
+	};
+
+	struct PendingBufferDestroy {
+		VkBuffer			buffer;
+		VmaAllocation		allocation;
 	};
 
 	struct VkLineVertex {

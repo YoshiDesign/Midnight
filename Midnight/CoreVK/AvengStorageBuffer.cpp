@@ -7,6 +7,8 @@ namespace aveng {
             bufferSize = 1024;
         }
 
+        /* Potential Improvement: Double the initial buffer size from the first init */
+
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = bufferSize;
@@ -14,6 +16,9 @@ namespace aveng {
 
         VmaAllocationCreateInfo vmaAllocInfo{};
         vmaAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+        // TODO - Create a separate storage buffer class for the compute shaders! They currently share this class which uses VMA_MEMORY_USAGE_CPU_TO_GPU (above)
+        // vmaAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;   // or AUTO for newer VMA
 
         VkResult result = vmaCreateBuffer(engineDevice.allocator(), &bufferInfo, &vmaAllocInfo,
             &SSBOData.buffer, &SSBOData.bufferAlloc, nullptr);
@@ -30,8 +35,8 @@ namespace aveng {
     bool ShaderStorageBuffer::checkForResize(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize) {
         if (bufferSize > SSBOData.bufferSize) {
             Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, bufferSize);
-            cleanup(engineDevice, SSBOData);
-            init(engineDevice, SSBOData, bufferSize);
+            // cleanup(engineDevice, SSBOData);
+            //init(engineDevice, SSBOData, bufferSize);
             return true;
         }
         return false;

@@ -236,11 +236,23 @@ namespace aveng {
 		}
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i]);
-			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i]);
 
-			ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList);
-			ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList);
+			size_t boneMatBufferSize = boneOffsetMatricesList.size() * sizeof(glm::mat4);
+			size_t boneParentBufferSize = boneParentIndexList.size() * sizeof(int32_t);
+
+			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneMatBufferSize);
+			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], boneParentBufferSize);
+
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList))
+			{
+				throw std::runtime_error("model buffer allocation size was incorrect");
+			};
+
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList))
+			{
+				throw std::runtime_error("model buffer allocation size was incorrect");
+			};
+
 		}
 
 		/* create descriptor set (for each available frame in flight) for per-model data */
@@ -294,6 +306,10 @@ namespace aveng {
 				Logger::log(1, "%s error: could not allocate Assimp Matrix Mult Compute per-model descriptor set (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
+
+			std::cout << "Index:\t"  << i << "\n" <<
+				"[Creating Model (mShaderBoneMatrixOffsetBuffers) Buffers] Size:\t" <<
+				mShaderBoneMatrixOffsetBuffers[i].bufferSize << std::endl;
 
 			VkDescriptorBufferInfo parentNodeInfo{};
 			parentNodeInfo.buffer = mBoneParentMatrixBuffers[i].buffer;	// ...attaching this data buffer

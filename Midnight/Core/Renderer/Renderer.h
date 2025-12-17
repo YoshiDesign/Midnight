@@ -99,9 +99,9 @@ namespace aveng {
 		bool createDescriptorLayouts();
 		bool createDescriptorSets();
 		bool setupDescriptors();
-		void updateDescriptorSets();
-		void updateComputeDescriptorSets();
-		void updateLightingDescriptorSets();
+		void updateDescriptorSets(int frameIndex);
+		void updateComputeDescriptorSets(int frameIndex);
+		void updateLightingDescriptorSets(int frameIndex);
 
 		bool createSyncObjects();
 		
@@ -144,6 +144,7 @@ namespace aveng {
 		void recreateSwapChain();
 		bool isRecreatingSwapChain() { return recreatingSwapchain; }
 		
+		void destroyTrash();
 		void cleanup();
 
 	private:
@@ -194,6 +195,8 @@ namespace aveng {
 		std::vector<VkShaderStorageBufferData> mShaderTrsMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
 		std::vector<VkShaderStorageBufferData> mLightDataBuffers;
+
+		std::vector<PendingBufferDestroy> buffer_trash;
 
 		// Renderer owns this
 		ModelAndInstanceData& mModelInstanceData; 

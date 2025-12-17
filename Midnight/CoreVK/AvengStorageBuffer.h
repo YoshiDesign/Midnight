@@ -22,13 +22,14 @@ namespace aveng {
                 return false;
             }
 
-            bool bufferResized = false;
-            size_t bufferSize = bufferData.size() * sizeof(T);
-            if (bufferSize > SSBOData.bufferSize) {
-                Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, bufferSize);
-                cleanup(engineDevice, SSBOData);
-                init(engineDevice, SSBOData, bufferSize);
-                bufferResized = true;
+            // bool bufferResized = false;
+            // size_t bufferSize = bufferData.size() * sizeof(T);
+            if ((bufferData.size() * sizeof(T)) > SSBOData.bufferSize) {
+                Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(T)));
+                // cleanup(engineDevice, SSBOData);
+                // init(engineDevice, SSBOData, bufferSize);
+                // bufferResized = true;
+                return true;
             }
 
             void* data;
@@ -37,11 +38,12 @@ namespace aveng {
                 Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
                 return false;
             }
-            std::memcpy(data, bufferData.data(), bufferSize);
+            std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(T)));
             vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
             vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
 
-            return bufferResized;
+            // return bufferResized;
+            return false;
         }
 
         static bool checkForResize(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData,

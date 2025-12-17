@@ -26,6 +26,8 @@ namespace aveng {
 		: engineDevice{engineDevice}, aveng_window{ window }, renderData{ renderData }, mModelInstanceData{ mModelInstanceData }
 	{
 
+		buffer_trash.clear();
+
 		// Define buffer vec's that are managed by the Renderer
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderModelRootMatrixBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
@@ -577,7 +579,7 @@ namespace aveng {
 		colorClearValues.emplace_back(colorClearValue);
 		if (selection) {
 			VkClearValue selectionClearValue;
-			selectionClearValue.color = { { -1.0f } };
+			selectionClearValue.color = { { -1.0 } }; // C++ aggregate initialization rules
 			colorClearValues.emplace_back(selectionClearValue);
 		}
 
@@ -647,15 +649,14 @@ namespace aveng {
 		}
 
 		createDescriptorLayouts();
-
-	createDescriptorSets();
-
-	updateDescriptorSets();
-
-	updateComputeDescriptorSets();
+		createDescriptorSets();
 		
-		// TODO
-		// updateLightingDescriptorSets();
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+			updateDescriptorSets(i);
+			updateComputeDescriptorSets(i);
+			// TODO
+			// updateLightingDescriptorSets(i);
+		}
 	
 	}
 
@@ -1119,6 +1120,7 @@ namespace aveng {
 		/* node transformation */
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute[currentFrameIndex], VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipeline);
+
 		// std::cout << "Check [0]" << std::endl;
 		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute[currentFrameIndex], VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipelineLayout, 0, 1, &renderData.rdAvengComputeTransformDescriptorSets[currentFrameIndex], 0, 0);
@@ -1308,36 +1310,105 @@ namespace aveng {
 			}
 		}
 
-		/* we need to update descriptors after the upload if buffer size changed */
-		bool bufferResized = false;
 		mUploadToUBOTimer.start();
 
-		// Ship the SSBO data
+		/*
+		* TIL: mNodeTransFormData is updated via instance->updateAnimation()
+		*	   That is also when & where we update mWorldPosMatrices.
+		*	   TRS and BoneMat buffers are updated by the compute shaders so you won't see uploadSsboData here on their behalf
+		*/
+
+		/*
+		* TODO: Whenever I re-architect this resizing logic: I could be re-initializing both buffers so that the subsequent frame doesn't need
+		* to also go through this, if it even works. This means I'd have to somehow get both buffers destroyed in 1 frame, whenever that becomes safe to do.
+		*/
+
+		bool bufferResized = false;
 		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers[currentFrameIndex], mNodeTransFormData);
-	
-		// If node transform buffer resized, resize ALL frames to keep them synchronized
+		// Upload every instance's current transform data (translation, scale, rotation)
+		// If it resized, no data was uploaded
 		if (bufferResized) {
-			size_t newBufferSize = mNodeTransformBuffers[currentFrameIndex].bufferSize;
-			for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-				if (i != currentFrameIndex) {
-					ShaderStorageBuffer::checkForResize(engineDevice, mNodeTransformBuffers[i], newBufferSize);
+
+			std::cout << "NodeTransform Buffer Resized" << std::endl;
+
+			size_t newBufferSize = std::max(mNodeTransFormData.size() * (sizeof NodeTransformData), mNodeTransformBuffers[currentFrameIndex].bufferSize * 2);
+
+			// Queue the old buffers for destruction within the next frame
+			buffer_trash.push_back(
+				PendingBufferDestroy{
+					mNodeTransformBuffers[currentFrameIndex].buffer,
+					mNodeTransformBuffers[currentFrameIndex].bufferAlloc,
 				}
+			);
+
+			// Reinitialize - New Allocation
+			ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers[currentFrameIndex], newBufferSize);
+
+			// Retry the upload - true == it resized again after we just tried to reallocate it. That would be bad
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers[currentFrameIndex], mNodeTransFormData))
+			{
+				std::printf("[1] Failed to accommodate resized buffer.\n");
+				throw std::runtime_error("[1] Failed to accommodate resized buffer.");
 			}
+
 		}
 
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		/* resize SSBO if needed */
-		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));
-			bufferResized |= ShaderStorageBuffer::checkForResize(engineDevice, mShaderBoneMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));
-		//}
+		/* resize SSBO if needed - Both of these are written by the compute shaders so we just make sure they're the right size (hence only using checkForResize) */
+		
+		bool trsResized = ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));
+		bool boneResized = ShaderStorageBuffer::checkForResize(engineDevice, mShaderBoneMatrixBuffers[currentFrameIndex], boneMatrixBufferSize * sizeof(glm::mat4));
 
-		// Note: this occurs if ANY buffer has a new size
-		if (bufferResized) {
+		bufferResized |= trsResized;
+		bufferResized |= boneResized;
+
+		if (trsResized || boneResized) {
+
+			std::cout << "TRSMat | BoneMat Buffers Resized" << std::endl;
+			
+			// TRS and BoneMat buffers are very similar, as you can tell from this size derivation - TODO - Just give each their own...
+			size_t newBufferSize = std::max(boneMatrixBufferSize * sizeof(glm::mat4), mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize * 2);
+
+			// Queue the old buffers for destruction within the next frame
+			buffer_trash.push_back(
+				PendingBufferDestroy{
+					mShaderTrsMatrixBuffers[currentFrameIndex].buffer,
+					mShaderTrsMatrixBuffers[currentFrameIndex].bufferAlloc,
+				}
+			);
+
+			buffer_trash.push_back(
+				PendingBufferDestroy{
+					mShaderBoneMatrixBuffers[currentFrameIndex].buffer,
+					mShaderBoneMatrixBuffers[currentFrameIndex].bufferAlloc,
+				}
+			);
+
+			// Reinitialize boneMat buffers
+			ShaderStorageBuffer::init(
+				engineDevice,
+				mShaderBoneMatrixBuffers[currentFrameIndex],
+				newBufferSize // New buffer size - these buffers are very similar
+			);
+
+			// Reinitialize TrsMat buffers
+			ShaderStorageBuffer::init(
+				engineDevice,
+				mShaderTrsMatrixBuffers[currentFrameIndex],
+				newBufferSize // New buffer size - these buffers are very similar
+			);
+
+			/* Note that we're not performing another SSBO Upload. 
+			That's because these two buffers are written by the compute shader */
+
+		}
+
+		if (bufferResized)
+		{
 			std::cout << "StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
-			updateDescriptorSets();
-			updateComputeDescriptorSets();
+			updateDescriptorSets(currentFrameIndex);
+			updateComputeDescriptorSets(currentFrameIndex);
 		}
 
 		/* record compute commands */
@@ -1433,23 +1504,35 @@ namespace aveng {
 
 		/* we need to update descriptors after the upload if buffer size changed */
 		mUploadToUBOTimer.start();
+
 		// TODO - Skip this upload if the camera's data hasn't changed (the view isn't moving).
 		UniformBuffer::uploadData(engineDevice, mPerspectiveViewMatrixUBOBuffers[currentFrameIndex], mMatrices);
-		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers[currentFrameIndex], mWorldPosMatrices);
+
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		// If one frame's buffer resized, resize ALL frames to keep them synchronized
-		if (bufferResized) {
-			size_t newBufferSize = mShaderModelRootMatrixBuffers[currentFrameIndex].bufferSize;
-			for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-				if (i != currentFrameIndex) {
-					ShaderStorageBuffer::checkForResize(engineDevice, mShaderModelRootMatrixBuffers[i], newBufferSize);
-				}
+		// TODO - Figure out why this occurs AFTER compute
+		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers[currentFrameIndex], mWorldPosMatrices)) {
+			size_t newBufferSize = std::max(mWorldPosMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers[currentFrameIndex].bufferSize * 2);
+			
+			/*
+				TODO - GC The old buffer
+			*/
+
+			// Reinitialize TrsMat buffers
+			ShaderStorageBuffer::init(
+				engineDevice,
+				mShaderModelRootMatrixBuffers[currentFrameIndex],
+				newBufferSize // New buffer size
+			);
+
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers[currentFrameIndex], mWorldPosMatrices)) {
+				std::printf("[2] Failed to accommodate resized buffer.\n");
+				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
 			}
 		
 			std::cout << "Model Root SSBO Resized - Updating Descriptor Sets" << std::endl;
-			updateDescriptorSets();
-			updateComputeDescriptorSets();
+			updateDescriptorSets(currentFrameIndex);
+			updateComputeDescriptorSets(currentFrameIndex);
 		}
 
 	}
@@ -1564,110 +1647,107 @@ namespace aveng {
 		return true;
 	}
 
-	void Renderer::updateDescriptorSets() {
+	void Renderer::updateDescriptorSets(int frameIndex) {
 		Logger::log(1, "%s: updating descriptor sets\n", __FUNCTION__);
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
+
+		/* we must update the descriptor sets whenever the buffer size has changed */
 		{
-			/* we must update the descriptor sets whenever the buffer size has changed */
-			{
-				/* non-animated shader */
-				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[i].buffer;
-				matrixInfo.offset = 0;
-				matrixInfo.range = VK_WHOLE_SIZE;
+			/* non-animated shader */
+			VkDescriptorBufferInfo matrixInfo{};
+			matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[frameIndex].buffer;
+			matrixInfo.offset = 0;
+			matrixInfo.range = VK_WHOLE_SIZE;
 
-				VkDescriptorBufferInfo worldPosInfo{};
-				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[i].buffer;
-				worldPosInfo.offset = 0;
-				worldPosInfo.range = VK_WHOLE_SIZE;
+			VkDescriptorBufferInfo worldPosInfo{};
+			worldPosInfo.buffer = mShaderModelRootMatrixBuffers[frameIndex].buffer;
+			worldPosInfo.offset = 0;
+			worldPosInfo.range = VK_WHOLE_SIZE;
 
-				VkDescriptorBufferInfo selectionInfo{};
-				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
-				selectionInfo.offset = 0;
-				selectionInfo.range = VK_WHOLE_SIZE;
+			VkDescriptorBufferInfo selectionInfo{};
+			selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[frameIndex].buffer;
+			selectionInfo.offset = 0;
+			selectionInfo.range = VK_WHOLE_SIZE;
 
-				VkWriteDescriptorSet matrixWriteDescriptorSet{};
-				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				matrixWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[i];
-				matrixWriteDescriptorSet.dstBinding = 0;
-				matrixWriteDescriptorSet.descriptorCount = 1;
-				matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
+			VkWriteDescriptorSet matrixWriteDescriptorSet{};
+			matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			matrixWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[frameIndex];
+			matrixWriteDescriptorSet.dstBinding = 0;
+			matrixWriteDescriptorSet.descriptorCount = 1;
+			matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
 
-				VkWriteDescriptorSet posWriteDescriptorSet{};
-				posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				posWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[i];
-				posWriteDescriptorSet.dstBinding = 1;
-				posWriteDescriptorSet.descriptorCount = 1;
-				posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
+			VkWriteDescriptorSet posWriteDescriptorSet{};
+			posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			posWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[frameIndex];
+			posWriteDescriptorSet.dstBinding = 1;
+			posWriteDescriptorSet.descriptorCount = 1;
+			posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
 
-				std::vector<VkWriteDescriptorSet> writeDescriptorSets =
-				{ matrixWriteDescriptorSet, posWriteDescriptorSet };
+			std::vector<VkWriteDescriptorSet> writeDescriptorSets =
+			{ matrixWriteDescriptorSet, posWriteDescriptorSet };
 
-				vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(writeDescriptorSets.size()),
-					writeDescriptorSets.data(), 0, nullptr);
-			}
-
-			{
-				/* animated shader */
-				VkDescriptorBufferInfo matrixInfo{};
-				matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[i].buffer;
-				matrixInfo.offset = 0;
-				matrixInfo.range = VK_WHOLE_SIZE;
-
-				VkDescriptorBufferInfo boneMatrixInfo{};
-				boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[i].buffer;
-				boneMatrixInfo.offset = 0;
-				boneMatrixInfo.range = VK_WHOLE_SIZE;
-
-				VkDescriptorBufferInfo worldPosInfo{};
-				worldPosInfo.buffer = mShaderModelRootMatrixBuffers[i].buffer;
-				worldPosInfo.offset = 0;
-				worldPosInfo.range = VK_WHOLE_SIZE;
-
-				VkDescriptorBufferInfo selectionInfo{};
-				selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[i].buffer;
-				selectionInfo.offset = 0;
-				selectionInfo.range = VK_WHOLE_SIZE;
-
-				VkWriteDescriptorSet matrixWriteDescriptorSet{};
-				matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				matrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[i];
-				matrixWriteDescriptorSet.dstBinding = 0;
-				matrixWriteDescriptorSet.descriptorCount = 1;
-				matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
-
-				VkWriteDescriptorSet boneMatrixWriteDescriptorSet{};
-				boneMatrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				boneMatrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[i];
-				boneMatrixWriteDescriptorSet.dstBinding = 1;
-				boneMatrixWriteDescriptorSet.descriptorCount = 1;
-				boneMatrixWriteDescriptorSet.pBufferInfo = &boneMatrixInfo;
-
-				VkWriteDescriptorSet posWriteDescriptorSet{};
-				posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				posWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[i];
-				posWriteDescriptorSet.dstBinding = 2;
-				posWriteDescriptorSet.descriptorCount = 1;
-				posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
-
-				std::vector<VkWriteDescriptorSet> skinningWriteDescriptorSets =
-				{ matrixWriteDescriptorSet, boneMatrixWriteDescriptorSet, posWriteDescriptorSet };
-
-				// AVENG_DESCRIPTOR->build()
-				vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(skinningWriteDescriptorSets.size()),
-					skinningWriteDescriptorSets.data(), 0, nullptr);
-			}
-		
+			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(writeDescriptorSets.size()),
+				writeDescriptorSets.data(), 0, nullptr);
 		}
 
+		{
+			/* animated shader */
+			VkDescriptorBufferInfo matrixInfo{};
+			matrixInfo.buffer = mPerspectiveViewMatrixUBOBuffers[frameIndex].buffer;
+			matrixInfo.offset = 0;
+			matrixInfo.range = VK_WHOLE_SIZE;
+
+			VkDescriptorBufferInfo boneMatrixInfo{};
+			boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[frameIndex].buffer;
+			boneMatrixInfo.offset = 0;
+			boneMatrixInfo.range = VK_WHOLE_SIZE;
+
+			VkDescriptorBufferInfo worldPosInfo{};
+			worldPosInfo.buffer = mShaderModelRootMatrixBuffers[frameIndex].buffer;
+			worldPosInfo.offset = 0;
+			worldPosInfo.range = VK_WHOLE_SIZE;
+
+			VkDescriptorBufferInfo selectionInfo{};
+			selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[frameIndex].buffer;
+			selectionInfo.offset = 0;
+			selectionInfo.range = VK_WHOLE_SIZE;
+
+			VkWriteDescriptorSet matrixWriteDescriptorSet{};
+			matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			matrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[frameIndex];
+			matrixWriteDescriptorSet.dstBinding = 0;
+			matrixWriteDescriptorSet.descriptorCount = 1;
+			matrixWriteDescriptorSet.pBufferInfo = &matrixInfo;
+
+			VkWriteDescriptorSet boneMatrixWriteDescriptorSet{};
+			boneMatrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			boneMatrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[frameIndex];
+			boneMatrixWriteDescriptorSet.dstBinding = 1;
+			boneMatrixWriteDescriptorSet.descriptorCount = 1;
+			boneMatrixWriteDescriptorSet.pBufferInfo = &boneMatrixInfo;
+
+			VkWriteDescriptorSet posWriteDescriptorSet{};
+			posWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			posWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			posWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[frameIndex];
+			posWriteDescriptorSet.dstBinding = 2;
+			posWriteDescriptorSet.descriptorCount = 1;
+			posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
+
+			std::vector<VkWriteDescriptorSet> skinningWriteDescriptorSets =
+			{ matrixWriteDescriptorSet, boneMatrixWriteDescriptorSet, posWriteDescriptorSet };
+
+			// AVENG_DESCRIPTOR->build()
+			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(skinningWriteDescriptorSets.size()),
+				skinningWriteDescriptorSets.data(), 0, nullptr);
+		}
+		
 	}
 
-	void Renderer::updateLightingDescriptorSets() {
+	void Renderer::updateLightingDescriptorSets(int frameIndex) {
 
 		//int i = currentFrameIndex;
 
@@ -1679,82 +1759,89 @@ namespace aveng {
 		
 	}
 
-	void Renderer::updateComputeDescriptorSets() {
+	void Renderer::updateComputeDescriptorSets(int frameIndex) {
 
 		Logger::log(1, "%s: updating compute descriptor sets\n", __FUNCTION__);
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
+
 		{
-			{
-				/* transform compute shader */
-				VkDescriptorBufferInfo transformInfo{};
-				transformInfo.buffer = mNodeTransformBuffers[i].buffer;
-				transformInfo.offset = 0;
-				transformInfo.range = VK_WHOLE_SIZE;
+			/* transform compute shader */
+			VkDescriptorBufferInfo transformInfo{};
+			transformInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
+			transformInfo.offset = 0;
+			transformInfo.range = VK_WHOLE_SIZE;
 
-				VkDescriptorBufferInfo trsInfo{};
-				trsInfo.buffer = mShaderTrsMatrixBuffers[i].buffer;
-				trsInfo.offset = 0;
-				trsInfo.range = VK_WHOLE_SIZE;
+			VkDescriptorBufferInfo trsInfo{};
+			trsInfo.buffer = mShaderTrsMatrixBuffers[frameIndex].buffer;
+			trsInfo.offset = 0;
+			trsInfo.range = VK_WHOLE_SIZE;
 
-				VkWriteDescriptorSet transformWriteDescriptorSet{};
-				transformWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				transformWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				transformWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[i];
-				transformWriteDescriptorSet.dstBinding = 0;
-				transformWriteDescriptorSet.descriptorCount = 1;
-				transformWriteDescriptorSet.pBufferInfo = &transformInfo;
+			VkWriteDescriptorSet transformWriteDescriptorSet{};
+			transformWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			transformWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			transformWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[frameIndex];
+			transformWriteDescriptorSet.dstBinding = 0;
+			transformWriteDescriptorSet.descriptorCount = 1;
+			transformWriteDescriptorSet.pBufferInfo = &transformInfo;
 
-				VkWriteDescriptorSet trsWriteDescriptorSet{};
-				trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[i];
-				trsWriteDescriptorSet.dstBinding = 1;
-				trsWriteDescriptorSet.descriptorCount = 1;
-				trsWriteDescriptorSet.pBufferInfo = &trsInfo;
+			VkWriteDescriptorSet trsWriteDescriptorSet{};
+			trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeTransformDescriptorSets[frameIndex];
+			trsWriteDescriptorSet.dstBinding = 1;
+			trsWriteDescriptorSet.descriptorCount = 1;
+			trsWriteDescriptorSet.pBufferInfo = &trsInfo;
 
-				std::vector<VkWriteDescriptorSet> transformWriteDescriptorSets =
-				{ transformWriteDescriptorSet, trsWriteDescriptorSet };
+			std::vector<VkWriteDescriptorSet> transformWriteDescriptorSets =
+			{ transformWriteDescriptorSet, trsWriteDescriptorSet };
 
-				vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(transformWriteDescriptorSets.size()),
-					transformWriteDescriptorSets.data(), 0, nullptr);
-			}
-
-			{
-				/* matrix multiplication compute shader, global data */
-				VkDescriptorBufferInfo trsInfo{};
-				trsInfo.buffer = mShaderTrsMatrixBuffers[i].buffer;
-				trsInfo.offset = 0;
-				trsInfo.range = VK_WHOLE_SIZE;
-
-				VkDescriptorBufferInfo boneMatrixInfo{};
-				boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[i].buffer;
-				boneMatrixInfo.offset = 0;
-				boneMatrixInfo.range = VK_WHOLE_SIZE;
-
-				VkWriteDescriptorSet trsWriteDescriptorSet{};
-				trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[i];
-				trsWriteDescriptorSet.dstBinding = 0;
-				trsWriteDescriptorSet.descriptorCount = 1;
-				trsWriteDescriptorSet.pBufferInfo = &trsInfo;
-
-				VkWriteDescriptorSet boneMatrixWriteDescriptorSet{};
-				boneMatrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				boneMatrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[i];
-				boneMatrixWriteDescriptorSet.dstBinding = 1;
-				boneMatrixWriteDescriptorSet.descriptorCount = 1;
-				boneMatrixWriteDescriptorSet.pBufferInfo = &boneMatrixInfo;
-
-				std::vector<VkWriteDescriptorSet> matrixMultWriteDescriptorSets =
-				{ trsWriteDescriptorSet, boneMatrixWriteDescriptorSet };
-
-				vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(matrixMultWriteDescriptorSets.size()),
-					matrixMultWriteDescriptorSets.data(), 0, nullptr);
-			}
-
+			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(transformWriteDescriptorSets.size()),
+				transformWriteDescriptorSets.data(), 0, nullptr);
 		}
+
+		{
+			/* matrix multiplication compute shader, global data */
+			VkDescriptorBufferInfo trsInfo{};
+			trsInfo.buffer = mShaderTrsMatrixBuffers[frameIndex].buffer;
+			trsInfo.offset = 0;
+			trsInfo.range = VK_WHOLE_SIZE;
+
+			VkDescriptorBufferInfo boneMatrixInfo{};
+			boneMatrixInfo.buffer = mShaderBoneMatrixBuffers[frameIndex].buffer;
+			boneMatrixInfo.offset = 0;
+			boneMatrixInfo.range = VK_WHOLE_SIZE;
+
+			VkWriteDescriptorSet trsWriteDescriptorSet{};
+			trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			trsWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[frameIndex];
+			trsWriteDescriptorSet.dstBinding = 0;
+			trsWriteDescriptorSet.descriptorCount = 1;
+			trsWriteDescriptorSet.pBufferInfo = &trsInfo;
+
+			VkWriteDescriptorSet boneMatrixWriteDescriptorSet{};
+			boneMatrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			boneMatrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			boneMatrixWriteDescriptorSet.dstSet = renderData.rdAvengComputeMatrixMultDescriptorSets[frameIndex];
+			boneMatrixWriteDescriptorSet.dstBinding = 1;
+			boneMatrixWriteDescriptorSet.descriptorCount = 1;
+			boneMatrixWriteDescriptorSet.pBufferInfo = &boneMatrixInfo;
+
+			std::vector<VkWriteDescriptorSet> matrixMultWriteDescriptorSets =
+			{ trsWriteDescriptorSet, boneMatrixWriteDescriptorSet };
+
+			std::cout
+				<< "[DS BONEMAT UPDATE] frame=" << currentFrameIndex
+				<< " set=1 binding=1"
+				<< " buffer=" << mShaderTrsMatrixBuffers[currentFrameIndex].buffer
+				<< " range=" << boneMatrixInfo.range
+				<< " ssboSize=" << mShaderTrsMatrixBuffers[currentFrameIndex].bufferSize
+				<< std::endl;
+
+			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(matrixMultWriteDescriptorSets.size()),
+				matrixMultWriteDescriptorSets.data(), 0, nullptr);
+		}
+
+
 
 	}
 
@@ -1870,7 +1957,6 @@ namespace aveng {
 				return false;
 			}
 			
-
 			if (!ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers[i])) {
 				Logger::log(1, "%s error: could not create node transform SSBO\n", __FUNCTION__);
 				return false;
@@ -1896,5 +1982,17 @@ namespace aveng {
 		return true;
 	}
 
+	/* Check the destruction queue for impending doom */
+	void Renderer::destroyTrash()
+	{
+		if (buffer_trash.size() > 0) {
+			for (auto& pending : buffer_trash) {
+				std::cout << "Destroying Buffer from Renderer" << std::endl;
+				vmaDestroyBuffer(engineDevice.allocator(), pending.buffer, pending.allocation);
+			}
+			buffer_trash.clear();
+		}
+		return;
+	}
 
 } // NS
