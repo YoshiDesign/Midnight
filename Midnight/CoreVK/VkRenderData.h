@@ -224,14 +224,14 @@ namespace aveng {
 		*/
 		//VkCommandPool rdCommandPool = VK_NULL_HANDLE;			// Get from engine device
 		//VkCommandPool rdComputeCommandPool = VK_NULL_HANDLE;	// Get from engine device
-		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;
-		std::vector<VkCommandBuffer> rdCommandBuffersCompute;
-		std::vector<VkCommandBuffer> rdLineCommandBuffers;		// Editor and Renderer
-		std::vector<VkCommandBuffer> rdGUICommandBuffers;		// Editor and Renderer
+		std::vector<VkCommandBuffer> rdCommandBuffersGraphics;	// x
+		std::vector<VkCommandBuffer> rdCommandBuffersCompute;	// x
+		std::vector<VkCommandBuffer> rdLineCommandBuffers;		// x Editor and Renderer
+		std::vector<VkCommandBuffer> rdGUICommandBuffers;		// x Editor and Renderer
 
-		VkRenderPass rdLineRenderpass = VK_NULL_HANDLE;							// EDITOR
-		VkRenderPass rdSelectionRenderpass = VK_NULL_HANDLE;							// EDITOR
-		VkRenderPass rdImguiRenderpass = VK_NULL_HANDLE;							// EDITOR
+		VkRenderPass rdLineRenderpass = VK_NULL_HANDLE;			// x			// EDITOR
+		VkRenderPass rdSelectionRenderpass = VK_NULL_HANDLE;	// x						// EDITOR
+		VkRenderPass rdImguiRenderpass = VK_NULL_HANDLE;		// x					// EDITOR
 
 		/**
 		* Sync

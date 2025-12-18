@@ -127,7 +127,6 @@ namespace aveng {
 		// vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
 	}
 
-
 	bool Renderer::hasModel(const std::string& modelFileName) {
 		auto modelIter = std::find_if(mModelInstanceData.miModelList.begin(), mModelInstanceData.miModelList.end(),
 			[modelFileName](const auto& model) {
@@ -1905,7 +1904,6 @@ namespace aveng {
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderModelRootMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
-			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdSelectedInstanceBuffers[i]);
 		
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);

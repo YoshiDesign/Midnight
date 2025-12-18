@@ -31,7 +31,7 @@ namespace aveng {
 
 	ObjectRenderSystem::~ObjectRenderSystem() {
 #if ENABLE_EDITOR
-		editor.cleanup();
+		// editor.cleanup();
 #endif
 	};
 

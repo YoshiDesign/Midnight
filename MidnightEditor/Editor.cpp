@@ -920,6 +920,14 @@ namespace aveng {
 		);
 		renderData.rdLineCommandBuffers.clear();
 
+		vkFreeCommandBuffers(
+			engineDevice.device(),
+			engineDevice.commandPoolGraphics(),
+			static_cast<uint32_t>(renderData.rdGUICommandBuffers.size()),
+			renderData.rdGUICommandBuffers.data()
+		);
+		renderData.rdGUICommandBuffers.clear();
+
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
 			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdSelectedInstanceBuffers[i]);
@@ -927,13 +935,24 @@ namespace aveng {
 			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengAnimationSelectionDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdLineDescriptorSets[i]);
 		}
-
+		
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengSelectionDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdLineDescriptorLayout, nullptr);
 
+		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
+
+		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengSelectionPipelineLayout, nullptr);
+		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionPipelineLayout, nullptr);
+		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdLinePipelineLayout, nullptr);
+
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdLineRenderpass, nullptr);
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdSelectionRenderpass, nullptr);
+		vkDestroyRenderPass(engineDevice.device(), renderData.rdImguiRenderpass, nullptr);
+
+		vkDestroyDescriptorPool(engineDevice.device(), renderData.editorDescriptorPool, nullptr);
 	}
 
 	/* Check the destruction queue for impending doom */

@@ -36,7 +36,7 @@ namespace aveng {
         createRenderPass();
         createDepthResources();
         createFramebuffers();
-        createEditorSelectionFramebuffers();
+        // createEditorSelectionFramebuffers();
     }
 
     SwapChain::~SwapChain() {
@@ -558,7 +558,7 @@ namespace aveng {
             framebufferInfo.width = swapChainExtent.width;
             framebufferInfo.height = swapChainExtent.height;
             framebufferInfo.layers = 1;
-
+            std::cout << "Creating mSwapChainFramebuffers [" << i << "]" << std::endl;
             if (vkCreateFramebuffer(device.device(), &framebufferInfo, nullptr, &mSwapChainFramebuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create framebuffer!");
             }
@@ -581,7 +581,7 @@ namespace aveng {
             FboInfo.width = width();
             FboInfo.height = height();
             FboInfo.layers = 1;
-
+            std::cout << "Creating mSelectionFramebuffers [" << i << "]" << std::endl;
             VkResult result = vkCreateFramebuffer(device.device(), &FboInfo, nullptr, &mSelectionFramebuffers[i]);
             if (result != VK_SUCCESS) {
                 Logger::log(1, "%s error: failed to create selection framebuffer %i (error: %i)\n", __FUNCTION__, i, result);
