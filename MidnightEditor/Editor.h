@@ -34,6 +34,7 @@ namespace aveng {
 		void drawSelectedModels(int frameIndex);
 		void cleanup();
 		void destroyTrash();
+		void recreateFrameBuffers(SwapChain* swapchain);
 
 		bool hasSelection() { return editorData.eHasSelection; }
 		bool hasClicked() { return editorData.eMousePick; }
@@ -64,7 +65,7 @@ namespace aveng {
 		void beginGUICommands(int frameIdx);
 		void endGUICommands(int frameIdx);
 		void endGUIRenderPass(VkCommandBuffer commandBuffer);
-		VkCommandBuffer getCurrentCommandBufferGUI() { return renderData.rdGUICommandBuffers[currentFrameIndex]; }
+		VkCommandBuffer getCurrentCommandBufferGUI() { return renderData.rdGUICommandBuffers.at(currentFrameIndex); }
 
 		void startGame();
 

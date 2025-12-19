@@ -58,6 +58,13 @@ namespace aveng {
 		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
 			VkMesh& mesh = mModelMeshes.at(i);
 
+			/*
+			* @Note
+			* For glTF imports, Assimp often maps glTF baseColorTexture -> aiTextureType_DIFFUSE 
+			* for compatibility with older code paths. Later, Assimp added a dedicated texture 
+			* type aiTextureType_BASE_COLOR specifically to represent glTF’s baseColor without pretending it’s "diffuse"
+			*/
+
 			// find diffuse texture by name
 			VkTextureData diffuseTex{};
 			auto diffuseTexName = mesh.textures.find(aiTextureType_DIFFUSE);
@@ -78,6 +85,7 @@ namespace aveng {
 			}
 
 			if (diffuseTex.image != VK_NULL_HANDLE) {
+				std::cout << "Binding Diffuse Texture" << std::endl;
 				vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
 					renderLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
 			}
@@ -141,8 +149,10 @@ namespace aveng {
 		if (scene->HasTextures()) {
 			unsigned int numTextures = scene->mNumTextures;
 
+			std::cout << "Model has an embedded texture!!" << std::endl;
+
 			for (int i = 0; i < scene->mNumTextures; ++i) {
-				std::string texName = scene->mTextures[i]->mFilename.C_Str();
+				std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
 
 				int height = scene->mTextures[i]->mHeight;
 				int width = scene->mTextures[i]->mWidth;
@@ -154,7 +164,7 @@ namespace aveng {
 				}
 
 				std::string internalTexName = "*" + std::to_string(i);
-				// std::printf("%s: - added internal texture '%s'\n", __FUNCTION__, internalTexName.c_str());
+
 				mTextures.insert({ internalTexName, newTex });
 			}
 
@@ -283,7 +293,6 @@ namespace aveng {
 		Logger::log(1, "%s: - model has a total of %i texture%s\n", __FUNCTION__, mTextures.size(), mTextures.size() == 1 ? "" : "s");
 		std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
 		std::printf("%s: - model has a total of %zi animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
-
 		std::printf("%s: successfully loaded model '%s' (%s)\n", __FUNCTION__, filepath.c_str(), mModelFilename.c_str());
 		return true;
 

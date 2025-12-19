@@ -99,6 +99,7 @@ namespace aveng {
 	}
 
 	void Editor::update(float frameTime, unsigned int frameIndex) {
+
 		currentFrameIndex = frameIndex;
 		updateCamera(frameTime);
 		setupSelectionHighlight(frameTime);
@@ -190,6 +191,11 @@ namespace aveng {
 		//}
 		editorData.eMousePick = false;
 		
+	}
+
+	void Editor::recreateFrameBuffers(SwapChain* swapchain)
+	{
+		swapchain->createEditorSelectionFramebuffers();
 	}
 
 	void Editor::init(SwapChain* swapchain) 
@@ -472,19 +478,19 @@ namespace aveng {
 
 		if (mCoordArrowsLineIndexCount > 0) {
 
-			if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex], 0)) {
+			if (!engineDevice.resetCommandBuffer(renderData.rdLineCommandBuffers.at(currentFrameIndex), 0)) {
 				Logger::log(1, "%s error: failed to reset line drawing command buffer\n", __FUNCTION__);
 				return false;
 			}
 
-			if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers[currentFrameIndex])) {
+			if (!engineDevice.beginSingleShotCommand(renderData.rdLineCommandBuffers.at(currentFrameIndex))) {
 				Logger::log(1, "%s error: failed to begin line drawing command buffer\n", __FUNCTION__);
 				return false;
 			}
 
 			// Begin - We can safely piggy back on the renderer's beginSwapChainRenderPass method - it's polymorphic
 			renderer.beginSwapChainRenderPass(
-				renderData.rdLineCommandBuffers[currentFrameIndex],
+				renderData.rdLineCommandBuffers.at(currentFrameIndex),
 				renderer.getCurrentFramebuffer(),
 				renderData.rdLineRenderpass);
 
@@ -492,20 +498,20 @@ namespace aveng {
 			VertexBuffer::uploadData(engineDevice, mLineVertexBuffer, *mLineMesh);
 			renderData.rdUploadToVBOTime += mUploadToVBOTimer.stop();
 
-			vkCmdBindPipeline(renderData.rdLineCommandBuffers[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdLinePipeline);
+			vkCmdBindPipeline(renderData.rdLineCommandBuffers.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdLinePipeline);
 
-			vkCmdBindDescriptorSets(renderData.rdLineCommandBuffers[currentFrameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
-				renderData.rdLinePipelineLayout, 0, 1, &renderData.rdLineDescriptorSets[currentFrameIndex], 0, nullptr);
+			vkCmdBindDescriptorSets(renderData.rdLineCommandBuffers.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS,
+				renderData.rdLinePipelineLayout, 0, 1, &renderData.rdLineDescriptorSets.at(currentFrameIndex), 0, nullptr);
 
 			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(renderData.rdLineCommandBuffers[currentFrameIndex], 0, 1, &mLineVertexBuffer.buffer, &offset);
-			vkCmdSetLineWidth(renderData.rdLineCommandBuffers[currentFrameIndex], 3.0f);
-			vkCmdDraw(renderData.rdLineCommandBuffers[currentFrameIndex], static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
+			vkCmdBindVertexBuffers(renderData.rdLineCommandBuffers.at(currentFrameIndex), 0, 1, &mLineVertexBuffer.buffer, &offset);
+			vkCmdSetLineWidth(renderData.rdLineCommandBuffers.at(currentFrameIndex), 3.0f);
+			vkCmdDraw(renderData.rdLineCommandBuffers.at(currentFrameIndex), static_cast<uint32_t>(mLineMesh->vertices.size()), 1, 0, 0);
 
 			// Fin - Specific end for Line renderpasses
-			endSwapChainLineRenderPass(renderData.rdLineCommandBuffers[currentFrameIndex]);
+			endSwapChainLineRenderPass(renderData.rdLineCommandBuffers.at(currentFrameIndex));
 
-			if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers[currentFrameIndex])) {
+			if (!engineDevice.endCommandBuffer(renderData.rdLineCommandBuffers.at(currentFrameIndex))) {
 				Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
 				return false;
 			}
@@ -523,7 +529,7 @@ namespace aveng {
 	{
 		//std::cout << "getCurrentCommandBufferLines: " << currentFrameIndex << std::endl;
 		assert(renderer.isFrameInProgress() && "Cannot get command buffer. The frame is not in progress.");
-		return renderData.rdLineCommandBuffers[currentFrameIndex];
+		return renderData.rdLineCommandBuffers.at(currentFrameIndex);
 	}
 
 	void Editor::endSwapChainLineRenderPass(VkCommandBuffer commandBuffer)
@@ -552,19 +558,19 @@ namespace aveng {
 	{
 
 		// If one frame's buffer resized, resize ALL frames to keep them synchronized
-		if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers[currentFrameIndex], editorData.eSelectedInstance)) {
+		if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), editorData.eSelectedInstance)) {
 
 			buffer_trash.push_back(PendingBufferDestroy {
-					renderData.rdSelectedInstanceBuffers[currentFrameIndex].buffer,
-					renderData.rdSelectedInstanceBuffers[currentFrameIndex].bufferAlloc
+					renderData.rdSelectedInstanceBuffers.at(currentFrameIndex).buffer,
+					renderData.rdSelectedInstanceBuffers.at(currentFrameIndex).bufferAlloc
 				}
 			);
 
-			size_t newBufferSize = std::max(editorData.eSelectedInstance.size() * (sizeof glm::vec2), renderData.rdSelectedInstanceBuffers[currentFrameIndex].bufferSize * 2);
+			size_t newBufferSize = std::max(editorData.eSelectedInstance.size() * (sizeof glm::vec2), renderData.rdSelectedInstanceBuffers.at(currentFrameIndex).bufferSize * 2);
 			
-			ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers[currentFrameIndex], newBufferSize);
+			ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), newBufferSize);
 
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers[currentFrameIndex], editorData.eSelectedInstance))
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), editorData.eSelectedInstance))
 			{
 				std::cout << "[3] Unable to resize SSBO" << std::endl;
 				throw std::runtime_error("[3] Unable to resize SSBO");

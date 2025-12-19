@@ -29,11 +29,7 @@ namespace aveng {
 		viewerObject.transform.translation.y = -2.5f;
 	}
 
-	ObjectRenderSystem::~ObjectRenderSystem() {
-#if ENABLE_EDITOR
-		// editor.cleanup();
-#endif
-	};
+	ObjectRenderSystem::~ObjectRenderSystem() {	};
 
 	void ObjectRenderSystem::initialize() 
 	{
@@ -85,11 +81,11 @@ namespace aveng {
 
 		// TODO? 
 		// updateData(frameTime);
-		//if (inputSystem.getMode() == AppMode::Game) {
-		//	// Update game state
-		//	updateCamera(frameTime);
-		//	holyShip.update(frameTime);
-		//}
+		if (mode_ == AppMode::Game) {
+			// Update game state
+			updateCamera(frameTime);
+			holyShip.update(frameTime);
+		}
 
 		frame.render(frameTime);
 

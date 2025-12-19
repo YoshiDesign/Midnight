@@ -80,11 +80,12 @@ namespace aveng {
         for (auto framebuffer : mSwapChainFramebuffers) {
             vkDestroyFramebuffer(device.device(), framebuffer, nullptr);
         }
-
+        mSwapChainFramebuffers.clear();
         // Selection Framebuffers
         for (auto& fb : mSelectionFramebuffers) {
             vkDestroyFramebuffer(device.device(), fb, nullptr);
         }
+        mSelectionFramebuffers.clear();
 
         // Destroy the primary renderpass
         vkDestroyRenderPass(device.device(), mRenderPass, nullptr);
@@ -671,7 +672,7 @@ namespace aveng {
         srcLayoutTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         srcLayoutTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         srcLayoutTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        srcLayoutTransferBarrier.image = renderData.rdSelectionImages[imageIndex];      // The image resource we're getting our data from (frame-specific)
+        srcLayoutTransferBarrier.image = renderData.rdSelectionImages.at(imageIndex);      // The image resource we're getting our data from (frame-specific)
         srcLayoutTransferBarrier.subresourceRange = layoutTransferRange;
         srcLayoutTransferBarrier.srcAccessMask = 0;
         srcLayoutTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -700,7 +701,7 @@ namespace aveng {
             0, 0, nullptr, 0, nullptr, 1, &layoutTransferBarrier);
         vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
             0, 0, nullptr, 0, nullptr, 1, &srcLayoutTransferBarrier);
-        vkCmdCopyImage(readbackCommandBuffer, renderData.rdSelectionImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        vkCmdCopyImage(readbackCommandBuffer, renderData.rdSelectionImages.at(imageIndex), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             readbackImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopyRegion);
         vkCmdPipelineBarrier(readbackCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
             0, 0, nullptr, 0, nullptr, 1, &destLayoutTransferBarrier);
@@ -711,7 +712,7 @@ namespace aveng {
         restoreSelectionLayoutBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         restoreSelectionLayoutBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         restoreSelectionLayoutBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        restoreSelectionLayoutBarrier.image = renderData.rdSelectionImages[imageIndex];
+        restoreSelectionLayoutBarrier.image = renderData.rdSelectionImages.at(imageIndex);
         restoreSelectionLayoutBarrier.subresourceRange = layoutTransferRange;
         restoreSelectionLayoutBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         restoreSelectionLayoutBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;

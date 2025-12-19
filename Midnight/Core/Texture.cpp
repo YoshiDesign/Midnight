@@ -4,6 +4,7 @@
 #include "Texture.h"
 
 namespace aveng {
+    /* This signature is used if we're loading a texture from a file */
     bool Texture::loadTexture(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData, std::string textureFilename,
         bool generateMipmaps, bool flipImage) {
         // Check if texture is already loaded (defensive check to prevent double-loading)
@@ -74,6 +75,7 @@ namespace aveng {
         return true;
     }
 
+    /* This signature is used if we're loading an embedded texture */
     bool Texture::loadTexture(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData, std::string textureName, aiTexel* textureData, int width, int height, bool generateMipmaps, bool flipImage) {
         // Check if texture is already loaded (defensive check to prevent double-loading)
         if (texData.image != VK_NULL_HANDLE) {
@@ -170,7 +172,7 @@ namespace aveng {
         imageInfo.arrayLayers = 1;
         imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Hmmm...
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -318,7 +320,6 @@ namespace aveng {
             lastBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             lastBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-            // This throws a validation error!
             vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 0, 0, nullptr, 0, nullptr, 1, &lastBarrier);
         }
@@ -383,7 +384,6 @@ namespace aveng {
             return false;
         }
 
-        // This can't go out of scope before calling vkAllocateDescriptorSets
         VkDescriptorSetLayout layout = renderData.rdAvengTextureDescriptorLayout;
 
         VkDescriptorSetAllocateInfo descriptorAllocateInfo{};

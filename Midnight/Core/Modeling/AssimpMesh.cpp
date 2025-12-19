@@ -1,8 +1,9 @@
 #include "AssimpMesh.h"
+#include <iostream>
 
 #include "Tools.h"
 namespace aveng {
-    // TODO - You're drilling a ref to the engine Device into this class, consider moving the entire engine device to VkRenderData
+
     bool AssimpMesh::processMesh(VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, std::string assetDirectory, std::unordered_map<std::string, VkTextureData>& textures) {
         mMeshName = mesh->mName.C_Str();
 
@@ -20,27 +21,27 @@ namespace aveng {
         }
         for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_TEXTURECOORDS; ++i) {
             if (mesh->HasTextureCoords(i)) {
-                // std::printf("%s: --- mesh has texture cooords in set %i\n", __FUNCTION__, i);
+                // std::printf("%s: --- mesh has texture coords in set %i\n", __FUNCTION__, i);
             }
         }
 
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         if (material) {
             aiString materialName = material->GetName();
-            // std::printf("%s: - material found, name '%s'\n", __FUNCTION__, materialName.C_Str());
 
             bool texturesFound = false;
             if (mesh->mMaterialIndex >= 0) {
-                // scan only for diifuse and scalar textures for a start
+                // scan only for difuse and scalar textures for a start
+                // @TODO : aiTextureType_BASE_COLOR
                 std::vector<aiTextureType> supportedTexTypes = { aiTextureType_DIFFUSE, aiTextureType_SPECULAR };
                 for (const auto& texType : supportedTexTypes) {
                     unsigned int textureCount = material->GetTextureCount(texType);
                     if (textureCount > 0) {
-                        // std::printf("%s: -- material '%s' has %i images of type %i\n", __FUNCTION__, materialName.C_Str(), textureCount, texType);
+                        
                         for (unsigned int i = 0; i < textureCount; ++i) {
                             aiString textureName;
                             material->GetTexture(texType, i, &textureName);
-                            // std::printf("%s: --- image %i has name '%s'\n", __FUNCTION__, i, textureName.C_Str());
+                        
 
                             std::string texName = textureName.C_Str();
                             mMesh.textures.insert({ texType, texName });
@@ -48,12 +49,13 @@ namespace aveng {
 
                             /* skip already loaded textures */
                             if (textures.count(texName) > 0) {
-                                // std::printf("%s: texture '%s' already loaded, skipping\n", __FUNCTION__, texName.c_str());
+                                
                                 continue;
                             }
 
                             // internal textures
                             if (!texName.empty() && texName.find("*") != 0) {
+                                std::cout << "LOADING INTERNAL TEXTURE" << std::endl;
                                 VkTextureData newTex{};
                                 std::string texNameWithPath = assetDirectory + '/' + texName;
                                 if (!Texture::loadTexture(engineDevice, renderData, newTex, texNameWithPath)) {

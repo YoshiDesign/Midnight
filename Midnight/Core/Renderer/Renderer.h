@@ -77,14 +77,14 @@ namespace aveng {
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
 		{
 			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
-			return renderData.rdCommandBuffersGraphics[currentFrameIndex];
+			return renderData.rdCommandBuffersGraphics.at(currentFrameIndex);
 		}
 
 		// Just use the returned values directly if working in renderer.cpp. This is for clients
 		VkCommandBuffer getCurrentCommandBufferCompute() const
 		{
 			assert(isFrameStarted && "Cannot get command buffer. The frame is not in progress.");
-			return renderData.rdCommandBuffersCompute[currentFrameIndex];
+			return renderData.rdCommandBuffersCompute.at(currentFrameIndex);
 		}
 
 		int getFrameIndex() const

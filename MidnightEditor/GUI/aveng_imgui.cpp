@@ -122,7 +122,7 @@ namespace aveng {
         ImDrawData* drawdata = ImGui::GetDrawData();
 
         // NOTE: This could be using its own command buffer (and its own renderpass), which could help if we ever want to run the editor on a different thread
-        ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdGUICommandBuffers[frameIndex]);
+        ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdGUICommandBuffers.at(frameIndex));
     }
 
     void AvengImgui::runGUI() {

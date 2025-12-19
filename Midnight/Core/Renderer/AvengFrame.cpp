@@ -43,13 +43,16 @@ namespace aveng {
 		if (!renderer.beginFrame())
 		{
 			// Window was resized
+#ifdef ENABLE_EDITOR
+			pEditor->recreateFrameBuffers(renderer.pGetSwapChain());
+#endif
 			return false;
 		}
 
   		int currentFrameIndex = renderer.getFrameIndex();
 
 		/* start graphics rendering */
-		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence[currentFrameIndex]);
+		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence.at(currentFrameIndex));
 		if (result != VK_SUCCESS) {
 			std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
 			throw std::runtime_error("Frame Failure 0");
@@ -58,13 +61,8 @@ namespace aveng {
 		// GC
 		renderer.destroyTrash();
 
-		//if (pEditor->hasClicked()) {
-		//	std::cout << "2 -----------[EDITOR DEBUG BEGIN]---------" << std::endl;
-		//	pEditor->debug();
-		//	std::cout << "3 -----------[EDITOR DEBUG END]---------" << std::endl;
-		//}
-
 		renderer.updateCamera();
+
 		/**
 		* Update Model Buffer Data - Does not record commands
 		* Side-effects: Buffers resizes cause descriptor sets to update
@@ -104,17 +102,16 @@ namespace aveng {
 		{
 			// Begin model + selection renderpass
 			renderer.beginSwapChainRenderPass(
-				renderData.rdCommandBuffersGraphics[currentFrameIndex], 
+				renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 
 				renderer.getCurrentSelectionFramebuffer(),
 				renderer.getSelectionRenderPass(),
 				true);
-
 		}
 		else {
 #endif
 			// Begin the basic model rendering renderpass
 			renderer.beginSwapChainRenderPass(
-				renderData.rdCommandBuffersGraphics[currentFrameIndex],
+				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderer.getCurrentFramebuffer(), // 
 				renderer.getSwapChainRenderPass()
 			);
@@ -131,13 +128,13 @@ namespace aveng {
 		else {
 #endif
 			renderer.drawModels(
-				renderData.rdCommandBuffersGraphics[currentFrameIndex],
+				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
 				renderData.rdAvengAnimationPipeline,
 				renderData.rdAvengPipelineLayout,
 				renderData.rdAvengAnimationPipelineLayout,
-				renderData.rdAvengDescriptorSets[currentFrameIndex],
-				renderData.rdAvengAnimationDescriptorSets[currentFrameIndex],
+				renderData.rdAvengDescriptorSets.at(currentFrameIndex),
+				renderData.rdAvengAnimationDescriptorSets.at(currentFrameIndex),
 				currentFrameIndex);
 
 #ifdef ENABLE_EDITOR
@@ -145,7 +142,7 @@ namespace aveng {
 #endif
 
 		// End model drawing renderpass (normal or selection-enabled)
-		renderer.endSwapChainRenderPass(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+		renderer.endSwapChainRenderPass(renderData.rdCommandBuffersGraphics.at(currentFrameIndex));
 		renderer.endGraphicsCommands(currentFrameIndex);
 
 #ifdef ENABLE_EDITOR
@@ -154,7 +151,7 @@ namespace aveng {
 
 		// Begin the ImGUI renderpass
 		renderer.beginSwapChainRenderPass(
-			renderData.rdGUICommandBuffers[currentFrameIndex],
+			renderData.rdGUICommandBuffers.at(currentFrameIndex),
 			renderer.getCurrentFramebuffer(), // 
 			renderData.rdImguiRenderpass
 		);
@@ -166,12 +163,12 @@ namespace aveng {
 		}
 
 		// End ImGUI renderpass & Command recording
-		pEditor->endGUIRenderPass(renderData.rdGUICommandBuffers[currentFrameIndex]);
+		pEditor->endGUIRenderPass(renderData.rdGUICommandBuffers.at(currentFrameIndex));
 		pEditor->endGUICommands(currentFrameIndex);
 #endif
 
 		// First in queue - Graphics commands
-		commandBuffers.push_back(renderData.rdCommandBuffersGraphics[currentFrameIndex]);
+		commandBuffers.push_back(renderData.rdCommandBuffersGraphics.at(currentFrameIndex));
 
 #ifdef ENABLE_EDITOR
 
@@ -181,20 +178,20 @@ namespace aveng {
 			if (pEditor->drawInstanceGizmo()) {
 
 				// Next in queue - Line drawing commands
-				commandBuffers.push_back(renderData.rdLineCommandBuffers[currentFrameIndex]);
+				commandBuffers.push_back(renderData.rdLineCommandBuffers.at(currentFrameIndex));
 			
 			}
 		}
 
 		// Last in Queue - ensures the editor always renders on top
-		commandBuffers.push_back(renderData.rdGUICommandBuffers[currentFrameIndex]);
+		commandBuffers.push_back(renderData.rdGUICommandBuffers.at(currentFrameIndex));
 #endif
 
 		/* submit command buffer */
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore[currentFrameIndex], renderData.rdPresentSemaphore[currentFrameIndex] };
+		std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore.at(currentFrameIndex), renderData.rdPresentSemaphore.at(currentFrameIndex) };
 		std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
 		/* compute shader: contine if in vertex input ready
@@ -203,14 +200,14 @@ namespace aveng {
 		submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
 		submitInfo.pWaitSemaphores = waitSemaphores.data();
 
-		std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore[currentFrameIndex], renderData.rdGraphicSemaphore[currentFrameIndex] };
+		std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore.at(currentFrameIndex), renderData.rdGraphicSemaphore.at(currentFrameIndex) };
 
 		submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
 		submitInfo.pSignalSemaphores = signalSemaphores.data();
 		submitInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 		submitInfo.pCommandBuffers = commandBuffers.data();
 
-		result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence[currentFrameIndex]);
+		result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, renderData.rdRenderFence.at(currentFrameIndex));
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: failed to submit draw command buffer (%i)\n", __FUNCTION__, result);
 			throw std::runtime_error("Frame Failure 1");
@@ -228,7 +225,7 @@ namespace aveng {
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &renderData.rdRenderSemaphore[currentFrameIndex];
+		presentInfo.pWaitSemaphores = &renderData.rdRenderSemaphore.at(currentFrameIndex);
 
 		VkSwapchainKHR swapchain = renderer.getVkSwapchain();
 		presentInfo.swapchainCount = 1;
@@ -238,14 +235,16 @@ namespace aveng {
 		result = vkQueuePresentKHR(engineDevice.presentQueue(), &presentInfo);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 			renderer.recreateSwapChain();
+#ifdef ENABLE_EDITOR
+			pEditor->recreateFrameBuffers(renderer.pGetSwapChain());
+#endif
+			// return false;
 		}
-		else {
-			if (result != VK_SUCCESS) {
-				std::printf("%s error: failed to present swapchain image\n", __FUNCTION__);
-				throw std::runtime_error("Frame Failure 2");
-			}
+		else if (result != VK_SUCCESS) {
+			std::printf("%s error: failed to present swapchain image\n", __FUNCTION__);
+			throw std::runtime_error("Frame Failure 2");
 		}
-
+		
 		renderer.endFrame();
 
 	}

@@ -48,8 +48,11 @@ namespace aveng {
 
 	private:
 
+#ifdef ENABLE_EDITOR
 		AppMode mode_ = AppMode::Editor;
-
+#else
+		AppMode mode_ = AppMode::Game;
+#endif
 		void updateData(float frameTime);
 
 		bool firstFrame;
