@@ -138,6 +138,13 @@ namespace aveng {
 		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion
 	};
 
+	struct PointLightData {
+		glm::vec4 ambientLightColor;
+		glm::vec4 positions[100];		// w is radius
+		glm::vec4 colors[100];			// w is intensity
+		alignas(16) uint32_t numLights;
+	};
+
 	struct VkUploadMatrices {
 		alignas(16) glm::mat4 viewMatrix{};
 		alignas(16) glm::mat4 projectionMatrix{};
@@ -177,6 +184,10 @@ namespace aveng {
 		Span<VkUniformBufferData>       viewProjUBOs;
 		Span<VkShaderStorageBufferData> modelRootSSBOs;
 		Span<VkShaderStorageBufferData> boneMatSSBOs;
+	};
+
+	struct LightingBuffersView {
+		Span<VkUniformBufferData>       viewPointLightUBOs;
 	};
 
 	struct VkRenderData {
@@ -297,6 +308,7 @@ namespace aveng {
 	instanceEditMode rdInstanceEditMode = instanceEditMode::move;
 
 	MatrixBuffersView matrixBuffersView; // Proxy for editor
+	LightingBuffersView pointLightBufferView;
 
 	std::vector<VkImage> rdSelectionImages;
 	std::vector<VkImageView> rdSelectionImageViews;

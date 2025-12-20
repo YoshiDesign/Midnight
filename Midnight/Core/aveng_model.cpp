@@ -85,7 +85,7 @@ namespace aveng {
 			}
 
 			if (diffuseTex.image != VK_NULL_HANDLE) {
-				std::cout << "Binding Diffuse Texture" << std::endl;
+				
 				vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
 					renderLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
 			}

@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <cassert>
 #include "PointLightSystem.h"
+#include "CoreVK/EngineDevice.h"
 
 namespace aveng {
 
@@ -13,6 +14,8 @@ namespace aveng {
 		//VkDescriptorSetLayout descriptorSetLayouts[2] = { 
 		//	renderData.rdAvengBasicDescriptorLayout, 
 		//	renderData.rdAvengBasicLightingDescriptorLayout};
+
+		// renderData.avengDescriptorPool
 
 		//createPipelineLayout(descriptorSetLayouts);
 		//createPipeline(renderPass);
@@ -52,23 +55,7 @@ namespace aveng {
 	*/
 	void PointLightSystem::createPipeline(VkRenderPass renderPass)
 	{
-		// Initialize the pipeline 
-		assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
 
-		PipelineConfig pipelineConfig{};
-		GFXPipeline::defaultPipelineConfig(pipelineConfig);
-		pipelineConfig.attributeDescriptions.clear();
-		pipelineConfig.bindingDescriptions.clear();
-		pipelineConfig.renderPass = renderPass;
-		pipelineConfig.pipelineLayout = pipelineLayout;
-
-		// A GFXPipeline
-		gfxPipeline = std::make_unique<GFXPipeline>(
-			engineDevice,
-			"shaders/point_light.vert.spv",
-			"shaders/point_light.frag.spv",
-			pipelineConfig
-		);
 	}
 
 	//void PointLightSystem::render(int frameIndex, VkCommandBuffer commandBuffer, int numLights)

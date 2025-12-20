@@ -608,7 +608,15 @@ namespace aveng {
 			assimpSelSsboBind2.pImmutableSamplers = nullptr;
 			assimpSelSsboBind2.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpSelUboBind, assimpSelSsboBind, assimpSelSsboBind2 };
+			// Lighting Uniform - Point Lights
+			VkDescriptorSetLayoutBinding assimpSkinningSsboBind3{};
+			assimpSkinningSsboBind3.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			assimpSkinningSsboBind3.binding = 3;
+			assimpSkinningSsboBind3.descriptorCount = 1;
+			assimpSkinningSsboBind3.pImmutableSamplers = nullptr;
+			assimpSkinningSsboBind3.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpSelUboBind, assimpSelSsboBind, assimpSelSsboBind2, assimpSkinningSsboBind3 };
 
 			VkDescriptorSetLayoutCreateInfo assimpSelCreateInfo{};
 			assimpSelCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -653,8 +661,16 @@ namespace aveng {
 			assimpSkinningSelSsboBind3.pImmutableSamplers = nullptr;
 			assimpSkinningSelSsboBind3.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+			// Lighting Uniform - Point Lights
+			VkDescriptorSetLayoutBinding assimpSkinningSsboBind4{};
+			assimpSkinningSsboBind4.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			assimpSkinningSsboBind4.binding = 4;
+			assimpSkinningSsboBind4.descriptorCount = 1;
+			assimpSkinningSsboBind4.pImmutableSamplers = nullptr;
+			assimpSkinningSsboBind4.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
 			std::vector<VkDescriptorSetLayoutBinding> assimpSkinningBindings =
-			{ assimpSelUboBind, assimpSkinningSelSsboBind, assimpSkinningSelSsboBind2, assimpSkinningSelSsboBind3 };
+			{ assimpSelUboBind, assimpSkinningSelSsboBind, assimpSkinningSelSsboBind2, assimpSkinningSelSsboBind3, assimpSkinningSsboBind4 };
 
 			VkDescriptorSetLayoutCreateInfo assimpSkinningCreateInfo{};
 			assimpSkinningCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -797,6 +813,11 @@ namespace aveng {
 			selectionInfo.offset = 0;
 			selectionInfo.range = VK_WHOLE_SIZE;
 
+			VkDescriptorBufferInfo lightsInfo{};
+			lightsInfo.buffer = renderData.pointLightBufferView.viewPointLightUBOs[frameIndex].buffer;
+			lightsInfo.offset = 0;
+			lightsInfo.range = VK_WHOLE_SIZE;
+
 			VkWriteDescriptorSet matrixWriteDescriptorSet{};
 			matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			matrixWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -821,8 +842,16 @@ namespace aveng {
 			selectionWriteDescriptorSet.descriptorCount = 1;
 			selectionWriteDescriptorSet.pBufferInfo = &selectionInfo;
 
+			VkWriteDescriptorSet lightsWriteDescriptorSet{};
+			lightsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			lightsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			lightsWriteDescriptorSet.dstSet = renderData.rdAvengSelectionDescriptorSets[frameIndex];
+			lightsWriteDescriptorSet.dstBinding = 3;
+			lightsWriteDescriptorSet.descriptorCount = 1;
+			lightsWriteDescriptorSet.pBufferInfo = &lightsInfo;
+
 			std::vector<VkWriteDescriptorSet> selectionWriteDescriptorSets =
-			{ matrixWriteDescriptorSet, posWriteDescriptorSet, selectionWriteDescriptorSet };
+			{ matrixWriteDescriptorSet, posWriteDescriptorSet, selectionWriteDescriptorSet, lightsWriteDescriptorSet };
 
 			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(selectionWriteDescriptorSets.size()),
 				selectionWriteDescriptorSets.data(), 0, nullptr);
@@ -849,6 +878,11 @@ namespace aveng {
 			selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[frameIndex].buffer;
 			selectionInfo.offset = 0;
 			selectionInfo.range = VK_WHOLE_SIZE;
+
+			VkDescriptorBufferInfo lightsInfo{};
+			lightsInfo.buffer = renderData.pointLightBufferView.viewPointLightUBOs[frameIndex].buffer;
+			lightsInfo.offset = 0;
+			lightsInfo.range = VK_WHOLE_SIZE;
 
 			VkWriteDescriptorSet matrixWriteDescriptorSet{};
 			matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -881,10 +915,18 @@ namespace aveng {
 			selectionWriteDescriptorSet.dstBinding = 3;
 			selectionWriteDescriptorSet.descriptorCount = 1;
 			selectionWriteDescriptorSet.pBufferInfo = &selectionInfo;
+			
+			VkWriteDescriptorSet lightsWriteDescriptorSet{};
+			lightsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			lightsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			lightsWriteDescriptorSet.dstSet = renderData.rdAvengAnimationSelectionDescriptorSets[frameIndex];
+			lightsWriteDescriptorSet.dstBinding = 4;
+			lightsWriteDescriptorSet.descriptorCount = 1;
+			lightsWriteDescriptorSet.pBufferInfo = &lightsInfo;
 
 			std::vector<VkWriteDescriptorSet> skinningSelectionWriteDescriptorSets =
 			{ matrixWriteDescriptorSet, boneMatrixWriteDescriptorSet,
-				posWriteDescriptorSet, selectionWriteDescriptorSet };
+				posWriteDescriptorSet, selectionWriteDescriptorSet, lightsWriteDescriptorSet };
 
 			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(skinningSelectionWriteDescriptorSets.size()),
 				skinningSelectionWriteDescriptorSets.data(), 0, nullptr);

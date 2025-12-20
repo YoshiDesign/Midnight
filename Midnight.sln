@@ -60,11 +60,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shaders", "shaders", "{02EA
 		shaders\line.vert = shaders\line.vert
 		shaders\point_light.frag = shaders\point_light.frag
 		shaders\point_light.vert = shaders\point_light.vert
-		shaders\post_process.vert = shaders\post_process.vert
-		shaders\simple_shader_instanced.frag = shaders\simple_shader_instanced.frag
-		shaders\simple_shader_instanced.vert = shaders\simple_shader_instanced.vert
-		shaders\simple_v2_instanced.frag = shaders\simple_v2_instanced.frag
-		shaders\simple_v2_instanced.vert = shaders\simple_v2_instanced.vert
+		shaders\archive\simple_shader.frag = shaders\archive\simple_shader.frag
+		shaders\archive\simple_shader.vert = shaders\archive\simple_shader.vert
 	EndProjectSection
 EndProject
 Global

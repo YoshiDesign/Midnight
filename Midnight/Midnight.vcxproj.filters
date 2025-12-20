@@ -48,7 +48,7 @@
     <ClCompile Include="Core\UUID.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CoreVK\PointLightSystem.cpp">
+    <ClCompile Include="Core\PointLightSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp">
@@ -1145,7 +1145,7 @@
     <ClInclude Include="Core\AvengComponent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreVK\PointLightSystem.h">
+    <ClInclude Include="Core\PointLightSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\Renderer\PipelineConfigManager.h">

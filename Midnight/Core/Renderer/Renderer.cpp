@@ -30,11 +30,11 @@ namespace aveng {
 
 		// Define buffer vec's that are managed by the Renderer
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mShaderModelRootMatrixBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mNodeTransformBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mShaderTrsMatrixBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mShaderBoneMatrixBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mLightDataBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mPointLightUBOBuffers			 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mShaderModelRootMatrixBuffers	 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mNodeTransformBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mShaderTrsMatrixBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mShaderBoneMatrixBuffers		 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT); // This one can be used as needed by the renderer and the editor.
 
 		// Define descriptor set vec's
@@ -49,11 +49,15 @@ namespace aveng {
 		createCommandBuffers();
 
 		if (!createMatrixUBO()) {
-			throw std::runtime_error("Failed to create UBO");
+			throw std::runtime_error("Failed to create UBOs");
 		}
 
 		if (!createSSBOs()) {
 			throw std::runtime_error("Failed to create SSBOs");
+		}
+
+		if (!createLightsUBO()) {
+			throw std::runtime_error("Failed to create Lighting UBOs");
 		}
 
 		// Initialize our descriptor layouts & sets, map buffers to device memory.
@@ -76,7 +80,7 @@ namespace aveng {
 		}
 
 		// Initialize PointLightSystem now that descriptor layouts are created
-		// initializePointLightSystem();
+		initializePointLights();
 
 		/* register callbacks */
 		mModelInstanceData.miModelCheckCallbackFunction = [this](const std::string& fileName) { return hasModel(fileName); };
@@ -703,14 +707,15 @@ namespace aveng {
 			assimpSsboBind.pImmutableSamplers = nullptr;
 			assimpSsboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+			// Lighting Uniform - Point Lights
 			VkDescriptorSetLayoutBinding assimpSsboBind2{}; // Selected Instance Data
-			assimpSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			assimpSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			assimpSsboBind2.binding = 2;
 			assimpSsboBind2.descriptorCount = 1;
 			assimpSsboBind2.pImmutableSamplers = nullptr;
-			assimpSsboBind2.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			assimpSsboBind2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpUboBind, assimpSsboBind, assimpSsboBind2 };
+			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpUboBind, assimpSsboBind, assimpSsboBind2  };
 
 			VkDescriptorSetLayoutCreateInfo assimpCreateInfo{};
 			assimpCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -748,12 +753,13 @@ namespace aveng {
 			assimpSkinningSsboBind2.pImmutableSamplers = nullptr;
 			assimpSkinningSsboBind2.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+			// Lighting Uniform - Point Lights
 			VkDescriptorSetLayoutBinding assimpSkinningSsboBind3{};
-			assimpSkinningSsboBind3.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			assimpSkinningSsboBind3.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			assimpSkinningSsboBind3.binding = 3;
 			assimpSkinningSsboBind3.descriptorCount = 1;
 			assimpSkinningSsboBind3.pImmutableSamplers = nullptr;
-			assimpSkinningSsboBind3.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			assimpSkinningSsboBind3.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 			std::vector<VkDescriptorSetLayoutBinding> assimpSkinningBindings = { assimpUboBind, assimpSkinningSsboBind, assimpSkinningSsboBind2, assimpSkinningSsboBind3 };
 
@@ -932,8 +938,8 @@ namespace aveng {
 		return true;
 	}
 
-	//void Renderer::initializePointLightSystem()
-	//{
+	void Renderer::initializePointLights()
+	{
 		//if (!renderData.rdAvengBasicLightingDescriptorLayout) {
 		//	throw std::runtime_error("Descriptor set layouts must be created before initializing PointLightSystem (call setupDescriptors first)");
 		//}
@@ -944,10 +950,32 @@ namespace aveng {
 		//pointLightSystem.initialize(getSwapChainRenderPass());
 
 		//std::cout << "PointLightSystem initialized" << std::endl;
-	//}
 
-	//void Renderer::renderLights()
-	//{
+		uint32_t step = 0;
+		for (int i = 0; i < 10; i++) {
+			for (int j = 0; j < 10; j++) {
+			
+				mPointLightData.positions[step] = glm::vec4((i + j) * 2, -5.f, j * -4.0f, 1.0f);
+				mPointLightData.colors[step] = glm::vec4((j + 1) / 100, 0.5f, ((i + 1) * 10) / 100, .95f);
+				step++;
+
+			}
+		
+		}
+
+		mPointLightData.numLights = step;
+		mPointLightData.ambientLightColor = glm::vec4(0.99f, 0.1f, 0.1f, 0.8f);
+
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers[i], mPointLightData);
+		}
+
+		std::cout << "Rendering: " << step << " lights" << std::endl;
+
+	}
+
+	void Renderer::renderLights()
+	{
 		//if (u_LightsData.numLights <= 0) {
 		//	return; // Nothing to render
 		//}
@@ -972,7 +1000,7 @@ namespace aveng {
 
 		//// Use instanced rendering: 6 vertices per light, numLights instances
 		//vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, u_LightsData.numLights, 0, 0);
-	//}
+	}
 
 	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
 	{
@@ -1506,7 +1534,7 @@ namespace aveng {
 
 		// TODO - Skip this upload if the camera's data hasn't changed (the view isn't moving).
 		UniformBuffer::uploadData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices);
-
+		UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
 		// TODO - Figure out why this occurs AFTER compute
@@ -1662,10 +1690,10 @@ namespace aveng {
 			worldPosInfo.offset = 0;
 			worldPosInfo.range = VK_WHOLE_SIZE;
 
-			VkDescriptorBufferInfo selectionInfo{};
-			selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[frameIndex].buffer;
-			selectionInfo.offset = 0;
-			selectionInfo.range = VK_WHOLE_SIZE;
+			VkDescriptorBufferInfo lightsInfo{};
+			lightsInfo.buffer = mPointLightUBOBuffers[frameIndex].buffer;
+			lightsInfo.offset = 0;
+			lightsInfo.range = VK_WHOLE_SIZE;
 
 			VkWriteDescriptorSet matrixWriteDescriptorSet{};
 			matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1683,8 +1711,16 @@ namespace aveng {
 			posWriteDescriptorSet.descriptorCount = 1;
 			posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
 
+			VkWriteDescriptorSet lightWriteDescriptorSet{};
+			lightWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			lightWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			lightWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[frameIndex];
+			lightWriteDescriptorSet.dstBinding = 1;
+			lightWriteDescriptorSet.descriptorCount = 1;
+			lightWriteDescriptorSet.pBufferInfo = &lightsInfo;
+
 			std::vector<VkWriteDescriptorSet> writeDescriptorSets =
-			{ matrixWriteDescriptorSet, posWriteDescriptorSet };
+			{ matrixWriteDescriptorSet, posWriteDescriptorSet, lightWriteDescriptorSet };
 
 			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(writeDescriptorSets.size()),
 				writeDescriptorSets.data(), 0, nullptr);
@@ -1707,10 +1743,10 @@ namespace aveng {
 			worldPosInfo.offset = 0;
 			worldPosInfo.range = VK_WHOLE_SIZE;
 
-			VkDescriptorBufferInfo selectionInfo{};
-			selectionInfo.buffer = renderData.rdSelectedInstanceBuffers[frameIndex].buffer;
-			selectionInfo.offset = 0;
-			selectionInfo.range = VK_WHOLE_SIZE;
+			VkDescriptorBufferInfo lightsInfo{};
+			lightsInfo.buffer = mPointLightUBOBuffers[frameIndex].buffer;
+			lightsInfo.offset = 0;
+			lightsInfo.range = VK_WHOLE_SIZE;
 
 			VkWriteDescriptorSet matrixWriteDescriptorSet{};
 			matrixWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1736,8 +1772,16 @@ namespace aveng {
 			posWriteDescriptorSet.descriptorCount = 1;
 			posWriteDescriptorSet.pBufferInfo = &worldPosInfo;
 
+			VkWriteDescriptorSet lightWriteDescriptorSet{};
+			lightWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			lightWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			lightWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[frameIndex];
+			lightWriteDescriptorSet.dstBinding = 2;
+			lightWriteDescriptorSet.descriptorCount = 1;
+			lightWriteDescriptorSet.pBufferInfo = &lightsInfo;
+
 			std::vector<VkWriteDescriptorSet> skinningWriteDescriptorSets =
-			{ matrixWriteDescriptorSet, boneMatrixWriteDescriptorSet, posWriteDescriptorSet };
+			{ matrixWriteDescriptorSet, boneMatrixWriteDescriptorSet, posWriteDescriptorSet, lightWriteDescriptorSet };
 
 			// AVENG_DESCRIPTOR->build()
 			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(skinningWriteDescriptorSets.size()),
@@ -1900,6 +1944,7 @@ namespace aveng {
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
 			UniformBuffer::cleanup(engineDevice, mPerspectiveViewMatrixUBOBuffers[i]);
+			UniformBuffer::cleanup(engineDevice, mPointLightUBOBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderTrsMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderModelRootMatrixBuffers[i]);
@@ -1927,13 +1972,13 @@ namespace aveng {
 	bool Renderer::createMatrixUBO() {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			if (!UniformBuffer::init(engineDevice, mPerspectiveViewMatrixUBOBuffers[i])) {
+			if (!UniformBuffer::init(engineDevice, mPerspectiveViewMatrixUBOBuffers[i], sizeof(VkUploadMatrices))) {
 				Logger::log(1, "%s error: could not create matrix uniform buffers\n", __FUNCTION__);
 				return false;
 			}
 		}
 
-		// Populate the shared view for the editor
+		// Populate the shared view for the editor - for when it needs to update its descriptor sets
 		renderData.matrixBuffersView.viewProjUBOs = {
 			mPerspectiveViewMatrixUBOBuffers.data(),
 			mPerspectiveViewMatrixUBOBuffers.size()
@@ -1941,6 +1986,26 @@ namespace aveng {
 			
 		return true;
 	}
+
+	bool Renderer::createLightsUBO() {
+
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			if (!UniformBuffer::init(engineDevice, mPointLightUBOBuffers[i], sizeof(PointLightData))) {
+				Logger::log(1, "%s error: could not create lighting uniform buffers\n", __FUNCTION__);
+				return false;
+			}
+		}
+
+		// Populate the shared view for the editor - for when it needs to update its descriptor sets
+		renderData.pointLightBufferView.viewPointLightUBOs = {
+			mPointLightUBOBuffers.data(),
+			mPointLightUBOBuffers.size()
+		};
+			
+		return true;
+	}
+
+
 
 	bool Renderer::createSSBOs() {
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {\
@@ -1967,7 +2032,7 @@ namespace aveng {
 
 		}
 
-		// Populate the shared view for the editor
+		// Populate the shared view for the editor - for when it needs to update its descriptor sets
 		renderData.matrixBuffersView.modelRootSSBOs = {
 			mShaderModelRootMatrixBuffers.data(),
 			mShaderModelRootMatrixBuffers.size()

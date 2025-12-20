@@ -35,7 +35,7 @@ namespace aveng {
             if (editor == nullptr) {
                 throw std::runtime_error("Editor is nullptr! 2");
             }
-            std::printf("%s::onMouseButton\n", __FUNCTION__);
+
             editor->handleMouseClick(e);
         }
 
@@ -50,7 +50,7 @@ namespace aveng {
             default:
                 break;
             }
-            std::printf("%s::KeyPress\n", __FUNCTION__);
+
         }
 
         /* */

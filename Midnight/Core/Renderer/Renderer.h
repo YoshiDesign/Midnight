@@ -72,6 +72,7 @@ namespace aveng {
 
 		bool createSSBOs();
 		bool createMatrixUBO();
+		bool createLightsUBO();
 
 		// Just use the returned values directly if working in renderer.cpp. This is for clients
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
@@ -131,7 +132,8 @@ namespace aveng {
 
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
-		//void renderLights();
+		void initializePointLights();
+		void renderLights();
 		int getLightCount() const { return u_LightsData.numLights; }
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();
@@ -190,11 +192,11 @@ namespace aveng {
 
 		// Descriptors and Buffers
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
+		std::vector<VkUniformBufferData> mPointLightUBOBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderModelRootMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderTrsMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
-		std::vector<VkShaderStorageBufferData> mLightDataBuffers;
 
 		std::vector<PendingBufferDestroy> buffer_trash;
 
@@ -209,6 +211,7 @@ namespace aveng {
 
 		std::vector<glm::mat4> mWorldPosMatrices{};
 		std::vector<NodeTransformData> mNodeTransFormData{};
+		PointLightData mPointLightData{};
 
 	};
 

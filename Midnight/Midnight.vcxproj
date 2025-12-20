@@ -180,7 +180,7 @@
     <ClCompile Include="CoreVK\IndexBuffer.cpp" />
     <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
-    <ClCompile Include="CoreVK\PointLightSystem.cpp" />
+    <ClCompile Include="Core\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\Shader.cpp" />
     <ClCompile Include="CoreVK\SkinningPipeline.cpp" />
     <ClCompile Include="CoreVK\swapchain.cpp" />
@@ -221,7 +221,7 @@
     <ClInclude Include="CoreVK\SkinningPipeline.h" />
     <ClInclude Include="CoreVK\SyncObjects.h" />
     <ClInclude Include="CoreVK\VertexBuffer.h" />
-    <ClInclude Include="CoreVK\PointLightSystem.h" />
+    <ClInclude Include="Core\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
     <ClInclude Include="CoreVK\VkRenderData.h" />
     <ClInclude Include="Core\app_object.h" />
