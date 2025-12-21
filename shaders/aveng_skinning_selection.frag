@@ -3,6 +3,7 @@ layout (location = 0) in vec4 color;
 layout (location = 1) in vec4 normal;
 layout (location = 2) in vec2 texCoord;
 layout (location = 3) flat in float selectInfo;
+layout (location = 4) in vec3 fragPosWorld;
 
 layout (location = 0) out vec4 FragColor;
 layout (location = 1) out float SelectedInstance;
@@ -10,15 +11,11 @@ layout (location = 1) out float SelectedInstance;
 layout (set = 0, binding = 0) uniform sampler2D tex;
 
 layout(set = 1, binding = 4) uniform LightsUbo {
-    vec4 ambientLightColor;
+    vec4 ambientLightColor;    // w component is intensity 
     vec4 lightPositions[100];  // w component is radius
     vec4 lightColors[100];     // w component is intensity
     uint numLights;
 } u_Lights;
-
-
-vec3 lightPos = vec3(4.0, 3.0, 6.0);
-vec3 lightColor = vec3(1.0, 1.0, 1.0);
 
 float toSRGB(float x) {
 if (x <= 0.0031308)
@@ -31,18 +28,43 @@ vec3 sRGB(vec3 c) {
 }
 
 void main() {
-  float ambientStrength = u_Lights.ambientLightColor.w;
-  vec3 ambient = ambientStrength * u_Lights.ambientLightColor.rgb;
 
-  vec3 norm = normalize(vec3(normal));
-  vec3 lightDir = normalize(vec3(lightPos));
+    float ambientStrength = u_Lights.ambientLightColor.w;
+    vec3 ambient = ambientStrength * u_Lights.ambientLightColor.rgb;
 
-  float diff = max(dot(norm, lightDir), 0.0);
-  vec3 diffuse = diff * u_Lights.ambientLightColor.rgb;
+    vec3 norm = normalize(vec3(normal));
+    vec3 diffuseLight = vec3(0.0);
 
-  FragColor = vec4(ambient + diffuse, 1.0) * texture(tex, texCoord) * color;
-  FragColor.rgb = sRGB(FragColor.rgb);
+    for(uint i = 0; i < u_Lights.numLights && i < 100; i++) {
 
-  /* fill the second color attachment with the ID of our model */
-  SelectedInstance = selectInfo;
+        vec3 lightPosition = u_Lights.lightPositions[i].rgb;
+        float lightRadius = u_Lights.lightPositions[i].w;
+
+        vec3 lightColor = u_Lights.lightColors[i].rgb;
+        float lightIntensity = u_Lights.lightColors[i].w;
+
+        // Calculate direction vector between light source and fragment position
+        vec3 L = lightPosition - fragPosWorld;
+        float dist2 = dot(L, L);
+        float dist = sqrt(dist2);
+
+        // Inverse-square attenuation scaled by radius
+        // Larger radius = stronger light contribution at same distance
+        float attenuation = (lightIntensity * lightRadius) / (1.0 + dist2);
+
+        vec3 directionToLight = L / dist;
+
+        // The diffuse impact of the light
+        float cosAngIncidence = max(dot(norm, directionToLight), 0);
+
+        vec3 diffuse = lightColor * attenuation * cosAngIncidence;
+        diffuseLight += diffuse;
+
+    }
+
+    FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex, texCoord) * color;
+    FragColor.rgb = sRGB(FragColor.rgb);
+
+    /* fill the second color attachment with the ID of our model */
+    SelectedInstance = selectInfo;
 }

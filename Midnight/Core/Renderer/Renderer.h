@@ -4,7 +4,7 @@
 #include <vector>
 #include <unordered_map>
 
-//#include "CoreVK/PointLightSystem.h"
+#include "Core/PointLightSystem.h"
 //#include "Core/aveng_scene_loader.h"
 
 #include "CoreVK/swapchain.h"
@@ -32,6 +32,8 @@ namespace aveng {
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
 
+		void initialize();
+
 		// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
 		SwapChain* pGetSwapChain() const { return aveng_swapchain.get(); }
 		uint32_t* pGetCurrentImageIndex() { return &currentImageIndex; }
@@ -43,6 +45,8 @@ namespace aveng {
 		VkRenderPass getSwapChainRenderPass() const { return aveng_swapchain->getRenderPass(); }
 		VkRenderPass getSelectionRenderPass() const { return renderData.rdSelectionRenderpass; }
 		VkRenderPass getLineRenderPass() const { return renderData.rdLineRenderpass; }
+
+		const PointLightData getPointLightData() { return mPointLightData; }
 
 		VkSwapchainKHR getVkSwapchain() const { return aveng_swapchain->getSwapchain(); }
 		VkFormat getSwapChainImageFormat() { return aveng_swapchain->getSwapChainImageFormat(); }
@@ -127,14 +131,13 @@ namespace aveng {
 		void endSwapChainRenderPass(VkCommandBuffer commandBuffer);
 
 		// New methods for descriptor/buffer management
-		// void initializePointLightSystem();
 		void updateCamera();
 
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
 		void initializePointLights();
 		void renderLights();
-		int getLightCount() const { return u_LightsData.numLights; }
+		int getLightCount() const { return mPointLightData.numLights; }
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();
 
@@ -171,14 +174,11 @@ namespace aveng {
 		Timer mUIGenerateTimer{};
 		Timer mUIDrawTimer{};
 
-		// Uniform buffer V1
-		LightsUbo u_LightsData{};
-
 		// const char* default_scene_file = "scenes/demo-scene.json";
 
 		//AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
-		// PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
+		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 		
 		// Dynamic texture array support
 		uint32_t currentImageIndex{ 0 };

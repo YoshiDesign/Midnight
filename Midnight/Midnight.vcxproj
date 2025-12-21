@@ -178,6 +178,7 @@
     <ClCompile Include="CoreVK\EngineDevice.cpp" />
     <ClCompile Include="CoreVK\GFXPipeline.cpp" />
     <ClCompile Include="CoreVK\IndexBuffer.cpp" />
+    <ClCompile Include="CoreVK\LightPipeline.cpp" />
     <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
     <ClCompile Include="Core\PointLightSystem.cpp" />
@@ -215,6 +216,7 @@
     <ClInclude Include="CoreVK\EngineDevice.h" />
     <ClInclude Include="CoreVK\GFXPipeline.h" />
     <ClInclude Include="CoreVK\IndexBuffer.h" />
+    <ClInclude Include="CoreVK\LightPipeline.h" />
     <ClInclude Include="CoreVK\LinePipeline.h" />
     <ClInclude Include="CoreVK\PipelineLayout.h" />
     <ClInclude Include="CoreVK\Shader.h" />

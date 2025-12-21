@@ -60,7 +60,7 @@ void main() {
         // Apply lighting contribution
         directionToLight = normalize(directionToLight);
         float cosAngIncidence = max(dot(surfaceNormal, directionToLight), 0);
-        vec3 lightContribution = lightColor * attenuation * cosAngIncidence; // DIFFUSE CONTRIBUTION
+        vec3 lightContribution = lightColor * attenuation * cosAngIncidence;
         diffuseLight += lightContribution;
     }
     

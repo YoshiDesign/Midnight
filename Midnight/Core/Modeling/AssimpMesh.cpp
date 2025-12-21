@@ -121,9 +121,31 @@ namespace aveng {
 
         for (unsigned int i = 0; i < mTriangleCount; ++i) {
             aiFace face = mesh->mFaces[i];
-            mMesh.indices.push_back(face.mIndices[0]);
-            mMesh.indices.push_back(face.mIndices[1]);
-            mMesh.indices.push_back(face.mIndices[2]);
+            
+            // Validate face has at least 3 indices (should always be true after triangulation)
+            if (face.mNumIndices < 3) {
+                std::printf("%s warning: mesh '%s' face %u has only %u indices, skipping\n", 
+                    __FUNCTION__, mMeshName.c_str(), i, face.mNumIndices);
+                continue;
+            }
+            
+            // Validate each index is within vertex bounds
+            bool validFace = true;
+            for (unsigned int j = 0; j < 3; ++j) {
+                if (face.mIndices[j] >= mVertexCount) {
+                    std::printf("%s error: mesh '%s' face %u has out-of-bounds vertex index %u (vertex count: %u), skipping face\n",
+                        __FUNCTION__, mMeshName.c_str(), i, face.mIndices[j], mVertexCount);
+                    validFace = false;
+                    break;
+                }
+            }
+            
+            // Valid
+            if (validFace) {
+                mMesh.indices.push_back(face.mIndices[0]);
+                mMesh.indices.push_back(face.mIndices[1]);
+                mMesh.indices.push_back(face.mIndices[2]);
+            }
         }
 
         if (mesh->HasBones()) {

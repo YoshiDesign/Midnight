@@ -1,5 +1,5 @@
 #version 460 core
-layout (location = 0) in vec4 aPos; // last float is uv.x :)
+layout (location = 0) in vec4 aPos; // last float is uv.x
 layout (location = 1) in vec4 aColor;
 layout (location = 2) in vec4 aNormal; // last float is uv.y
 layout (location = 3) in uvec4 aBoneNum;
@@ -9,6 +9,7 @@ layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normal;
 layout (location = 2) out vec2 texCoord;
 layout (location = 3) out float selectInfo;
+layout (location = 4) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
@@ -43,9 +44,11 @@ void main() {
   aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
 
   mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + worldPosOffset] * skinMat;
+  vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0f);
   gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 
   color = aColor * selected[gl_InstanceIndex + worldPosOffset].x;
+
   /* draw the instance always on top when highlighted, helps to find it better */
   if (selected[gl_InstanceIndex + worldPosOffset].x != 1.0f) {
     gl_Position.z -= 1.0f;
@@ -53,6 +56,7 @@ void main() {
 
   normal = transpose(inverse(worldPosSkinMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
   texCoord = vec2(aPos.w, aNormal.w);
+  fragPosWorld = positionWorld.xyz;
 
   /* we need vertex id only (z -> y) */
   selectInfo = selected[gl_InstanceIndex + worldPosOffset].y;

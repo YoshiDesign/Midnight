@@ -8,6 +8,7 @@ layout (location = 4) in vec4 aBoneWeight;
 layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normal;
 layout (location = 2) out vec2 texCoord;
+layout (location = 3) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
@@ -37,9 +38,12 @@ void main() {
     aBoneWeight.z * boneMat[aBoneNum.z + skinMatOffset] +
     aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
 
-  mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + worldPosOffset] * skinMat;
-  gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
-  color = aColor;
-  normal = transpose(inverse(worldPosSkinMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
-  texCoord = vec2(aPos.w, aNormal.w);
+    mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + worldPosOffset] * skinMat;
+    gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
+    vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0); // Skinned model matrix * position
+
+    color = aColor;
+    normal = transpose(inverse(worldPosSkinMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
+    texCoord = vec2(aPos.w, aNormal.w);
+    fragPosWorld = positionWorld.xyz;
 }

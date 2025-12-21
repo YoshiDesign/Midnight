@@ -1,5 +1,5 @@
 #version 460 core
-layout (location = 0) in vec4 aPos; // last float is uv.x :)
+layout (location = 0) in vec4 aPos; // last float is uv.x
 layout (location = 1) in vec4 aColor;
 layout (location = 2) in vec4 aNormal; // last float is uv.y
 layout (location = 3) in uvec4 aBoneNum; // ignored
@@ -8,6 +8,7 @@ layout (location = 4) in vec4 aBoneWeight; // ignored
 layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normal;
 layout (location = 2) out vec2 texCoord;
+layout (location = 3) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
@@ -26,8 +27,11 @@ layout (std430, set = 1, binding = 1) readonly buffer WorldPosMatrices {
 
 void main() {
   mat4 modelMat = worldPosMat[gl_InstanceIndex + worldPosOffset];
-  gl_Position = projection * view * modelMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
+  vec4 positionWorld = modelMat * vec4(aPos.xyz, 1.0);
+
+  gl_Position = projection * view * modelMat * positionWorld;
   color = aColor;
   normal = transpose(inverse(modelMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
   texCoord = vec2(aPos.w, aNormal.w);
+  fragPosWorld = positionWorld.xyz;
 }

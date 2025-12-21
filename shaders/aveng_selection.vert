@@ -9,6 +9,7 @@ layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normal;
 layout (location = 2) out vec2 texCoord;
 layout (location = 3) out float selectInfo;
+layout (location = 4) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
@@ -40,8 +41,11 @@ void main() {
     gl_Position.z -= 1.0f;
   }
 
+  vec4 positionWorld = modelMat * vec4(aPos.xyz, 1.0);
+
   normal = transpose(inverse(modelMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
   texCoord = vec2(aPos.w, aNormal.w);
+  fragPosWorld = positionWorld.xyz;
 
   /* we need vertex id only (z -> y) */
   selectInfo = selected[gl_InstanceIndex + worldPosOffset].y;

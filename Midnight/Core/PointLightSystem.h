@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreVK/VkRenderData.h"
 #include <memory>
+#include <vector>
 
 namespace aveng {
 
@@ -13,20 +14,22 @@ namespace aveng {
 		PointLightSystem() = delete;
 		PointLightSystem(EngineDevice& device, VkRenderData& renderData);
 		~PointLightSystem();
-		void initialize(VkRenderPass renderPass);
+		void initialize(VkRenderPass renderPass, int nColorAttachments, bool colorMask);
+		// void createDescriptorLayouts();
 		PointLightSystem(const PointLightSystem&) = delete;
 		PointLightSystem& operator=(const PointLightSystem&) = delete;
 		void render(int frameIndex, VkCommandBuffer commandBuffer, int numLights);
 		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
+		VkPipeline getPipeline() { return pipeline; }
 
 	private:
 
-		void createPipelineLayout(VkDescriptorSetLayout* descriptorSetLayouts);
-		void createPipeline(VkRenderPass renderPass);
+		void createPipeline(VkRenderPass renderPass, int nColorAttachments, bool colorMask);
 
 		EngineDevice& engineDevice;
 
 		VkPipelineLayout pipelineLayout;
+		VkPipeline pipeline;
 		VkRenderData& renderData;
 
 	};

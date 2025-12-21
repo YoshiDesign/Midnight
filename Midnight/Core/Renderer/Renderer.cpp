@@ -42,7 +42,7 @@ namespace aveng {
 		renderData.rdAvengAnimationDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		renderData.basicLightingDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// renderData.basicLightingDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 
 		recreateSwapChain();
 
@@ -78,9 +78,6 @@ namespace aveng {
 			std::cerr << "error [Renderer 3]!" << std::endl;
 			throw std::runtime_error("Failed to create sync objects");
 		}
-
-		// Initialize PointLightSystem now that descriptor layouts are created
-		initializePointLights();
 
 		/* register callbacks */
 		mModelInstanceData.miModelCheckCallbackFunction = [this](const std::string& fileName) { return hasModel(fileName); };
@@ -129,6 +126,46 @@ namespace aveng {
 		freeCommandBuffers();
 		cleanup();
 		// vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
+	}
+
+	void Renderer::initialize() {
+		initializePointLights();
+
+		addLight(
+			glm::vec3(20.0f, 0.0f, 20.0f),
+			glm::vec3(0.f, 0.0f, 1.0f),
+			5.9f,
+			1.0f
+		);
+
+		addLight(
+			glm::vec3(-20.0f, 0.0f, 20.0f),
+			glm::vec3(0.95f, .88f, 1.0f),
+			5.9f,
+			1.0f
+		);
+
+		addLight(
+			glm::vec3(20.0f, 0.0f, -20.0f),
+			glm::vec3(0.f, 1.0f, 0.0f),    
+			5.9f,						   
+			1.0f
+		);
+
+		addLight(
+			glm::vec3(-20.0f, 0.0f, -20.0f),
+			glm::vec3(0.9f, 0.08f, 0.02f),  
+			5.9f,						 
+			1.0f                 
+		);
+
+		addLight(
+			glm::vec3(0.0f, -30.0f, 0.0f),
+			glm::vec3(0.7f, 0.98f, 0.98f),
+			1.0f,
+			4.0f
+		);
+
 	}
 
 	bool Renderer::hasModel(const std::string& modelFileName) {
@@ -564,7 +601,7 @@ namespace aveng {
 			"Can't begin render pass on command buffer from a different frame");
 
 		// Clear Color for now
-		glm::vec3 rgb = glm::vec3(0.001f, 0.008f, 0.06f); // Cool, dark midnight blue
+		glm::vec3 rgb = glm::vec3(0.001f, 0.002f, 0.009f); // Cool, dark midnight blue
 
 		// Render pass info
 		VkRenderPassBeginInfo renderPassInfo{};
@@ -694,26 +731,25 @@ namespace aveng {
 		{
 			/* non-animated shader */
 			VkDescriptorSetLayoutBinding assimpUboBind{};
-			assimpUboBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			assimpUboBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // V/P Mats
 			assimpUboBind.binding = 0;
 			assimpUboBind.descriptorCount = 1;
 			assimpUboBind.pImmutableSamplers = nullptr;
 			assimpUboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 			VkDescriptorSetLayoutBinding assimpSsboBind{};
-			assimpSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			assimpSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // WorldPosMatricess
 			assimpSsboBind.binding = 1;
 			assimpSsboBind.descriptorCount = 1;
 			assimpSsboBind.pImmutableSamplers = nullptr;
 			assimpSsboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			// Lighting Uniform - Point Lights
-			VkDescriptorSetLayoutBinding assimpSsboBind2{}; // Selected Instance Data
-			assimpSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			VkDescriptorSetLayoutBinding assimpSsboBind2{};
+			assimpSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Point Lights
 			assimpSsboBind2.binding = 2;
 			assimpSsboBind2.descriptorCount = 1;
 			assimpSsboBind2.pImmutableSamplers = nullptr;
-			assimpSsboBind2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			assimpSsboBind2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 
 			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpUboBind, assimpSsboBind, assimpSsboBind2  };
 
@@ -890,7 +926,7 @@ namespace aveng {
 				Logger::log(1, "%s error: could not allocate Assimp descriptor set (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
-
+			
 			/* animated models */
 			VkDescriptorSetAllocateInfo skinningDescriptorAllocateInfo{};
 			skinningDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -940,88 +976,67 @@ namespace aveng {
 
 	void Renderer::initializePointLights()
 	{
-		//if (!renderData.rdAvengBasicLightingDescriptorLayout) {
-		//	throw std::runtime_error("Descriptor set layouts must be created before initializing PointLightSystem (call setupDescriptors first)");
-		//}
 
-		//std::cout << "Initializing PointLightSystem" << std::endl;
-
-		//// Initialize point light system using existing descriptor set layouts
-		//pointLightSystem.initialize(getSwapChainRenderPass());
-
-		//std::cout << "PointLightSystem initialized" << std::endl;
-
-		uint32_t step = 0;
-		for (int i = 0; i < 10; i++) {
-			for (int j = 0; j < 10; j++) {
-			
-				mPointLightData.positions[step] = glm::vec4((i + j) * 2, -5.f, j * -4.0f, 1.0f);
-				mPointLightData.colors[step] = glm::vec4((j + 1) / 100, 0.5f, ((i + 1) * 10) / 100, .95f);
-				step++;
-
-			}
-		
-		}
-
-		mPointLightData.numLights = step;
-		mPointLightData.ambientLightColor = glm::vec4(0.99f, 0.1f, 0.1f, 0.8f);
-
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers[i], mPointLightData);
-		}
-
-		std::cout << "Rendering: " << step << " lights" << std::endl;
+		glm::vec3 midnightBlue = glm::vec3(0.97f, 0.89f, 0.9f);
+		mPointLightData.ambientLightColor = glm::vec4(midnightBlue, 0.01f);
+		pointLightSystem.initialize(getSwapChainRenderPass(), 1, false);
 
 	}
 
 	void Renderer::renderLights()
 	{
-		//if (u_LightsData.numLights <= 0) {
-		//	return; // Nothing to render
-		//}
-		//assert(renderData.rdCommandBuffersGraphics.at(currentFrameIndex) == getCurrentCommandBufferGraphics()
-		//	&& "Point Light system is using the wrong command buffer");
+		if (mPointLightData.numLights <= 0) {
+			return; // Nothing to render
+		}
+		assert(renderData.rdCommandBuffersGraphics.at(currentFrameIndex) == getCurrentCommandBufferGraphics()
+			&& "Point Light system is using the wrong command buffer");
 
-		//pointLightSystem.getPipeline()->bind(renderData.rdCommandBuffersGraphics.at(currentFrameIndex));
+		// This might not be necessary
+		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pointLightSystem.getPipeline());
 
-		//// vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengPipeline);
+		// Bind both descriptor sets
+		VkDescriptorSet descriptorSets[1] = { renderData.rdAvengDescriptorSets.at(currentFrameIndex) };
+		vkCmdBindDescriptorSets(
+			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pointLightSystem.getPipelineLayout(),
+			0,
+			1, // binding 1 descriptor set
+			descriptorSets,
+			0,
+			nullptr);
 
-		//// Bind both descriptor sets
-		//VkDescriptorSet descriptorSets[2] = { renderData.rdAvengDescriptorSets.at(currentFrameIndex), renderData.basicLightingDescriptorSets.at(currentFrameIndex) };
-		//vkCmdBindDescriptorSets(
-		//	renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
-		//	VK_PIPELINE_BIND_POINT_GRAPHICS,
-		//	pointLightSystem.getPipelineLayout(),
-		//	0,
-		//	2, // binding 2 descriptor sets
-		//	descriptorSets,
-		//	0,
-		//	nullptr);
+		std::cout << "Rendering Lights..." << std::endl;
 
-		//// Use instanced rendering: 6 vertices per light, numLights instances
-		//vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, u_LightsData.numLights, 0, 0);
+		// Use instanced rendering: 6 vertices per light, numLights instances
+		vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, mPointLightData.numLights, 0, 0);
 	}
 
 	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
 	{
-		if (u_LightsData.numLights >= LightsUbo::MAX_LIGHTS) {
-			std::cout << "Warning: Maximum number of lights (" << LightsUbo::MAX_LIGHTS << ") reached. Cannot add more lights." << std::endl;
+		if (mPointLightData.numLights >= 100) {
+			std::cout << "Warning: Maximum number of lights (" << 100 << ") reached. Cannot add more lights." << std::endl;
 			return;
 		}
 
-		u_LightsData.lightPositions[u_LightsData.numLights] = glm::vec4(position, radius);
-		u_LightsData.lightColors[u_LightsData.numLights] = glm::vec4(color, intensity);
-		u_LightsData.numLights++;
-	
+		mPointLightData.positions[mPointLightData.numLights] = glm::vec4(position, radius);
+		mPointLightData.colors[mPointLightData.numLights] = glm::vec4(color, intensity);
+		mPointLightData.numLights++;
+
+		// Update the UBO in the most inefficent way possible... for now!
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers[i], mPointLightData);
+		}
+
 	}
 
 	void Renderer::clearLights()
 	{
 
-		u_LightsData.numLights = 0;
+		mPointLightData.numLights = 0;
 		// Zero out the light arrays for clean state
-		memset(u_LightsData.lightPositions, 0, sizeof(u_LightsData.lightPositions));
-		memset(u_LightsData.lightColors, 0, sizeof(u_LightsData.lightColors));
+		memset(mPointLightData.positions, 0, sizeof(mPointLightData.positions));
+		memset(mPointLightData.colors, 0, sizeof(mPointLightData.colors));
 	}
 
 	bool Renderer::createPipelineLayouts() {
@@ -1135,9 +1150,10 @@ namespace aveng {
 
 	size_t Renderer::calculateDynamicUBOStride() const
 	{
-		size_t objectSize = sizeof(ObjectUniformData);
-		size_t minAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
-		return ((objectSize + minAlignment - 1) / minAlignment) * minAlignment;
+		//size_t objectSize = sizeof(ObjectUniformData);
+		//size_t minAlignment = engineDevice.properties.limits.minUniformBufferOffsetAlignment;
+		//return ((objectSize + minAlignment - 1) / minAlignment) * minAlignment;
+		return 0;
 	}
 
 	void Renderer::runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset) {
@@ -1351,6 +1367,7 @@ namespace aveng {
 		*/
 
 		bool bufferResized = false;
+		// TODO - This upload only needs to occur if there are Animated Models!
 		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), mNodeTransFormData);
 		// Upload every instance's current transform data (translation, scale, rotation)
 		// If it resized, no data was uploaded
@@ -1434,6 +1451,39 @@ namespace aveng {
 		if (bufferResized)
 		{
 			std::cout << "StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
+			updateDescriptorSets(currentFrameIndex);
+			updateComputeDescriptorSets(currentFrameIndex);
+		}
+
+		/* we need to update descriptors after the upload if buffer size changed */
+		mUploadToUBOTimer.start();
+
+		// TODO - Skip this upload if the camera's data hasn't changed (the view isn't moving).
+		UniformBuffer::uploadData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices);
+		// UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
+		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+		// TODO - Figure out why this occurs AFTER compute
+		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), mWorldPosMatrices)) {
+			size_t newBufferSize = std::max(mWorldPosMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
+
+			/*
+				TODO - GC The old buffer
+			*/
+
+			// Reinitialize TrsMat buffers
+			ShaderStorageBuffer::init(
+				engineDevice,
+				mShaderModelRootMatrixBuffers.at(currentFrameIndex),
+				newBufferSize // New buffer size
+			);
+
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), mWorldPosMatrices)) {
+				std::printf("[2] Failed to accommodate resized buffer.\n");
+				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
+			}
+
+			std::cout << "Model Root SSBO Resized - Updating Descriptor Sets" << std::endl;
 			updateDescriptorSets(currentFrameIndex);
 			updateComputeDescriptorSets(currentFrameIndex);
 		}
@@ -1529,38 +1579,7 @@ namespace aveng {
 			};
 		}
 
-		/* we need to update descriptors after the upload if buffer size changed */
-		mUploadToUBOTimer.start();
 
-		// TODO - Skip this upload if the camera's data hasn't changed (the view isn't moving).
-		UniformBuffer::uploadData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices);
-		UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
-		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
-
-		// TODO - Figure out why this occurs AFTER compute
-		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), mWorldPosMatrices)) {
-			size_t newBufferSize = std::max(mWorldPosMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
-			
-			/*
-				TODO - GC The old buffer
-			*/
-
-			// Reinitialize TrsMat buffers
-			ShaderStorageBuffer::init(
-				engineDevice,
-				mShaderModelRootMatrixBuffers.at(currentFrameIndex),
-				newBufferSize // New buffer size
-			);
-
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), mWorldPosMatrices)) {
-				std::printf("[2] Failed to accommodate resized buffer.\n");
-				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
-			}
-		
-			std::cout << "Model Root SSBO Resized - Updating Descriptor Sets" << std::endl;
-			updateDescriptorSets(currentFrameIndex);
-			updateComputeDescriptorSets(currentFrameIndex);
-		}
 
 	}
 
@@ -1611,10 +1630,10 @@ namespace aveng {
 		/* draw the models */
 		uint32_t worldPosOffset = 0;
 		uint32_t skinMatOffset = 0;
-		for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) 
+		for (const auto& model : mModelInstanceData.miModelList)
 		{
-			size_t numberOfInstances = modelType.second.size();
-			std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+			// std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
 
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
 			{
@@ -1675,7 +1694,7 @@ namespace aveng {
 	}
 
 	void Renderer::updateDescriptorSets(int frameIndex) {
-		Logger::log(1, "%s: updating descriptor sets\n", __FUNCTION__);
+		Logger::log(1, "%s: Renderer updating descriptor sets\n", __FUNCTION__);
 
 		/* we must update the descriptor sets whenever the buffer size has changed */
 		{
@@ -1715,7 +1734,7 @@ namespace aveng {
 			lightWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			lightWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			lightWriteDescriptorSet.dstSet = renderData.rdAvengDescriptorSets[frameIndex];
-			lightWriteDescriptorSet.dstBinding = 1;
+			lightWriteDescriptorSet.dstBinding = 2;
 			lightWriteDescriptorSet.descriptorCount = 1;
 			lightWriteDescriptorSet.pBufferInfo = &lightsInfo;
 
@@ -1776,7 +1795,7 @@ namespace aveng {
 			lightWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			lightWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			lightWriteDescriptorSet.dstSet = renderData.rdAvengAnimationDescriptorSets[frameIndex];
-			lightWriteDescriptorSet.dstBinding = 2;
+			lightWriteDescriptorSet.dstBinding = 3;
 			lightWriteDescriptorSet.descriptorCount = 1;
 			lightWriteDescriptorSet.pBufferInfo = &lightsInfo;
 
@@ -1919,6 +1938,8 @@ namespace aveng {
 			std::printf("%s fatal error: could not wait for device idle (error: %i)\n", __FUNCTION__, result);
 			return;
 		}
+
+		destroyTrash();
 
 		/* delete models to destroy Vulkan objects */
 		for (const auto& model : mModelInstanceData.miModelList) {

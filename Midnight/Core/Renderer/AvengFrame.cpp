@@ -106,6 +106,7 @@ namespace aveng {
 				renderer.getCurrentSelectionFramebuffer(),
 				renderer.getSelectionRenderPass(),
 				true);
+
 		}
 		else {
 #endif
@@ -121,12 +122,18 @@ namespace aveng {
 
 		if (gameData.currentAppMode == AppMode::Editor) {
 
+			// Editor takes over lighting
+			pEditor->renderLights();
+
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
 			pEditor->drawSelectedModels(currentFrameIndex); 
 			
 		}
 		else {
 #endif
+			// Renderer lighting
+			renderer.renderLights();
+
 			renderer.drawModels(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,

@@ -139,6 +139,14 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
+	void Editor::initializePointLights()
+	{
+
+		pointLightSystem.initialize(renderData.rdSelectionRenderpass, 1, false);
+		std::cout << "(Editor) PointLightSystem initialized" << std::endl;
+
+	}
+
 	void Editor::readPixelDataPos()
 	{
 		if (!editorData.eMousePick || renderer.isRecreatingSwapChain()) {
@@ -198,7 +206,7 @@ namespace aveng {
 		swapchain->createEditorSelectionFramebuffers();
 	}
 
-	void Editor::init(SwapChain* swapchain) 
+	void Editor::initialize(SwapChain* swapchain) 
 	{
 		// The primary renderpass, just in case
 		// VkRenderPass renderPass = swapchain->getRenderPass();
@@ -259,6 +267,42 @@ namespace aveng {
 			renderData.rdImguiRenderpass,
 			swapchain->imageCount()
 		);
+
+		pointLightSystem.initialize(
+			renderData.rdSelectionRenderpass, 
+			2, true);
+	}
+
+	void Editor::renderLights()
+	{
+		if (renderer.getPointLightData().numLights <= 0) {
+			return; // Nothing to render
+		}
+
+		PointLightData pl = renderer.getPointLightData();
+		//std::cout << "Point Light Pos: " << pl.positions[0].x << ", " << pl.positions[0].y << ", " << pl.positions[0].z << ", " << pl.positions[0].w << std::endl;
+		//std::cout << "Point Light Pos: " << pl.colors[0].r << ", " << pl.colors[0].g << ", " << pl.colors[0].b << ", " << pl.colors[0].a << std::endl;
+		//
+		assert(renderData.rdCommandBuffersGraphics.at(currentFrameIndex) == renderer.getCurrentCommandBufferGraphics()
+			&& "Point Light system is using the wrong command buffer");
+
+		// This might not be necessary
+		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pointLightSystem.getPipeline());
+
+		// Bind both descriptor sets
+		VkDescriptorSet descriptorSets[1] = { renderData.rdAvengDescriptorSets.at(currentFrameIndex) };
+		vkCmdBindDescriptorSets(
+			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pointLightSystem.getPipelineLayout(),
+			0,
+			1, // binding 1 descriptor set
+			descriptorSets,
+			0,
+			nullptr);
+
+		// Use instanced rendering: 6 vertices per light, numLights instances
+		vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, renderer.getPointLightData().numLights, 0, 0);
 	}
 
 	bool Editor::createPipelineLayouts() {
@@ -796,6 +840,8 @@ namespace aveng {
 	void Editor::updateDescriptorSets(int frameIndex)
 	{
 
+		// Logger::log(1, "%s: Editor updating descriptor sets.", __FUNCTION__);
+
 		{
 			/* selection shader, non-animated  */
 			VkDescriptorBufferInfo matrixInfo{};
@@ -958,6 +1004,8 @@ namespace aveng {
 
 	void Editor::cleanup()
 	{
+
+		destroyTrash();
 
 		// Free command buffers
 		vkFreeCommandBuffers(

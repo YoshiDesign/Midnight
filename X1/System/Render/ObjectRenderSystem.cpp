@@ -17,9 +17,9 @@ namespace aveng {
 	{
 
 		window.setInputSystem(&inputSystem);
-
+		renderer.initialize(); // Very new
 #if ENABLE_EDITOR
-		editor.init(renderer.pGetSwapChain());
+		editor.initialize(renderer.pGetSwapChain());
 #endif
 
 		firstFrame = true;

@@ -42,18 +42,6 @@ namespace aveng {
 		bool empty() const { return size == 0; }
 	};
 
-	struct LightsUbo {
-		static constexpr int MAX_LIGHTS = 100;
-		uint32_t numLights{ 0 };
-		alignas(16) glm::vec4 lightPositions[MAX_LIGHTS];  // w component is radius
-		alignas(16) glm::vec4 lightColors[MAX_LIGHTS];     // w component is intensity
-	};
-
-	// NOTE: Recall Dynamic UBOs (see Renderer::calculateDynamicUBOStride) Change it to whatever you need
-	struct ObjectUniformData {
-		alignas(16) int texIndex;
-	};
-
 	struct VkTextureData {
 		std::string texturePath{};
 		VkImage image = VK_NULL_HANDLE;
@@ -139,7 +127,7 @@ namespace aveng {
 	};
 
 	struct PointLightData {
-		glm::vec4 ambientLightColor;
+		glm::vec4 ambientLightColor;	// w is intensity
 		glm::vec4 positions[100];		// w is radius
 		glm::vec4 colors[100];			// w is intensity
 		alignas(16) uint32_t numLights;
@@ -269,12 +257,13 @@ namespace aveng {
 		VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE; // EDITOR
 		VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE; // EDITOR
 		VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE; // EDITOR
+		VkDescriptorSetLayout rdPointLightDescriptorLayout = VK_NULL_HANDLE; // EDITOR
 
 		std::vector<VkDescriptorSet> rdAvengDescriptorSets;
 		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;
 		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;
 		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;
-		std::vector<VkDescriptorSet> basicLightingDescriptorSets;
+		// std::vector<VkDescriptorSet> basicLightingDescriptorSets;
 		std::vector<VkDescriptorSet> textureDescriptorSets;
 		std::vector<VkDescriptorSet> rdAvengSelectionDescriptorSets;	// EDITOR
 		std::vector<VkDescriptorSet> rdAvengAnimationSelectionDescriptorSets; // EDITOR

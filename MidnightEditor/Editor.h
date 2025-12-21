@@ -2,6 +2,7 @@
 #include <cassert>
 #include "GUI/aveng_imgui.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
+#include "Core/PointLightSystem.h"
 #include "Game/data.h"
 #include "System/Camera/aveng_camera.h"
 #include "System/Peripheral/KeyboardController.h"
@@ -27,14 +28,16 @@ namespace aveng {
 		~Editor();
 
 
-		void init(SwapChain* swapchain);
+		void initialize(SwapChain* swapchain);
 		void update(float frameTime, unsigned int frameIndex);
 		void renderGUI(float frameTime);
+		void renderLights();
 		void updateCamera(float frameTime);
 		void drawSelectedModels(int frameIndex);
 		void cleanup();
 		void destroyTrash();
 		void recreateFrameBuffers(SwapChain* swapchain);
+		void initializePointLights();
 
 		bool hasSelection() { return editorData.eHasSelection; }
 		bool hasClicked() { return editorData.eMousePick; }
@@ -125,6 +128,7 @@ namespace aveng {
 		AvengAppObject editorViewerObject{ AvengAppObject::createAppObject(1001) };
 		KeyboardController keyboardController{ editorViewerObject, gameData };
 		AvengImgui aveng_imgui{ renderData, gameData, editorData, window, engineDevice, mModelInstanceData };
+		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 	};
 
 }

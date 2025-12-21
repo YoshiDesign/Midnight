@@ -17,11 +17,6 @@ namespace aveng {
 
 	class AvengWindow;
 
-	// Use engine types
-	using LightsUbo = aveng::LightsUbo;
-	// using GlobalUbo = aveng::GlobalUbo;
-	using ObjectUniformData = aveng::ObjectUniformData;
-
 	class ObjectRenderSystem {
 	public:
 		//ObjectRenderSystem();

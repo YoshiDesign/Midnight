@@ -290,8 +290,11 @@ namespace aveng {
         VkPhysicalDeviceFeatures deviceFeatures = {};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
         deviceFeatures.fillModeNonSolid = VK_TRUE;  // Enable wireframe/line rendering
+
 #ifdef ENABLE_EDITOR
+        // Requirements for the editor
         deviceFeatures.wideLines = VK_TRUE;
+        deviceFeatures.independentBlend = VK_TRUE;
 #endif
 
         // Config - Core

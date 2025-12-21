@@ -12,16 +12,16 @@ const vec2 OFFSETS[6] = vec2[](
 layout (location = 0) out vec2 fragOffset;
 layout (location = 1) out vec4 lightColor;
 
-layout(set = 0, binding = 0) uniform Matrices {
-	mat4 projection;
-	mat4 view;
-} ubo;
+layout (std140, set = 0, binding = 0) uniform Matrices {
+  mat4 view;
+  mat4 projection;
+};
 
-// Lights uniform buffer - matches fragment shader layout
-layout(set = 1, binding = 0) uniform LightsUbo {
-	uint numLights;
-	vec4 lightPositions[100];  // w component is radius
-	vec4 lightColors[100];     // w component is intensity
+layout(set = 0, binding = 2) uniform LightsUbo {
+    vec4 ambientLightColor;
+    vec4 lightPositions[100];  // w component is radius
+    vec4 lightColors[100];     // w component is intensity
+    uint numLights;
 } lightsUbo;
 
 void main() {
@@ -30,7 +30,7 @@ void main() {
 	
 	if (lightIndex >= lightsUbo.numLights) {
 		// Render off-screen if we're beyond the number of lights
-		gl_Position = vec4(-2.0, -2.0, -2.0, 1.0); // ai nonsense
+		gl_Position = vec4(-2.0, -2.0, -2.0, 1.0);
 		return;
 	}
 
@@ -41,8 +41,8 @@ void main() {
 	fragOffset = OFFSETS[gl_VertexIndex];
 	lightColor = lightColorData;
 
-	vec4 lightCameraSpace = ubo.view * vec4(lightPosition.xyz, 1.0);
+	vec4 lightCameraSpace = view * vec4(lightPosition.xyz, 1.0);
 	vec4 positionCameraSpace = lightCameraSpace + lightRadius * vec4(fragOffset, 0.0, 0.0);
 
-	gl_Position = ubo.projection * positionCameraSpace;
+	gl_Position = projection * positionCameraSpace;
 }
