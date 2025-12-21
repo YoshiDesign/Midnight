@@ -73,8 +73,6 @@ namespace aveng {
 
 		EngineDevice& engineDevice;
 		bool hasIndexBuffer = false;
-		uint32_t vertexCount; // Old
-		uint32_t indexCount; // Old
 
 		// map textures to external or internal texture names
 		std::unordered_map<std::string, VkTextureData> mTextures{};

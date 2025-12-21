@@ -134,35 +134,35 @@ namespace aveng {
 		addLight(
 			glm::vec3(20.0f, 0.0f, 20.0f),
 			glm::vec3(0.f, 0.0f, 1.0f),
-			5.9f,
+			15.f,
 			1.0f
 		);
 
 		addLight(
 			glm::vec3(-20.0f, 0.0f, 20.0f),
 			glm::vec3(0.95f, .88f, 1.0f),
-			5.9f,
+			15.f,
 			1.0f
 		);
 
 		addLight(
 			glm::vec3(20.0f, 0.0f, -20.0f),
 			glm::vec3(0.f, 1.0f, 0.0f),    
-			5.9f,						   
+			15.f,
 			1.0f
 		);
 
 		addLight(
 			glm::vec3(-20.0f, 0.0f, -20.0f),
 			glm::vec3(0.9f, 0.08f, 0.02f),  
-			5.9f,						 
+			15.f,
 			1.0f                 
 		);
 
 		addLight(
 			glm::vec3(0.0f, -30.0f, 0.0f),
 			glm::vec3(0.7f, 0.98f, 0.98f),
-			1.0f,
+			8.0f,
 			4.0f
 		);
 
@@ -1512,9 +1512,9 @@ namespace aveng {
 			}
 
 			uint32_t computeShaderModelOffset = 0;
-			for (const auto& modelType : mModelInstanceData.miAssimpInstancesPerModel) {
-				size_t numberOfInstances = modelType.second.size();
-				std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+			for (const auto& model : mModelInstanceData.miModelList) {
+				size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+				
 				if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 
 					/* compute shader for animated models only */

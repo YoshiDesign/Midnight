@@ -1024,6 +1024,8 @@ namespace aveng {
 		);
 		renderData.rdGUICommandBuffers.clear();
 
+		VertexBuffer::cleanup(engineDevice, mLineVertexBuffer);
+
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
 			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdSelectedInstanceBuffers[i]);

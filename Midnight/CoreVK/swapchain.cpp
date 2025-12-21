@@ -644,6 +644,7 @@ namespace aveng {
 
         VkResult result = vmaCreateImage(device.allocator(), &imageInfo, &imageAllocInfo, &readbackImage, &readbackImageAlloc, nullptr);
         if (result != VK_SUCCESS) {
+            vmaDestroyImage(device.allocator(), readbackImage, readbackImageAlloc);
             Logger::log(1, "%s error: could not allocate read back image image via VMA (error: %i)\n", __FUNCTION__, result);
             return pixelColor;
         }
@@ -723,6 +724,7 @@ namespace aveng {
         bool commandResult = device.submitSingleShotBuffer(readbackCommandBuffer); // Note: Uses the graphics queue
   
         if (!commandResult) {
+            vmaDestroyImage(device.allocator(), readbackImage, readbackImageAlloc);
             Logger::log(1, "%s error: could not submit readback transfer commands\n", __FUNCTION__);
             return pixelColor;
         }
@@ -738,6 +740,7 @@ namespace aveng {
         const float* data;
         result = vmaMapMemory(device.allocator(), readbackImageAlloc, (void**)&data);
         if (result != VK_SUCCESS) {
+            vmaDestroyImage(device.allocator(), readbackImage, readbackImageAlloc);
             Logger::log(1, "%s error: could not map readback image memory (error: %i)\n", __FUNCTION__, result);
             return pixelColor;
         }
