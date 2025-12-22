@@ -17,9 +17,6 @@ namespace aveng {
 			{
 			case GLFW_KEY_SPACE			: if (action == GLFW_PRESS) updatePipeline(); 
 				break;
-			case GLFW_KEY_PERIOD		: if (action == GLFW_PRESS) updateFlightMode();
-				break;
-			
 			default:
 				break;
 			}
@@ -35,11 +32,6 @@ namespace aveng {
 		static int getCurPipeline()
 		{
 			return current_pipeline;
-		}
-
-		static void updateFlightMode()
-		{
-			flightMode = !flightMode;
 		}
 
 		static int current_pipeline;

@@ -30,6 +30,8 @@ namespace aveng {
 	}
 #endif
 
+	int AvengFrame::currentFrameIndex() { return renderer.getFrameIndex(); }
+
 	bool AvengFrame::render(float deltaTime)
 	{
 
@@ -154,24 +156,25 @@ namespace aveng {
 
 #ifdef ENABLE_EDITOR
 		
-		pEditor->beginGUICommands(currentFrameIndex);
-
-		// Begin the ImGUI renderpass
-		renderer.beginSwapChainRenderPass(
-			renderData.rdGUICommandBuffers.at(currentFrameIndex),
-			renderer.getCurrentFramebuffer(), // 
-			renderData.rdImguiRenderpass
-		);
-
 		if (gameData.currentAppMode == AppMode::Editor) {
+
+			pEditor->beginGUICommands(currentFrameIndex);
+
+			// Begin the ImGUI renderpass
+			renderer.beginSwapChainRenderPass(
+				renderData.rdGUICommandBuffers.at(currentFrameIndex),
+				renderer.getCurrentFramebuffer(), // 
+				renderData.rdImguiRenderpass
+			);
 
 			// This is where the editor updates its current frame index - TODO - Maybe this index is better passed into it as an arg here
 			pEditor->renderGUI(deltaTime);
+			// End ImGUI renderpass & Command recording
+			pEditor->endGUIRenderPass(renderData.rdGUICommandBuffers.at(currentFrameIndex));
+			pEditor->endGUICommands(currentFrameIndex);
+
 		}
 
-		// End ImGUI renderpass & Command recording
-		pEditor->endGUIRenderPass(renderData.rdGUICommandBuffers.at(currentFrameIndex));
-		pEditor->endGUICommands(currentFrameIndex);
 #endif
 
 		// First in queue - Graphics commands
@@ -188,10 +191,10 @@ namespace aveng {
 				commandBuffers.push_back(renderData.rdLineCommandBuffers.at(currentFrameIndex));
 			
 			}
-		}
 
-		// Last in Queue - ensures the editor always renders on top
-		commandBuffers.push_back(renderData.rdGUICommandBuffers.at(currentFrameIndex));
+			// Last in Queue - ensures the editor always renders on top
+			commandBuffers.push_back(renderData.rdGUICommandBuffers.at(currentFrameIndex));
+		}
 #endif
 
 		/* submit command buffer */

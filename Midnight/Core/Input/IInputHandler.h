@@ -13,6 +13,9 @@ namespace aveng {
         virtual void onMouseButton(const MouseButtonEvent&) = 0;
         virtual void onKey(const KeyEvent&) = 0;
         virtual void onMouseMove(const MouseMoveEvent&) = 0;
+
+        // Editor Only
+        virtual void setMode(const AppMode& mode) { /*no-op*/ };
     };
 
     struct GameInput : IInputHandler {
@@ -24,6 +27,7 @@ namespace aveng {
         void onMouseMove(const MouseMoveEvent& e) { /*TODO*/ }
 
         void update(const InputState& inputState, float dt) { /*TODO*/ };
+
     };
 
 #ifdef ENABLE_EDITOR
@@ -63,6 +67,7 @@ namespace aveng {
 
             editor->handleMouseMove(e);
         }
+
     };
 
     struct EditorGameRouter : IInputHandler {
@@ -85,8 +90,12 @@ namespace aveng {
         void onMouseMove(const MouseMoveEvent& e) {
             (mode == AppMode::Editor ? editor : game).onMouseMove(e);
         }
+
+        // Editor Only
+        void setMode(const AppMode& _mode) {
+            mode = _mode;
+        }
     };
 #endif
-
 
 }

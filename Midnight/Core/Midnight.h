@@ -2,7 +2,6 @@
 #include "Core/Input/InputSystem.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
-#include "Core/aveng_window.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
 #include "Game/data.h"
@@ -23,25 +22,24 @@ namespace aveng {
 		void beginFrameInput() { inputSystem.beginFrame(); }
 
 		const InputState& inputState() { return inputSystem.inputState(); }
-		const AppMode mode() { return mode_; }
+
+		// Editor Only
+		const AppMode mode() { return game_data.currentAppMode; }
+		// Editor Only
 
 		const VkDevice device() { return engineDevice.device(); }
-		float getAspectRatio() { return renderer.getAspectRatio(); }
 
-		void render(float frameTime) { frame.render(frameTime); }
+		void render(float frameTime);
 		void updateCamera(glm::mat4 proj, glm::mat4 view);
 
+		// Resource State
+		bool frameInProgress() { return renderer.isFrameInProgress(); }
 		bool shouldClose() { return aveng_window.shouldClose(); }
+		float getAspectRatio() { return renderer.getAspectRatio(); }
 
 	private:
 
 		GameData& game_data;
-
-#ifdef ENABLE_EDITOR
-		AppMode mode_ = AppMode::Editor;
-#else
-		AppMode mode_ = AppMode::Game;
-#endif
 		GameInput gameInput;
 		
 		// Move these to Midnight
@@ -54,14 +52,15 @@ namespace aveng {
 		Renderer renderer{ engineDevice, aveng_window, renderData, mModelInstanceData };
 
 #ifdef ENABLE_EDITOR
+
 		Editor editor{ renderData, renderer, game_data, engineDevice, aveng_window, mModelInstanceData };
 		EditorInput editorInput{ &editor };
-		EditorGameRouter inputRouter{ mode_, editorInput, gameInput };
+		EditorGameRouter inputRouter{ game_data.currentAppMode, editorInput, gameInput };
 		AvengFrame frame{ renderer, renderData, game_data, engineDevice, mModelInstanceData, &editor };
-		InputSystem inputSystem{ inputRouter };
+		InputSystem inputSystem{ inputRouter, game_data };
 #else
 		AvengFrame frame{ renderer, renderData, game_data, engineDevice, mModelInstanceData, nullptr };
-		InputSystem inputSystem{ gameInput };
+		InputSystem inputSystem{ gameInput, game_data };
 #endif
 
 	};

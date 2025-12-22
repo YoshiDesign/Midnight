@@ -598,7 +598,7 @@ namespace aveng {
 		assert(isFrameStarted && "Can't call beginSwapChain if frame is not in progress.");
 		// This method is used to begin multiple renderpasses, so this check is irrelevant sometimes
 		assert(renderData.rdCommandBuffersGraphics.at(currentFrameIndex) == getCurrentCommandBufferGraphics() &&
-			"Can't begin render pass on command buffer from a different frame");
+			"[Renderer] Can't begin render pass on command buffer from a different frame");
 
 		// Clear Color for now
 		glm::vec3 rgb = glm::vec3(0.001f, 0.002f, 0.009f); // Cool, dark midnight blue
@@ -1006,8 +1006,6 @@ namespace aveng {
 			0,
 			nullptr);
 
-		std::cout << "Rendering Lights..." << std::endl;
-
 		// Use instanced rendering: 6 vertices per light, numLights instances
 		vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, mPointLightData.numLights, 0, 0);
 	}
@@ -1359,11 +1357,6 @@ namespace aveng {
 		* TIL: mNodeTransFormData is updated via instance->updateAnimation()
 		*	   That is also when & where we update mWorldPosMatrices.
 		*	   TRS and BoneMat buffers are updated by the compute shaders so you won't see uploadSsboData here on their behalf
-		*/
-
-		/*
-		* TODO: Whenever I re-architect this resizing logic: I could be re-initializing both buffers so that the subsequent frame doesn't need
-		* to also go through this, if it even works. This means I'd have to somehow get both buffers destroyed in 1 frame, whenever that becomes safe to do.
 		*/
 
 		bool bufferResized = false;
@@ -1810,15 +1803,8 @@ namespace aveng {
 	}
 
 	void Renderer::updateLightingDescriptorSets(int frameIndex) {
-
-		//int i = currentFrameIndex;
-
-		//// TODO
-		//auto lightsBufferInfo = mLightDataBuffers[i]->descriptorInfo(sizeof(LightsUbo), 0);
-		//AvengDescriptorSetWriter(*renderData.rdAvengBasicLightingDescriptorLayout, *renderData.avengDescriptorPool)
-		//	.writeBuffer(0, &lightsBufferInfo)
-		//	.build(renderData.basicLightingDescriptorSets[i]);
-		
+		// This won't be necessary until lights have their own unique descriptor layout,
+		// similar to how textures currently do
 	}
 
 	void Renderer::updateComputeDescriptorSets(int frameIndex) {
@@ -1902,8 +1888,6 @@ namespace aveng {
 			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(matrixMultWriteDescriptorSets.size()),
 				matrixMultWriteDescriptorSets.data(), 0, nullptr);
 		}
-
-
 
 	}
 

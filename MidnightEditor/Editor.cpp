@@ -85,7 +85,7 @@ namespace aveng {
 
 	void Editor::startGame()
 	{
-		gameData.currentAppMode = AppMode::Game;
+		// gameData.currentAppMode = AppMode::Game;
 	}
 
 	void Editor::renderGUI(float frameTime)
@@ -135,7 +135,7 @@ namespace aveng {
 	{
 		// assert(isFrameStarted && "Can't call endSwapChain if frame is not in progress.");
 		assert(commandBuffer == getCurrentCommandBufferGUI() &&
-			"Can't end render pass on command buffer from a different frame");
+			"[End GUI RenderPass] Can't end render pass on command buffer from a different frame");
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
@@ -275,34 +275,7 @@ namespace aveng {
 
 	void Editor::renderLights()
 	{
-		if (renderer.getPointLightData().numLights <= 0) {
-			return; // Nothing to render
-		}
-
-		PointLightData pl = renderer.getPointLightData();
-		//std::cout << "Point Light Pos: " << pl.positions[0].x << ", " << pl.positions[0].y << ", " << pl.positions[0].z << ", " << pl.positions[0].w << std::endl;
-		//std::cout << "Point Light Pos: " << pl.colors[0].r << ", " << pl.colors[0].g << ", " << pl.colors[0].b << ", " << pl.colors[0].a << std::endl;
-		//
-		assert(renderData.rdCommandBuffersGraphics.at(currentFrameIndex) == renderer.getCurrentCommandBufferGraphics()
-			&& "Point Light system is using the wrong command buffer");
-
-		// This might not be necessary
-		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pointLightSystem.getPipeline());
-
-		// Bind both descriptor sets
-		VkDescriptorSet descriptorSets[1] = { renderData.rdAvengDescriptorSets.at(currentFrameIndex) };
-		vkCmdBindDescriptorSets(
-			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pointLightSystem.getPipelineLayout(),
-			0,
-			1, // binding 1 descriptor set
-			descriptorSets,
-			0,
-			nullptr);
-
-		// Use instanced rendering: 6 vertices per light, numLights instances
-		vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, renderer.getPointLightData().numLights, 0, 0);
+		renderer.renderLights();
 	}
 
 	bool Editor::createPipelineLayouts() {
@@ -403,6 +376,10 @@ namespace aveng {
 			}
 		}
 	}
+
+	//void Editor::onModeSwitched(int frameIndex, AppMode& mode) {
+	//	currentFrameIndex = frameIndex;
+	//}
 
 	void Editor::handleMouseClick(const MouseButtonEvent& e) {
 		aveng_imgui.handleMouseButtonEvents(e.button, e.action, e.mods);

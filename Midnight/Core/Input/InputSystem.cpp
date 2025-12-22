@@ -80,4 +80,23 @@ namespace aveng {
 		// GLFW_REPEAT intentionally ignored
 	}
 
+	bool InputSystem::isKeyPressed(int key) {
+		return state.keyPressed[key];
+	}
+
+	// Editor Only
+	void InputSystem::setMode(const AppMode& _mode) {
+		// Note that these are decoupled. Input handler can change modes without consequences. 
+		// Rendering needs sync
+		
+		if (!gameData.modeSwitchRequested) {
+
+			gameData.requestedMode = _mode;
+			gameData.modeSwitchRequested = true;
+			// gameData.currentAppMode = _mode;
+			handler.setMode(_mode);
+		}
+
+	}
+
 }

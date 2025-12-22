@@ -39,6 +39,8 @@ namespace aveng {
 		void recreateFrameBuffers(SwapChain* swapchain);
 		void initializePointLights();
 
+		// void onModeSwitched(int frameIndex, AppMode& mode);
+
 		bool hasSelection() { return editorData.eHasSelection; }
 		bool hasClicked() { return editorData.eMousePick; }
 		void debug() {

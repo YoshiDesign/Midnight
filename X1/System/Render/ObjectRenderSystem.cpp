@@ -6,8 +6,6 @@ namespace aveng {
 
 	ObjectRenderSystem::ObjectRenderSystem()
 	{
-
-		firstFrame = true;
 		// Initial camera position
 		viewerObject.transform.translation.z = -5.5f;
 		viewerObject.transform.translation.y = -2.5f;
@@ -18,57 +16,18 @@ namespace aveng {
 	void ObjectRenderSystem::initialize() 
 	{
 
-		// Lights, temporary placement
-		//for (int i = 0; i <= 4; i++) {
-		//	for (int j = 0; j < 5; j++) {
-		//		
-		//		renderer.addLight(
-		//			glm::vec3(i * 4.f, -50.f, j * -4.0f),  // position
-		//			glm::vec3(1.f, 0.0f, 0.0f),    // red color
-		//			0.75f,						   // intensity
-		//			i * 0.15f + 0.3f                 // radius
-		//		);
-
-
-		//		renderer.addLight(
-		//			glm::vec3(30 + (i * 4.f), -50.f, 30 + (j * -4.0f)),  // position
-		//			glm::vec3(0.8f, 0.9f, 0.8f),    // turquoise color
-		//			0.75f,						   // intensity
-		//			i * 0.15f + 0.3f                 // radius
-		//		);
-
-		//		renderer.addLight(
-		//			glm::vec3(-30 + (i * 4.f), -50.f, 30 + (j * -4.0f)),  // position
-		//			glm::vec3(1.f, 0.0f, 1.0f),    // Purple color
-		//			0.75f,						   // intensity
-		//			i * 0.15f + 0.3f                 // radius
-		//		);
-
-
-		//	}
-
-		//	renderer.addLight(
-		//		glm::vec3(-(i * 25.f), -25.f, -5.f),  // position
-		//		glm::vec3(.75f, 0.9f, 1.0f),    // turquoise color
-		//		0.75f,							// intensity
-		//		0.5f                            // radius
-		//	);
-
-		//}
-		
 	}
 
 	void ObjectRenderSystem::render(float frameTime)
 	{
 		midnight.beginFrameInput();
+		midnight.render(frameTime);
 
-		if (midnight.mode() == AppMode::Game) {
+		if (midnight.mode() == AppMode::Game) { // Editor only
 			// Update game state
 			updateCamera(frameTime);
 			holyShip.update(midnight.inputState(), frameTime);
-		}
-
-		midnight.render(frameTime);
+		} // Editor only
 
 	}
 
@@ -113,8 +72,7 @@ namespace aveng {
 	void ObjectRenderSystem::loadGame(const std::string& scenePath)
 	{
 		std::cout << "Loading scene from: " << scenePath << std::endl;
-		
-		//renderer.loadScenes(scenePath.c_str());
+
 	}
 
-} //
+} 

@@ -20,6 +20,7 @@ namespace aveng {
 			Editor* editor = nullptr);
 
 		bool render(float deltaTime);
+		int currentFrameIndex();
 
 #ifdef ENABLE_EDITOR
 		// Editor helpers

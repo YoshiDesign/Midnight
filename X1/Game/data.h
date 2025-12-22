@@ -1,5 +1,5 @@
 #pragma once
-#include "Utils/glm_includes.h"
+#include "avpch.h"
 
 namespace aveng {
 
@@ -25,6 +25,8 @@ namespace aveng {
 	// Debug info for GUI, also contains player state data ...oops
 	struct GameData {
 		AppMode currentAppMode = AppMode::Editor;
+		std::atomic<bool> modeSwitchRequested = false;
+		AppMode requestedMode = AppMode::Editor; // or whatever
 
 		int			numPointLights = 0;
 		int			num_objs;

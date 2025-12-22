@@ -47,7 +47,6 @@ namespace aveng {
 	private:
 		void updateData(float frameTime);
 
-		bool firstFrame;
 		int last_sec;
 		float aspect;
 		int frameIndex;
@@ -63,7 +62,6 @@ namespace aveng {
 		// Application-level components
 		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
 		KeyboardController keyboardController{ viewerObject, gameData };
-
 
 	};
 

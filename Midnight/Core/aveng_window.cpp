@@ -1,5 +1,6 @@
 #include "aveng_window.h"
 #include "Core/Input/InputSystem.h"
+#include "Game/data.h" // For AppMode
 #include <iostream>
 #include <stdexcept>
 
@@ -91,6 +92,12 @@ namespace aveng {
 	{
 		if (inputSystem) {
 			inputSystem->handleKey(key, scancode, action, mods);
+#ifdef ENABLE_EDITOR
+			// Toggle between Game and Editor
+			if (inputSystem->isKeyPressed(GLFW_KEY_PERIOD) && action != GLFW_REPEAT) {
+				inputSystem->setMode((inputSystem->getMode() == AppMode::Game ? AppMode::Editor : AppMode::Game ));
+			}
+#endif
 		} else { std::cout << "missing input system 3" << std::endl; }
 	}
 
