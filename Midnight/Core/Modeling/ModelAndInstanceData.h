@@ -8,10 +8,6 @@
 #include <functional>
 #include <string>
 
-/*
-TODO - Can this (partially) be moved to the Editor so Releases dont ship with it?
-*/
-
 namespace aveng {
 	// forward declaration
 	class AvengModel;

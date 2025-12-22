@@ -277,7 +277,7 @@ namespace aveng {
 	{
 		renderer.renderLights();
 	}
-
+	
 	bool Editor::createPipelineLayouts() {
 
 		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants) } };
@@ -393,6 +393,7 @@ namespace aveng {
 	* Find the instance that was selected
 	* TODO - When we begin working with large numbers of instance, maybe just mix
 	* this into the renderer's draw() method which also loops over every instance
+	* 
 	*/
 	void Editor::setSelectedInstance()
 	{
@@ -438,7 +439,7 @@ namespace aveng {
 						editorData.eSelectedInstance.at(instanceToStore + instIndex).x = 1.0f; // color is unchanged
 					}
 
-					// Set the buffer's y
+					// Set the buffer's y - TODO - This probably can be uncommented(?)
 					//if (editorData.eMousePick || editorData.eHasSelection) 
 					//{
 						InstanceSettings instSettings = instance->getInstanceSettings();

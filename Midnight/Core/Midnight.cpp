@@ -17,11 +17,6 @@ namespace aveng {
 #ifdef ENABLE_EDITOR
 		if (game_data.modeSwitchRequested)
 		{
-			std::cout << "Detected Mode Switch to: " << static_cast<int>(game_data.requestedMode) << std::endl;
-			// optional but often wise:
-			// renderer.waitForCurrentFrameFence();  // ensure we aren't still using old frame resources
-			// or vkDeviceWaitIdle(device);          // heavy hammer but great for debugging
-
 			game_data.currentAppMode = game_data.requestedMode;
 			game_data.modeSwitchRequested = false;
 
