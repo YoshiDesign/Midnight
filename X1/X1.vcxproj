@@ -158,7 +158,6 @@
     <ClCompile Include="Game\Player\GameplayFunctions.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="System\Camera\aveng_camera.cpp" />
-    <ClCompile Include="System\InputSystem.cpp" />
     <ClCompile Include="System\Peripheral\Controller.cpp" />
     <ClCompile Include="System\Peripheral\KeyboardController.cpp" />
     <ClCompile Include="System\Render\ObjectRenderSystem.cpp" />
@@ -172,9 +171,6 @@
     <ClInclude Include="Game\Player\Command.h" />
     <ClInclude Include="Game\Player\GameplayFunctions.h" />
     <ClInclude Include="System\Camera\aveng_camera.h" />
-    <ClInclude Include="System\InputSystem.h" />
-    <ClInclude Include="System\Input\EventPayloads.h" />
-    <ClInclude Include="System\Interface\IInputHandler.h" />
     <ClInclude Include="System\Peripheral\Controller.h" />
     <ClInclude Include="System\Peripheral\KeyboardController.h" />
     <ClInclude Include="System\Render\ObjectRenderSystem.h" />

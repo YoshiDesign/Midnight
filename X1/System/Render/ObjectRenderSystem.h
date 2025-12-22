@@ -1,11 +1,12 @@
 #pragma once
-#include "System/Interface/IInputHandler.h"
+#include "Core/Midnight.h"
 #include "CoreVK/EngineDevice.h"
+#include "CoreVK/VkRenderData.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
 #include "System/Camera/aveng_camera.h"
-#include "CoreVK/VkRenderData.h"
-#include "System/InputSystem.h"
+#include "Core/Input/IInputHandler.h"
+#include "Core/Input/InputSystem.h"
 #include "System/Peripheral/KeyboardController.h"
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
@@ -42,12 +43,6 @@ namespace aveng {
 		VkDevice getEngineDevice() { return engineDevice.device(); }
 
 	private:
-
-#ifdef ENABLE_EDITOR
-		AppMode mode_ = AppMode::Editor;
-#else
-		AppMode mode_ = AppMode::Game;
-#endif
 		void updateData(float frameTime);
 
 		bool firstFrame;
@@ -56,36 +51,33 @@ namespace aveng {
 		int frameIndex;
 
 		int curCamera = 1; // Tmp
-
-		AvengWindow& window;				 // GLHF
-		EngineDevice engineDevice{ window }; // Summon things to this world
 		AvengCamera player_camera;
 		
 		// Game & State
 		GameData gameData;
 		Game holyShip{ gameData };
-		VkRenderData renderData;
-		ModelAndInstanceData mModelInstanceData{};
 
 		// Application-level components
 		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
 		KeyboardController keyboardController{ viewerObject, gameData };
 
+		// Move these to Midnight
+		AvengWindow& window;				 // GLHF
+		EngineDevice engineDevice{ window }; // Summon things to this world
+		VkRenderData renderData;
+		ModelAndInstanceData mModelInstanceData{};
+
 		// Engine & Renderer
 		Renderer renderer{ engineDevice, window, renderData, mModelInstanceData };
-		GameInput gameInput;
 
 #ifdef ENABLE_EDITOR
-		EditorInput editorInput;
-		EditorGameRouter inputRouter;
-		InputSystem inputSystem;
-
 		Editor editor{ renderData, renderer, gameData, engineDevice, window, mModelInstanceData };
 		AvengFrame frame{renderer, renderData, gameData, engineDevice, mModelInstanceData, &editor };
 #else
-		InputSystem inputSystem;
 		AvengFrame frame{ renderer, renderData, gameData, engineDevice, mModelInstanceData, nullptr };
 #endif
+
+		Midnight midnight{editor, window};
 
 	};
 

@@ -1,5 +1,5 @@
 #include "aveng_window.h"
-#include "System/InputSystem.h"
+#include "Core/Input/InputSystem.h"
 #include <iostream>
 #include <stdexcept>
 

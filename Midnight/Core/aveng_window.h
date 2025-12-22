@@ -1,6 +1,6 @@
 #pragma once
 
-#include "System/Input/EventPayloads.h"
+#include "Core/Input/EventPayloads.h"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <string>
@@ -43,7 +43,7 @@ namespace aveng {
 
 		void onKey(int key, int scancode, int action, int mods);
 
-		void setInputSystem(InputSystem* input) { inputSystem = input; }
+		void setInputSystem(InputSystem* input) { inputSystem = input; } // TODO - pass window width & height to prevent mouse position state when > window width & height
 
 	private:
 		static void framebufferResizedCallback(GLFWwindow* window, int width, int height);

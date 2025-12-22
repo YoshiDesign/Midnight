@@ -6,24 +6,12 @@ namespace aveng {
 
 	ObjectRenderSystem::ObjectRenderSystem(AvengWindow& window)
 		: window{ window }
-		, gameInput{holyShip}
-#ifdef ENABLE_EDITOR
-		, editorInput{&editor}
-		, inputRouter{ mode_, editorInput, gameInput }
-		, inputSystem{ inputRouter }
-#else
-		, inputSystem{ gameInput }
-#endif
 	{
-
-		window.setInputSystem(&inputSystem);
 		renderer.initialize(); // Very new
 #if ENABLE_EDITOR
 		editor.initialize(renderer.pGetSwapChain());
 #endif
-
 		firstFrame = true;
-
 		// Initial camera position
 		viewerObject.transform.translation.z = -5.5f;
 		viewerObject.transform.translation.y = -2.5f;
@@ -76,21 +64,15 @@ namespace aveng {
 
 	void ObjectRenderSystem::render(float frameTime)
 	{
+		midnight.beginFrameInput();
 
-		// updateCamera(frameTime);
-
-		// TODO? 
-		// updateData(frameTime);
-		if (mode_ == AppMode::Game) {
+		if (midnight.mode() == AppMode::Game) {
 			// Update game state
 			updateCamera(frameTime);
-			holyShip.update(frameTime);
+			holyShip.update(midnight.inputState(), frameTime);
 		}
 
 		frame.render(frameTime);
-
-		// Render lights -- BINDS DESCRIPTORS -- BINDS A DIFFERENT PIPELINE
-		// renderer.renderLights();
 
 	}
 
@@ -102,7 +84,7 @@ namespace aveng {
 		aspect = getAspectRatio();
 
 		// Track key press to transform viewer object
-		keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
+		// keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
 
 		// Apply new viewer obj values to the camera
 		player_camera.setViewYXZ(viewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), viewerObject.transform.rotation);

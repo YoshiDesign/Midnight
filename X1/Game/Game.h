@@ -1,5 +1,6 @@
 #pragma once
-#include "System/Input/EventPayloads.h"
+#include "Core/Input/EventPayloads.h"
+#include "Core/Input/InputState.h"
 #include "Game/data.h"
 
 namespace aveng {
@@ -9,10 +10,7 @@ namespace aveng {
 		Game(GameData& gameData);
 		~Game();
 
-		void handleMouseClick(const MouseButtonEvent& e);
-		void handleMouseMove(const MouseMoveEvent& e);
-		void update(float frameTime);
-		void startEditor();
+		void update(const InputState& state, float frameTime);
 
 	private:
 		GameData& gameData;

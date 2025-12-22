@@ -1,5 +1,6 @@
 #pragma once
-#include "System/Interface/IInputHandler.h"
+#include "Core/Input/IInputHandler.h"
+#include "Core/Input/InputState.h"
 #include "Game/Game.h"
 #include "Game/data.h"
 #include "Editor.h"
@@ -9,7 +10,7 @@ namespace aveng {
 	class InputSystem {
 	public:
 		// Accepts an interface for input handling
-		explicit InputSystem(IInputHandler& _handler) : handler(_handler) {}
+		explicit InputSystem(IInputHandler& _handler) : handler{ _handler } {}
 		InputSystem();
 		~InputSystem();
 
@@ -17,19 +18,22 @@ namespace aveng {
 		void handleMouseButton(int button, int action, int mods, double x, double y);
 		void handleKey(int key, int scancode, int action, int mods);
 
-		bool setInputSystem() {}
+		// Getter
+		const InputState& inputState() const { return state; }
+
+		// Setters
+		void updateInputState(const MouseMoveEvent);
+		void updateInputState(const MouseButtonEvent);
+		void updateInputState(const KeyEvent);
+
+		// Reset all values
+		void beginFrame() { state.beginFrame(); }
 
 	private:
 		AppMode mode{ AppMode::Editor };
 
-		double mouseX = 0;
-		double mouseY = 0;
-		double mouseDX = 0;
-		double mouseDY = 0;
-
 		IInputHandler& handler;
-
-		bool mouseButtons[GLFW_MOUSE_BUTTON_LAST + 1]{};
+		InputState state;
 
 	};
 

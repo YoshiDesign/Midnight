@@ -181,6 +181,9 @@
     <ClCompile Include="CoreVK\LightPipeline.cpp" />
     <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
+    <ClCompile Include="Core\Input\InputState.cpp" />
+    <ClCompile Include="Core\Input\InputSystem.cpp" />
+    <ClCompile Include="Core\Midnight.cpp" />
     <ClCompile Include="Core\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\Shader.cpp" />
     <ClCompile Include="CoreVK\SkinningPipeline.cpp" />
@@ -223,6 +226,11 @@
     <ClInclude Include="CoreVK\SkinningPipeline.h" />
     <ClInclude Include="CoreVK\SyncObjects.h" />
     <ClInclude Include="CoreVK\VertexBuffer.h" />
+    <ClInclude Include="Core\Input\EventPayloads.h" />
+    <ClInclude Include="Core\Input\IInputHandler.h" />
+    <ClInclude Include="Core\Input\InputState.h" />
+    <ClInclude Include="Core\Input\InputSystem.h" />
+    <ClInclude Include="Core\Midnight.h" />
     <ClInclude Include="Core\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
     <ClInclude Include="CoreVK\VkRenderData.h" />

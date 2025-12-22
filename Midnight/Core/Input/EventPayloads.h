@@ -1,11 +1,16 @@
 #pragma once
 
 namespace aveng {
+
+    //struct Button {
+    //    bool down = false;
+    //    bool pressed = false;
+    //    bool released = false;
+    //};
+
     struct MouseMoveEvent {
         double x;
         double y;
-        double deltaX;
-        double deltaY;
         bool rmbDown;
     };
 

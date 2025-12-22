@@ -1,6 +1,7 @@
 #pragma once
 #include "Editor.h"
-#include "System/Input/EventPayloads.h"
+// #include "Core/Input/EventPayloads.h"
+#include "Core/Input/InputState.h"
 #include "Game/data.h"
 #include "Game/Game.h"
 
@@ -15,13 +16,14 @@ namespace aveng {
     };
 
     struct GameInput : IInputHandler {
-        explicit GameInput(Game& _game) : game(_game) {}
+        explicit GameInput() {};
         ~GameInput() {}
-        Game& game;
 
-        void onMouseButton(const MouseButtonEvent& e) override { game.handleMouseClick(e); }
+        void onMouseButton(const MouseButtonEvent& e) override {/*TODO*/ }
         void onKey(const KeyEvent& e) override { /*TODO*/ }
-        void onMouseMove(const MouseMoveEvent& e) { game.handleMouseMove(e); }
+        void onMouseMove(const MouseMoveEvent& e) { /*TODO*/ }
+
+        void update(const InputState& inputState, float dt) { /*TODO*/ };
     };
 
 #ifdef ENABLE_EDITOR
