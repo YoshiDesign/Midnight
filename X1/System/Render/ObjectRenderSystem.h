@@ -21,7 +21,7 @@ namespace aveng {
 	class ObjectRenderSystem {
 	public:
 		//ObjectRenderSystem();
-		explicit ObjectRenderSystem(AvengWindow& _window);
+		explicit ObjectRenderSystem();
 		~ObjectRenderSystem();
 		ObjectRenderSystem& operator=(const ObjectRenderSystem&) = delete;
 		ObjectRenderSystem(const ObjectRenderSystem&) = delete;
@@ -29,7 +29,7 @@ namespace aveng {
 		// Application-level interface
 		void initialize();
 		void loadGame(const std::string& scenePath);
-		float getAspectRatio() { return renderer.getAspectRatio(); }
+		float getAspectRatio() { return midnight.getAspectRatio(); }
 
 		// Light management
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity = 1.0f, float radius = 0.1f);
@@ -40,7 +40,9 @@ namespace aveng {
 		// Application-specific updates
 		void updateCamera(float frameTime);
 
-		VkDevice getEngineDevice() { return engineDevice.device(); }
+		VkDevice getEngineDevice() { return midnight.device(); }
+
+		bool shouldClose() { return midnight.shouldClose(); }
 
 	private:
 		void updateData(float frameTime);
@@ -56,28 +58,12 @@ namespace aveng {
 		// Game & State
 		GameData gameData;
 		Game holyShip{ gameData };
+		Midnight midnight{ gameData };
 
 		// Application-level components
 		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
 		KeyboardController keyboardController{ viewerObject, gameData };
 
-		// Move these to Midnight
-		AvengWindow& window;				 // GLHF
-		EngineDevice engineDevice{ window }; // Summon things to this world
-		VkRenderData renderData;
-		ModelAndInstanceData mModelInstanceData{};
-
-		// Engine & Renderer
-		Renderer renderer{ engineDevice, window, renderData, mModelInstanceData };
-
-#ifdef ENABLE_EDITOR
-		Editor editor{ renderData, renderer, gameData, engineDevice, window, mModelInstanceData };
-		AvengFrame frame{renderer, renderData, gameData, engineDevice, mModelInstanceData, &editor };
-#else
-		AvengFrame frame{ renderer, renderData, gameData, engineDevice, mModelInstanceData, nullptr };
-#endif
-
-		Midnight midnight{editor, window};
 
 	};
 

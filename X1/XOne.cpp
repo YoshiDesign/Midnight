@@ -29,7 +29,7 @@ namespace aveng {
 		std::chrono::time_point<std::chrono::steady_clock> loopEndTime = std::chrono::steady_clock::now();
 
 		// Render Loop
-		while (!aveng_window.shouldClose()) {
+		while (!objectRenderSystem.shouldClose()) {
 
 			objectRenderSystem.render(frameTime);
 

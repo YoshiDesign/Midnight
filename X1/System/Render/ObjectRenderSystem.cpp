@@ -4,13 +4,9 @@
 
 namespace aveng {
 
-	ObjectRenderSystem::ObjectRenderSystem(AvengWindow& window)
-		: window{ window }
+	ObjectRenderSystem::ObjectRenderSystem()
 	{
-		renderer.initialize(); // Very new
-#if ENABLE_EDITOR
-		editor.initialize(renderer.pGetSwapChain());
-#endif
+
 		firstFrame = true;
 		// Initial camera position
 		viewerObject.transform.translation.z = -5.5f;
@@ -72,7 +68,7 @@ namespace aveng {
 			holyShip.update(midnight.inputState(), frameTime);
 		}
 
-		frame.render(frameTime);
+		midnight.render(frameTime);
 
 	}
 
@@ -92,9 +88,7 @@ namespace aveng {
 		// Recalculate perspective
 		player_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
 
-		// Update the renderer's camera data
-		renderData.cameraProxy.projection = player_camera.getProjection();
-		renderData.cameraProxy.view = player_camera.getView();
+		midnight.updateCamera(player_camera.getProjection(), player_camera.getView());
 
 	}
 

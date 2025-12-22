@@ -14,9 +14,6 @@ namespace aveng {
 
 	public:
 
-		static constexpr int WIDTH = 2080;
-		static constexpr int HEIGHT = 960;
-
 		XOne();
 		~XOne() {};
 
@@ -37,8 +34,8 @@ namespace aveng {
 		* !! Order of member initialization matters !!
 		* See: � 12.6.2 of the C++ Standard
 		*/
-		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
-		ObjectRenderSystem objectRenderSystem{ aveng_window };
+		
+		ObjectRenderSystem objectRenderSystem{};
 	
 	};
 

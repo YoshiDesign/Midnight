@@ -86,7 +86,6 @@ namespace aveng{
 			moveDir += upDir;
 		}
 
-
 		// This if statement effectively makes sure that rotate (matrix) is non-zero
 		if (glm::dot(moveDir, moveDir) > std::numeric_limits<float>::epsilon()) {
 			// Update according to Delta Time. Normalize keeps multiple rotations in sync so one direction doesn't rotate faster than another
