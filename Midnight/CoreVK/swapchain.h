@@ -33,7 +33,7 @@ namespace aveng {
         VkFormat        getSwapChainImageFormat() { return swapChainImageFormat; }
 
         VkRenderPass    getRenderPass() { return mRenderPass; }
-        // VkRenderPass getSecondaryRenderPass() { return mSecondaryRenderPass; } // This can be acquired from renderData
+        // VkRenderPass getSecondaryRenderPass() { return mSecondaryRenderPass; } // This is now acquired from renderData instead
 
         // Framebuffers & Views
         std::vector<VkImageView>& getSwapChainImageViews() { return swapChainImageViews; }
