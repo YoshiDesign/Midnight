@@ -1,12 +1,14 @@
 #pragma once
 #include <cassert>
-#include "GUI/aveng_imgui.h"
+#include "System/Peripheral/KeyboardController.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "Core/PointLightSystem.h"
-#include "Game/data.h"
-#include "System/Camera/aveng_camera.h"
-#include "System/Peripheral/KeyboardController.h"
+#include "Core/Camera/aveng_camera.h"
 #include "Core/Input/EventPayloads.h"
+#include "Game/Camera/CameraManager.h"
+#include "Game/data.h"
+#include "GUI/aveng_imgui.h"
+#include "EditorCamera.h"
 #include "EditorData.h"
 
 /**
@@ -21,19 +23,20 @@ namespace aveng {
 	class EngineDevice;
 	class AvengWindow;
 	class Renderer;
+	class InputState;
 
 	class Editor {
 	public:
-		Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData);
+		Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData, CameraManager& _cameraManager);
 		~Editor();
 
 
 		void initialize(SwapChain* swapchain);
 		void update(float frameTime, unsigned int frameIndex);
 		void renderGUI(float frameTime);
-		void renderLights();
+		void updateLights();
 		void updateCamera(float frameTime);
-		void drawSelectedModels(int frameIndex);
+		void drawModels(int frameIndex);
 		void cleanup();
 		void destroyTrash();
 		void recreateFrameBuffers(SwapChain* swapchain);
@@ -91,11 +94,15 @@ namespace aveng {
 		void updateStorageBuffers();
 		VkCommandBuffer getCurrentCommandBufferLines() const;
 
+		void updateInputState(const InputState& state);
+
 	private:
+
+		CameraManager& cameraManager;
+		int editor_camera_id;
 
 		Timer mUploadToVBOTimer{};
 		unsigned int currentFrameIndex = 0; // Updated at render() from the renderer
-		AvengCamera editor_camera{};
 		float aspect;
 
 		// GC stuff

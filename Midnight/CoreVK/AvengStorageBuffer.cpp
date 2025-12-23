@@ -1,42 +1,61 @@
 #include "AvengStorageBuffer.h"
 
 namespace aveng {
-    bool ShaderStorageBuffer::init(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize) {
+    bool ShaderStorageBuffer::init(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, MapMode mode, ResidentMode resMode, size_t bufferSize) {
         /* avoid errors with zero sized buffers */
         if (bufferSize == 0) {
             bufferSize = 1024;
         }
 
-        /* Potential Improvement: Double the initial buffer size from the first init */
-
+        assert((mode == MapMode::Persistent && resMode == ResidentMode::GPU) == false && "SSBO was initialized with misconfigured options.");
+        
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = bufferSize;
         bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
         VmaAllocationCreateInfo vmaAllocInfo{};
-        vmaAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        if (resMode == ResidentMode::GPU) { vmaAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE; }
+        else { vmaAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; }
 
-        // TODO - Create a separate storage buffer class for the compute shaders! They currently share this class which uses VMA_MEMORY_USAGE_CPU_TO_GPU (above)
-        // vmaAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;   // or AUTO for newer VMA
+        if (mode == MapMode::Persistent) {
+            /* Warning */
+            // When using VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT never access the buffer randomly e.g.pMappedData[i] 
+            // Prepare your data in a local variable and memcpy() it to the mapped pointer all at once.
+            vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        }
 
+        if (mode == MapMode::GpuOnly || mode == MapMode::OnDemand) {
+            vmaAllocInfo.flags = 0;
+        }
+
+        VmaAllocationInfo readInfo{};
         VkResult result = vmaCreateBuffer(engineDevice.allocator(), &bufferInfo, &vmaAllocInfo,
-            &SSBOData.buffer, &SSBOData.bufferAlloc, nullptr);
+            &SSBOData.buffer, &SSBOData.bufferAlloc, &readInfo);
         if (result != VK_SUCCESS) {
             Logger::log(1, "%s error: could not allocate SSBO via VMA (error: %i)\n", __FUNCTION__, result);
             return false;
         }
 
-        SSBOData.bufferSize = bufferSize;
-        Logger::log(1, "%s: created SSBO of size %i\n", __FUNCTION__, bufferSize);
+        SSBOData.bufferSize = bufferSize;                                              
+        SSBOData.mapped = (mode == MapMode::Persistent) ? readInfo.pMappedData : nullptr; // readInfo.pMappedData will safely assign null, I'm just being explicit
+        
+        // If the buffer turns out to be host coherent, you won't need to flush it after data is uploaded
+        if (mode != MapMode::GpuOnly) {
+            VkMemoryPropertyFlags memFlags{};
+            vmaGetAllocationMemoryProperties(engineDevice.allocator(), SSBOData.bufferAlloc, &memFlags);
+            SSBOData.isHostCoherent = (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
+        }
+
+        if (resMode == ResidentMode::GPU) Logger::log(1, "--- Created GPU-ONLY Resident!\n");
+        Logger::log(1, "%s: created SSBO of size %i\nResident of:\t%d\nCoherence:\t%d\n", __FUNCTION__, bufferSize, resMode, SSBOData.isHostCoherent);
+
         return true;
     }
 
     bool ShaderStorageBuffer::checkForResize(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize) {
         if (bufferSize > SSBOData.bufferSize) {
             Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, bufferSize);
-            // cleanup(engineDevice, SSBOData);
-            //init(engineDevice, SSBOData, bufferSize);
             return true;
         }
         return false;

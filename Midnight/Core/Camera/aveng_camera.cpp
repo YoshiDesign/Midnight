@@ -6,6 +6,10 @@ namespace aveng {
 	* Orientation is expressed either as a direction vector + up, or as Euler angles (YXZ)
 	*/
 
+	void AvengCamera::setTransform(CameraTransform& transform) {
+		transform_ = transform;
+	}
+
 	void AvengCamera::setOrthographicProjection(
 		float left, float right, float top, float bottom, float near, float far) 
 	{

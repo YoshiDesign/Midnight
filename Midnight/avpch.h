@@ -22,5 +22,6 @@
 #include <limits>
 #include <cmath>
 #include <atomic>
+#include <cstdint>
 
 #define DEBUG(what) std::cout << what << " " <<  __FILE__ << ":" << __LINE__ << std::endl

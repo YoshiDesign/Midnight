@@ -102,6 +102,7 @@ namespace aveng {
 #ifdef ENABLE_EDITOR
 		if (gameData.currentAppMode == AppMode::Editor)
 		{
+		
 			// Begin model + selection renderpass
 			renderer.beginSwapChainRenderPass(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 
@@ -112,6 +113,7 @@ namespace aveng {
 		}
 		else {
 #endif
+
 			// Begin the basic model rendering renderpass
 			renderer.beginSwapChainRenderPass(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
@@ -125,16 +127,15 @@ namespace aveng {
 		if (gameData.currentAppMode == AppMode::Editor) {
 
 			// Editor takes over lighting
-			pEditor->renderLights();
+			pEditor->updateLights();
 
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
-			pEditor->drawSelectedModels(currentFrameIndex); 
+			pEditor->drawModels(currentFrameIndex); 
 			
 		}
 		else {
 #endif
-			// Renderer lighting
-			renderer.renderLights();
+			renderer.updateLights();
 
 			renderer.drawModels(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),

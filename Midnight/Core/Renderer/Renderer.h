@@ -78,6 +78,8 @@ namespace aveng {
 		bool createMatrixUBO();
 		bool createLightsUBO();
 
+		void updateLights();
+
 		// Just use the returned values directly if working in renderer.cpp. This is for clients
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
 		{
@@ -136,7 +138,7 @@ namespace aveng {
 		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
 		
 		void initializePointLights();
-		void renderLights();
+		void renderLights(const VkPipeline& pipeline, const VkPipelineLayout& layout);
 		int getLightCount() const { return mPointLightData.numLights; }
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();

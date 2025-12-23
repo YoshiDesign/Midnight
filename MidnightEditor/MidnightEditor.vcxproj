@@ -159,6 +159,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="EditorCamera.cpp" />
     <ClCompile Include="GUI\aveng_imgui.cpp" />
     <ClCompile Include="GUI\imgui.cpp" />
     <ClCompile Include="GUI\ImGuiFileDialog.cpp" />
@@ -174,6 +175,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Editor.h" />
+    <ClInclude Include="EditorCamera.h" />
     <ClInclude Include="EditorData.h" />
     <ClInclude Include="GUI\aveng_imgui.h" />
     <ClInclude Include="GUI\dirent\dirent.h" />

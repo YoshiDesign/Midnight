@@ -71,6 +71,7 @@ namespace aveng {
 			}
 			state.keyDown[e.key] = true;
 		}
+
 		else if (e.action == GLFW_RELEASE) {
 			if (state.keyDown[e.key]) {
 				state.keyReleased[e.key] = true;
@@ -80,6 +81,7 @@ namespace aveng {
 		// GLFW_REPEAT intentionally ignored
 	}
 
+	// Just a quick method for the window to check on events directly from this class
 	bool InputSystem::isKeyPressed(int key) {
 		return state.keyPressed[key];
 	}
@@ -93,7 +95,7 @@ namespace aveng {
 
 			gameData.requestedMode = _mode;
 			gameData.modeSwitchRequested = true;
-			// gameData.currentAppMode = _mode;
+
 			handler.setMode(_mode);
 		}
 

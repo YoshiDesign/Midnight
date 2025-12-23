@@ -181,7 +181,7 @@
     <ClCompile Include="CoreVK\LightPipeline.cpp" />
     <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
-    <ClCompile Include="Core\Input\InputState.cpp" />
+    <ClCompile Include="Core\Camera\aveng_camera.cpp" />
     <ClCompile Include="Core\Input\InputSystem.cpp" />
     <ClCompile Include="Core\Midnight.cpp" />
     <ClCompile Include="Core\PointLightSystem.cpp" />
@@ -226,6 +226,7 @@
     <ClInclude Include="CoreVK\SkinningPipeline.h" />
     <ClInclude Include="CoreVK\SyncObjects.h" />
     <ClInclude Include="CoreVK\VertexBuffer.h" />
+    <ClInclude Include="Core\Camera\aveng_camera.h" />
     <ClInclude Include="Core\Input\EventPayloads.h" />
     <ClInclude Include="Core\Input\IInputHandler.h" />
     <ClInclude Include="Core\Input\InputState.h" />

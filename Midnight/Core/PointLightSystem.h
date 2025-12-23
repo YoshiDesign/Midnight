@@ -20,7 +20,7 @@ namespace aveng {
 		PointLightSystem& operator=(const PointLightSystem&) = delete;
 		void render(int frameIndex, VkCommandBuffer commandBuffer, int numLights);
 		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
-		VkPipeline getPipeline() { return pipeline; }
+		const VkPipeline& getPipeline() { return pipeline; }
 
 	private:
 

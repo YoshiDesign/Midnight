@@ -15,7 +15,7 @@ namespace aveng {
         virtual void onMouseMove(const MouseMoveEvent&) = 0;
 
         // Editor Only
-        virtual void setMode(const AppMode& mode) { /*no-op*/ };
+        virtual void setMode(const AppMode& mode) { /* Base class, no-op*/ };
     };
 
     struct GameInput : IInputHandler {

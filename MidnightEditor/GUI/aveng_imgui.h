@@ -3,8 +3,7 @@
 #include "Utils/window_callbacks.h"
 #include "Utils/Timer.h"
 #include "Game/data.h"
-
-// libs
+#include "Core/Input/InputState.h"
 #include "Utils/glm_includes.h"
 #include "GUI/imgui.h"
 #include "GUI/imgui_impl_glfw.h"
@@ -20,10 +19,11 @@
 // std
 #include <stdexcept>
 
-class EngineDevice;
-class AvengWindow;
-
 namespace aveng {
+
+    class EngineDevice;
+    class AvengWindow;
+    class InputState;
 
 	static void check_vk_result(VkResult err) {
 		if (err == 0) return;
@@ -32,6 +32,7 @@ namespace aveng {
 	}
 
 	class AvengImgui {
+
 	public:
 
 		AvengImgui(VkRenderData& _renderData, GameData& _gameData, EditorData& editorData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData);
@@ -45,8 +46,9 @@ namespace aveng {
         void handleMouseButtonEvents(int button, int action, int mods);
         void handleMousePositionEvents(double xPos, double yPos, bool rmbDown);
 		void hideMouse(bool hide);
+        void updateInputState(const InputState& updateInputState);
 
-		bool show_player_controller_window = false;
+		bool show_input_panel = false;
 		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 	private:
@@ -58,6 +60,7 @@ namespace aveng {
 		EngineDevice& engineDevice;
         AvengWindow& window;
         EditorData& editorData;
+        InputState inputState;
 
         VkRenderPass mSelectionRenderpass = VK_NULL_HANDLE;
         VkRenderPass mLineRenderpass = VK_NULL_HANDLE;

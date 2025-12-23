@@ -153,24 +153,26 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Camera\CameraManager.cpp" />
+    <ClCompile Include="Game\Camera\ICameraDriver.cpp" />
     <ClCompile Include="Game\Game.cpp" />
     <ClCompile Include="Game\Math\aveng_math.cpp" />
     <ClCompile Include="Game\Player\GameplayFunctions.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="System\Camera\aveng_camera.cpp" />
     <ClCompile Include="System\Peripheral\Controller.cpp" />
     <ClCompile Include="System\Peripheral\KeyboardController.cpp" />
     <ClCompile Include="System\Render\ObjectRenderSystem.cpp" />
     <ClCompile Include="XOne.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Camera\CameraManager.h" />
+    <ClInclude Include="Game\Camera\ICameraDriver.h" />
     <ClInclude Include="Game\data.h" />
     <ClInclude Include="Game\Game.h" />
     <ClInclude Include="Game\Math\aveng_math.h" />
     <ClInclude Include="Game\Player\Action.h" />
     <ClInclude Include="Game\Player\Command.h" />
     <ClInclude Include="Game\Player\GameplayFunctions.h" />
-    <ClInclude Include="System\Camera\aveng_camera.h" />
     <ClInclude Include="System\Peripheral\Controller.h" />
     <ClInclude Include="System\Peripheral\KeyboardController.h" />
     <ClInclude Include="System\Render\ObjectRenderSystem.h" />

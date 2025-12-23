@@ -19,8 +19,8 @@ layout (std140, set = 0, binding = 0) uniform Matrices {
 
 layout(set = 0, binding = 2) uniform LightsUbo {
     vec4 ambientLightColor;
-    vec4 lightPositions[100];  // w component is radius
-    vec4 lightColors[100];     // w component is intensity
+    vec4 lightPositions[200];  // w component is radius
+    vec4 lightColors[200];     // w component is intensity
     uint numLights;
 } lightsUbo;
 

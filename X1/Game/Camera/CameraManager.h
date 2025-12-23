@@ -1,0 +1,47 @@
+#pragma once
+#include "Core/Camera/aveng_camera.h"
+#include "Game/Camera/ICameraDriver.h"
+#include "Core/Input/InputState.h"
+#include "avpch.h"
+
+namespace aveng {
+    using CameraId = uint32_t;
+
+    struct CameraSlot {
+        AvengCamera camera;
+        CameraTransform   transform;
+        std::unique_ptr<ICameraDriver> driver;
+        std::string name;
+        bool enabled = true;
+    };
+
+    class CameraManager {
+    public:
+
+        CameraId createCamera(std::string name, std::unique_ptr<ICameraDriver> cameraDriver);
+        void setActive(CameraId id) { active_ = id; };
+
+        // const-correct override pair
+        inline CameraSlot& active() { return cameras_[active_]; }
+        inline const CameraSlot& active() const { return cameras_[active_]; } // when this* is const CameraManager - readonly
+        inline const CameraId& activeId() const { return active_; }
+
+        void update(float dt, const InputState& input) {
+            auto& c = active();
+            if (c.driver) // This check should be unnecessary given the invariance of this class
+            {
+                //std::cout << "Updating Driver!\t" << active_ << std::endl;
+                c.driver->update(dt, input, c.transform);
+            }
+
+            // Interesting, that we apply calculations to the CameraSlot's transform member, 
+            // and then apply it to the camera member's transform_. Yet another invariant /shrug
+            c.camera.setTransform(c.transform);
+
+        }
+
+    private:
+        std::vector<CameraSlot> cameras_;
+        CameraId active_ = 0;
+    };
+}

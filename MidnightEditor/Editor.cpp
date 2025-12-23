@@ -8,6 +8,7 @@
 #include "CoreVK/PipelineLayout.h"
 #include "Core/aveng_window.h"
 #include "Core/Renderer/Renderer.h"
+#include "Core/Input/InputState.h"
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/AvengStorageBuffer.h"
 #include <cassert>
@@ -15,13 +16,14 @@
 
 namespace aveng {
 
-	Editor::Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData)
-		: renderData{ _renderData }, renderer{_renderer}, gameData{ _gameData }, engineDevice{ _engineDevice }, window{ window }, mModelInstanceData{ modelInstanceData }
+	Editor::Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData, CameraManager& _cameraManager)
+		: renderData{ _renderData }, renderer{ _renderer }, gameData{ _gameData }, engineDevice{ _engineDevice }, window{ window }, mModelInstanceData{ modelInstanceData }, cameraManager{ _cameraManager }
 	{
 
-		// Initial camera position
-		editorViewerObject.transform.translation.z = -15.5f;
-		editorViewerObject.transform.translation.y = -2.5f;
+		// Register a camera
+		auto editor_camera = std::make_unique<EditorCamera>();
+		editor_camera_id = cameraManager.createCamera("editor_camera", std::move(editor_camera));
+		std::cout << "editor_camera_id\t" << editor_camera_id << std::endl;
 
 		renderData.rdLineDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdAvengSelectionDescriptorSets.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
@@ -29,9 +31,7 @@ namespace aveng {
 
 		/* valid, but emtpy */
 		mLineMesh = std::make_shared<VkLineMesh>();
-		Logger::log(1, "%s: line mesh storage initialized\n", __FUNCTION__);
-
-		mModelInstanceData.miInstanceCenterCallbackFunctionEditor = [this](std::shared_ptr<AssimpInstance> instance) { renderer.centerInstance(instance); };
+		// Logger::log(1, "%s: line mesh storage initialized\n", __FUNCTION__);
 
 		if (!createCommandBuffers())
 		{
@@ -58,27 +58,6 @@ namespace aveng {
 		cleanup();
 	}
 
-	void Editor::updateCamera(float frameTime)
-	{
-
-		// Fetched all the way from downtown (the swapchain)
-		aspect = getAspectRatio();
-
-		// Track key press to transform viewer object
-		keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
-
-		// Apply new viewer obj values to the camera
-		editor_camera.setViewYXZ(editorViewerObject.transform.translation + glm::vec3(0.f, 0.f, -.80f), editorViewerObject.transform.rotation);
-
-		// Recalculate perspective
-		editor_camera.setPerspectiveProjection(glm::radians(50.f), aspect, 0.1f, 1000.f);
-
-		// Update the data which the renderer reads from
-		renderData.cameraProxy.projection = editor_camera.getProjection();
-		renderData.cameraProxy.view = editor_camera.getView();
-		
-	}
-
 	float Editor::getAspectRatio() {
 		return renderer.getAspectRatio();
 	}
@@ -101,7 +80,12 @@ namespace aveng {
 	void Editor::update(float frameTime, unsigned int frameIndex) {
 
 		currentFrameIndex = frameIndex;
-		updateCamera(frameTime);
+
+		if (cameraManager.activeId() != editor_camera_id) {
+			std::cout << "Setting Editor as Active Camera..." << std::endl;
+			cameraManager.setActive(editor_camera_id);
+		}
+
 		setupSelectionHighlight(frameTime);
 		setSelectedInstance();
 		updateStorageBuffers();
@@ -273,9 +257,9 @@ namespace aveng {
 			2, true);
 	}
 
-	void Editor::renderLights()
+	void Editor::updateLights()
 	{
-		renderer.renderLights();
+		renderer.renderLights(pointLightSystem.getPipeline(), pointLightSystem.getPipelineLayout());
 	}
 	
 	bool Editor::createPipelineLayouts() {
@@ -334,7 +318,7 @@ namespace aveng {
 	bool Editor::createSSBOs()
 	{
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers[i])) {
+			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers[i], MapMode::Persistent, ResidentMode::CPU)) {
 				Logger::log(1, "%s error: could not create selection SSBO\n", __FUNCTION__);
 				return false;
 			}
@@ -554,6 +538,11 @@ namespace aveng {
 		return renderData.rdLineCommandBuffers.at(currentFrameIndex);
 	}
 
+	void Editor::updateInputState(const InputState& state)
+	{
+		aveng_imgui.updateInputState(state);
+	}
+
 	void Editor::endSwapChainLineRenderPass(VkCommandBuffer commandBuffer)
 	{
 		assert(renderer.isFrameInProgress() && "Can't call endSwapChain if frame is not in progress.");
@@ -562,7 +551,7 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
-	void Editor::drawSelectedModels(int frameIndex)
+	void Editor::drawModels(int frameIndex)
 	{
 		//
 		renderer.drawModels(
@@ -590,7 +579,7 @@ namespace aveng {
 
 			size_t newBufferSize = std::max(editorData.eSelectedInstance.size() * (sizeof glm::vec2), renderData.rdSelectedInstanceBuffers.at(currentFrameIndex).bufferSize * 2);
 			
-			ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), newBufferSize);
+			ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), MapMode::Persistent, ResidentMode::CPU, newBufferSize);
 
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), editorData.eSelectedInstance))
 			{
@@ -817,8 +806,6 @@ namespace aveng {
 
 	void Editor::updateDescriptorSets(int frameIndex)
 	{
-
-		// Logger::log(1, "%s: Editor updating descriptor sets.", __FUNCTION__);
 
 		{
 			/* selection shader, non-animated  */

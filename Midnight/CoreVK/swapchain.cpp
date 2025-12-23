@@ -8,6 +8,7 @@
 #include <limits>
 #include <set>
 #include <stdexcept>
+#include <algorithm>
 
 namespace aveng {
 
@@ -100,13 +101,18 @@ namespace aveng {
         VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            imageCount = std::max(uint32_t{ 3 }, swapChainSupport.capabilities.minImageCount + 1);
+        }
+        
         if (swapChainSupport.capabilities.maxImageCount > 0 && 
             imageCount > swapChainSupport.capabilities.maxImageCount) 
         {
-            std::cout << "Swapchain minImageCount + 1 exceeds the Max Image Count: " << swapChainSupport.capabilities.maxImageCount << std::endl;
             imageCount = swapChainSupport.capabilities.maxImageCount;
         }
+
         std::cout << "Swapchain Image count: " << imageCount << std::endl;
+
         VkSwapchainCreateInfoKHR createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         createInfo.surface = device.surface();
@@ -823,20 +829,20 @@ namespace aveng {
     VkPresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) 
     {
         // Pro-Tip: VK_PRESENT_MODE_MAILBOX_KHR is probably the most efficient, but more energy intensive so it might not be well suited for mobile applications.
-        //for (const auto& availablePresentMode : availablePresentModes) {
-        //    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-        //        std::cout << "Present mode: Mailbox" << std::endl;
-        //        return availablePresentMode;
-        //    }
-        //}
+        for (const auto& availablePresentMode : availablePresentModes) {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                std::cout << "Present mode: Mailbox" << std::endl;
+                return availablePresentMode;
+            }
+        }
 
-        // Pro-Tip: Immediate mode will not work on most mobile devices
-        // for (const auto &availablePresentMode : availablePresentModes) {
-        //   if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-        //     std::cout << "Present mode: Immediate" << std::endl;
-        //     return availablePresentMode;
-        //   }
-        // }
+         // Pro-Tip: Immediate mode will not work on most mobile devices
+         //for (const auto &availablePresentMode : availablePresentModes) {
+         //  if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+         //    std::cout << "Present mode: Immediate" << std::endl;
+         //    return availablePresentMode;
+         //  }
+         //}
 
         std::cout << "Present mode: V-Sync" << std::endl;
         return VK_PRESENT_MODE_FIFO_KHR;

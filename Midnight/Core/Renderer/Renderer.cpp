@@ -90,6 +90,8 @@ namespace aveng {
 		mModelInstanceData.miInstanceCloneCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { cloneInstance(instance); };
 		mModelInstanceData.miInstanceCloneManyCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance, int numClones) { cloneInstances(instance, numClones); };
 
+		mModelInstanceData.miInstanceCenterCallbackFunctionEditor = [this](std::shared_ptr<AssimpInstance> instance) { centerInstance(instance); };
+
 		{
 			/* Null model instance - Utility */
 			std::shared_ptr<AvengModel> nullModel = std::make_shared<AvengModel>(engineDevice);
@@ -983,7 +985,8 @@ namespace aveng {
 
 	}
 
-	void Renderer::renderLights()
+	/* Render the lighting billboards */
+	void Renderer::renderLights(const VkPipeline& pipeline, const VkPipelineLayout& layout)
 	{
 		if (mPointLightData.numLights <= 0) {
 			return; // Nothing to render
@@ -992,14 +995,14 @@ namespace aveng {
 			&& "Point Light system is using the wrong command buffer");
 
 		// This might not be necessary
-		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pointLightSystem.getPipeline());
+		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
 		// Bind both descriptor sets
 		VkDescriptorSet descriptorSets[1] = { renderData.rdAvengDescriptorSets.at(currentFrameIndex) };
 		vkCmdBindDescriptorSets(
 			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pointLightSystem.getPipelineLayout(),
+			layout,
 			0,
 			1, // binding 1 descriptor set
 			descriptorSets,
@@ -1012,10 +1015,12 @@ namespace aveng {
 
 	void Renderer::addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius)
 	{
-		if (mPointLightData.numLights >= 100) {
-			std::cout << "Warning: Maximum number of lights (" << 100 << ") reached. Cannot add more lights." << std::endl;
+		if (mPointLightData.numLights >= 200) {
+			std::cout << "Warning: Maximum number of lights (" << 200 << ") reached. Cannot add more lights." << std::endl;
 			return;
 		}
+
+		std::cout << "Adding Light..." << std::endl;
 
 		mPointLightData.positions[mPointLightData.numLights] = glm::vec4(position, radius);
 		mPointLightData.colors[mPointLightData.numLights] = glm::vec4(color, intensity);
@@ -1023,7 +1028,7 @@ namespace aveng {
 
 		// Update the UBO in the most inefficent way possible... for now!
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers[i], mPointLightData);
+			UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers[i], mPointLightData);
 		}
 
 	}
@@ -1172,11 +1177,7 @@ namespace aveng {
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		// std::printf("Dispatching compute: %d x %d x 1\n", numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));
-
 		vkCmdDispatch(renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
-		/*std::printf("Compute dispatch called: bones=%d, instanceGroups=%d\n",
-			numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)));*/
 
 		/* memory barrier between the compute shaders
 		 * wait for TRS buffer to be written  */
@@ -1361,12 +1362,10 @@ namespace aveng {
 
 		bool bufferResized = false;
 		// TODO - This upload only needs to occur if there are Animated Models!
-		bufferResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), mNodeTransFormData);
+		bufferResized = ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), mNodeTransFormData);
 		// Upload every instance's current transform data (translation, scale, rotation)
 		// If it resized, no data was uploaded
 		if (bufferResized) {
-
-			std::cout << "NodeTransform Buffer Resized" << std::endl;
 
 			size_t newBufferSize = std::max(mNodeTransFormData.size() * (sizeof NodeTransformData), mNodeTransformBuffers.at(currentFrameIndex).bufferSize * 2);
 
@@ -1379,10 +1378,10 @@ namespace aveng {
 			);
 
 			// Reinitialize - New Allocation
-			ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), newBufferSize);
+			ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), MapMode::Persistent, ResidentMode::CPU, newBufferSize);
 
 			// Retry the upload - true == it resized again after we just tried to reallocate it. That would be bad
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), mNodeTransFormData))
+			if (ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), mNodeTransFormData))
 			{
 				std::printf("[1] Failed to accommodate resized buffer.\n");
 				throw std::runtime_error("[1] Failed to accommodate resized buffer.");
@@ -1426,6 +1425,8 @@ namespace aveng {
 			ShaderStorageBuffer::init(
 				engineDevice,
 				mShaderBoneMatrixBuffers.at(currentFrameIndex),
+				MapMode::GpuOnly,
+				ResidentMode::GPU,
 				newBufferSize // New buffer size - these buffers are very similar
 			);
 
@@ -1433,6 +1434,8 @@ namespace aveng {
 			ShaderStorageBuffer::init(
 				engineDevice,
 				mShaderTrsMatrixBuffers.at(currentFrameIndex),
+				MapMode::GpuOnly,
+				ResidentMode::GPU,
 				newBufferSize // New buffer size - these buffers are very similar
 			);
 
@@ -1451,23 +1454,26 @@ namespace aveng {
 		/* we need to update descriptors after the upload if buffer size changed */
 		mUploadToUBOTimer.start();
 
-		// TODO - Skip this upload if the camera's data hasn't changed (the view isn't moving).
-		UniformBuffer::uploadData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices);
-		// UniformBuffer::uploadData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
+		UniformBuffer::uploadPersistentData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices);
+		UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		// TODO - Figure out why this occurs AFTER compute
 		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), mWorldPosMatrices)) {
 			size_t newBufferSize = std::max(mWorldPosMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
-			/*
-				TODO - GC The old buffer
-			*/
+			buffer_trash.push_back(
+				PendingBufferDestroy{
+					mShaderModelRootMatrixBuffers.at(currentFrameIndex).buffer,
+					mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferAlloc,
+				}
+			);
 
 			// Reinitialize TrsMat buffers
 			ShaderStorageBuffer::init(
 				engineDevice,
 				mShaderModelRootMatrixBuffers.at(currentFrameIndex),
+				MapMode::Persistent,
+				ResidentMode::CPU,
 				newBufferSize // New buffer size
 			);
 
@@ -1513,11 +1519,6 @@ namespace aveng {
 					/* compute shader for animated models only */
 					if (model->hasAnimations() && !model->getBoneList().empty()) {
 						size_t numberOfBones = model->getBoneList().size();
-
-						//std::printf("[runComputeShaders] Buffer sizes - NodeTransform: %zu, TRSMatrix: %zu, BoneMatrix: %zu\n",
-						//	mNodeTransformBuffers.at(currentFrameIndex).bufferSize,
-						//	mShaderTrsMatrixBuffers.at(currentFrameIndex).bufferSize,
-						//	mShaderBoneMatrixBuffers.at(currentFrameIndex).bufferSize);
 
 						runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
 
@@ -1602,6 +1603,11 @@ namespace aveng {
 			throw std::runtime_error("error: could not end render pass");
 		}
 
+	}
+
+	void Renderer::updateLights() {
+		// Renderer lighting
+		renderLights(pointLightSystem.getPipeline(), pointLightSystem.getPipelineLayout());
 	}
 
 	/**
@@ -1977,13 +1983,13 @@ namespace aveng {
 	bool Renderer::createMatrixUBO() {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			if (!UniformBuffer::init(engineDevice, mPerspectiveViewMatrixUBOBuffers[i], sizeof(VkUploadMatrices))) {
+			if (!UniformBuffer::init(engineDevice, mPerspectiveViewMatrixUBOBuffers[i], sizeof(VkUploadMatrices), MapMode::Persistent)) {
 				Logger::log(1, "%s error: could not create matrix uniform buffers\n", __FUNCTION__);
 				return false;
 			}
 		}
 
-		// Populate the shared view for the editor - for when it needs to update its descriptor sets
+		// Populate the shared view for the editor - for when it needs to update descriptor sets on behalf of its shaders
 		renderData.matrixBuffersView.viewProjUBOs = {
 			mPerspectiveViewMatrixUBOBuffers.data(),
 			mPerspectiveViewMatrixUBOBuffers.size()
@@ -1995,7 +2001,8 @@ namespace aveng {
 	bool Renderer::createLightsUBO() {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			if (!UniformBuffer::init(engineDevice, mPointLightUBOBuffers[i], sizeof(PointLightData))) {
+			std::cout << "Creating persistent Lights UBO" << std::endl;
+			if (!UniformBuffer::init(engineDevice, mPointLightUBOBuffers[i], sizeof(PointLightData), MapMode::Persistent)) {
 				Logger::log(1, "%s error: could not create lighting uniform buffers\n", __FUNCTION__);
 				return false;
 			}
@@ -2013,25 +2020,25 @@ namespace aveng {
 
 
 	bool Renderer::createSSBOs() {
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {\
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
-			if (!ShaderStorageBuffer::init(engineDevice, mShaderTrsMatrixBuffers[i])) {
+			if (!ShaderStorageBuffer::init(engineDevice, mShaderTrsMatrixBuffers[i], MapMode::GpuOnly, ResidentMode::GPU)) {
 				Logger::log(1, "%s error: could not create TRS matrices SSBO\n", __FUNCTION__);
 				return false;
 			}
 
-			if (!ShaderStorageBuffer::init(engineDevice, mShaderModelRootMatrixBuffers[i])) {
-				Logger::log(1, "%s error: could not create nodel root position SSBO\n", __FUNCTION__);
-				return false;
-			}
-			
-			if (!ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers[i])) {
-				Logger::log(1, "%s error: could not create node transform SSBO\n", __FUNCTION__);
+			if (!ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixBuffers[i], MapMode::GpuOnly, ResidentMode::GPU)) {
+				Logger::log(1, "%s error: could not create bone matrix SSBO\n", __FUNCTION__);
 				return false;
 			}
 
-			if (!ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixBuffers[i])) {
-				Logger::log(1, "%s error: could not create bone matrix SSBO\n", __FUNCTION__);
+			if (!ShaderStorageBuffer::init(engineDevice, mShaderModelRootMatrixBuffers[i], MapMode::Persistent)) { // CPU Resident
+				Logger::log(1, "%s error: could not create nodel root position SSBO\n", __FUNCTION__);
+				return false;
+			}
+
+			if (!ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers[i], MapMode::Persistent)) { // CPU Resident
+				Logger::log(1, "%s error: could not create node transform SSBO\n", __FUNCTION__);
 				return false;
 			}
 

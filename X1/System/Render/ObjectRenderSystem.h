@@ -4,10 +4,11 @@
 #include "CoreVK/VkRenderData.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
-#include "System/Camera/aveng_camera.h"
+#include "Core/Camera/aveng_camera.h"
 #include "Core/Input/IInputHandler.h"
 #include "Core/Input/InputSystem.h"
 #include "System/Peripheral/KeyboardController.h"
+#include "Game/Camera/CameraManager.h"
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
@@ -38,30 +39,23 @@ namespace aveng {
 		void render(float frameTime);
 
 		// Application-specific updates
-		void updateCamera(float frameTime);
+		void updateCamera(float frameTime, const InputState& state);
 
 		VkDevice getEngineDevice() { return midnight.device(); }
 
 		bool shouldClose() { return midnight.shouldClose(); }
 
 	private:
-		void updateData(float frameTime);
 
 		int last_sec;
 		float aspect;
 		int frameIndex;
+		int player_camera_id;
 
-		int curCamera = 1; // Tmp
-		AvengCamera player_camera;
-		
 		// Game & State
 		GameData gameData;
 		Game holyShip{ gameData };
 		Midnight midnight{ gameData };
-
-		// Application-level components
-		AvengAppObject viewerObject{ AvengAppObject::createAppObject(1000) };
-		KeyboardController keyboardController{ viewerObject, gameData };
 
 	};
 

@@ -31,6 +31,9 @@
 
 namespace aveng {
 
+	enum class MapMode { OnDemand, Persistent, GpuOnly };
+	enum class ResidentMode { CPU, GPU };
+
 	// std::span<T> super-lightweight doppleganger. Used to create a window into our data
 	// so the Editor can report what on things
 	template <typename T>
@@ -73,6 +76,8 @@ namespace aveng {
 		size_t bufferSize = 0;
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
+		void* mapped = nullptr; // Used when persistently mapped
+		bool isHostCoherent = false; // true == no need to flush
 
 		VkDescriptorSet descriptorSet = VK_NULL_HANDLE; // Unused
 	};
@@ -81,6 +86,8 @@ namespace aveng {
 		size_t bufferSize = 0;
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
+		void* mapped = nullptr;
+		bool isHostCoherent = false;
 
 		VkDescriptorSet descriptorSet = VK_NULL_HANDLE; // Unused
 	};
@@ -128,8 +135,8 @@ namespace aveng {
 
 	struct PointLightData {
 		glm::vec4 ambientLightColor;	// w is intensity
-		glm::vec4 positions[100];		// w is radius
-		glm::vec4 colors[100];			// w is intensity
+		glm::vec4 positions[200];		// w is radius
+		glm::vec4 colors[200];			// w is intensity
 		alignas(16) uint32_t numLights;
 	};
 

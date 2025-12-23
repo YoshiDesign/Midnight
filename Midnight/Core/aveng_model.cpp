@@ -250,8 +250,8 @@ namespace aveng {
 			size_t boneMatBufferSize = boneOffsetMatricesList.size() * sizeof(glm::mat4);
 			size_t boneParentBufferSize = boneParentIndexList.size() * sizeof(int32_t);
 
-			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneMatBufferSize);
-			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], boneParentBufferSize);
+			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
+			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
 
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList))
 			{

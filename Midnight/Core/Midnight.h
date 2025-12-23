@@ -30,20 +30,29 @@ namespace aveng {
 		const VkDevice device() { return engineDevice.device(); }
 
 		void render(float frameTime);
-		void updateCamera(glm::mat4 proj, glm::mat4 view);
+		void updateCamera(float frameTime);
+		int registerCamera(std::string name, std::unique_ptr<ICameraDriver> cameraDriver);
+		void setActiveCamera(int id) { cameraManager.setActive(id); }
+		const int& activeCameraId() const { return cameraManager.activeId(); }
 
 		// Resource State
 		bool frameInProgress() { return renderer.isFrameInProgress(); }
 		bool shouldClose() { return aveng_window.shouldClose(); }
 		float getAspectRatio() { return renderer.getAspectRatio(); }
 
+#ifdef ENABLE_EDITOR
+		void updateGUI(const InputState& state);
+#endif
 	private:
 
+		float aspect;
 		GameData& game_data;
-		GameInput gameInput;
+		GameInput gameInput; // Not exactly useful at the moment - game gets a const ref of InputState 
+
+		CameraManager cameraManager;
 		
 		// Move these to Midnight
-		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };			 // GLHF
+		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
 		EngineDevice engineDevice{ aveng_window }; // Summon things to this world
 		VkRenderData renderData;
 		ModelAndInstanceData mModelInstanceData{};
@@ -53,7 +62,7 @@ namespace aveng {
 
 #ifdef ENABLE_EDITOR
 
-		Editor editor{ renderData, renderer, game_data, engineDevice, aveng_window, mModelInstanceData };
+		Editor editor{ renderData, renderer, game_data, engineDevice, aveng_window, mModelInstanceData, cameraManager };
 		EditorInput editorInput{ &editor };
 		EditorGameRouter inputRouter{ game_data.currentAppMode, editorInput, gameInput };
 		AvengFrame frame{ renderer, renderData, game_data, engineDevice, mModelInstanceData, &editor };

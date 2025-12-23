@@ -16,9 +16,9 @@
 namespace aveng {
 
     AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, EditorData& editorData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData)
-        : renderData{ _renderData }, gameData{ _gameData }, editorData{ editorData }, engineDevice {
-        _engineDevice
-    }, modInstData{ _modInstData }, window{ _window }
+        : renderData{ _renderData }, gameData{ _gameData }, 
+        editorData{ editorData }, engineDevice { _engineDevice}, 
+        modInstData{ _modInstData }, window{ _window }
     {
         // Initialize all the timing vectors with their proper sizes
         mFPSValues.resize(mNumFPSValues, 0.0f);
@@ -125,6 +125,10 @@ namespace aveng {
         ImGui_ImplVulkan_RenderDrawData(drawdata, renderData.rdGUICommandBuffers.at(frameIndex));
     }
 
+    void AvengImgui::updateInputState(const InputState& state) {
+        inputState = state;
+    }
+
     void AvengImgui::runGUI() {
 
         //static float slider = 0.0f;
@@ -141,7 +145,7 @@ namespace aveng {
         {
             ImGui::Begin("Debug");
 
-            ImGui::Checkbox("Player Debug", &show_player_controller_window);
+            ImGui::Checkbox("Input Panel", &show_input_panel);
 
             ImGui::Text(
                 "Last Click At: (%d, %d)", editorData.eMouseLastClickX, editorData.eMouseLastClickY);
@@ -166,13 +170,16 @@ namespace aveng {
 
             ImGui::Text("GFX-Pipe:\t%d", gameData.cur_pipe);
 
-            //ImGui::Text(
-            //    "Frame = %.3f ms/frame (%.1f FPS)",
-            //    1000.0f / ImGui::GetIO().Framerate,
-            //    ImGui::GetIO().Framerate);
-            //ImGui::Text("c = %d", counter);
-            
             ImGui::End(); // End Debug window
+        }
+
+        if (show_input_panel) {
+            ImGui::Begin("Input Triggers");
+            ImGui::Text("W: \t%d", inputState.keyDown[GLFW_KEY_W]);
+            ImGui::Text("A: \t%d", inputState.keyDown[GLFW_KEY_A]);
+            ImGui::Text("S: \t%d", inputState.keyDown[GLFW_KEY_S]);
+            ImGui::Text("D: \t%d", inputState.keyDown[GLFW_KEY_D]);
+            ImGui::End();
         }
 
         {
