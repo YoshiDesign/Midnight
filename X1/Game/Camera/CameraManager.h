@@ -26,7 +26,11 @@ namespace aveng {
     public:
 
         CameraId createCamera(std::string name, std::unique_ptr<ICameraDriver> cameraDriver);
-        void setActive(CameraId id) { active_ = id; };
+        void setActive(CameraId id) { 
+            cameras_[active_].enabled = false;
+            active_ = id; 
+            cameras_[active_].enabled = true;
+        };
 
         // const-correct override pair
         inline CameraSlot& active() { return cameras_[active_]; }

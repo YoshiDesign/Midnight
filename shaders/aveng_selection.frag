@@ -32,6 +32,7 @@ vec3 sRGB(vec3 c) {
 }
 
 void main() {
+
     float ambientStrength = u_Lights.ambientLightColor.w;
     vec3 ambient = ambientStrength * u_Lights.ambientLightColor.rgb;
 
@@ -46,20 +47,16 @@ void main() {
         vec3 lightColor = u_Lights.lightColors[i].rgb;
         float lightIntensity = u_Lights.lightColors[i].w;
 
-        // The first thing we need to calculate is the direction 
-        // vector between the light source and the fragment's position.
-
+        // Calculate direction vector between light source and fragment position
         vec3 L = lightPosition - fragPosWorld;
-        float dist2 = dot(L,L); // Scalar
-        float r2 = lightRadius * lightRadius;
+        float dist2 = dot(L, L);
+        float dist = sqrt(dist2);
 
-        if (dist2 > r2)
-            continue;
+        // Inverse-square attenuation scaled by radius
+        // Larger radius = stronger light contribution at same distance
+        float attenuation = (lightIntensity * lightRadius) / (1.0 + dist2);
 
-        float normalizedDist2 = dist2 / r2; // 0 -> 1
-        float attenuation = lightIntensity * (1.0 - normalizedDist2);
-
-        vec3 directionToLight = L * inversesqrt(dist2);
+        vec3 directionToLight = L / dist;
 
         // The diffuse impact of the light
         float cosAngIncidence = max(dot(norm, directionToLight), 0);

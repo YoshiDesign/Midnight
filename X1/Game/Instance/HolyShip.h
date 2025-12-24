@@ -20,15 +20,7 @@ namespace xone {
             std::cout << "[HolyShip] Exit\n";
         }
 
-        void update(const TickContext& ctx) override {
-            // Pretend the user pressed "Start"
-            elapsed_ += ctx.dt;
-            if (elapsed_ > 1.0f && !started_) {
-                started_ = true;
-                play_.requestPlay("holyship");
-            }
-            std::cout << "[HolyShip] !! \n";
-        }
+        void update(const TickContext& ctx) override;
 
         void render(const RenderContext&) override {
             // draw game
