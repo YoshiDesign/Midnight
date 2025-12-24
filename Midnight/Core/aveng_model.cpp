@@ -288,7 +288,11 @@ namespace aveng {
 		mModelFilename = std::filesystem::path(filepath).filename().generic_string();
 
 		/* get root transformation matrix from model's root node */
-		mRootTransformMatrix = Tools::convertAiToGLM(rootNode->mTransformation);
+		glm::mat4 local_gltf = Tools::convertAiToGLM(rootNode->mTransformation);
+		glm::mat4 local_engine =
+			Tools::gltfToEngine * local_gltf * glm::inverse(Tools::gltfToEngine);
+
+		mRootTransformMatrix = local_engine;
 
 		Logger::log(1, "%s: - model has a total of %i texture%s\n", __FUNCTION__, mTextures.size(), mTextures.size() == 1 ? "" : "s");
 		std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");

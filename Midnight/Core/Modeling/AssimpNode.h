@@ -46,6 +46,6 @@ private:
     glm::mat4 mParentNodeMatrix = glm::mat4(1.0f);
     glm::mat4 mLocalTRSMatrix = glm::mat4(1.0f);
 
-    /* extra matrix to move model instances  around */
+    /* extra matrix to move model instances around */
     glm::mat4 mRootTransformMatrix = glm::mat4(1.0f);
 };

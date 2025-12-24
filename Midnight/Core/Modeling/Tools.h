@@ -34,45 +34,37 @@ namespace aveng {
 
         /**
          * Convert Assimp vector3 to GLM vec3
-         * Applies coordinate system conversion if needed
+         * No coordinate conversion applied - use gltfToEngine matrix for that
          */
-        static glm::vec3 convertAiToGLM(const aiVector3D& aiVec, bool applyCoordConversion = true) {
-            if (applyCoordConversion) {
-                // Convert from Assimp (Y-up) to Midnight (Z-forward, -Y-up)
-                return glm::vec3(aiVec.x, -aiVec.z, aiVec.y);
-            }
+        static glm::vec3 convertAiToGLM(const aiVector3D& aiVec) {
             return glm::vec3(aiVec.x, aiVec.y, aiVec.z);
         }
 
         /**
          * Convert Assimp quaternion to GLM quaternion
-         * Applies coordinate system conversion
+         * No coordinate conversion applied - use gltfToEngine matrix sandwich for that
          */
-        static glm::quat convertAiToGLM(const aiQuaternion& aiQuat, bool applyCoordConversion = true) {
-            if (applyCoordConversion) {
-                // Convert from Assimp (Y-up) to Midnight (Z-forward, -Y-up)
-                // Quaternion: (w, x, y, z) -> (w, x, -z, y)
-                return glm::quat(aiQuat.w, aiQuat.x, -aiQuat.z, aiQuat.y);
-            }
+        static glm::quat convertAiToGLM(const aiQuaternion& aiQuat) {
             return glm::quat(aiQuat.w, aiQuat.x, aiQuat.y, aiQuat.z);
         }
 
         /**
-         * Create coordinate system conversion matrix
-         * Converts from Assimp coordinate system to Midnight Engine coordinate system
+         * Midnight Engine coordinate system basis: -Y up, +Z forward, +X right
+         * 
+         * glTF/Assimp uses: +Y up, -Z forward, +X right
+         * This matrix converts from glTF to engine coordinates by flipping Y and Z.
+         * 
+         * For transforming:
+         *   - Points/vectors: B * v
+         *   - Matrices (rotations, transforms): B * M * inverse(B)
          */
-        static glm::mat4 getCoordinateConversionMatrix() {
-            // Rotate -90 degrees around X to convert Y-up to Z-forward
-            return glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        }
+        inline static const glm::mat4 gltfToEngine = glm::mat4(
+            1, 0, 0, 0,
+            0, -1, 0, 0,
+            0, 0, -1, 0,
+            0, 0, 0, 1
+        );
 
-        /**
-         * Apply coordinate system conversion to a transformation matrix
-         */
-        static glm::mat4 applyCoordinateConversion(const glm::mat4& matrix) {
-            glm::mat4 conversion = getCoordinateConversionMatrix();
-            return conversion * matrix;
-        }
     };
 
 } // namespace aveng 

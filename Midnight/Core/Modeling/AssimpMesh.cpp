@@ -77,11 +77,18 @@ namespace aveng {
             }
         }
 
+        glm::mat4 B = Tools::gltfToEngine;
+
+        // Packing Loop
         for (unsigned int i = 0; i < mVertexCount; ++i) {
+
+            glm::vec3 p_gltf(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
+            glm::vec3 p_eng = glm::vec3(B * glm::vec4(p_gltf, 1.0f));
+
             VkVertex vertex;
-            vertex.position.x = mesh->mVertices[i].x;
-            vertex.position.y = mesh->mVertices[i].y;
-            vertex.position.z = mesh->mVertices[i].z;
+            vertex.position.x = p_eng.x;
+            vertex.position.y = p_eng.y;
+            vertex.position.z = p_eng.z;
 
             if (mesh->HasVertexColors(0)) {
                 vertex.color.r = mesh->mColors[0][i].r;
@@ -99,9 +106,13 @@ namespace aveng {
             }
 
             if (mesh->HasNormals()) {
-                vertex.normal.x = mesh->mNormals[i].x;
-                vertex.normal.y = mesh->mNormals[i].y;
-                vertex.normal.z = mesh->mNormals[i].z;
+
+                glm::vec3 n_gltf(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+                glm::vec3 n_eng = glm::normalize(glm::vec3(B * glm::vec4(n_gltf, 0.0f)));
+
+                vertex.normal.x = n_eng.x;
+                vertex.normal.y = n_eng.y;
+                vertex.normal.z = n_eng.z;
             }
             else {
                 vertex.normal = glm::vec4(0.0f);
@@ -119,10 +130,11 @@ namespace aveng {
             mMesh.vertices.emplace_back(vertex);
         }
 
+        // Packing Loop
         for (unsigned int i = 0; i < mTriangleCount; ++i) {
             aiFace face = mesh->mFaces[i];
             
-            // Validate face has at least 3 indices (should always be true after triangulation)
+            // Skip faces with fewer than 3 indices
             if (face.mNumIndices < 3) {
                 std::printf("%s warning: mesh '%s' face %u has only %u indices, skipping\n", 
                     __FUNCTION__, mMeshName.c_str(), i, face.mNumIndices);
@@ -149,14 +161,22 @@ namespace aveng {
         }
 
         if (mesh->HasBones()) {
+
+            const glm::mat4 B = Tools::gltfToEngine;
+
             unsigned int numBones = mesh->mNumBones;
-            // std::printf("%s: -- mesh has information about %i bones\n", __FUNCTION__, numBones);
+            
             for (unsigned int boneId = 0; boneId < numBones; ++boneId) {
+
                 std::string boneName = mesh->mBones[boneId]->mName.C_Str();
                 unsigned int numWeights = mesh->mBones[boneId]->mNumWeights;
-                // std::printf("%s: --- bone nr. %i has name %s, contains %i weights\n", __FUNCTION__, boneId, boneName.c_str(), numWeights);
 
-                std::shared_ptr<AssimpBone> newBone = std::make_shared<AssimpBone>(boneId, boneName, Tools::convertAiToGLM(mesh->mBones[boneId]->mOffsetMatrix));
+                glm::mat4 offset_gltf = Tools::convertAiToGLM(mesh->mBones[boneId]->mOffsetMatrix);
+                // Use the sandwich (B * M * inv(B)), not just B * M.
+                glm::mat4 offset_engine = B * offset_gltf * glm::inverse(B);
+
+                std::shared_ptr<AssimpBone> newBone = std::make_shared<AssimpBone>(boneId, boneName, offset_engine);
+
                 mBoneList.push_back(newBone);
 
                 for (unsigned int weight = 0; weight < numWeights; ++weight) {

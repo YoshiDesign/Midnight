@@ -26,7 +26,7 @@ namespace aveng {
         std::string mNodeName;
 
         /* use separate timinigs vectors, just in case not all keys have the same time */
-        std::vector<float> mTranslationTiminngs{};
+        std::vector<float> mTranslationTimings{};
         std::vector<float> mInverseTranslationTimeDiffs{};
         std::vector<float> mRotationTiminigs{};
         std::vector<float> mInverseRotationTimeDiffs{};
