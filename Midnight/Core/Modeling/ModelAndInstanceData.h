@@ -39,9 +39,7 @@ namespace aveng {
 
 		int miSelectedEditorInstance = 0;
 
-
-		/* we can only delete models in Vulkan outside the command buffers,
-		 * so let's use a separate pending list */
+		/* pending list for deletion - outside of command buffer recording */
 		std::unordered_set<std::shared_ptr<AvengModel>> miPendingDeleteAvengModels{};
 
 		// Filepaths pending loading
