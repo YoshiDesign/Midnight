@@ -135,6 +135,7 @@ namespace aveng {
 		}
 		else {
 #endif
+
 			renderer.updateLights();
 
 			renderer.drawModels(

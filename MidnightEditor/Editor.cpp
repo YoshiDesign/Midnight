@@ -200,6 +200,7 @@ namespace aveng {
 		swapchain->createEditorSelectionFramebuffers();
 	}
 
+	// TODO - Make this synonymous to the renderer's initialization.
 	void Editor::initialize(SwapChain* swapchain) 
 	{
 		// The primary renderpass, just in case

@@ -29,7 +29,7 @@ void main() {
   mat4 modelMat = worldPosMat[gl_InstanceIndex + worldPosOffset];
   vec4 positionWorld = modelMat * vec4(aPos.xyz, 1.0);
 
-  gl_Position = projection * view * modelMat * positionWorld;
+  gl_Position = projection * view * positionWorld;
   color = aColor;
   normal = transpose(inverse(modelMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
   texCoord = vec2(aPos.w, aNormal.w);
