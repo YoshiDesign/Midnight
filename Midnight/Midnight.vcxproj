@@ -254,6 +254,9 @@
     <ClInclude Include="Core\Renderer\TextureStreamingManager.h" />
     <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\UUID.h" />
+    <ClInclude Include="Runtime\Play\GameRegistry.h" />
+    <ClInclude Include="Runtime\Play\IGameInstance.h" />
+    <ClInclude Include="Runtime\Play\PlayManager.h" />
     <ClInclude Include="stb\stb_connected_components.h" />
     <ClInclude Include="stb\stb_c_lexer.h" />
     <ClInclude Include="stb\stb_divide.h" />

@@ -7,8 +7,9 @@
 #include "CoreVK/EngineDevice.h"
 #include "CoreVk/aveng_buffer.h"
 #include "System/Peripheral/KeyboardController.h"
+#include "Runtime/Play/PlayManager.h"
 
-namespace aveng {
+namespace xone {
 
 	class XOne {
 
@@ -25,18 +26,13 @@ namespace aveng {
 	private:
 
 		float frameTime;
-		// void testAnimationSystem();
-		// void updateAnimationSystem(float frameTime);
-		//void updateCamera(float frameTime, AvengAppObject& viewerObject, KeyboardController& cameraController, AvengCamera& camera);
-		//void updateData();
+		ObjectRenderSystem objectRenderSystem{};
 
 		/*
 		* !! Order of member initialization matters !!
 		* See: � 12.6.2 of the C++ Standard
 		*/
 		
-		ObjectRenderSystem objectRenderSystem{};
-	
 	};
 
 }

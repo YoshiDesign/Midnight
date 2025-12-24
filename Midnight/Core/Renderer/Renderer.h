@@ -19,6 +19,8 @@ namespace aveng {
 	class AssimpInstance;
 	class AvengModel;
 	class AvengWindow;
+	class CameraManager;
+	struct CameraTransform;
 
 	class Renderer {
 
@@ -26,7 +28,7 @@ namespace aveng {
 
 	public:
 
-		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData);
+		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData, CameraManager& cameraManager);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
@@ -144,6 +146,7 @@ namespace aveng {
 		void clearLights();
 
 		// void loadScenes(const char* filepath);
+		const CameraTransform& activeCameraTransform();
 
 		// Newest methods:
 		void beginGraphicsCommands(int currentFrameIndex);
@@ -166,6 +169,7 @@ namespace aveng {
 		// Engine systems
 		AvengWindow& aveng_window;
 		EngineDevice& engineDevice;
+		CameraManager& cameraManager;
 
 		VkResult err;
 		VkResult result;

@@ -1,45 +1,68 @@
 #include "avpch.h"
 #include "XOne.h"
 #include "Game/Math/aveng_math.h"
-#include "Utils/window_callbacks.h"
-#include "Game/Player/GameplayFunctions.h"
+#include "Game/Instance/HolyShip.h"
+#include "Game/Instance/Starfield.h"
+#ifdef ENABLE_EDITOR
+#include "EditorData.h"
+#endif
 
-namespace aveng {
+namespace xone {
 
-	// Dynamic Helpers on window callback keys
-	int WindowCallbacks::current_pipeline{ 1 };
-	glm::vec3 WindowCallbacks::modRot{ 0.0f, 0.0f, 0.0f };
-	glm::vec3 WindowCallbacks::modTrans{ 0.0f, 0.0f, 0.0f };
-	int WindowCallbacks::posNeg = 1;
-	bool WindowCallbacks::flightMode = false;
-	float WindowCallbacks::modPI = PI;
+	inline void RegisterGames(GameRegistry& registry, PlayManager& play) {
+		registry.registerGame("holyship", [&play]() {
+			return std::make_unique<HolyShip>(play);
+		});
+
+		registry.registerGame("starfield", [&play]() {
+			return std::make_unique<Starfield>(play);
+		});
+	}
 
 	XOne::XOne()
 	{
-
-		objectRenderSystem.initialize();		
-		// Testing 123
-		// testAnimationSystem();
+		objectRenderSystem.initialize(); // Note: objectRenderSystem owns all cameras
 	}
 
 	void XOne::run()
 	{
+
+		GameRegistry registry;
+		PlayManager play(registry);
+
+		// "Yo, Tank..."
+		RegisterGames(registry, play);
+
+		// play.requestPlay("holyship");
 
 		std::chrono::time_point<std::chrono::steady_clock> loopStartTime = std::chrono::steady_clock::now();
 		std::chrono::time_point<std::chrono::steady_clock> loopEndTime = std::chrono::steady_clock::now();
 
 		// Render Loop
 		while (!objectRenderSystem.shouldClose()) {
-
-			objectRenderSystem.render(frameTime);
-
 			// Potentially blocking
 			glfwPollEvents();
+
+			objectRenderSystem.updateInputState();
+			TickContext tick{ frameTime, objectRenderSystem.inputState() };
+
+			play.update(tick);
+			objectRenderSystem.render(frameTime);
 
 			// Calculate time between frames
 			loopEndTime = std::chrono::steady_clock::now();
 			frameTime = std::chrono::duration<float, std::chrono::seconds::period>(loopEndTime - loopStartTime).count();
 			loopStartTime = loopEndTime;
+
+#ifdef ENABLE_EDITOR
+			for (const auto cmd : objectRenderSystem.editorData().drainCommands()) {
+				switch (cmd.type) {
+				case aveng::EditorCommand::Type::RequestPlay: play.requestPlay(cmd.payload); break;
+				// case aveng::EditorCommand::Type::RequestStop: play.requestStop(); break;
+				default: break;
+				}
+			}
+#endif
 
 		}
 
@@ -47,10 +70,7 @@ namespace aveng {
 		vkDeviceWaitIdle(objectRenderSystem.getEngineDevice());
 	}
 
-	/*
-	* Test the new Assimp-based animation system
-	*/
-	
+
 
 	//void XOne::pendulum(EngineDevice& engineDevice, int _max_rows)
 	//{

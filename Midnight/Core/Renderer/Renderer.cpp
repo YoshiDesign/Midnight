@@ -10,6 +10,7 @@
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/aveng_window.h"
 #include "Core/aveng_model.h"
+#include "Game/Camera/CameraManager.h"
 #include <filesystem>
 #include <stdexcept>
 #include <iostream>
@@ -22,8 +23,8 @@
 
 namespace aveng {
 
-	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData)
-		: engineDevice{engineDevice}, aveng_window{ window }, renderData{ renderData }, mModelInstanceData{ mModelInstanceData }
+	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData, CameraManager& _cameraManager)
+		: engineDevice{ engineDevice }, aveng_window{ window }, renderData{ renderData }, mModelInstanceData{ mModelInstanceData }, cameraManager{ _cameraManager }
 	{
 
 		buffer_trash.clear();
@@ -90,7 +91,7 @@ namespace aveng {
 		mModelInstanceData.miInstanceCloneCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { cloneInstance(instance); };
 		mModelInstanceData.miInstanceCloneManyCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance, int numClones) { cloneInstances(instance, numClones); };
 
-		mModelInstanceData.miInstanceCenterCallbackFunctionEditor = [this](std::shared_ptr<AssimpInstance> instance) { centerInstance(instance); };
+		mModelInstanceData.miInstanceCenterCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { centerInstance(instance); };
 
 		{
 			/* Null model instance - Utility */
@@ -417,12 +418,17 @@ namespace aveng {
 		updateTriangleCount();
 	}
 
+	const CameraTransform& Renderer::activeCameraTransform() {
+		return cameraManager.active().transform;
+	}
+
 	void Renderer::centerInstance(std::shared_ptr<AssimpInstance> instance) {
 		InstanceSettings instSettings = instance->getInstanceSettings();
 
-		renderData.rdCameraWorldPosition = instSettings.isWorldPosition + glm::vec3(5.0f);
+		cameraManager.active().transform.translation = instSettings.isWorldPosition + glm::vec3(5.f, -2.f, 5.f);
+		//renderData.rdCameraWorldPosition = instSettings.isWorldPosition + glm::vec3(5.f, -5.f, 5.f);
 		/* hard-code values for now, reversing from lookAt() matrix is too much work */
-		// TODO - Use our camera's parameters, not these just yet.
+
 		renderData.rdViewAzimuth = 310.0f;
 		renderData.rdViewElevation = -15.0f;
 	}

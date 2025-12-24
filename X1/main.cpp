@@ -1,13 +1,12 @@
 #include "XOne.h"
 #include "avpch.h"
-// #include "Apps/Gravity.h"
 
 #define LOG(a) std::cout << a << std::endl
 
 int main(void)
 {
 
-	aveng::XOne app{};
+	xone::XOne app{};
 
 	try {
 		app.run();

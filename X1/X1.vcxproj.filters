@@ -36,13 +36,16 @@
     <ClCompile Include="System\Peripheral\KeyboardController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Game.cpp">
+    <ClCompile Include="Game\Instance\HolyShip.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Game\Camera\CameraManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Game\Camera\ICameraDriver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Instance\Starfield.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -80,7 +83,7 @@
     <ClInclude Include="System\Peripheral\KeyboardController.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Game.h">
+    <ClInclude Include="Game\Instance\HolyShip.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\data.h">
@@ -90,6 +93,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Camera\CameraManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Instance\Starfield.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

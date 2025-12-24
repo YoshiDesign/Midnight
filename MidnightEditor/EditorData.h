@@ -1,10 +1,33 @@
 #pragma once
 #include "CoreVK/VkRenderData.h"
 #include "Core/Modeling/AssimpInstance.h"
+#include "Game/Camera/CameraManager.h"
 
 namespace aveng {
 
+    // Editor sink to emit commands to XOne
+    struct EditorCommand {
+        enum class Type { RequestPlay, RequestStop, RequestPause, RequestResume } type;
+        std::string payload; // e.g. "holyship"
+    };
+
     struct EditorData {
+
+        std::vector<EditorCommand> commands;
+
+        void requestPlay(std::string_view game) {
+            commands.push_back({ EditorCommand::Type::RequestPlay, std::string(game) });
+        }
+        void requestStop() {
+            commands.push_back({ EditorCommand::Type::RequestStop, {} });
+        }
+
+        std::vector<EditorCommand> drainCommands() {
+            auto out = std::move(commands);
+            commands.clear();
+            return out;
+        }
+
         /* color hightlight for selection etc */
         std::vector<glm::vec2> eSelectedInstance{}; // Shader Uniform Data
 
@@ -16,6 +39,9 @@ namespace aveng {
         int eManyInstanceCloneNum = 1;
 
         std::shared_ptr<AssimpInstance> eCurrentSelectedInstance = nullptr;
+
+        CameraTransform cameraTransform{};
+        std::vector<CameraDebugInfo> cameraDebugList;
 
         bool eMousePick = false;
         bool eMouseLock = false;

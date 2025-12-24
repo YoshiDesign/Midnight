@@ -35,7 +35,8 @@ namespace aveng {
 	enum class ResidentMode { CPU, GPU };
 
 	// std::span<T> super-lightweight doppleganger. Used to create a window into our data
-	// so the Editor can report what on things
+	// so the Editor can access buffers.
+	// Don't forget that the same mapped buffer rules apply: don't randomly index into buffers with VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
 	template <typename T>
 	struct Span {
 		const T* data = nullptr;

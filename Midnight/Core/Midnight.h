@@ -5,7 +5,9 @@
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
 #include "Game/data.h"
+#ifdef ENABLE_EDITOR
 #include "Editor.h"
+#endif
 #include "avpch.h"
 
 namespace aveng {
@@ -42,6 +44,8 @@ namespace aveng {
 
 #ifdef ENABLE_EDITOR
 		void updateGUI(const InputState& state);
+		const EditorData&	editorData() const	{ return editor.data(); }
+		EditorData&			editorData()		{ return editor.data(); }
 #endif
 	private:
 
@@ -58,7 +62,7 @@ namespace aveng {
 		ModelAndInstanceData mModelInstanceData{};
 
 		// Engine & Renderer
-		Renderer renderer{ engineDevice, aveng_window, renderData, mModelInstanceData };
+		Renderer renderer{ engineDevice, aveng_window, renderData, mModelInstanceData, cameraManager };
 
 #ifdef ENABLE_EDITOR
 

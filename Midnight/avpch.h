@@ -10,6 +10,9 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <string_view>
+#include <string>
+#include <functional>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -23,5 +26,6 @@
 #include <cmath>
 #include <atomic>
 #include <cstdint>
+#include <unordered_map>
 
 #define DEBUG(what) std::cout << what << " " <<  __FILE__ << ":" << __LINE__ << std::endl

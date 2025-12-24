@@ -58,7 +58,7 @@ namespace aveng {
 		instanceCloneCallback miInstanceCloneCallbackFunction;
 		instanceCloneManyCallback miInstanceCloneManyCallbackFunction;
 
-		instanceCenterCallbackEditor miInstanceCenterCallbackFunctionEditor;
+		instanceCenterCallbackEditor miInstanceCenterCallbackFunction;
 	};
 
 }

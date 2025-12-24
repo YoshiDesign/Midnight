@@ -15,6 +15,18 @@
 
 namespace aveng {
 
+    /*
+    * Note that editorData is not pointer. If it were, we could hot-swap editor data (weaker invariant)
+    * Using a reference is cleaner/stronger invariance, but not without obvious limitations.
+    * If AvengImgui were able to exist without an Editor, a pointer could easily make more sense.
+    *
+        // Good for a hybrid approach. Use as a pointer with guarantees via editorData()
+        EditorData& editorData() {
+            assert(data_ && "EditorData not set");
+            return *data_;
+        }
+    */
+
     AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, EditorData& editorData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData)
         : renderData{ _renderData }, gameData{ _gameData }, 
         editorData{ editorData }, engineDevice { _engineDevice}, 
@@ -143,32 +155,46 @@ namespace aveng {
         }
 
         {
+
             ImGui::Begin("Debug");
 
             ImGui::Checkbox("Input Panel", &show_input_panel);
+            ImGui::Checkbox("All Cameras", &show_all_cameras);
 
             ImGui::Text(
                 "Last Click At: (%d, %d)", editorData.eMouseLastClickX, editorData.eMouseLastClickY);
             ImGui::Text(
-                "App Mode: %d", gameData.currentAppMode);
+                "App Mode: %s", (gameData.currentAppMode == AppMode::Editor) ? "Editor" : "Other");
+
             ImGui::Text(
-                "Camera View:\t\t(%.03lf, %.03lf, %.03lf)", gameData.cameraView.x, gameData.cameraView.y, gameData.cameraView.z);
+                "Camera Position:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.translation.x, editorData.cameraTransform.translation.y, editorData.cameraTransform.translation.z);
             ImGui::Text(
-                "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", gameData.cameraRot.x, gameData.cameraRot.y, gameData.cameraRot.z);
-            ImGui::Text(
-                "Camera Position:\t(%.03lf, %.03lf, %.03lf)", gameData.cameraPos.x, gameData.cameraPos.y, gameData.cameraPos.z);
-            ImGui::Text(
-                "Player Rotation:\t(%.03lf, %.03lf, %.03lf)", gameData.playerRot.x,gameData.playerRot.y, gameData.playerRot.z);
+                "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.rotation.x, editorData.cameraTransform.rotation.y, editorData.cameraTransform.rotation.z);
             ImGui::Text(
                 "Player Position:\t(%.03lf, %.03lf, %.03lf)", gameData.playerPos.x, gameData.playerPos.y, gameData.playerPos.z);
-            ImGui::Text(
-                "Mod Rotation:\t(%.03lf, %.03lf, %.03lf)", gameData.modRot.x, gameData.modRot.y, gameData.modRot.z);
-            ImGui::Text(
-                "Mod Position:\t(%.03lf, %.03lf, %.03lf)", gameData.modPos.x, gameData.modPos.y, gameData.modPos.z);
             ImGui::Text(
                 "Forward Direction:\t(%.03lf, %.03lf, %.03lf)", gameData.forwardDir.x, gameData.forwardDir.y, gameData.forwardDir.z);
 
             ImGui::Text("GFX-Pipe:\t%d", gameData.cur_pipe);
+            if (show_all_cameras) {
+                int i = 0;
+                ImGui::Text("_____________________________");
+                for (const auto& cam : editorData.cameraDebugList) {
+                    std::string name(cam.name);
+                    ImGui::Text("Camera ID[%d]:\t%s", i, name.c_str());
+                    ImGui::Text("Active:\t%d", cam.active);
+                    ImGui::Text(
+                        "Position:\t(%.03lf, %.03lf, %.03lf)",cam.transform.translation.x, cam.transform.translation.y, cam.transform.translation.z);
+                    ImGui::Text(
+                        "Rotation:\t(%.03lf, %.03lf, %.03lf)", cam.transform.rotation.x, cam.transform.rotation.y, cam.transform.rotation.z);
+                    ++i;
+                }
+                ImGui::Text("_____________________________");
+            }
+
+            if (ImGui::Button("Play HolyShip")) {
+                editorData.requestPlay("holyship");
+            }
 
             ImGui::End(); // End Debug window
         }
@@ -447,7 +473,6 @@ namespace aveng {
                     ImGui::EndDisabled();
                 }
 
-
                 if (ImGui::Button("Import Model")) {
                     IGFD::FileDialogConfig config;
                     config.path = ".";
@@ -615,12 +640,12 @@ namespace aveng {
                 if (ImGui::Button("Center This Instance")) {
                     std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
                     // Callback Function - Center Selected Instance
-                    modInstData.miInstanceCenterCallbackFunctionEditor(currentInstance);
+                    modInstData.miInstanceCenterCallbackFunction(currentInstance);
                 }
 
                 ImGui::SameLine();
 
-                /* we MUST retain the last model */
+                /* we MUST retain the last model - caps, I'd heed that sh*t */
                 unsigned int numberOfInstancesPerModel = 0;
                 if (modInstData.miAssimpInstances.size() > 1) {
                     std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
@@ -662,15 +687,21 @@ namespace aveng {
                 }
 
                 if (ImGui::Button("Create Multiple Clones")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                    // Callback function - Clone Many
-                    modInstData.miInstanceCloneManyCallbackFunction(currentInstance, editorData.eManyInstanceCloneNum);
 
-                    /* reset to last position for now */
-                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
+                    if (editorData.eManyInstanceCloneNum > 1) {
+                     
+                        std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
 
-                    /* read back settings for UI */
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                        // Callback function - Clone Many
+                        modInstData.miInstanceCloneManyCallbackFunction(currentInstance, editorData.eManyInstanceCloneNum);
+
+                        /* reset to last position for now */
+                        modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
+
+                        /* read back settings for UI */
+                        settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                    }
+   
                 }
                 ImGui::SameLine();
                 ImGui::SliderInt("##MassInstanceCloning", &editorData.eManyInstanceCloneNum, 1, 100, "%d", flags);

@@ -1,23 +1,12 @@
 #pragma once
 #include "Core/Midnight.h"
-#include "CoreVK/EngineDevice.h"
-#include "CoreVK/VkRenderData.h"
-#include "Core/Renderer/Renderer.h"
-#include "Core/Renderer/AvengFrame.h"
-#include "Core/Camera/aveng_camera.h"
-#include "Core/Input/IInputHandler.h"
-#include "Core/Input/InputSystem.h"
-#include "System/Peripheral/KeyboardController.h"
-#include "Game/Camera/CameraManager.h"
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
 #endif
 #include "avpch.h"
 
-namespace aveng {
-
-	class AvengWindow;
+namespace xone {
 
 	class ObjectRenderSystem {
 	public:
@@ -39,11 +28,18 @@ namespace aveng {
 		void render(float frameTime);
 
 		// Application-specific updates
-		void updateCamera(float frameTime, const InputState& state);
+		void updateCamera(float frameTime, const aveng::InputState& state);
 
 		VkDevice getEngineDevice() { return midnight.device(); }
 
 		bool shouldClose() { return midnight.shouldClose(); }
+
+		const aveng::InputState& inputState() { return midnight.inputState(); }
+		void updateInputState() { midnight.beginFrameInput(); }
+
+#ifdef ENABLE_EDITOR
+		aveng::EditorData& editorData() { return midnight.editorData(); }
+#endif
 
 	private:
 
@@ -53,9 +49,8 @@ namespace aveng {
 		int player_camera_id;
 
 		// Game & State
-		GameData gameData;
-		Game holyShip{ gameData };
-		Midnight midnight{ gameData };
+		aveng::GameData gameData; // This is a big design flaw at the moment. Don't rely on it
+		aveng::Midnight midnight{ gameData };
 
 	};
 

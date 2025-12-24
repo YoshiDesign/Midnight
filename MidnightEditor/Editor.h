@@ -35,33 +35,20 @@ namespace aveng {
 		void update(float frameTime, unsigned int frameIndex);
 		void renderGUI(float frameTime);
 		void updateLights();
-		void updateCamera(float frameTime);
 		void drawModels(int frameIndex);
 		void cleanup();
 		void destroyTrash();
 		void recreateFrameBuffers(SwapChain* swapchain);
 		void initializePointLights();
+		const EditorData& data() const	{ return editorData; }
+		EditorData& data()				{ return editorData; }
 
 		// void onModeSwitched(int frameIndex, AppMode& mode);
 
 		bool hasSelection() { return editorData.eHasSelection; }
 		bool hasClicked() { return editorData.eMousePick; }
 		void debug() {
-			std::cout << "miSelectedEditorModel: " << mModelInstanceData.miSelectedEditorModel << std::endl;
-			std::cout << "miSelectedEditorInstance: " << mModelInstanceData.miSelectedEditorInstance << std::endl;
-			std::cout << "has selection: " << editorData.eHasSelection << std::endl;
-			std::cout << "eHighlightSelectedInstance: " << editorData.eHighlightSelectedInstance << std::endl;
-			std::cout << "eCurrentSelectedInstance: " << editorData.eCurrentSelectedInstance << std::endl;
-			std::cout << "eSelectedInstance.size(): " << editorData.eSelectedInstance.size() << std::endl;
-
-			if (mModelInstanceData.miSelectedEditorInstance < editorData.eSelectedInstance.size()) {
-				std::cout << "eSelectedInstance[EditorInstance].y: " << editorData.eSelectedInstance[mModelInstanceData.miSelectedEditorInstance].y << std::endl;
-			}
-			else {
-				std::cout << "eSelectedInstance[EditorInstance].y: OUT OF BOUNDS (index: "
-					<< mModelInstanceData.miSelectedEditorInstance << ", size: "
-					<< editorData.eSelectedInstance.size() << ")" << std::endl;
-			}
+			/* Open to suggestions */
 		}
 
 		void readPixelDataPos();

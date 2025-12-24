@@ -49,6 +49,7 @@ namespace aveng {
         void updateInputState(const InputState& updateInputState);
 
 		bool show_input_panel = false;
+        bool show_all_cameras = false;
 		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 	private:

@@ -155,7 +155,8 @@
   <ItemGroup>
     <ClCompile Include="Game\Camera\CameraManager.cpp" />
     <ClCompile Include="Game\Camera\ICameraDriver.cpp" />
-    <ClCompile Include="Game\Game.cpp" />
+    <ClCompile Include="Game\Instance\HolyShip.cpp" />
+    <ClCompile Include="Game\Instance\Starfield.cpp" />
     <ClCompile Include="Game\Math\aveng_math.cpp" />
     <ClCompile Include="Game\Player\GameplayFunctions.cpp" />
     <ClCompile Include="main.cpp" />
@@ -168,7 +169,8 @@
     <ClInclude Include="Game\Camera\CameraManager.h" />
     <ClInclude Include="Game\Camera\ICameraDriver.h" />
     <ClInclude Include="Game\data.h" />
-    <ClInclude Include="Game\Game.h" />
+    <ClInclude Include="Game\Instance\HolyShip.h" />
+    <ClInclude Include="Game\Instance\Starfield.h" />
     <ClInclude Include="Game\Math\aveng_math.h" />
     <ClInclude Include="Game\Player\Action.h" />
     <ClInclude Include="Game\Player\Command.h" />

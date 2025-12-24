@@ -81,6 +81,16 @@ namespace aveng {
 
 		currentFrameIndex = frameIndex;
 
+		editorData.cameraTransform = cameraManager.active().transform;
+
+		editorData.cameraDebugList.clear();
+		editorData.cameraDebugList.reserve(cameraManager.cameraCount());
+
+		cameraManager.forEachCamera([&](const auto& cam) {
+			editorData.cameraDebugList.push_back({ cam.name, cam.transform, cam.active });
+		});
+
+
 		if (cameraManager.activeId() != editor_camera_id) {
 			std::cout << "Setting Editor as Active Camera..." << std::endl;
 			cameraManager.setActive(editor_camera_id);

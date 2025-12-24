@@ -3,7 +3,6 @@
 // #include "Core/Input/EventPayloads.h"
 #include "Core/Input/InputState.h"
 #include "Game/data.h"
-#include "Game/Game.h"
 
 namespace aveng {
 
@@ -14,8 +13,8 @@ namespace aveng {
         virtual void onKey(const KeyEvent&) = 0;
         virtual void onMouseMove(const MouseMoveEvent&) = 0;
 
-        // Editor Only
-        virtual void setMode(const AppMode& mode) { /* Base class, no-op*/ };
+        // Editor Only at the moment
+        virtual void setMode(const AppMode& mode) { /* Base class, no-op without editor enabled */ };
     };
 
     struct GameInput : IInputHandler {
@@ -91,7 +90,7 @@ namespace aveng {
             (mode == AppMode::Editor ? editor : game).onMouseMove(e);
         }
 
-        // Editor Only
+        // Editor Only at the moment
         void setMode(const AppMode& _mode) {
             mode = _mode;
         }
