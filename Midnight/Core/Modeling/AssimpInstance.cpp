@@ -1,11 +1,11 @@
 #include "AssimpInstance.h"
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "avpch.h"
 
 namespace aveng {
 
-    AssimpInstance::AssimpInstance(std::shared_ptr<AvengModel> model, glm::vec3 position, glm::vec3 rotation, float modelScale) : mAvengModel(model) {
+    AssimpInstance::~AssimpInstance() { mAvengModel = nullptr; }
+
+    AssimpInstance::AssimpInstance(AvengModel* model, glm::vec3 position, glm::vec3 rotation, float modelScale) : mAvengModel(model) {
         if (!model) {
             // std::printf("%s error: invalid model given\n", __FUNCTION__);
             return;
@@ -72,9 +72,26 @@ namespace aveng {
         updateModelRootMatrix();
     }
 
-    std::shared_ptr<AvengModel> AssimpInstance::getModel() {
-        return mAvengModel;
+    void AssimpInstance::setInstanceSettings(const InstanceSettings& settings) {
+        // Determine whether we actually need to recompute transforms
+        const bool transformDirty =
+            settings.isWorldPosition != mInstanceSettings.isWorldPosition ||
+            settings.isWorldRotation != mInstanceSettings.isWorldRotation ||
+            settings.isScale != mInstanceSettings.isScale ||
+            settings.isSwapYZAxis != mInstanceSettings.isSwapYZAxis;
+
+        // Always copy settings (anim changes are cheap & valid)
+        mInstanceSettings = settings;
+
+        // Only rebuild matrices if something transform-related changed
+        if (transformDirty) {
+            updateModelRootMatrix();
+        }
     }
+    
+    //std::shared_ptr<AvengModel> AssimpInstance::getModel() {
+    //    return mAvengModel;
+    //}
 
     glm::vec3 AssimpInstance::getWorldPosition() {
         return mInstanceSettings.isWorldPosition;
@@ -120,10 +137,10 @@ namespace aveng {
         return mInstanceSettings.isSwapYZAxis;
     }
 
-    void AssimpInstance::setInstanceSettings(InstanceSettings settings) {
-        mInstanceSettings = settings;
-        updateModelRootMatrix();
-    }
+    //void AssimpInstance::setInstanceSettings(InstanceSettings settings) {
+    //    mInstanceSettings = settings;
+    //    updateModelRootMatrix();
+    //}
 
     InstanceSettings AssimpInstance::getInstanceSettings() {
         return mInstanceSettings;

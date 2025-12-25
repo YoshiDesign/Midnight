@@ -12,13 +12,11 @@ namespace aveng {
 		VkRenderData& renderData,
 		GameData& gameData,
 		EngineDevice& engineDevice,
-		ModelAndInstanceData& modelInstanceData,
 		Editor* editor)
 		: renderer{ renderer }
 		, renderData{ renderData }
 		, gameData { gameData }
 		, engineDevice{ engineDevice }
-		, modelInstanceData{ modelInstanceData }
 		, pEditor{ editor }
 	{
 	}

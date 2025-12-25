@@ -423,6 +423,10 @@ namespace aveng {
 		return mTriangleCount;
 	}
 
+	unsigned int AvengModel::getTriangleCount() const {
+		return mTriangleCount;
+	}
+
 	const std::vector<VkShaderStorageBufferData>& AvengModel::getBoneMatrixOffsetBuffers() const {
 		return mShaderBoneMatrixOffsetBuffers;
 	}

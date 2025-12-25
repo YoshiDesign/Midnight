@@ -16,7 +16,6 @@ namespace aveng {
 			VkRenderData& renderData,
 			GameData& gameData,
 			EngineDevice& engineDevice,
-			ModelAndInstanceData& modelInstanceData,
 			Editor* editor = nullptr);
 
 		bool render(float deltaTime);
@@ -31,7 +30,6 @@ namespace aveng {
 		std::vector<VkCommandBuffer> commandBuffers;
 		bool drawGizmo = false;
 		VkResult result;
-		ModelAndInstanceData& modelInstanceData;
 		EngineDevice& engineDevice;
 		VkRenderData& renderData;
 		GameData& gameData;

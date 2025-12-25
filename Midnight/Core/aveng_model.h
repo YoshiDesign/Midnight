@@ -59,6 +59,7 @@ namespace aveng {
 		glm::mat4 getRootTranformationMatrix();
 		bool hasAnimations();
 		unsigned int getTriangleCount();
+		unsigned int getTriangleCount() const;
 
 		void drawInstancedV2(VkRenderData& renderData, VkPipelineLayout basicLayout, VkPipelineLayout animationLayout, uint32_t instanceCount, int frameIndex);
 

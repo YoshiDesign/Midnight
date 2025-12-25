@@ -24,10 +24,11 @@ namespace aveng {
 	class AvengWindow;
 	class Renderer;
 	class InputState;
+	class InstanceManager<>;
 
 	class Editor {
 	public:
-		Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData, CameraManager& _cameraManager);
+		Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, CameraManager& _cameraManager);
 		~Editor();
 
 
@@ -82,6 +83,17 @@ namespace aveng {
 		VkCommandBuffer getCurrentCommandBufferLines() const;
 
 		void updateInputState(const InputState& state);
+
+		template<class Tag>
+		void updateSelectionForPool(
+			aveng::InstanceManager<Tag>& mgr,
+			const std::vector<InstanceHandle<Tag>>& drawOrder,
+			std::vector<glm::vec2>& out,
+			const AnyHandle& selectedAny,
+			bool highlight,
+			float blinkValue);
+
+
 
 	private:
 

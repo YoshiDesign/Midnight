@@ -4,6 +4,7 @@
 #include "CoreVK/EngineDevice.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
+#include "Runtime/World/InstanceManager.h"
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
@@ -59,20 +60,22 @@ namespace aveng {
 		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
 		EngineDevice engineDevice{ aveng_window }; // Summon things to this world
 		VkRenderData renderData;
-		ModelAndInstanceData mModelInstanceData{};
+		
+		InstanceManager<StaticTag> staticMgr{ renderData, engineDevice };
+		InstanceManager<AnimatedTag> animMgr{ renderData, engineDevice };
 
 		// Engine & Renderer
-		Renderer renderer{ engineDevice, aveng_window, renderData, mModelInstanceData, cameraManager };
+		Renderer renderer{ engineDevice, aveng_window, renderData, cameraManager };
 
 #ifdef ENABLE_EDITOR
 
-		Editor editor{ renderData, renderer, game_data, engineDevice, aveng_window, mModelInstanceData, cameraManager };
+		Editor editor{ renderData, renderer, game_data, engineDevice, aveng_window, cameraManager };
 		EditorInput editorInput{ &editor };
 		EditorGameRouter inputRouter{ game_data.currentAppMode, editorInput, gameInput };
-		AvengFrame frame{ renderer, renderData, game_data, engineDevice, mModelInstanceData, &editor };
+		AvengFrame frame{ renderer, renderData, game_data, engineDevice, &editor };
 		InputSystem inputSystem{ inputRouter, game_data };
 #else
-		AvengFrame frame{ renderer, renderData, game_data, engineDevice, mModelInstanceData, nullptr };
+		AvengFrame frame{ renderer, renderData, game_data, engineDevice, nullptr };
 		InputSystem inputSystem{ gameInput, game_data };
 #endif
 

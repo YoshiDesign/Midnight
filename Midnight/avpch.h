@@ -10,6 +10,8 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <variant>
+#include <filesystem>
 #include <string_view>
 #include <string>
 #include <functional>
@@ -27,5 +29,7 @@
 #include <atomic>
 #include <cstdint>
 #include <unordered_map>
+
+#include "Utils/aveng_utils.h"
 
 #define DEBUG(what) std::cout << what << " " <<  __FILE__ << ":" << __LINE__ << std::endl

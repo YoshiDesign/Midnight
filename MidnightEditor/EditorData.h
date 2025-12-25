@@ -2,8 +2,15 @@
 #include "CoreVK/VkRenderData.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Game/Camera/CameraManager.h"
+#include "Core/Modeling/ModelAndInstanceData.h"
+#include "avpch.h"
 
 namespace aveng {
+
+    using StaticH = InstanceHandle<StaticTag>;
+    using AnimatedH = InstanceHandle<AnimatedTag>;
+
+    using AnyHandle = std::variant<AnimatedHandle, StaticHandle>;
 
     // Editor sink to emit commands to XOne
     struct EditorCommand {
@@ -12,6 +19,11 @@ namespace aveng {
     };
 
     struct EditorData {
+
+        // AssimpInstance* eCurrentSelectedInstance = nullptr;
+        AnyHandle selectedInstance{};
+        bool highlight = false;
+        float blink = 0.1f;
 
         std::vector<EditorCommand> commands;
 
@@ -30,6 +42,8 @@ namespace aveng {
 
         /* color hightlight for selection etc */
         std::vector<glm::vec2> eSelectedInstance{}; // Shader Uniform Data
+        std::vector<glm::vec2> selectedStatic;   // x = highlight factor, y = instanceIndexPosition (or whatever)
+        std::vector<glm::vec2> selectedAnim;
 
         bool eHighlightSelectedInstance = false;
         bool eHasSelection = false;
@@ -38,7 +52,9 @@ namespace aveng {
         int eManyInstanceCreateNum = 1;
         int eManyInstanceCloneNum = 1;
 
-        std::shared_ptr<AssimpInstance> eCurrentSelectedInstance = nullptr;
+
+        //int miSelectedEditorInstance = 0;
+
 
         CameraTransform cameraTransform{};
         std::vector<CameraDebugInfo> cameraDebugList;

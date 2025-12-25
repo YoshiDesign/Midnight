@@ -24,11 +24,9 @@ namespace aveng {
 
 	class Renderer {
 
-		void updateTriangleCount();
-
 	public:
 
-		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData, CameraManager& cameraManager);
+		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, CameraManager& cameraManager);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
@@ -63,18 +61,17 @@ namespace aveng {
 		bool queueModelLoad(const std::string& filepath);
 		void processPendingModelLoads();  // Call this before/after frames
 
-		// These functions might get moved to ObjectRenderSystem
-		bool hasModel(const std::string& modelFileName);
-		std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
-		bool addModel(const std::string& modelFileName);
-		void deleteModel(const std::string& modelFileName);
-		std::shared_ptr<AssimpInstance> addInstance(std::shared_ptr<AvengModel> model);
-		void addInstances(std::shared_ptr<AvengModel> model, int numInstances);
-		void deleteInstance(std::shared_ptr<AssimpInstance> instance);
-		void cloneInstance(std::shared_ptr<AssimpInstance> instance);
-		void cloneInstances(std::shared_ptr<AssimpInstance> instance, int numClones);
-		void centerInstance(std::shared_ptr<AssimpInstance> instance);
-		void assignInstanceIndices();
+		// These functions are removed to the InstanceManager
+		// bool hasModel(const std::string& modelFileName);
+		//std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
+		//bool addModel(const std::string& modelFileName);
+		//void deleteModel(const std::string& modelFileName);
+		//void addInstance(std::shared_ptr<AvengModel> model);
+		//void addInstances(std::shared_ptr<AvengModel> model, int numInstances);
+		//void deleteInstance(const InstanceHandle& instance);
+		//void cloneInstance(const InstanceHandle& instance);
+		//void cloneInstances(const InstanceHandle& instance, int numClones); // Pass a slot instead??
+		// void centerInstance(const InstanceHandle& handle);
 
 		bool createSSBOs();
 		bool createMatrixUBO();
@@ -205,9 +202,6 @@ namespace aveng {
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
 
 		std::vector<PendingBufferDestroy> buffer_trash;
-
-		// Renderer owns this
-		ModelAndInstanceData& mModelInstanceData; 
 
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 		VkPushConstants mModelData{};

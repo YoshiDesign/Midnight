@@ -47,10 +47,10 @@ void main() {
   vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0f);
   gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 
-  color = aColor * selected[gl_InstanceIndex + worldPosOffset].x;
+  color = aColor * selected[gl_InstanceIndex].x;
 
   /* draw the instance always on top when highlighted, helps to find it better */
-  if (selected[gl_InstanceIndex + worldPosOffset].x != 1.0f) {
+  if (selected[gl_InstanceIndex].x != 1.0f) {
     gl_Position.z -= 1.0f;
   }
 
@@ -59,5 +59,5 @@ void main() {
   fragPosWorld = positionWorld.xyz;
 
   /* we need vertex id only (z -> y) */
-  selectInfo = selected[gl_InstanceIndex + worldPosOffset].y;
+  selectInfo = selected[gl_InstanceIndex].y;
 }

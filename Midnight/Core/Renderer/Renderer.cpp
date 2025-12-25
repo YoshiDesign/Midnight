@@ -23,8 +23,8 @@
 
 namespace aveng {
 
-	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, ModelAndInstanceData& mModelInstanceData, CameraManager& _cameraManager)
-		: engineDevice{ engineDevice }, aveng_window{ window }, renderData{ renderData }, mModelInstanceData{ mModelInstanceData }, cameraManager{ _cameraManager }
+	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, CameraManager& _cameraManager)
+		: engineDevice{ engineDevice }, aveng_window{ window }, renderData{ renderData }, cameraManager{ _cameraManager }
 	{
 
 		buffer_trash.clear();
@@ -80,29 +80,8 @@ namespace aveng {
 			throw std::runtime_error("Failed to create sync objects");
 		}
 
-		/* register callbacks */
-		mModelInstanceData.miModelCheckCallbackFunction = [this](const std::string& fileName) { return hasModel(fileName); };
-		mModelInstanceData.miModelAddCallbackFunction = [this](const std::string& fileName) {/* return addModel(fileName);*/ return queueModelLoad(fileName); };
-		mModelInstanceData.miModelDeleteCallbackFunction = [this](const std::string& modelName) { deleteModel(modelName); };
-
-		mModelInstanceData.miInstanceAddCallbackFunction = [this](std::shared_ptr<AvengModel> model) { return addInstance(model); };
-		mModelInstanceData.miInstanceAddManyCallbackFunction = [this](std::shared_ptr<AvengModel> model, int numInstances) { addInstances(model, numInstances); };
-		mModelInstanceData.miInstanceDeleteCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { deleteInstance(instance); };
-		mModelInstanceData.miInstanceCloneCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { cloneInstance(instance); };
-		mModelInstanceData.miInstanceCloneManyCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance, int numClones) { cloneInstances(instance, numClones); };
-
-		mModelInstanceData.miInstanceCenterCallbackFunction = [this](std::shared_ptr<AssimpInstance> instance) { centerInstance(instance); };
-
-		{
-			/* Null model instance - Utility */
-			std::shared_ptr<AvengModel> nullModel = std::make_shared<AvengModel>(engineDevice);
-			mModelInstanceData.miModelList.emplace_back(nullModel);
-			std::cout << "Null Filename: " << nullModel->getModelFileName() << std::endl;
-			std::shared_ptr<AssimpInstance> nullInstance = std::make_shared<AssimpInstance>(nullModel);
-			mModelInstanceData.miAssimpInstancesPerModel[nullModel->getModelFileName()].emplace_back(nullInstance);
-			mModelInstanceData.miAssimpInstances.emplace_back(nullInstance);
-			assignInstanceIndices();
-		}
+		// Renderer's only callback registration - See InstanceManager for others
+		//mModelInstanceCallbacks.miInstanceCenterCallbackFunction = [this](const InstanceHandle& handle) { centerInstance(handle); };
 
 		/* signal graphics semaphores before doing anything else to be able to run compute submit */
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
@@ -171,293 +150,19 @@ namespace aveng {
 
 	}
 
-	bool Renderer::hasModel(const std::string& modelFileName) {
-		auto modelIter = std::find_if(mModelInstanceData.miModelList.begin(), mModelInstanceData.miModelList.end(),
-			[modelFileName](const auto& model) {
-			return model->getModelFileNamePath() == modelFileName || model->getModelFileName() == modelFileName;
-		});
-		return modelIter != mModelInstanceData.miModelList.end();
-	}
-
-	std::shared_ptr<AvengModel> Renderer::getModel(const std::string& modelFileName) {
-		auto modelIter = std::find_if(mModelInstanceData.miModelList.begin(), mModelInstanceData.miModelList.end(),
-			[modelFileName](const auto& model) {
-			return model->getModelFileNamePath() == modelFileName || model->getModelFileName() == modelFileName;
-		});
-		if (modelIter != mModelInstanceData.miModelList.end()) {
-			return *modelIter;
-		}
-		return nullptr;
-	}
-
-	bool Renderer::addModel(const std::string& modelFileName) {
-		
-		if (isFrameStarted) {
-			std::printf("ERROR: addModel called mid-frame!\n");
-			throw std::runtime_error("Internal error: model loading during frame");
-		}
-
-		if (hasModel(modelFileName)) {
-			std::printf("%s warning: model '%s' already existed, skipping\n", __FUNCTION__, modelFileName.c_str());
-			return false;
-		}
-
-		std::shared_ptr<AvengModel> model = std::make_shared<AvengModel>(engineDevice);
-		if (!model->loadModelV2(renderData, modelFileName)) {
-			std::printf("%s error: could not load model file '%s'\n", __FUNCTION__, modelFileName.c_str());
-			return false;
-		}
-
-		mModelInstanceData.miModelList.emplace_back(model);
-		addInstance(model);
-
-		// Maybe
-		//if (mModelInstanceData.miAssimpInstances.size() == 2) {
-		//	std::shared_ptr<AssimpInstance> firstInstance = mModelInstanceData.miAssimpInstances.at(1);
-		//	centerInstance(firstInstance);
-		//}
-
-		return true;
-	}
-
-	void Renderer::deleteModel(const std::string& modelFileName) {
-		std::string shortModelFileName = std::filesystem::path(modelFileName).filename().generic_string();
-
-		if (!mModelInstanceData.miAssimpInstances.empty()) {
-			mModelInstanceData.miAssimpInstances.erase(
-				std::remove_if(
-					mModelInstanceData.miAssimpInstances.begin(),
-					mModelInstanceData.miAssimpInstances.end(),
-					[shortModelFileName](std::shared_ptr<AssimpInstance> instance) {
-				return instance->getModel()->getModelFileName() == shortModelFileName;
-			}
-				),
-				mModelInstanceData.miAssimpInstances.end()
-			);
-		}
-
-		if (mModelInstanceData.miAssimpInstancesPerModel.count(shortModelFileName) > 0) {
-			mModelInstanceData.miAssimpInstancesPerModel[shortModelFileName].clear();
-			mModelInstanceData.miAssimpInstancesPerModel.erase(shortModelFileName);
-		}
-
-		/* add models to pending delete list */
-		for (const auto& model : mModelInstanceData.miModelList) {
-			if (model && (model->getTriangleCount() > 0)) {
-				mModelInstanceData.miPendingDeleteAvengModels.insert(model);
-			}
-		}
-
-		mModelInstanceData.miModelList.erase(
-			std::remove_if(
-				mModelInstanceData.miModelList.begin(),
-				mModelInstanceData.miModelList.end(),
-				[modelFileName](std::shared_ptr<AvengModel> model) {
-			return model->getModelFileName() == modelFileName;
-		}
-			)
-		);
-
-		updateTriangleCount();
-	}
-
-	bool Renderer::queueModelLoad(const std::string& filepath) {
-		mModelInstanceData.mPendingModelLoads.push_back(filepath);
-		std::printf("Queued model load (will load after current frame)\n");
-		return true;
-	}
-
-	void Renderer::processPendingModelLoads() {
-
-		if (mModelInstanceData.mPendingModelLoads.empty()) {
-			return;
-		}
-
-		for (const auto& filepath : mModelInstanceData.mPendingModelLoads) {
-			if (hasModel(filepath))
-			{
-				return;
-			}
-
-			std::printf("Processing queued model load: %s\n", filepath.c_str());
-			// if (!addModel(pending.filepath)) {
-			if (!addModel(filepath)) {
-				std::printf("Failed to load queued model: %s\n", filepath.c_str());
-			}
-			else {
-				/* select new model and new instance */
-				mModelInstanceData.miSelectedEditorModel = mModelInstanceData.miModelList.size() - 1;
-				mModelInstanceData.miSelectedEditorInstance = mModelInstanceData.miAssimpInstances.size() - 1;
-			}
-		}
-
-		mModelInstanceData.mPendingModelLoads.clear();
-	}
-
-	std::shared_ptr<AssimpInstance> Renderer::addInstance(std::shared_ptr<AvengModel> model) {
-		std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model);
-		mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
-		mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
-
-		assignInstanceIndices();
-		updateTriangleCount();
-
-		return newInstance;
-	}
-
-	void Renderer::addInstances(std::shared_ptr<AvengModel> model, int numInstances) {
-		if (model->hasAnimations()) {
-			size_t animClipNum = model->getAnimClips().size();
-			for (int i = 0; i < numInstances; ++i) {
-				int xPos = std::rand() % 50 - 25;
-				int zPos = std::rand() % 50 - 25;
-				int rotation = std::rand() % 360 - 180;
-				int clipNr = std::rand() % animClipNum;
-
-				std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model, glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
-				if (animClipNum > 0) {
-					InstanceSettings instSettings = newInstance->getInstanceSettings();
-					instSettings.isAnimClipNr = clipNr;
-					newInstance->setInstanceSettings(instSettings);
-				}
-
-				mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
-				mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
-			}
-		}
-		else {
-
-			for (int i = 0; i < numInstances; ++i) {
-				int xPos = std::rand() % 50 - 25;
-				int zPos = std::rand() % 50 - 25;
-				int rotation = std::rand() % 360 - 180;
-
-				std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model, glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
-
-				mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
-				mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
-			}
-		
-		}
-		
-		assignInstanceIndices();
-		updateTriangleCount();
-	}
-
-	void Renderer::deleteInstance(std::shared_ptr<AssimpInstance> instance) {
-		std::shared_ptr<AvengModel> currentModel = instance->getModel();
-		std::string currentModelName = currentModel->getModelFileName();
-
-		mModelInstanceData.miAssimpInstances.erase(
-			std::remove_if(
-				mModelInstanceData.miAssimpInstances.begin(),
-				mModelInstanceData.miAssimpInstances.end(),
-				[instance](std::shared_ptr<AssimpInstance> inst) {
-			return inst == instance;
-		}
-			));
-
-
-		mModelInstanceData.miAssimpInstancesPerModel[currentModelName].erase(
-			std::remove_if(
-				mModelInstanceData.miAssimpInstancesPerModel[currentModelName].begin(),
-				mModelInstanceData.miAssimpInstancesPerModel[currentModelName].end(),
-				[instance](std::shared_ptr<AssimpInstance> inst) {
-			return inst == instance;
-		}
-			));
-
-		assignInstanceIndices();
-		updateTriangleCount();
-	}
-
-	void Renderer::cloneInstance(std::shared_ptr<AssimpInstance> instance) {
-		std::shared_ptr<AvengModel> currentModel = instance->getModel();
-		std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(currentModel);
-		InstanceSettings newInstanceSettings = instance->getInstanceSettings();
-
-		/* slight offset to see new instance */
-		newInstanceSettings.isWorldPosition += glm::vec3(1.0f, 0.0f, -1.0f);
-		newInstance->setInstanceSettings(newInstanceSettings);
-
-		mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
-		mModelInstanceData.miAssimpInstancesPerModel[currentModel->getModelFileName()].emplace_back(newInstance);
-
-		assignInstanceIndices();
-		updateTriangleCount();
-	}
-
-	/* keep scaling and axis flipping */
-	void Renderer::cloneInstances(std::shared_ptr<AssimpInstance> instance, int numClones) {
-		std::shared_ptr<AvengModel> model = instance->getModel();
-		size_t animClipNum = model->getAnimClips().size();
-		for (int i = 0; i < numClones; ++i) {
-			int xPos = std::rand() % 50 - 25;
-			int zPos = std::rand() % 50 - 25;
-			int rotation = std::rand() % 360 - 180;
-
-			int clipNr = std::rand() % animClipNum;
-			float animSpeed = (std::rand() % 50 + 75) / 100.0f;
-
-			std::shared_ptr<AssimpInstance> newInstance = std::make_shared<AssimpInstance>(model);
-			InstanceSettings instSettings = instance->getInstanceSettings();
-			instSettings.isWorldPosition = glm::vec3(xPos, 0.0f, zPos);
-			instSettings.isWorldRotation = glm::vec3(0.0f, rotation, 0.0f);
-			if (animClipNum > 0) {
-				instSettings.isAnimClipNr = clipNr;
-				instSettings.isAnimSpeedFactor = animSpeed;
-			}
-
-			newInstance->setInstanceSettings(instSettings);
-
-			mModelInstanceData.miAssimpInstances.emplace_back(newInstance);
-			mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
-		}
-
-		assignInstanceIndices();
-		updateTriangleCount();
-	}
-
 	const CameraTransform& Renderer::activeCameraTransform() {
 		return cameraManager.active().transform;
 	}
 
-	void Renderer::centerInstance(std::shared_ptr<AssimpInstance> instance) {
-		InstanceSettings instSettings = instance->getInstanceSettings();
+	//void Renderer::centerInstance(const InstanceHandle& handle) {
+	//	InstanceSettings instSettings = mModelInstanceData.miInstanceSlots[handle.index].instance.getInstanceSettings();
 
-		cameraManager.active().transform.translation = instSettings.isWorldPosition + glm::vec3(5.f, -2.f, 5.f);
-		//renderData.rdCameraWorldPosition = instSettings.isWorldPosition + glm::vec3(5.f, -5.f, 5.f);
-		/* hard-code values for now, reversing from lookAt() matrix is too much work */
+	//	cameraManager.active().transform.translation = instSettings.isWorldPosition + glm::vec3(5.f, -2.f, 5.f);
+	//	//renderData.rdCameraWorldPosition = instSettings.isWorldPosition + glm::vec3(5.f, -5.f, 5.f);
+	//	/* hard-code values for now, reversing from lookAt() matrix is too much work */
 
-		renderData.rdViewAzimuth = 310.0f;
-		renderData.rdViewElevation = -15.0f;
-	}
-
-	void Renderer::assignInstanceIndices() {
-		std::cout << "ASSINGING INDICES:" << std::endl;
-		for (size_t i = 0; i < mModelInstanceData.miAssimpInstances.size(); ++i) {
-			std::cout 
-				<< "modInstanceData.miAssimpInstances[" 
-				<< i <<  "] " 
-				<< mModelInstanceData.miAssimpInstances.at(i)->getModel()->getModelFileName() 
-				<< std::endl;
-
-			InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(i)->getInstanceSettings();
-			instSettings.isInstanceIndexPosition = i;
-			mModelInstanceData.miAssimpInstances.at(i)->setInstanceSettings(instSettings);
-		}
-	}
-
-	void Renderer::updateTriangleCount() {
-		renderData.rdTriangleCount = 0;
-		for (const auto& instance : mModelInstanceData.miAssimpInstances) {
-			renderData.rdTriangleCount += instance->getModel()->getTriangleCount();
-		}
-	}
-
-	//void Renderer::loadScenes(const char* filepath)
-	//{
-
+	//	renderData.rdViewAzimuth = 310.0f;
+	//	renderData.rdViewElevation = -15.0f;
 	//}
 
 	/*
@@ -1271,7 +976,7 @@ namespace aveng {
 		/* calculate the size of the node matrix buffer over all animated instances */
 		boneMatrixBufferSize = 0;
 		for (const auto& model : mModelInstanceData.miModelList) {
-			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+			size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size();
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 
 				/* animated models */
@@ -1286,7 +991,7 @@ namespace aveng {
 
 		/* clear and resize world pos matrices */
 		mWorldPosMatrices.clear();
-		mWorldPosMatrices.resize(mModelInstanceData.miAssimpInstances.size());
+		mWorldPosMatrices.resize(mModelInstanceData.miInstanceSlots.size());
 		mNodeTransFormData.clear();
 		mNodeTransFormData.resize(boneMatrixBufferSize);
 
@@ -1297,7 +1002,7 @@ namespace aveng {
 
 		for (const auto& model : mModelInstanceData.miModelList) { //
 
-			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size(); // second is the vector of <shared_ptr> AssimpInstance
+			size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size(); // second is the vector of <shared_ptr> AssimpInstance
 
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 				/* animated models */
@@ -1314,19 +1019,18 @@ namespace aveng {
 					
 					// For each instance
 					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
-					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
+					for (const auto& instanceHandle : mModelInstanceData.miInstancesPerModel[model->getModelFileName()]) {
 
-						//auto& instance = instances[i];
+						mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.updateAnimation(deltaTime);
 
-						instance->updateAnimation(deltaTime);
-						std::vector<NodeTransformData> instanceNodeTransform = instance->getNodeTransformData();
+						std::vector<NodeTransformData> instanceNodeTransform = mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.getNodeTransformData();
 
 						// Copy the NodeTransform Data to the vector of NodeTransform datas. I didn't know you can use arithmetic with iterator access patterns. Nice
 						// STORAGE BUFFER DATA - Packed with every instance's data
 						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + instIndex * numberOfBones);
 
 						// STORAGE BUFFER DATA - Packed with every instance's data
-						mWorldPosMatrices.at(instanceToStore + instIndex) = instance->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+						mWorldPosMatrices.at(instanceToStore + instIndex) = mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.getWorldTransformMatrix(); // model Root Matrix SSBO data 
 						instIndex++;
 					}
 
@@ -1342,11 +1046,10 @@ namespace aveng {
 					/* non-animated models */
 					mMatrixGenerateTimer.start();
 					int instIndex = 0;
-					//std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
-					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
-					for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
-						//auto& instance = instances[i];
-						mWorldPosMatrices.at(instanceToStore + instIndex) = instance->getWorldTransformMatrix(); // model Root Matrix SSBO data 
+
+					for (const auto& instanceHandle : mModelInstanceData.miInstancesPerModel[model->getModelFileName()]) {
+		
+						mWorldPosMatrices.at(instanceToStore + instIndex) = mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.getWorldTransformMatrix(); // model Root Matrix SSBO data 
 						instIndex++;
 					}
 
@@ -1518,7 +1221,7 @@ namespace aveng {
 
 			uint32_t computeShaderModelOffset = 0;
 			for (const auto& model : mModelInstanceData.miModelList) {
-				size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+				size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size();
 				
 				if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
 
@@ -1637,7 +1340,7 @@ namespace aveng {
 		uint32_t skinMatOffset = 0;
 		for (const auto& model : mModelInstanceData.miModelList)
 		{
-			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+			size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size();
 			// std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
 
 			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 

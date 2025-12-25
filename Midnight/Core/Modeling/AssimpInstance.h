@@ -14,9 +14,12 @@
 namespace aveng {
     class AssimpInstance {
     public:
-        AssimpInstance(std::shared_ptr<AvengModel> model, glm::vec3 position = glm::vec3(0.0f), glm::vec3 rotation = glm::vec3(0.0f), float modelScale = 1.0f);
+        AssimpInstance(AvengModel* model, glm::vec3 position = glm::vec3(0.0f), glm::vec3 rotation = glm::vec3(0.0f), float modelScale = 1.0f);
 
         std::shared_ptr<AvengModel> getModel();
+        //AvengModel* getModel() { return mAvengModel; }
+        const AvengModel* getModel() const { return mAvengModel; }
+
         glm::vec3 getWorldPosition();
         glm::mat4 getWorldTransformMatrix();
 
@@ -32,14 +35,23 @@ namespace aveng {
 
         std::vector<NodeTransformData> getNodeTransformData();
 
-        void setInstanceSettings(InstanceSettings settings);
+        void setInstanceSettings(const InstanceSettings& settings);
+        // void setInstanceSettings(InstanceSettings settings);
+
         InstanceSettings getInstanceSettings();
 
         void updateModelRootMatrix();
         void updateAnimation(float deltaTime);
 
+        void setAnimClipNr(uint32_t clipNr) {
+            mInstanceSettings.isAnimClipNr = clipNr;
+        }
+
     private:
-        std::shared_ptr<AvengModel> mAvengModel = nullptr;
+        //std::shared_ptr<AvengModel> mAvengModel = nullptr;
+        AvengModel* mAvengModel = nullptr;
+        uint32_t generation = 0;
+        bool alive = false;
 
         InstanceSettings mInstanceSettings{};
 

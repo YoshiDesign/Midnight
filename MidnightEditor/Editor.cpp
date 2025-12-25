@@ -11,13 +11,14 @@
 #include "Core/Input/InputState.h"
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/AvengStorageBuffer.h"
+#include "Runtime/World/InstanceManager.h"
 #include <cassert>
 #include <stdexcept>
 
 namespace aveng {
 
-	Editor::Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, ModelAndInstanceData& modelInstanceData, CameraManager& _cameraManager)
-		: renderData{ _renderData }, renderer{ _renderer }, gameData{ _gameData }, engineDevice{ _engineDevice }, window{ window }, mModelInstanceData{ modelInstanceData }, cameraManager{ _cameraManager }
+	Editor::Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, CameraManager& _cameraManager)
+		: renderData{ _renderData }, renderer{ _renderer }, gameData{ _gameData }, engineDevice{ _engineDevice }, window{ window }, cameraManager{ _cameraManager }
 	{
 
 		// Register a camera
@@ -363,7 +364,7 @@ namespace aveng {
 		editorData.eCurrentSelectedInstance = nullptr;
 		if (editorData.eHighlightSelectedInstance) {
 
-			editorData.eCurrentSelectedInstance = mModelInstanceData.miAssimpInstances[mModelInstanceData.miSelectedEditorInstance];
+			editorData.eCurrentSelectedInstance = &mModelInstanceData.miAssimpInstances[mModelInstanceData.miSelectedEditorInstance];
 			editorData.eSelectHighlightValue += dt * 4.0f;
 
 			if (editorData.eSelectHighlightValue > 2.0f) {
@@ -383,6 +384,46 @@ namespace aveng {
 	void Editor::handleMouseMove(const MouseMoveEvent& e) {
 		aveng_imgui.handleMousePositionEvents(e.x, e.y, e.rmbDown);
 	}
+
+	template<class Tag>
+	void Editor::updateSelectionForPool(
+		aveng::InstanceManager<Tag>& mgr,
+		const std::vector<InstanceHandle<Tag>>& drawOrder,
+		std::vector<glm::vec2>& out,
+		const AnyHandle& selectedAny,
+		bool highlight,
+		float blinkValue)
+	{
+		ensureSize(out, drawOrder.size());
+
+		// default fill
+		for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
+			out[drawIdx].x = 1.0f;
+
+			if (auto* inst = mgr.get(drawOrder[drawIdx])) {
+				const auto s = inst->getInstanceSettings();
+				out[drawIdx].y = float(s.isInstanceIndexPosition);
+			}
+			else {
+				out[drawIdx].y = -1.0f;
+			}
+		}
+
+		if (!highlight) return;
+
+		// only highlight if the variant holds this pool's handle type
+		if (const auto* sel = std::get_if<InstanceHandle<Tag>>(&selectedAny)) {
+			// O(n) search in draw order (fine)
+			for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
+				if (drawOrder[drawIdx] == *sel) {
+					out[drawIdx].x = blinkValue;
+					break;
+				}
+			}
+		}
+	}
+
+
 
 	/*
 	* Find the instance that was selected
