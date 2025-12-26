@@ -95,21 +95,21 @@ namespace aveng {
 		staticMgr.setCallbacks({
 			.onDelete = [&](const StaticHandle& h) { staticMgr.deleteInstance(h); },
 			.onDeleteMany = [&](std::vector<const StaticHandle&> h) { staticMgr.deleteInstances(h); },
-			.onClone = [&](const StaticHandle& h) { staticMgr.cloneInstance(h);  },
+			.onClone = [&](const StaticHandle& h, AvengModel* m, const InstanceSettings& s) { staticMgr.cloneInstanceFrom(h, m, s);  },
 			.onCloneMany = [&](const StaticHandle& h, int n) { staticMgr.cloneInstances(h, n); },
 			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
-			.onInstanceAdd = [&](const ModelId& h) { staticMgr.addInstance(h); },
+			.onInstanceAdd = [&](const ModelRef& h) { staticMgr.createInstance(h); },
 			.onInstanceAddMany = [&](std::vector<const ModelId&> h, unsigned int n) { staticMgr.addInstances(h, n);  }
 		});
 
 		animMgr.setCallbacks({
 			.onDelete = [&](const AnimatedHandle& h) { animMgr.deleteInstance(h); },
-			.onDeleteMany = [&](std::vector < const AnimatedHandle&> h) { animMgr.deleteInstances(h); },
-			.onClone = [&](const AnimatedHandle& h) { animMgr.cloneInstance(h);  },
+			.onDeleteMany = [&](std::vector<const AnimatedHandle&> h) { animMgr.deleteInstances(h); },
+			.onClone = [&](const AnimatedHandle& h, AvengModel* m, const InstanceSettings& s) { animMgr.cloneInstanceFrom(h, m, s);  },
 			.onCloneMany = [&](const AnimatedHandle& h, int n) { animMgr.cloneInstances(h, n); },
-			// .onCenter = [&](const AnimatedHandle& h) { editor_->centerOn(h); }
-			.onInstanceAdd = [&](const ModelId& h) { animMgr.addInstance(h); },
-			.onInstanceAddMany = [&](std::vector<const ModelId&> h, unsigned int n) { animMgr.addInstances(h, n);  }
+			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
+			.onInstanceAdd = [&](const ModelRef& h) { animMgr.createInstance(h); },
+			.onInstanceAddMany = [&](std::vector<const ModelId&> h, unsigned int n) { animMgr.addInstances(h, n); }
 		});
 
 	}

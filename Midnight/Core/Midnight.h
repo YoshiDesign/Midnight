@@ -78,8 +78,8 @@ namespace aveng {
 		Renderer renderer;
 
 		// Instance managers depend on renderData + engineDevice (as you have)
-		InstanceManager<StaticTag, AvengInstance>   staticMgr;
-		InstanceManager<AnimatedTag, AssimpInstance> animMgr;
+		InstanceManager<StaticTag>   staticMgr;
+		InstanceManager<AnimatedTag> animMgr;
 
 		ModelAndInstanceCallbacks static_cb{};
 		ModelAndInstanceCallbacks anim_cb{};

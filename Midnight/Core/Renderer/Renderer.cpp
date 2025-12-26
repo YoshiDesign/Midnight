@@ -93,6 +93,22 @@ namespace aveng {
 			throw std::runtime_error("Failed to create sync objects");
 		}
 
+		{
+			/* I feel like this causes the need for more resource mgmt that could be obviated... 
+				We have null-instances too.
+			*/
+			// Register a null model for "no selected models"
+			ModelEntry entry;
+			entry.id = 0;
+			entry.key = "null";
+			entry.model.reset();
+			entry.isAnimated = false;
+
+			modelDb_.models.emplace_back(std::move(entry));
+			modelDb_.idByKey.emplace("null", 0);
+			modelDb_.indexById.emplace(0, 0);
+		}
+
 		// Renderer's only callback registration - See InstanceManager for others
 		//mModelInstanceCallbacks.miInstanceCenterCallbackFunction = [this](const InstanceHandle& handle) { centerInstance(handle); };
 
@@ -162,6 +178,12 @@ namespace aveng {
 		);
 
 	}
+
+	void Renderer::setInstanceViews(const InstancePoolData<StaticTag>& stat, const InstancePoolData<AnimatedTag>& anim)
+	{
+		stat_ = &stat;
+		anim_ = &anim;
+	}
 	
 	// Queue any model type for loading
 	//bool Renderer::queueModelLoad(const std::string& filepath) {
@@ -181,7 +203,7 @@ namespace aveng {
 		queue.swap(modelDb_.pendingLoads); // O(1) cool
 
 		bool anyLoaded = false;
-		ModelId lastLoadedId = InvalidModelId;
+		ModelId lastLoadedId = NullModelId;
 
 		for (const AssetKey& key : queue) {
 			auto it = modelDb_.idByKey.find(key);
@@ -237,7 +259,7 @@ namespace aveng {
 		}
 
 		// Arbitrary
-		if (anyLoaded && lastLoadedId != InvalidModelId) {
+		if (anyLoaded && lastLoadedId != NullModelId) {
 			// After uploading latest model, make it the editor's currently selected model
 			modelDb_.selectedModel = lastLoadedId;
 		}

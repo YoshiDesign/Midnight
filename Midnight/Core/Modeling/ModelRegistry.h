@@ -33,6 +33,6 @@ namespace aveng {
 	//};
 
 
-	constexpr ModelId InvalidModelId = 0;
+	constexpr ModelId NullModelId = 0;
 
 }

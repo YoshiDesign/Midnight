@@ -23,23 +23,15 @@ namespace aveng {
     class AvengModel;
     class EngineDevice;
 
-    template<class Tag, class InstanceT>
+    template<class Tag>
     class InstanceManager {
-
-        using Instance      = InstanceT;
-        using Handle        = InstanceHandle<Tag>;
-        using Slot          = InstanceSlot<Tag, InstanceT>;
-        using InstanceData  = InstancePoolData<Tag>;
-        using InstanceCallbacks = InstanceCallbacksPerPool<Handle>;
-
-        InstanceCallbacks   callbacks_{};
-        InstanceData        instanceData_{};
-        ModelRegistryData   modelData_{};
-        VkRenderData&       renderData;
-        EngineDevice&       engineDevice;
-        
-
     public:
+
+        using Handle = InstanceHandle<Tag>;
+        using Instance = InstanceFor<Tag>;
+        using Slot = InstanceSlot<Instance>;
+        using InstanceData = InstancePoolData<Tag>;
+        using InstanceCallbacks = InstanceCallbacksPerPool<Handle>;
 
         void setCallbacks(InstanceCallbacks callbacks) {
             callbacks_ = std::move(callbacks);
@@ -58,7 +50,7 @@ namespace aveng {
         const std::vector<Slot>& slots() const { return instanceData_.slots; }
 
         /* If renderer needs per-model groups: */ 
-        const std::unordered_map<std::string, std::vector<Handle>>& instancesPerModel() const { return instanceData_.instancesPerModel; }
+        const std::unordered_map<ModelId, std::vector<Handle>>& instancesPerModel() const { return instanceData_.instancesPerModel; }
 
         /* Ctor */
         explicit InstanceManager(VkRenderData& renderData_, EngineDevice& engineDevice_)
@@ -69,7 +61,8 @@ namespace aveng {
                 std::shared_ptr<AvengModel> nullModel = std::make_shared<AvengModel>(engineDevice);
                 modelData_.models.emplace_back(nullModel);
 
-                Instance nullInstance = Instance(nullModel.get());
+                // Note: Manually setting the modelId for the null-instance
+                Instance nullInstance = Instance(0, nullModel.get());
 
                 Slot slot = {
                     nullInstance, // instance
@@ -83,7 +76,7 @@ namespace aveng {
                 };
 
                 // NOTE: We probably won't need to keep null instance in instancesPerModel anymore - test later
-                instanceData_.instancesPerModel[nullModel->getModelFileName()].emplace_back(handle);
+                instanceData_.instancesPerModel[0].emplace_back(handle);
                 instanceData_.slots.emplace_back(slot);
                 // assignInstanceIndices();
             }
@@ -133,7 +126,6 @@ namespace aveng {
     public:
 
         /* get() */
-        template<class Tag>
         Instance* get(Handle h) {
             if (h.generation == 0) return nullptr;
             if (h.index >= instanceData_.slots.size()) return nullptr;
@@ -141,13 +133,13 @@ namespace aveng {
             auto& slot = instanceData_.slots[h.index];
             if (!slot.alive) return nullptr;
             if (slot.generation != h.generation) return nullptr;
+            if (!slot.instance.has_value()) return nullptr;
 
-            return &slot.instance;
+            return &slot.instance.value();
         }
 
         /* get() const - only safe if the non-const get() does not actually modify the manager 
         (and doesn’t return a mutable reference that would be used to modify through a const object). */
-        template<class Tag>
         const Instance* get(Handle h) const {
             return const_cast<InstanceManager*>(this)->get(h);
         }
@@ -404,6 +396,14 @@ namespace aveng {
             int zPos = (std::rand() % 50 - 25) + origin.z;
             return { xPos, 0.0f, zPos };
         }
+
+    private:
+
+        InstanceCallbacks   callbacks_{};
+        InstanceData        instanceData_{};
+        ModelRegistryData   modelData_{};
+        VkRenderData& renderData;
+        EngineDevice& engineDevice;
 
     };
 }

@@ -27,6 +27,7 @@ namespace aveng {
 	class CameraManager;
 	struct CameraTransform;
 
+	// The renderer is something of a "ModelManager" too, for now
 	class Renderer {
 
 	public:
@@ -36,17 +37,19 @@ namespace aveng {
 
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
+		//bool queueModelLoad(const std::string& filepath);
+		// std::shared_ptr<AvengModel> getOrLoadModelPtr(std::string_view assetKeyView);
+
+		/* Callback definitions */
+		ModelRef getOrLoadModel(const AssetKey& key);
+		bool addModel(const std::string& modelFileName); // OLD
+		void deleteModel(const std::string& modelFileName);
 
 		void initialize();
+		void setInstanceViews(const InstancePoolData<StaticTag>& stat, const InstancePoolData<AnimatedTag>& anim);
 		std::string baseDirForAssetKey(const AssetKey& key) const;
-		// The renderer is something of a "ModelManager" too, for now
 		void processPendingModelLoads();  // Call this in between frames
-		bool queueModelLoad(const std::string& filepath);
 		std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
-		ModelRef getOrLoadModel(const AssetKey& key);
-		// std::shared_ptr<AvengModel> getOrLoadModelPtr(std::string_view assetKeyView);
-		bool addModel(const std::string& modelFileName);
-		void deleteModel(const std::string& modelFileName);
 		bool hasModel(const std::string& modelFileName);
 		std::shared_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
 
@@ -230,6 +233,9 @@ namespace aveng {
 
 		std::string contentRoot_ = "Assets"; // or "." or absolute
 		std::string textureRoot_ = "textures"; // relative to contentRoot_
+
+		const InstancePoolData<StaticTag>* stat_ = nullptr;
+		const InstancePoolData<AnimatedTag>* anim_ = nullptr;
 
 	};
 
