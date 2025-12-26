@@ -9,6 +9,7 @@
 #include <string>
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/Modeling/AvengInstance.h"
+#include "Core/Modeling/Sources/IModelSource.h"
 
 namespace aveng {
 	// forward declaration
@@ -22,6 +23,14 @@ namespace aveng {
 		uint32_t generation = 0;
 		explicit operator bool() const { return generation != 0; } // Generation begins at 1
 	};
+
+	// These two tags allow us to safely use typed instances of InstanceManager (or whoever needs em)
+	// We're creating 2 unique type-aliases to satisfy a specific template type for ModelAndInstanceCallbacks
+	struct AnimatedTag {};
+	using AnimatedHandle = InstanceHandle<AnimatedTag>;
+
+	struct StaticTag {};
+	using StaticHandle = InstanceHandle<StaticTag>;
 
 	// Declaring this outside of the struct to symbolize their lack of functional logic
 	// They carry no behavior, and don't mutate. They are simple values. Keeps InstanceHandles purely data.
@@ -40,52 +49,55 @@ namespace aveng {
 		return !(a == b);
 	}
 
-	struct AnimatedTag {};
-	using AnimatedHandle = InstanceHandle<AnimatedTag>;
-
-	struct StaticTag {};
-	using StaticHandle = InstanceHandle<StaticTag>;
-
-	// Identified by InstanceHandle
-	template <class T>
+	// Important: Tag is not required here, but it prevents accidental cross-pool misuse. The compiler will catch it.
+	template <class Tag/*phantom type*/, class InstanceT>
 	struct InstanceSlot {
-		std::optional<T> instance;
+		std::optional<InstanceT> instance;
 		uint32_t generation = 1;
 		bool alive = false;
 	};
 
 	/* 
-	* Critical invariant: 
+	* TODO: refactoring- 
 	*	instanceSettings.isInstanceIndexPosition == index in miInstancesInOrder
+	* Audit this prior relationship
 	*/
-	template<class Tag>
-	struct ModelAndInstanceData {
 
-		using Handle = InstanceHandle<Tag>
+	struct ModelRegistryData {
+		std::vector<ModelEntry> models;
+		std::unordered_map<AssetKey, ModelId> idByKey;
+		std::unordered_map<ModelId, size_t> indexById;
 
-		// A list of the unique models currently loaded
-		std::vector<std::shared_ptr<AvengModel>> miModelList{};
-		int miSelectedEditorModel = 0;
+		std::vector<AssetKey> pendingLoads;
+		std::vector<ModelId> pendingUnload;
 
-		// Pools
-		std::vector<InstanceSlot<Handle>> miInstanceSlots{};
-		std::vector<uint32_t> miFreeIndices{}; // uint32_t slotIndex values (indices into miInstanceSlots)
-		std::vector<uint32_t> miActiveIndices{}; // uint32_t slotIndex values (indices into miInstanceSlots)
-		// Views / indexing
-		std::vector<StaticHandle> miInstancesInOrder{};
-		std::unordered_map<std::string, std::vector<Handle>> miInstancesPerModel{};
-
-		/* pending list for deletion - outside of command buffer recording */
-		std::unordered_set<std::shared_ptr<AvengModel>> miPendingDeleteAvengModels{};
-
-		// Filepaths pending loading
-		std::vector<std::string> mPendingModelLoads;
-
+		std::optional<ModelId> selectedModel;
 	};
 
-	// Templated callbacks
+	template<class Tag>
+	struct InstancePoolData {
+		using Handle = InstanceHandle<Tag>;
+		using Slot = InstanceSlot<typename InstanceTypeFor<Tag>::type>;
+
+		std::vector<Slot> slots{};
+		std::vector<uint32_t> free{};
+		std::vector<uint32_t> active{};
+
+		std::vector<Handle> instancesInOrder{};
+		std::unordered_map<ModelId, std::vector<Handle>> instancesPerModel;
+
+		int selectedEditorInstance = 0;
+	};
+
+	// Templated callbacks - Instances
+	template<class HandleT>
+	using instanceAddCallback = std::function<void(const ModelId)>;
+	template<class HandleT>
+	using instanceAddManyCallback = std::function<void(std::vector<const ModelId&> h, unsigned int n)>;
 	template<class HandleT>
 	using instanceDeleteCallback = std::function<void(const HandleT&)>;
+	template<class HandleT>
+	using instanceDeleteManyCallback = std::function<void(std::vector<const HandleT&> v)>;
 	template<class HandleT>
 	using instanceCloneCallback = std::function<void(const HandleT&)>;
 	template<class HandleT>
@@ -93,28 +105,31 @@ namespace aveng {
 	template<class HandleT>
 	using instanceCenterCallbackEditor = std::function<void(const HandleT&)>;
 
-	// Callbacks based on model. These will validate between Anim/Static. I think
+	// Model Callbacks
 	using modelCheckCallback = std::function<bool(std::string)>;
 	using modelAddCallback = std::function<bool(std::string)>;
 	using modelDeleteCallback = std::function<void(std::string)>;
-	using instanceAddCallback = std::function<void(std::shared_ptr<AvengModel>)>;
-	using instanceAddManyCallback = std::function<void(std::shared_ptr<AvengModel>, int)>;
 
+	template<class HandleT>
+	struct InstanceCallbacksPerPool {
+		
+		instanceDeleteCallback<HandleT>     onDelete;
+		instanceDeleteManyCallback<HandleT> onDeleteMany;
+		instanceCloneCallback<HandleT>      onClone;
+		instanceCloneManyCallback<HandleT>  onCloneMany;
+		instanceCenterCallbackEditor<HandleT>	onCenter;
+		instanceAddCallback<HandleT>			onInstanceAdd;
+		instanceAddManyCallback<HandleT>		onInstanceAddMany;
+	};
+
+	// This goes to Midnight
 	struct ModelAndInstanceCallbacks {
-		modelCheckCallback miModelCheckCallbackFunction;
-		modelAddCallback miModelAddCallbackFunction;
-		modelDeleteCallback miModelDeleteCallbackFunction;
-		instanceAddCallback miInstanceAddCallbackFunction;
-		instanceAddManyCallback miInstanceAddManyCallbackFunction;
+		modelCheckCallback  onModelCheck;
+		modelAddCallback    onModelAdd;
+		modelDeleteCallback onModelDelete;
 
-		instanceDeleteCallback<AnimatedHandle> miInstanceDeleteCallbackFunction;
-		instanceDeleteCallback<StaticHandle> miInstanceDeleteCallbackFunction;
-		instanceCloneCallback<AnimatedHandle> miInstanceCloneCallbackFunction;
-		instanceCloneCallback<StaticHandle> miInstanceCloneCallbackFunction;
-		instanceCloneManyCallback<AnimatedHandle> miInstanceCloneManyCallbackFunction;
-		instanceCloneManyCallback<StaticHandle> miInstanceCloneManyCallbackFunction;
-		instanceCenterCallbackEditor<StaticHandle> miInstanceCenterCallbackFunction;
-		instanceCenterCallbackEditor<AnimatedHandle> miInstanceCenterCallbackFunction;
+		InstanceCallbacksPerPool<AnimatedHandle> anim;
+		InstanceCallbacksPerPool<StaticHandle>   stat;
 	};
 
 }

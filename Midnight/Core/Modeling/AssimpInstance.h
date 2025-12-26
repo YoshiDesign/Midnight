@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 #include "Utils/glm_includes.h"
-
+#include "Core/Modeling/ModelRegistry.h"
 #include "Core/aveng_model.h"
 #include "./AssimpNode.h"
 #include "./AssimpBone.h"
@@ -14,10 +14,9 @@
 namespace aveng {
     class AssimpInstance {
     public:
-        AssimpInstance(AvengModel* model, glm::vec3 position = glm::vec3(0.0f), glm::vec3 rotation = glm::vec3(0.0f), float modelScale = 1.0f);
+        AssimpInstance(ModelId mid, AvengModel* model, glm::vec3 position = glm::vec3(0.0f), glm::vec3 rotation = glm::vec3(0.0f), float modelScale = 1.0f);
 
-        std::shared_ptr<AvengModel> getModel();
-        //AvengModel* getModel() { return mAvengModel; }
+        AvengModel* getModel() { return mAvengModel; }
         const AvengModel* getModel() const { return mAvengModel; }
 
         glm::vec3 getWorldPosition();
@@ -47,9 +46,13 @@ namespace aveng {
             mInstanceSettings.isAnimClipNr = clipNr;
         }
 
+        ModelId modelId() const { return modelId_; }
+
     private:
-        //std::shared_ptr<AvengModel> mAvengModel = nullptr;
+
+        ModelId modelId_ = 0; // Never derive it from AvengModel*, never ask the model for it later.
         AvengModel* mAvengModel = nullptr;
+
         uint32_t generation = 0;
         bool alive = false;
 

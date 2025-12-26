@@ -5,6 +5,7 @@
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
 #include "Runtime/World/InstanceManager.h"
+#include "Core/Modeling/Sources/FilesystemModelSource.h"
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
@@ -22,13 +23,18 @@ namespace aveng {
 		Midnight(GameData& _gamedata);
 		~Midnight() = default;
 
-		void beginFrameInput() { inputSystem.beginFrame(); }
+		void initialize();
+		void initializeDependencies();
 
-		const InputState& inputState() { return inputSystem.inputState(); }
+		void beginFrameInput() { inputSystem_->beginFrame(); }
+
+		const InputState& inputState() { return inputSystem_->inputState(); }
 
 		// Editor Only
 		const AppMode mode() { return game_data.currentAppMode; }
 		// Editor Only
+
+		std::unique_ptr<IModelSource> createModelSource();
 
 		const VkDevice device() { return engineDevice.device(); }
 
@@ -43,41 +49,65 @@ namespace aveng {
 		bool shouldClose() { return aveng_window.shouldClose(); }
 		float getAspectRatio() { return renderer.getAspectRatio(); }
 
+		void registerInstanceManagerCallbacks();
+
 #ifdef ENABLE_EDITOR
 		void updateGUI(const InputState& state);
-		const EditorData&	editorData() const	{ return editor.data(); }
-		EditorData&			editorData()		{ return editor.data(); }
+		const EditorData&	editorData() const	{ return editor_->data(); }
+		EditorData&			editorData()		{ return editor_->data(); }
 #endif
 	private:
-
-		float aspect;
+		// ---- External state
 		GameData& game_data;
-		GameInput gameInput; // Not exactly useful at the moment - game gets a const ref of InputState 
 
+		// ---- Core state (order matters!)
+		float aspect = 0.0f;
 		CameraManager cameraManager;
-		
-		// Move these to Midnight
-		AvengWindow aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
-		EngineDevice engineDevice{ aveng_window }; // Summon things to this world
-		VkRenderData renderData;
-		
-		InstanceManager<StaticTag> staticMgr{ renderData, engineDevice };
-		InstanceManager<AnimatedTag> animMgr{ renderData, engineDevice };
 
-		// Engine & Renderer
-		Renderer renderer{ engineDevice, aveng_window, renderData, cameraManager };
+		// Window must exist before EngineDevice (surface/device)
+		AvengWindow  aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
+		EngineDevice engineDevice{ aveng_window };
+
+		// Render data depends on device/window typically
+		VkRenderData renderData{};
+
+		// Model source lifetime owned by Midnight, passed into Renderer
+		std::unique_ptr<IModelSource> modelSource_;
+
+		// Renderer consumes device/window/renderData/cameraManager/modelSource
+		Renderer renderer;
+
+		// Instance managers depend on renderData + engineDevice (as you have)
+		InstanceManager<StaticTag, AvengInstance>   staticMgr;
+		InstanceManager<AnimatedTag, AssimpInstance> animMgr;
+
+		ModelAndInstanceCallbacks static_cb{};
+		ModelAndInstanceCallbacks anim_cb{};
+
+		// Input
+		GameInput gameInput;
 
 #ifdef ENABLE_EDITOR
-
-		Editor editor{ renderData, renderer, game_data, engineDevice, aveng_window, cameraManager };
-		EditorInput editorInput{ &editor };
-		EditorGameRouter inputRouter{ game_data.currentAppMode, editorInput, gameInput };
-		AvengFrame frame{ renderer, renderData, game_data, engineDevice, &editor };
-		InputSystem inputSystem{ inputRouter, game_data };
-#else
-		AvengFrame frame{ renderer, renderData, game_data, engineDevice, nullptr };
-		InputSystem inputSystem{ gameInput, game_data };
+		// Prefer pointers/optional to avoid duplicating big member-init lists
+		std::unique_ptr<Editor> editor_;
+		std::unique_ptr<EditorInput> editorInput_;
+		std::unique_ptr<EditorGameRouter> inputRouter_;
 #endif
+
+		std::unique_ptr<InputSystem> inputSystem_;
+		std::unique_ptr<AvengFrame>  frame_;
+
+		// std::shared_ptr<AvengFrame> someFrame // do not do this elsewhere!!
+
+		/*
+		* Note to self:
+		* Stack allocate when 
+		*	Object is trivial
+			Object has no optional lifetime - probably the biggest factor due to the many implications
+			Object has no rebuild path
+			Object does not depend on editor/game mode
+			Object does not touch GPU resources
+		*/
 
 	};
 

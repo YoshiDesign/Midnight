@@ -1,10 +1,11 @@
 #include "AssimpMesh.h"
+#include "Utils/AssetResolution.h"
 #include <iostream>
 
 #include "Tools.h"
 namespace aveng {
 
-    bool AssimpMesh::processMesh(VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, std::string assetDirectory, std::unordered_map<std::string, VkTextureData>& textures) {
+    bool AssimpMesh::processMesh(VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, /*std::string assetDirectory*/const std::string modelBaseDir, const std::string contentRoot, std::unordered_map<std::string, VkTextureData>& textures) {
         mMeshName = mesh->mName.C_Str();
 
         mTriangleCount = mesh->mNumFaces;
@@ -54,17 +55,41 @@ namespace aveng {
                             }
 
                             // internal textures
-                            if (!texName.empty() && texName.find("*") != 0) {
+                            //if (!texName.empty() && texName.find("*") != 0) {
+                            //    VkTextureData newTex{};
+                            //    // std::string texNameWithPath = assetDirectory + '/' + texName;
+                            //    std::string resolved = resolveModelTexturePath(modelBaseDir, contentRoot, texName);
+
+                            //    // if (!Texture::loadTexture(engineDevice, renderData, newTex, texNameWithPath)) {
+                            //    if (!Texture::loadTexture(engineDevice, renderData, newTex, resolved)) {
+                            //        // std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
+                            //        Texture::cleanup(engineDevice, renderData, newTex);
+                            //        continue;
+                            //    }
+
+                            //    textures.insert({ texName, newTex });
+                            //}
+                            // external textures referenced by materials (NOT embedded "*0")
+                            if (!texName.empty() && texName.rfind("*", 0) != 0) {
+
+                                // Resolve relative references robustly
+                                std::string texPath = resolveModelTexturePath(modelBaseDir, contentRoot, texName);
+                                std::cout << "Resolved Internal Texture: " << texPath << std::endl;
                                 VkTextureData newTex{};
-                                std::string texNameWithPath = assetDirectory + '/' + texName;
-                                if (!Texture::loadTexture(engineDevice, renderData, newTex, texNameWithPath)) {
-                                    // std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
+                                if (!Texture::loadTexture(engineDevice, renderData, newTex, texPath)) {
+                                    // Optional: log once while you’re learning what Assimp returns
+                                    // std::printf("[AvengModel] Failed to load texture ref='%s' resolved='%s'\n",
+                                    //     texName.c_str(), texPath.c_str());
+
                                     Texture::cleanup(engineDevice, renderData, newTex);
                                     continue;
                                 }
 
+                                // IMPORTANT: keep the map key as the ORIGINAL texName Assimp returns,
+                                // because materials will refer to it by that string.
                                 textures.insert({ texName, newTex });
                             }
+
                         }
                     }
                 }

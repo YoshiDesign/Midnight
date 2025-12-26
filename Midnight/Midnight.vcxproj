@@ -184,6 +184,9 @@
     <ClCompile Include="Core\Camera\aveng_camera.cpp" />
     <ClCompile Include="Core\Input\InputSystem.cpp" />
     <ClCompile Include="Core\Midnight.cpp" />
+    <ClCompile Include="Core\Modeling\AvengInstance.cpp" />
+    <ClCompile Include="Core\Modeling\Sources\FilesystemModelSource.cpp" />
+    <ClCompile Include="Core\Modeling\Sources\PackModelSource.cpp" />
     <ClCompile Include="Core\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\Shader.cpp" />
     <ClCompile Include="CoreVK\SkinningPipeline.cpp" />
@@ -232,6 +235,10 @@
     <ClInclude Include="Core\Input\InputState.h" />
     <ClInclude Include="Core\Input\InputSystem.h" />
     <ClInclude Include="Core\Midnight.h" />
+    <ClInclude Include="Core\Modeling\AvengInstance.h" />
+    <ClInclude Include="Core\Modeling\Sources\FilesystemModelSource.h" />
+    <ClInclude Include="Core\Modeling\Sources\IModelSource.h" />
+    <ClInclude Include="Core\Modeling\Sources\PackModelSource.h" />
     <ClInclude Include="Core\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
     <ClInclude Include="CoreVK\VkRenderData.h" />
@@ -257,6 +264,7 @@
     <ClInclude Include="Runtime\Play\GameRegistry.h" />
     <ClInclude Include="Runtime\Play\IGameInstance.h" />
     <ClInclude Include="Runtime\Play\PlayManager.h" />
+    <ClInclude Include="Runtime\World\InstanceManager.h" />
     <ClInclude Include="stb\stb_connected_components.h" />
     <ClInclude Include="stb\stb_c_lexer.h" />
     <ClInclude Include="stb\stb_divide.h" />

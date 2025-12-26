@@ -1,15 +1,26 @@
 #include "Midnight.h"
-
+#include "Core/Modeling/ModelAndInstanceData.h"
 namespace aveng {
 
-	Midnight::Midnight(GameData& _gamedata) : game_data{ _gamedata }
+	Midnight::Midnight(GameData& gd)
+		: game_data(gd)
+		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
+		, engineDevice(aveng_window)
+		, modelSource_(createModelSource())
+		, renderer(engineDevice, aveng_window, std::move(modelSource_), renderData, cameraManager)
+		, staticMgr(renderData, engineDevice)
+		, animMgr(renderData, engineDevice)
 	{
-		aveng_window.setInputSystem(&inputSystem);
-		renderer.initialize(); // Very new
-#if ENABLE_EDITOR
-		editor.initialize(renderer.pGetSwapChain());
-#endif
+		initializeDependencies();
+		initialize();
+	}
 
+	std::unique_ptr<IModelSource> Midnight::createModelSource() {
+#ifdef ENABLE_EDITOR
+		return std::make_unique<FilesystemModelSource>();
+#else
+		return std::make_unique<PackModelSource>("assets.pak");
+#endif
 	}
 
 	void Midnight::render(float frameTime) {
@@ -25,7 +36,7 @@ namespace aveng {
 			// editor.onModeSwitched(frame.currentFrameIndex(), game_data.currentAppMode);
 		}
 #endif
-		frame.render(frameTime); 
+		frame_->render(frameTime); 
 	}
 
 	// This is the game's camera updates, not the editor's. It's more convenient to do this here at the moment
@@ -57,7 +68,80 @@ namespace aveng {
 	}
 
 	void Midnight::updateGUI(const InputState& state) {
-		editor.updateInputState(state);
+		editor_->updateInputState(state);
+	}
+
+	void Midnight::registerInstanceManagerCallbacks()
+	{
+
+		/*
+		    // Clean Example or whatever you prefer...
+
+			static_cb.onInstanceSelected = [&](InstanceHandle<StaticTag> h) {
+				// do selection stuff
+			};
+
+			staticMgr.setCallbacks(static_cb);
+
+			// Example: animated callbacks
+			anim_cb.onInstanceSelected = [&](InstanceHandle<AnimatedTag> h) {
+				// do selection stuff
+			};
+
+			animMgr.setCallbacks(anim_cb);
+		*/
+
+		// Note the cool C++20 designated initialization syntax (fun fact: concept was borrowed from C99). Works for simple aggregate types
+		staticMgr.setCallbacks({
+			.onDelete = [&](const StaticHandle& h) { staticMgr.deleteInstance(h); },
+			.onDeleteMany = [&](std::vector<const StaticHandle&> h) { staticMgr.deleteInstances(h); },
+			.onClone = [&](const StaticHandle& h) { staticMgr.cloneInstance(h);  },
+			.onCloneMany = [&](const StaticHandle& h, int n) { staticMgr.cloneInstances(h, n); },
+			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
+			.onInstanceAdd = [&](const ModelId& h) { staticMgr.addInstance(h); },
+			.onInstanceAddMany = [&](std::vector<const ModelId&> h, unsigned int n) { staticMgr.addInstances(h, n);  }
+		});
+
+		animMgr.setCallbacks({
+			.onDelete = [&](const AnimatedHandle& h) { animMgr.deleteInstance(h); },
+			.onDeleteMany = [&](std::vector < const AnimatedHandle&> h) { animMgr.deleteInstances(h); },
+			.onClone = [&](const AnimatedHandle& h) { animMgr.cloneInstance(h);  },
+			.onCloneMany = [&](const AnimatedHandle& h, int n) { animMgr.cloneInstances(h, n); },
+			// .onCenter = [&](const AnimatedHandle& h) { editor_->centerOn(h); }
+			.onInstanceAdd = [&](const ModelId& h) { animMgr.addInstance(h); },
+			.onInstanceAddMany = [&](std::vector<const ModelId&> h, unsigned int n) { animMgr.addInstances(h, n);  }
+		});
+
+	}
+
+	void Midnight::initializeDependencies() {
+#ifdef ENABLE_EDITOR
+		editor_ = std::make_unique<Editor>(renderData, renderer, game_data, engineDevice, aveng_window, cameraManager);
+		editorInput_ = std::make_unique<EditorInput>(editor_.get());
+		inputRouter_ = std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, gameInput);
+
+		inputSystem_ = std::make_unique<InputSystem>(*inputRouter_, game_data);
+		frame_ = std::make_unique<AvengFrame>(renderer, renderData, game_data, engineDevice, editor_.get());
+#else
+		inputSystem_ = std::make_unique<InputSystem>(gameInput, game_data);
+		frame_ = std::make_unique<AvengFrame>(renderer, renderData, game_data, engineDevice, nullptr);
+#endif
+
+		aveng_window.setInputSystem(inputSystem_.get());
+		registerInstanceManagerCallbacks();
+
+		assert(frame_ && "Frame not initialized");
+
+	}
+
+	void Midnight::initialize() {
+		renderer.initialize();
+
+#ifdef ENABLE_EDITOR
+		if (editor_) {
+			editor_->initialize(renderer.pGetSwapChain());
+		}
+#endif
 	}
 
 }

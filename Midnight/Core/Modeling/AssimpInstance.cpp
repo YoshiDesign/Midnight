@@ -5,7 +5,15 @@ namespace aveng {
 
     AssimpInstance::~AssimpInstance() { mAvengModel = nullptr; }
 
-    AssimpInstance::AssimpInstance(AvengModel* model, glm::vec3 position, glm::vec3 rotation, float modelScale) : mAvengModel(model) {
+    AssimpInstance::AssimpInstance(
+        ModelId mid, 
+        AvengModel* model, 
+        glm::vec3 position, 
+        glm::vec3 rotation, 
+        float modelScale)
+    : mAvengModel(model),  modelId_{ mid } 
+    {
+
         if (!model) {
             // std::printf("%s error: invalid model given\n", __FUNCTION__);
             return;
@@ -88,10 +96,6 @@ namespace aveng {
             updateModelRootMatrix();
         }
     }
-    
-    //std::shared_ptr<AvengModel> AssimpInstance::getModel() {
-    //    return mAvengModel;
-    //}
 
     glm::vec3 AssimpInstance::getWorldPosition() {
         return mInstanceSettings.isWorldPosition;

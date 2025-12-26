@@ -1,17 +1,18 @@
 #pragma once
 
-#include "Utils/glm_includes.h"
-
+#include <span>
 #include <array>
 #include <memory>
 #include <vector>
-#include "CoreVK/aveng_descriptors.h"
+#include "Utils/glm_includes.h"
+#include "Utils/AssetResolution.h"
 #include "Core/Modeling/AssimpNode.h"
 #include "Core/Modeling/AssimpMesh.h"
 #include "Core/Modeling/AssimpAnimClip.h"
-#include "CoreVK/VkRenderData.h"
 #include "Core/Modeling/Tools.h"
-
+#include "Core/Modeling/ModelRegistry.h"
+#include "CoreVK/aveng_descriptors.h"
+#include "CoreVK/VkRenderData.h"
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
@@ -25,17 +26,6 @@ namespace aveng {
 
 	public:
 
-		//// Vertex and index information to be sent to the model's vertex and index buffer memory
-		//struct Builder {
-		//	std::vector<VkVertex> vertices{};
-		//	std::vector<uint32_t> indices{};
-
-		//	void loadModel(const std::string& filepath);
-		//	
-		//};
-
-		// Deprecated
-		// AvengModel(EngineDevice& device, std::vector<Vertex> vertices, std::vector<uint32_t> indices, const std::string& filepath);
 		AvengModel(EngineDevice& device);
 
 		~AvengModel();
@@ -43,9 +33,25 @@ namespace aveng {
 		AvengModel(const AvengModel&) = delete;
 		AvengModel& operator=(const AvengModel&) = delete;
 
+		bool loadModelV2(
+			VkRenderData& renderData,
+			const AssetKey& key,                       // keep for debug + extension hint
+			std::span<const std::byte> bytes,          // data from IModelSource
+			unsigned int extraImportFlags,
+			const std::string& modelBaseDir = "",
+			const std::string& contentRoot = ""
+		);
+
 		bool loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags = 0);
 		bool createDescriptorSet(VkRenderData& renderData);
-		void processNode(VkRenderData& renderData, std::shared_ptr<AssimpNode> node, aiNode* aNode, const aiScene* scene, std::string assetDirectory);
+		void processNode(
+			VkRenderData& renderData, 
+			std::shared_ptr<AssimpNode> node, 
+			aiNode* aNode, 
+			const aiScene* scene, 
+			const std::string modelBaseDir, 
+			const std::string contentRoot // Texture root
+		/* std::string assetDirectory*/);
 
 		std::string getModelFileName();
 		std::string getModelFileNamePath();
@@ -107,7 +113,7 @@ namespace aveng {
 		VkDescriptorSetLayout mComputeMatrixMultPerModelDescriptorSetLayout;
 
 		std::string mModelFilenamePath{"nullpath"};
-		std::string mModelFilename{"nullname"};
+		std::string mModelFilename{"nullname"}; // Deprecatee this, or let the null instantiation set this name, not default to it
 
 	};
 

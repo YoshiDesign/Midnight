@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "Utils/AssetResolution.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/SkinningPipeline.h"
 #include "CoreVK/ComputePipeline.h"
@@ -9,7 +10,6 @@
 #include "CoreVK/SyncObjects.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/aveng_window.h"
-#include "Core/aveng_model.h"
 #include "Game/Camera/CameraManager.h"
 #include <filesystem>
 #include <stdexcept>
@@ -23,8 +23,21 @@
 
 namespace aveng {
 
-	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, CameraManager& _cameraManager)
-		: engineDevice{ engineDevice }, aveng_window{ window }, renderData{ renderData }, cameraManager{ _cameraManager }
+	static AssetKey normalizeAssetKey(std::string_view in) {
+		AssetKey out(in);
+		for (char& c : out) {
+			if (c == '\\') c = '/';
+		}
+		// Optional: lowercase, strip "./", etc.
+		return out;
+	}
+
+	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, std::unique_ptr<IModelSource> modelSource, VkRenderData& renderData, CameraManager& _cameraManager)
+		:   engineDevice	{ engineDevice }, 
+			aveng_window	{ window }, 
+			modelSource_	{std::move(modelSource)}, 
+			renderData		{ renderData }, 
+			cameraManager	{ _cameraManager }
 	{
 
 		buffer_trash.clear();
@@ -148,6 +161,266 @@ namespace aveng {
 			4.0f
 		);
 
+	}
+	
+	// Queue any model type for loading
+	//bool Renderer::queueModelLoad(const std::string& filepath) {
+	//	modelDb_.pendingLoads.push_back(filepath);
+	//	std::printf("Queued model load (will load after current frame)\n");
+	//	return true;
+	//}
+
+	void Renderer::processPendingModelLoads()
+	{
+		if (modelDb_.pendingLoads.empty()) {
+			return;
+		}
+
+		// Consume queue atomically (so getOrLoadModel can keep pushing next frame)
+		std::vector<AssetKey> queue;
+		queue.swap(modelDb_.pendingLoads); // O(1) cool
+
+		bool anyLoaded = false;
+		ModelId lastLoadedId = InvalidModelId;
+
+		for (const AssetKey& key : queue) {
+			auto it = modelDb_.idByKey.find(key);
+			if (it == modelDb_.idByKey.end()) {
+				// Key got removed or never registered (should be rare)
+				std::printf("[Renderer] Pending load key missing from registry: %s\n", key.c_str());
+				continue;
+			}
+
+			const ModelId id = it->second;
+			auto idxIt = modelDb_.indexById.find(id);
+			if (idxIt == modelDb_.indexById.end()) {
+				std::printf("[Renderer] Pending load id missing from index map: %u\n", id);
+				continue;
+			}
+
+			ModelEntry& entry = modelDb_.models[idxIt->second];
+
+			// Might have loaded already (e.g. duplicate queue)
+			if (entry.model) {
+				continue;
+			}
+
+			std::printf("[Renderer] Processing queued model load: %s\n", key.c_str());
+
+			// 1) Read bytes (or ignore bytes if your builder loads from path)
+			std::vector<std::byte> bytes = modelSource_->readModelBytes(key);
+
+			// 2) Build/import
+			std::shared_ptr<AvengModel> model = buildModelFromSource(key, bytes);
+			if (!model) {
+				std::printf("[Renderer] Failed to load model: %s\n", key.c_str());
+				// Policy: do NOT requeue automatically (avoid infinite spam).
+				// If you want retry-once, you can push_back(key) here conditionally.
+				continue;
+			}
+
+			// 3) Commit to registry
+			entry.model = std::move(model);
+
+			// You already have: bool AvengModel::hasAnimations()
+			entry.isAnimated = entry.model->hasAnimations();
+
+			anyLoaded = true;
+			lastLoadedId = entry.id;
+
+			std::printf("[Renderer] Loaded model id=%u key=%s animated=%s\n",
+				entry.id, entry.key.c_str(), entry.isAnimated ? "true" : "false"
+			);
+
+			// Optional: if you have GPU upload steps, do them HERE (still between frames)
+			// uploadModelToGpu(entry);
+		}
+
+		// Arbitrary
+		if (anyLoaded && lastLoadedId != InvalidModelId) {
+			// After uploading latest model, make it the editor's currently selected model
+			modelDb_.selectedModel = lastLoadedId;
+		}
+	}
+
+	bool Renderer::addModel(const std::string& modelFileName) {
+
+		// TODO - relocate to the caller
+		//if (isFrameStarted) {
+		//	std::printf("ERROR: addModel called mid-frame!\n");
+		//	throw std::runtime_error("Internal error: model loading during frame");
+		//}
+
+		if (hasModel(modelFileName)) {
+			std::printf("%s warning: model '%s' already existed, skipping\n", __FUNCTION__, modelFileName.c_str());
+			return false;
+		}
+
+		std::shared_ptr<AvengModel> model = std::make_shared<AvengModel>(engineDevice);
+		if (!model->loadModelV2(renderData, modelFileName)) {
+			std::printf("%s error: could not load model file '%s'\n", __FUNCTION__, modelFileName.c_str());
+			return false;
+		}
+
+		// TODO - if model has animations or is static - register it with the appropriate manager
+
+		modelDb_.models.emplace_back(model);
+		// addInstance(model); TODO - after mgr wiring
+
+		return true;
+	}
+
+	ModelRef Renderer::getOrLoadModel(const AssetKey& assetKey)
+	{
+		const AssetKey key = normalizeAssetKey(assetKey);
+		std::cout << "[Renderer::getOrLoadModel] Loading Model: " << assetKey << std::endl;
+		// Already known?
+		if (auto it = modelDb_.idByKey.find(key); it != modelDb_.idByKey.end()) {
+			const ModelId id = it->second;
+			const auto idxIt = modelDb_.indexById.find(id);
+			if (idxIt == modelDb_.indexById.end()) {
+				// Should never happen if maps are consistent
+				return {};
+			}
+
+			ModelEntry& entry = modelDb_.models[idxIt->second];
+
+			// If already loaded, return valid ref
+			if (entry.model) {
+				return makeModelRef(entry);
+			}
+
+			// Ensure it's queued (avoid duplicates)
+			if (std::find(modelDb_.pendingLoads.begin(), modelDb_.pendingLoads.end(), key) == modelDb_.pendingLoads.end()) {
+				modelDb_.pendingLoads.push_back(key);
+			}
+
+			// Return a stable id even though it's not loaded yet
+			return ModelRef{ entry.id, nullptr, entry.isAnimated };
+		}
+
+		// New registration: allocate a stable id now
+		const ModelId id = nextModelId_++;
+		const size_t index = modelDb_.models.size();
+
+		ModelEntry entry;
+		entry.id = id;
+		entry.key = key;
+		entry.model.reset();
+		entry.isAnimated = false;
+
+		modelDb_.models.emplace_back(std::move(entry));
+		modelDb_.idByKey.emplace(key, id);
+		modelDb_.indexById.emplace(id, index);
+
+		// Queue for later load
+		modelDb_.pendingLoads.push_back(key);
+
+		// Not loaded yet -> invalid ref, but caller can keep the id
+		return aveng::ModelRef{ id, nullptr, false };
+	}
+
+	//std::shared_ptr<AvengModel> Renderer::getOrLoadModelPtr(std::string_view assetKeyView) {
+	//	const ModelId id = getOrLoadModel(assetKeyView);
+	//	if (id == 0) return {};
+
+	//	const size_t idx = modelDb_.indexById.at(id);
+	//	return modelDb_.models[idx].model;
+	//}
+
+
+	// If you want: compute baseDir from the key (filesystem path today)
+	std::string Renderer::baseDirForAssetKey(const AssetKey& key) const
+	{
+		// You can swap this policy later without touching the import path.
+		// For now: baseDir derived from key, which is expected to be a path-like string.
+		auto pos = key.find_last_of("/\\");
+		if (pos == std::string::npos) {
+			// Fallback: you can hard-code here if you want a global assets directory
+			// return "Assets";
+			return {};
+		}
+		return key.substr(0, pos);
+	}
+
+	std::shared_ptr<AvengModel> Renderer::buildModelFromSource(
+		const AssetKey& key,
+		std::span<const std::byte> bytes
+	) {
+		// Construct model
+		auto model = std::make_shared<AvengModel>(engineDevice);
+
+		// Base directory policy for resolving external refs (textures/bin/etc)
+		const std::string baseDir = baseDirForAssetKey(key);
+
+		// Import flags—keep your existing defaults, pass extra if needed
+		constexpr unsigned int extraImportFlags = 0;
+
+		const std::string modelBaseDir = baseDirForAssetKey(key);                // e.g. "Assets/Models/House"
+		const std::string engineTextureDir = joinPath(contentRoot_, textureRoot_); // e.g. "Assets/textures"
+
+		// NOTE: AvengModel now does "import/build", not IO.
+		const bool ok = model->loadModelV2(
+			renderData,
+			key,
+			bytes,
+			extraImportFlags,
+			modelBaseDir,
+			engineTextureDir
+		);
+
+		if (!ok) {
+			std::printf("[Renderer] buildModelFromSource failed for key=%s\n", key.c_str());
+			return {};
+		}
+
+		return model;
+	}
+
+
+
+	void Renderer::deleteModel(const std::string& modelFileName) {
+	//	std::string shortModelFileName = std::filesystem::path(modelFileName).filename().generic_string();
+
+	//	// First we need to determine which mgr we're going to delete all of this model's instances from. Right?
+
+	//	if (!data_.miInstanceSlots.empty()) {
+	//		data_.miInstanceSlots.erase(
+	//			std::remove_if(
+	//				data_.miInstanceSlots.begin(),
+	//				data_.miInstanceSlots.end(),
+	//				[shortModelFileName](std::shared_ptr<AssimpInstance> instance) {
+	//			return instance->getModel()->getModelFileName() == shortModelFileName;
+	//		}
+	//			),
+	//			data_.miInstanceSlots.end()
+	//		);
+	//	}
+
+	//	// Delete every model in the hash, and delete the hash
+	//	if (data_.miInstancesPerModel.count(shortModelFileName) > 0) {
+	//		data_.miInstancesPerModel[shortModelFileName].clear();
+	//		data_.miInstancesPerModel.erase(shortModelFileName);
+	//	}
+
+	//	/* add models to pending delete list */
+	//	for (const auto& model : data_.miModelList) {
+	//		if (model && (model->getTriangleCount() > 0)) {
+	//			data_.miPendingDeleteAvengModels.insert(model);
+	//		}
+	//	}
+
+	//	data_.miModelList.erase(
+	//		std::remove_if(
+	//			data_.miModelList.begin(),
+	//			data_.miModelList.end(),
+	//			[modelFileName](std::shared_ptr<AvengModel> model) {
+	//		return model->getModelFileName() == modelFileName;
+	//	}
+	//		)
+	//	);
+
+	//	updateTriangleCount();
 	}
 
 	const CameraTransform& Renderer::activeCameraTransform() {
@@ -1359,14 +1632,14 @@ namespace aveng {
 					mUploadToUBOTimer.start();
 
 					// The number of bones in the model
-					mModelData.pkModelStride = numberOfBones;
+					mModelPushConst.pkModelStride = numberOfBones;
 					// An index to the first location of this model's instances.
-					mModelData.pkWorldPosOffset = worldPosOffset;
+					mModelPushConst.pkWorldPosOffset = worldPosOffset;
 					// An index to the first location of this model's bones.
-					mModelData.pkSkinMatOffset = skinMatOffset;
+					mModelPushConst.pkSkinMatOffset = skinMatOffset;
 
 					vkCmdPushConstants(commandBuffer, animationLayout,
-						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
+						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelPushConst);
 
 					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
@@ -1383,11 +1656,11 @@ namespace aveng {
 						basicLayout, 1, 1, &basicDescriptorSet, 0, nullptr);
 
 					mUploadToUBOTimer.start();
-					mModelData.pkModelStride = 0;
-					mModelData.pkWorldPosOffset = worldPosOffset;
-					mModelData.pkSkinMatOffset = 0;
+					mModelPushConst.pkModelStride = 0;
+					mModelPushConst.pkWorldPosOffset = worldPosOffset;
+					mModelPushConst.pkSkinMatOffset = 0;
 					vkCmdPushConstants(commandBuffer, basicLayout,
-						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelData);
+						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelPushConst);
 					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
 					// Note: We pass the animation layout here even though its implicitly basic

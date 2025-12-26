@@ -14,13 +14,14 @@
 namespace aveng {
     class AssimpMesh {
     public:
-        // TODO - You're drilling a ref to the engine Device into this class, consider moving the entire engine device to VkRenderData
+        
         bool processMesh(
             VkRenderData& renderData, 
             EngineDevice& engineDevice,
             aiMesh* mesh, 
             const aiScene* scene,
-            std::string assetDirectory,
+           /* std::string assetDirectory,*/
+            const std::string modelBaseDir, const std::string contentRoot,
             std::unordered_map<std::string, VkTextureData>& textures);
 
         std::string getMeshName();

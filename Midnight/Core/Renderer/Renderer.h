@@ -1,23 +1,28 @@
 #pragma once
-
+#include <span>
 #include <memory>
 #include <vector>
 #include <unordered_map>
-
-#include "Core/PointLightSystem.h"
-//#include "Core/aveng_scene_loader.h"
-
-#include "CoreVK/swapchain.h"
-#include "CoreVK/VkRenderData.h"
+#include "Core/Modeling/ModelRegistry.h"
+#include "Core/Modeling/Sources/IModelSource.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
-#include "Utils/Timer.h"
+#include "CoreVK/VkRenderData.h"
+#include "Core/aveng_model.h"
+#include "Core/PointLightSystem.h"
+#include "CoreVK/swapchain.h"
 #include "Utils/glm_includes.h"
+#include "Utils/Timer.h"
+
+/*
+* Convention I'm learning/acquiring:
+* If a member variable ends with an underscore, it's owned
+* by this class and, more importantly, exposed via methods.
+*/
 
 namespace aveng {
 
 	class EngineDevice;
 	class AssimpInstance;
-	class AvengModel;
 	class AvengWindow;
 	class CameraManager;
 	struct CameraTransform;
@@ -26,13 +31,26 @@ namespace aveng {
 
 	public:
 
-		Renderer(EngineDevice& engineDevice, AvengWindow& window, VkRenderData& renderData, CameraManager& cameraManager);
+		Renderer(EngineDevice& engineDevice, AvengWindow& window, std::unique_ptr<IModelSource> modelSource, VkRenderData& renderData, CameraManager& cameraManager);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
 
 		void initialize();
+		std::string baseDirForAssetKey(const AssetKey& key) const;
+		// The renderer is something of a "ModelManager" too, for now
+		void processPendingModelLoads();  // Call this in between frames
+		bool queueModelLoad(const std::string& filepath);
+		std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
+		ModelRef getOrLoadModel(const AssetKey& key);
+		// std::shared_ptr<AvengModel> getOrLoadModelPtr(std::string_view assetKeyView);
+		bool addModel(const std::string& modelFileName);
+		void deleteModel(const std::string& modelFileName);
+		bool hasModel(const std::string& modelFileName);
+		std::shared_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
+
+		bool isFrameInProgress() const { return isFrameStarted; }
 
 		// Our app needs to be able to access the swap chain render pass in order to configure any pipelines it creates
 		SwapChain* pGetSwapChain() const { return aveng_swapchain.get(); }
@@ -53,26 +71,8 @@ namespace aveng {
 		VkFramebuffer getCurrentFramebuffer() { return aveng_swapchain->getFrameBuffer(currentImageIndex); }
 		VkFramebuffer getCurrentSelectionFramebuffer() { return aveng_swapchain->getSelectionFrameBuffer(currentImageIndex); }
 
-		bool isFrameInProgress() const { return isFrameStarted; }
 		bool createPipelineLayouts();
 		bool createPipelines();
-
-		// Add public method:
-		bool queueModelLoad(const std::string& filepath);
-		void processPendingModelLoads();  // Call this before/after frames
-
-		// These functions are removed to the InstanceManager
-		// bool hasModel(const std::string& modelFileName);
-		//std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
-		//bool addModel(const std::string& modelFileName);
-		//void deleteModel(const std::string& modelFileName);
-		//void addInstance(std::shared_ptr<AvengModel> model);
-		//void addInstances(std::shared_ptr<AvengModel> model, int numInstances);
-		//void deleteInstance(const InstanceHandle& instance);
-		//void cloneInstance(const InstanceHandle& instance);
-		//void cloneInstances(const InstanceHandle& instance, int numClones); // Pass a slot instead??
-		// void centerInstance(const InstanceHandle& handle);
-
 		bool createSSBOs();
 		bool createMatrixUBO();
 		bool createLightsUBO();
@@ -98,6 +98,15 @@ namespace aveng {
 			// Note: This assertion saved you from serious headache. Assertions are great, use them
 			assert(isFrameStarted && "Cannot get the frame index when frame is not in progress.");
 			return currentFrameIndex;
+		}
+
+		inline ModelRef makeModelRef(const ModelEntry& e)
+		{
+			return ModelRef{
+				e.id,
+				e.model.get(),   // raw pointer view
+				e.isAnimated
+			};
 		}
 
 		void setRenderpassBypass(bool _state) { mRenderpassBypass = _state; }
@@ -156,6 +165,10 @@ namespace aveng {
 
 	private:
 
+		void createCommandBuffers();
+		void freeCommandBuffers();
+		size_t calculateDynamicUBOStride() const;
+
 		VkRenderData& renderData;
 		size_t boneMatrixBufferSize;
 
@@ -177,9 +190,6 @@ namespace aveng {
 		Timer mUIGenerateTimer{};
 		Timer mUIDrawTimer{};
 
-		// const char* default_scene_file = "scenes/demo-scene.json";
-
-		//AvengSceneLoader sceneLoader{ renderData };			// Contains shared pointers to objects with VMA Buffer Allocation
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
 		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 		
@@ -187,11 +197,6 @@ namespace aveng {
 		uint32_t currentImageIndex{ 0 };
 		int currentFrameIndex{ 0 }; // Not tied to the image index
 		bool isFrameStarted{ false };
-
-		void createCommandBuffers();
-		void freeCommandBuffers();
-		
-		size_t calculateDynamicUBOStride() const;
 
 		// Descriptors and Buffers
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
@@ -203,8 +208,10 @@ namespace aveng {
 
 		std::vector<PendingBufferDestroy> buffer_trash;
 
+
+
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
-		VkPushConstants mModelData{};
+		VkPushConstants mModelPushConst{};
 		VkComputePushConstants mComputeModelData{};
 
 		/* for animated and non-animated models */
@@ -212,6 +219,17 @@ namespace aveng {
 		std::vector<glm::mat4> mWorldPosMatrices{};
 		std::vector<NodeTransformData> mNodeTransFormData{};
 		PointLightData mPointLightData{};
+
+		// Model Registry and Management
+		ModelRegistryData modelDb_;
+		std::unique_ptr<IModelSource> modelSource_;
+		std::unordered_map<AssetKey, ModelId> keyToId;
+		std::vector<ModelEntry>              entriesById; // index = id (or id-1), or unordered_map<ModelId, ModelEntry>
+		ModelId nextModelId_ = 1; // 0 reserved as "invalid"
+
+
+		std::string contentRoot_ = "Assets"; // or "." or absolute
+		std::string textureRoot_ = "textures"; // relative to contentRoot_
 
 	};
 

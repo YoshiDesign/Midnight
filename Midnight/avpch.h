@@ -11,6 +11,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <variant>
+#include <fstream>
 #include <filesystem>
 #include <string_view>
 #include <string>
