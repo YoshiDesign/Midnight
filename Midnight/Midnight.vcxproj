@@ -208,6 +208,7 @@
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
     <ClCompile Include="Core\Texture.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
+    <ClCompile Include="Utils\AssetResolution.cpp" />
     <ClCompile Include="Utils\Logger.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />
     <ClCompile Include="Utils\window_callbacks.cpp" />
@@ -236,6 +237,7 @@
     <ClInclude Include="Core\Input\InputSystem.h" />
     <ClInclude Include="Core\Midnight.h" />
     <ClInclude Include="Core\Modeling\AvengInstance.h" />
+    <ClInclude Include="Core\Modeling\ModelRegistry.h" />
     <ClInclude Include="Core\Modeling\Sources\FilesystemModelSource.h" />
     <ClInclude Include="Core\Modeling\Sources\IModelSource.h" />
     <ClInclude Include="Core\Modeling\Sources\PackModelSource.h" />
@@ -286,6 +288,7 @@
     <ClInclude Include="stb\stb_voxel_render.h" />
     <ClInclude Include="Utils\aveng_utils.h" />
     <ClInclude Include="Utils\glm_includes.h" />
+    <ClInclude Include="Utils\AssetResolution.h" />
     <ClInclude Include="Utils\Logger.h" />
     <ClInclude Include="Utils\Timer.h" />
     <ClInclude Include="Utils\window_callbacks.h" />
