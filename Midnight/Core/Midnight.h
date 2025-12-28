@@ -2,6 +2,7 @@
 #include "Core/Input/InputSystem.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
+#include "Core/Renderer/ModelLibrary.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
 #include "Runtime/World/InstanceManager.h"
@@ -71,13 +72,15 @@ namespace aveng {
 		// Render data depends on device/window typically
 		VkRenderData renderData{};
 
-		// Model source lifetime owned by Midnight, passed into Renderer
+		// Model source (how assets load) lifetime owned by Midnight, passed into Renderer
 		std::unique_ptr<IModelSource> modelSource_;
+
+		ModelLibrary modelLib_;
 
 		// Renderer consumes device/window/renderData/cameraManager/modelSource
 		Renderer renderer;
 
-		// Instance managers depend on renderData + engineDevice (as you have)
+		// Instance managers depend on `renderer`
 		InstanceManager<StaticTag>   staticMgr;
 		InstanceManager<AnimatedTag> animMgr;
 

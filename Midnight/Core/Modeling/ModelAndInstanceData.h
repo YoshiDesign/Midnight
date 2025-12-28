@@ -121,15 +121,15 @@ namespace aveng {
 	template<class HandleT>
 	using instanceAddCallback = std::function<void(const ModelRef&)>;
 	template<class HandleT>
-	using instanceAddManyCallback = std::function<void(std::vector<const ModelId&> h, unsigned int n)>;
+	using instanceAddManyCallback = std::function<void(const ModelRef&, std::span<const InstanceSettings>, unsigned int )>;
 	template<class HandleT>
 	using instanceDeleteCallback = std::function<void(const HandleT&)>;
 	template<class HandleT>
-	using instanceDeleteManyCallback = std::function<void(std::vector<const HandleT&> v)>;
+	using instanceDeleteManyCallback = std::function<void(std::span<const HandleT>)>;
 	template<class HandleT>
-	using instanceCloneCallback = std::function<void(const HandleT&, AvengModel*, const InstanceSettings&)>;
+	using instanceCloneCallback = std::function<void(const HandleT&)>;
 	template<class HandleT>
-	using instanceCloneManyCallback = std::function<void(const HandleT&, int)>;
+	using instanceCloneManyCallback = std::function<void(const HandleT&, unsigned int)>;
 	template<class HandleT>
 	using instanceCenterCallbackEditor = std::function<void(const HandleT&)>;
 

@@ -19,6 +19,10 @@ namespace aveng {
 		InstanceSettings instanceSettings() const { return mInstanceSettings; };
 		void setInstanceSettings(const InstanceSettings& is) { mInstanceSettings = is; };
 		void updateModelRootMatrix();
+
+		// Used by the InstanceManager
+		void setModelId(ModelId id) { modelId_ = id; };
+		void setModelRootMatrix(glm::mat4 rootMatrix) { mModelRootMatrix = rootMatrix; };
 		
 	private:
 

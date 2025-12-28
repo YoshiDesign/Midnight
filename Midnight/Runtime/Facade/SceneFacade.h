@@ -25,6 +25,9 @@ namespace aveng {
 
 	public:
 
+		SceneFacade(IModelLibrary& modelLib, const IModelQuery& modelQuery);
+		~SceneFacade() {}
+
 		struct Config {
 			// If true, spawn/clone/destroy will no-op and return monostate/empty on invalid handles/models.
 			// If false, you might assert/throw depending on your engine policy.
@@ -35,7 +38,7 @@ namespace aveng {
 		ModelId getOrLoadModel(const AssetKey& key);
 		bool    unloadModel(const AssetKey& key);
 
-		/* IInstanceOps */
+		/* Instance Ops */
 		AnyInstanceHandle spawn(ModelRef modelRef, const InstanceSettings& s);
 		/// Spawn many instances. `settings.size()` can be 1 (repeat) or N (cycled/repeated).
 		std::vector<AnyInstanceHandle> spawnMany(ModelRef modelRef,
@@ -44,13 +47,12 @@ namespace aveng {
 
 		AnyInstanceHandle clone(AnyInstanceHandle src);
 		std::vector<AnyInstanceHandle> cloneMany(std::span<const AnyInstanceHandle> srcHandles);
-		std::vector<AnyInstanceHandle> cloneMany();
 
 		void destroy(AnyInstanceHandle h);
 		void destroyMany(std::span<const AnyInstanceHandle> handles);
 
-		/* ITransformOps */
-		void setTransform(AnyInstanceHandle handle);
+		/* Transform Ops */
+		void setTransform(AnyInstanceHandle handle, std::span<const Transform> transforms);
 		void setTransforms(
 			std::span<const AnyInstanceHandle> handles,
 			std::span<const Transform> transforms);
@@ -82,12 +84,17 @@ namespace aveng {
 
 		// Dependencies (owned elsewhere)
 		IModelLibrary& modelLib_;
-		const IModelQuery& modelQuery_;
+
+		/*
+			This class is a decorator of IModelQuery calls, 
+			hence the inheritance of this member's type
+		*/
+		const IModelQuery& modelQuery_; 
 		Config cfg_{};
 
 		// Instance pools (you can also inject references if you don’t want ownership here)
-		InstanceManager<StaticTag>   staticMgr_;
-		InstanceManager<AnimatedTag> animatedMgr_;
+		InstanceManager<StaticTag>   staticMgr_{ modelQuery_ };
+		InstanceManager<AnimatedTag> animatedMgr_{ modelQuery_ };
 
 		// Cache of validated models for this scene:
 		// modelId -> poolKind (static vs animated)

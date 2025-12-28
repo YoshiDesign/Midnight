@@ -48,6 +48,7 @@ namespace aveng {
         const std::unordered_map<ModelId, std::vector<Handle>>& instancesPerModel() const { return instanceData_.instancesPerModel; }
 
         /* Ctor - Each instance manager manages a null instance */
+        /* We pass an IModelQuery because instances need model constants */
         explicit InstanceManager(const IModelQuery& models)
             : models_(models) {
         
@@ -90,7 +91,7 @@ namespace aveng {
 
     public:
 
-        /* get() - With a lot validation */
+        /* get() the instance from a slot, given a heandle - With a lot validation */
         Instance* get(Handle h) {
             if (h.generation == 0) return nullptr;
             if (h.index >= instanceData_.slots.size()) return nullptr;
@@ -225,10 +226,12 @@ namespace aveng {
             slot.instance.emplace(m.id);
             slot.alive = true;
 
+            // Initialize instance's model constants
             auto& inst = slot.instance.value();
-            inst.setModelId(m.id);
-            inst.setModelRootMatrix(meta.root);
+            inst.setModelId(m.id);      // Apply model's ID
+            inst.setModelRootMatrix(meta.root); // Apply Model's root matrix 
 
+            // Technically we could have used models_.isModelAnimated() but this is more educational and one less stack frame, so...
             if constexpr (TagTraits<Tag>::kAnimated) {
                 inst.resizeNodeTransformData(meta.boneCount);
             }

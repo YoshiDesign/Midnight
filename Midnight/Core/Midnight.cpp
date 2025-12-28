@@ -7,9 +7,9 @@ namespace aveng {
 		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
 		, engineDevice(aveng_window)
 		, modelSource_(createModelSource())
-		, renderer(engineDevice, aveng_window, std::move(modelSource_), renderData, cameraManager)
-		, staticMgr(renderData, engineDevice)
-		, animMgr(renderData, engineDevice)
+		, renderer(engineDevice, aveng_window, std::move(modelSource_), renderData, cameraManager, modelLib_.query(), modelLib_.animQuery())
+		, staticMgr(modelLib_.query())
+		, animMgr(modelLib_.query())
 	{
 		initializeDependencies();
 		initialize();
@@ -91,25 +91,27 @@ namespace aveng {
 			animMgr.setCallbacks(anim_cb);
 		*/
 
+		/* You're setting the class's own methods as its callbacks lol */
+
 		// Note the cool C++20 designated initialization syntax (fun fact: concept was borrowed from C99). Works for simple aggregate types
 		staticMgr.setCallbacks({
 			.onDelete = [&](const StaticHandle& h) { staticMgr.deleteInstance(h); },
-			.onDeleteMany = [&](std::vector<const StaticHandle&> h) { staticMgr.deleteInstances(h); },
-			.onClone = [&](const StaticHandle& h, AvengModel* m, const InstanceSettings& s) { staticMgr.cloneInstanceFrom(h, m, s);  },
+			.onDeleteMany = [&](std::span<const StaticHandle> h) { staticMgr.deleteInstances(h); },
+			.onClone = [&](const StaticHandle& h) { staticMgr.cloneInstance(h);  },
 			.onCloneMany = [&](const StaticHandle& h, int n) { staticMgr.cloneInstances(h, n); },
 			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
 			.onInstanceAdd = [&](const ModelRef& h) { staticMgr.createInstance(h); },
-			.onInstanceAddMany = [&](std::vector<const ModelId&> h, unsigned int n) { staticMgr.addInstances(h, n);  }
+			.onInstanceAddMany = [&](const ModelRef& ref, std::span<const InstanceSettings> sett, unsigned int n) { staticMgr.addInstancesOfModel(ref, sett, n); }
 		});
 
 		animMgr.setCallbacks({
 			.onDelete = [&](const AnimatedHandle& h) { animMgr.deleteInstance(h); },
-			.onDeleteMany = [&](std::vector<const AnimatedHandle&> h) { animMgr.deleteInstances(h); },
-			.onClone = [&](const AnimatedHandle& h, AvengModel* m, const InstanceSettings& s) { animMgr.cloneInstanceFrom(h, m, s);  },
+			.onDeleteMany = [&](std::span<const AnimatedHandle> h) { animMgr.deleteInstances(h); },
+			.onClone = [&](const AnimatedHandle& h) { animMgr.cloneInstance(h);  },
 			.onCloneMany = [&](const AnimatedHandle& h, int n) { animMgr.cloneInstances(h, n); },
 			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
 			.onInstanceAdd = [&](const ModelRef& h) { animMgr.createInstance(h); },
-			.onInstanceAddMany = [&](std::vector<const ModelId&> h, unsigned int n) { animMgr.addInstances(h, n); }
+			.onInstanceAddMany = [&](const ModelRef& ref, std::span<const InstanceSettings> sett, unsigned int n) { animMgr.addInstancesOfModel(ref, sett, n); }
 		});
 
 	}

@@ -29,23 +29,25 @@ namespace aveng {
 	struct CameraTransform;
 
 	// The renderer is something of a "ModelManager" too, for now, hence the IModelQuery
-	class Renderer : public IModelQuery {
+	class Renderer {
 
 	public:
 
-		Renderer(EngineDevice& engineDevice, AvengWindow& window, std::unique_ptr<IModelSource> modelSource, VkRenderData& renderData, CameraManager& cameraManager);
+		Renderer(
+			EngineDevice& engineDevice, 
+			AvengWindow& window, 
+			std::unique_ptr<IModelSource> modelSource, 
+			VkRenderData& renderData, 
+			CameraManager& cameraManager,
+			const IModelQuery& q,	// Access into ModelDB (via ModelLibrary)
+			const IModelAnimQuery& animQ // Access into ModelDB (via ModelLlibrary)
+		);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
-	
-		/* IModelQuery */
-		bool tryGetModelMeta(ModelId id, ModelMeta& out) const override;
-		bool isModelAnimated(ModelId id, ModelMeta& out) const override;
-		bool isModelLoaded(ModelId id, ModelMeta& out) const override;
 
-		const IModelAnimQuery& animQuery() const { return modelDb_; }
-
+		// const IModelAnimQuery& animQuery() const { return modelDb_; } // Replace this
 
 		/* Callback definitions */
 		ModelRef getOrLoadModel(const AssetKey& key);
@@ -179,6 +181,9 @@ namespace aveng {
 		void freeCommandBuffers();
 		size_t calculateDynamicUBOStride() const;
 
+		const IModelQuery& modelQuery_;
+		const IModelAnimQuery& animQuery_;
+
 		VkRenderData& renderData;
 		size_t boneMatrixBufferSize;
 
@@ -218,8 +223,6 @@ namespace aveng {
 
 		std::vector<PendingBufferDestroy> buffer_trash;
 
-
-
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 		VkPushConstants mModelPushConst{};
 		VkComputePushConstants mComputeModelData{};
@@ -231,7 +234,8 @@ namespace aveng {
 		PointLightData mPointLightData{};
 
 		// Model Registry and Management
-		ModelRegistryData modelDb_;
+
+		// ModelRegistryData modelDb_;
 		std::unique_ptr<IModelSource> modelSource_;
 		std::unordered_map<AssetKey, ModelId> keyToId;
 		std::vector<ModelEntry>              entriesById; // index = id (or id-1), or unordered_map<ModelId, ModelEntry>

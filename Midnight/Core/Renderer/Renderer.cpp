@@ -29,35 +29,30 @@ namespace aveng {
 			if (c == '\\') c = '/';
 		}
 		// Optional: lowercase, strip "./", etc.
+		std::cout << "Renderer Normalized Asset Key: " << out << std::endl;
 		return out;
 	}
 
-	/* <BEGIN> Query Services */
-	// Override from derived class - exposes a transferrable interface
-	bool Renderer::tryGetModelMeta(ModelId id, ModelMeta& out) const {
-		std::cout << "Renderer::tryGetModelMeta - Querying\n";
-			const ModelEntry * e = modelDb_.get(id);
-		if (!e) return false;
-
-		out.root = e->rootTransform;
-		out.boneCount = e->boneCount;
-		out.animated = e->isAnimated;
-		return true;
-	}
-
-	bool Renderer::isModelAnimated(ModelId id, ModelMeta& out) const { return true; }
-	bool Renderer::isModelLoaded(ModelId id, ModelMeta& out) const { return true; }
-
-	const IModelAnimQuery& Renderer::animQuery() const { return modelDb_; }
-
+	// Narrow interface into modelDb_ specifically for a model's animation metadata
+	//const IModelAnimQuery& Renderer::animQuery() const { return modelDb_; }
 	/* <END> Query Services */
 
-	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, std::unique_ptr<IModelSource> modelSource, VkRenderData& renderData, CameraManager& _cameraManager)
+	Renderer::Renderer(
+		EngineDevice& engineDevice, 
+		AvengWindow& window, 
+		std::unique_ptr<IModelSource> modelSource, 
+		VkRenderData& renderData, 
+		CameraManager& _cameraManager,
+		const IModelQuery& q,
+		const IModelAnimQuery& animQ)
 		:   engineDevice	{ engineDevice }, 
 			aveng_window	{ window }, 
 			modelSource_	{std::move(modelSource)}, 
 			renderData		{ renderData }, 
-			cameraManager	{ _cameraManager }
+			cameraManager	{ _cameraManager },
+			modelQuery_{q},
+			animQuery_{animQ}
+
 	{
 
 		buffer_trash.clear();

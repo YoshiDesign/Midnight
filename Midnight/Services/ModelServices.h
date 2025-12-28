@@ -14,7 +14,7 @@ namespace aveng {
 	};
 
 	struct ModelMeta {
-		glm::mat4 root;          // model-space -> engine-space correction
+		glm::mat4 root;          // model-space -> engine-space correction created at model load
 		uint32_t  boneCount = 0; // 0 for static models
 		bool      animated = false;
 	};
