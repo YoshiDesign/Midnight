@@ -3,31 +3,21 @@
 
 namespace aveng {
 
-    AssimpInstance::~AssimpInstance() { mAvengModel = nullptr; }
+    AssimpInstance::~AssimpInstance() { }
 
     AssimpInstance::AssimpInstance(
         ModelId mid, 
-        AvengModel* model, 
         glm::vec3 position, 
         glm::vec3 rotation, 
         float modelScale)
-    : mAvengModel(model),  modelId_{ mid } 
+        : modelId_{ mid }
     {
 
-        if (!model) {
-            // std::printf("%s error: invalid model given\n", __FUNCTION__);
-            return;
-        }
         mInstanceSettings.isWorldPosition = position;
         mInstanceSettings.isWorldRotation = rotation;
         mInstanceSettings.isScale = modelScale;
 
-        /* avoid resizes during fill */
-        mNodeTransformData.resize(mAvengModel->getBoneList().size());
-
-        /* save model root matrix */
-        mModelRootMatrix = mAvengModel->getRootTranformationMatrix();
-
+        // Not sure if this is necessary yet
         updateModelRootMatrix();
     }
 
@@ -50,20 +40,36 @@ namespace aveng {
 
         // Do the math
         mLocalTransformMatrix = mLocalTranslationMatrix * mLocalRotationMatrix * mLocalSwapAxisMatrix * mLocalScaleMatrix;
+
         // Final answer
         mInstanceRootMatrix = mLocalTransformMatrix * mModelRootMatrix;
     }
 
-    void AssimpInstance::updateAnimation(float deltaTime) {
-        mInstanceSettings.isAnimPlayTimePos += deltaTime * mAvengModel->getAnimClips().at(mInstanceSettings.isAnimClipNr)->getClipTicksPerSecond() * mInstanceSettings.isAnimSpeedFactor;
-        mInstanceSettings.isAnimPlayTimePos = std::fmod(mInstanceSettings.isAnimPlayTimePos, mAvengModel->getAnimClips().at(mInstanceSettings.isAnimClipNr)->getClipDuration());
+    void AssimpInstance::updateAnimation(float deltaTime, const IModelAnimQuery& animQ) {
 
-        std::vector<std::shared_ptr<AssimpAnimChannel>> animChannels = mAvengModel->getAnimClips().at(mInstanceSettings.isAnimClipNr)->getChannels();
+        /*
+            Consider this: animation data is finally decoupled from the model after introducing IModelAnimQuery.
+            This creates a bottleneck, and in inefficient pattern, but it's ok for now.
+            There are several ways to improve this. Cacheing + SoA design
+        */
+        if(!animQ.tryGetClipMeta(modelId_, mInstanceSettings.isAnimClipNr, animationMeta))
+        {
+            std::cout << "AssimpInstance::updateAnimation - Failed to retrieve clip meta returned false\n";
+            return;
+        }
+
+        if (animationMeta.durationTicks <= 0.0f) return; // avoid fmod by zero / negative durations
+
+        mInstanceSettings.isAnimPlayTimePos += deltaTime * animationMeta.ticksPerSecond * mInstanceSettings.isAnimSpeedFactor;
+        if (mInstanceSettings.isAnimPlayTimePos < 0.0f) mInstanceSettings.isAnimPlayTimePos += animationMeta.durationTicks;
+        mInstanceSettings.isAnimPlayTimePos = std::fmod(mInstanceSettings.isAnimPlayTimePos, animationMeta.durationTicks);
+
+        // std::vector<std::shared_ptr<AssimpAnimChannel>> animChannels = mAvengModel->getAnimClips().at(mInstanceSettings.isAnimClipNr)->getChannels();
 
         std::fill(mNodeTransformData.begin(), mNodeTransformData.end(), NodeTransformData{});
 
         /* animate clip via channels */
-        for (const auto& channel : animChannels) {
+        for (const auto& channel : animationMeta.animChannels) {
             NodeTransformData nodeTransform;
 
             nodeTransform.translation = channel->getTranslation(mInstanceSettings.isAnimPlayTimePos);
@@ -139,15 +145,6 @@ namespace aveng {
 
     bool AssimpInstance::getSwapYZAxis() {
         return mInstanceSettings.isSwapYZAxis;
-    }
-
-    //void AssimpInstance::setInstanceSettings(InstanceSettings settings) {
-    //    mInstanceSettings = settings;
-    //    updateModelRootMatrix();
-    //}
-
-    InstanceSettings AssimpInstance::getInstanceSettings() {
-        return mInstanceSettings;
     }
 
     std::vector<NodeTransformData> AssimpInstance::getNodeTransformData() {

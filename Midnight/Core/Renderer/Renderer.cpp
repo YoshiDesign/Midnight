@@ -32,6 +32,26 @@ namespace aveng {
 		return out;
 	}
 
+	/* <BEGIN> Query Services */
+	// Override from derived class - exposes a transferrable interface
+	bool Renderer::tryGetModelMeta(ModelId id, ModelMeta& out) const {
+		std::cout << "Renderer::tryGetModelMeta - Querying\n";
+			const ModelEntry * e = modelDb_.get(id);
+		if (!e) return false;
+
+		out.root = e->rootTransform;
+		out.boneCount = e->boneCount;
+		out.animated = e->isAnimated;
+		return true;
+	}
+
+	bool Renderer::isModelAnimated(ModelId id, ModelMeta& out) const { return true; }
+	bool Renderer::isModelLoaded(ModelId id, ModelMeta& out) const { return true; }
+
+	const IModelAnimQuery& Renderer::animQuery() const { return modelDb_; }
+
+	/* <END> Query Services */
+
 	Renderer::Renderer(EngineDevice& engineDevice, AvengWindow& window, std::unique_ptr<IModelSource> modelSource, VkRenderData& renderData, CameraManager& _cameraManager)
 		:   engineDevice	{ engineDevice }, 
 			aveng_window	{ window }, 
@@ -94,19 +114,16 @@ namespace aveng {
 		}
 
 		{
-			/* I feel like this causes the need for more resource mgmt that could be obviated... 
-				We have null-instances too.
-			*/
 			// Register a null model for "no selected models"
 			ModelEntry entry;
-			entry.id = 0;
+			entry.id = NullModelId;
 			entry.key = "null";
 			entry.model.reset();
 			entry.isAnimated = false;
 
 			modelDb_.models.emplace_back(std::move(entry));
-			modelDb_.idByKey.emplace("null", 0);
-			modelDb_.indexById.emplace(0, 0);
+			modelDb_.idByKey.emplace("null", NullModelId);
+			modelDb_.indexById.emplace(NullModelId, 0);
 		}
 
 		// Renderer's only callback registration - See InstanceManager for others
@@ -233,7 +250,7 @@ namespace aveng {
 			std::vector<std::byte> bytes = modelSource_->readModelBytes(key);
 
 			// 2) Build/import
-			std::shared_ptr<AvengModel> model = buildModelFromSource(key, bytes);
+			std::unique_ptr<AvengModel> model = buildModelFromSource(key, bytes);
 			if (!model) {
 				std::printf("[Renderer] Failed to load model: %s\n", key.c_str());
 				// Policy: do NOT requeue automatically (avoid infinite spam).
@@ -297,10 +314,11 @@ namespace aveng {
 		const AssetKey key = normalizeAssetKey(assetKey);
 		std::cout << "[Renderer::getOrLoadModel] Loading Model: " << assetKey << std::endl;
 		// Already known?
-		if (auto it = modelDb_.idByKey.find(key); it != modelDb_.idByKey.end()) {
+		if (auto it = modelDb_.idByKey.find(key); it != modelDb_.idByKey.end()) { // very "Go" semantic lol
 			const ModelId id = it->second;
 			const auto idxIt = modelDb_.indexById.find(id);
 			if (idxIt == modelDb_.indexById.end()) {
+				std::cout << "[Renderer::getOrLoadModel] Anomaly alert [1]\n";
 				// Should never happen if maps are consistent
 				return {};
 			}
@@ -312,16 +330,16 @@ namespace aveng {
 				return makeModelRef(entry);
 			}
 
-			// Ensure it's queued (avoid duplicates)
+			// We didn't find a model at a valid entry for some reason. Ensure it's queued (avoid duplicates)
 			if (std::find(modelDb_.pendingLoads.begin(), modelDb_.pendingLoads.end(), key) == modelDb_.pendingLoads.end()) {
 				modelDb_.pendingLoads.push_back(key);
 			}
 
 			// Return a stable id even though it's not loaded yet
-			return ModelRef{ entry.id, nullptr, entry.isAnimated };
+			return ModelRef{ entry.id, entry.isAnimated };
 		}
 
-		// New registration: allocate a stable id now
+		// New registration: allocate a stable id
 		const ModelId id = nextModelId_++;
 		const size_t index = modelDb_.models.size();
 
@@ -339,7 +357,7 @@ namespace aveng {
 		modelDb_.pendingLoads.push_back(key);
 
 		// Not loaded yet -> invalid ref, but caller can keep the id
-		return aveng::ModelRef{ id, nullptr, false };
+		return aveng::ModelRef{ id, false };
 	}
 
 	//std::shared_ptr<AvengModel> Renderer::getOrLoadModelPtr(std::string_view assetKeyView) {
@@ -365,12 +383,12 @@ namespace aveng {
 		return key.substr(0, pos);
 	}
 
-	std::shared_ptr<AvengModel> Renderer::buildModelFromSource(
+	std::unique_ptr<AvengModel> Renderer::buildModelFromSource(
 		const AssetKey& key,
 		std::span<const std::byte> bytes
 	) {
 		// Construct model
-		auto model = std::make_shared<AvengModel>(engineDevice);
+		auto model = std::make_unique<AvengModel>(engineDevice);
 
 		// Base directory policy for resolving external refs (textures/bin/etc)
 		const std::string baseDir = baseDirForAssetKey(key);
@@ -1316,7 +1334,7 @@ namespace aveng {
 					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
 					for (const auto& instanceHandle : mModelInstanceData.miInstancesPerModel[model->getModelFileName()]) {
 
-						mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.updateAnimation(deltaTime);
+						mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.updateAnimation(deltaTime, animQuery());
 
 						std::vector<NodeTransformData> instanceNodeTransform = mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.getNodeTransformData();
 

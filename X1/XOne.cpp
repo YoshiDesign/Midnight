@@ -10,6 +10,8 @@
 namespace xone {
 
 	inline void RegisterGames(GameRegistry& registry, PlayManager& play) {
+
+		/* Technically this is "register scene" */
 		registry.registerGame("holyship", [&play]() {
 			return std::make_unique<HolyShip>(play);
 		});
@@ -21,7 +23,7 @@ namespace xone {
 
 	XOne::XOne()
 	{
-		objectRenderSystem.initialize(); // Note: objectRenderSystem owns all cameras
+		// objectRenderSystem.initialize();
 	}
 
 	void XOne::run()
@@ -30,24 +32,45 @@ namespace xone {
 		GameRegistry registry;
 		PlayManager play(registry);
 
+		// Temporary Placement
+		/* We need one camera to be active at all times, this is technically a limitation */
+		auto player_camera = std::make_unique<aveng::PlayerCamera>();
+		player_camera_id = midnight.registerCamera("player_camera", std::move(player_camera));
+		// Note: Editor will take precedence if enabled
+		midnight.setActiveCamera(player_camera_id);
+
 		// "Yo, Tank..."
 		RegisterGames(registry, play);
-
-		// play.requestPlay("holyship");
 
 		std::chrono::time_point<std::chrono::steady_clock> loopStartTime = std::chrono::steady_clock::now();
 		std::chrono::time_point<std::chrono::steady_clock> loopEndTime = std::chrono::steady_clock::now();
 
 		// Render Loop
-		while (!objectRenderSystem.shouldClose()) {
+		while (!midnight.shouldClose()) {
 			// Potentially blocking
 			glfwPollEvents();
 
-			objectRenderSystem.updateInputState();
-			TickContext tick{ frameTime, objectRenderSystem.inputState() };
+			// Clear all input states, calculate mouse & scroll deltas, reset key edges, etc.
+			midnight.beginFrameInput();
+			TickContext tick{ frameTime, midnight.inputState() };
 
 			play.update(tick);
-			objectRenderSystem.render(frameTime);
+
+#ifdef ENABLE_EDITOR
+			/* There currently exist no methods for switching cameras within the context of AppMode::Game
+			   This is a hard switch from the window callbacks set by aveng_window */
+			if (midnight.mode() == aveng::AppMode::Game) {
+				if (midnight.activeCameraId() != player_camera_id) {
+					std::cout << "Setting Game as Active Camera..." << std::endl;
+					midnight.setActiveCamera(player_camera_id);
+				}
+			}
+#endif
+
+			midnight.updateCamera(frameTime);
+			midnight.render(frameTime);
+
+			// objectRenderSystem.render(frameTime);
 
 			// Calculate time between frames
 			loopEndTime = std::chrono::steady_clock::now();
@@ -55,7 +78,8 @@ namespace xone {
 			loopStartTime = loopEndTime;
 
 #ifdef ENABLE_EDITOR
-			for (const auto cmd : objectRenderSystem.editorData().drainCommands()) {
+			// Process Editor Commands
+			for (const auto cmd : editorData().drainCommands()) {
 				switch (cmd.type) {
 				case aveng::EditorCommand::Type::RequestPlay: play.requestPlay(cmd.payload); break;
 				// case aveng::EditorCommand::Type::RequestStop: play.requestStop(); break;
@@ -67,7 +91,7 @@ namespace xone {
 		}
 
 		// Block until all GPU operations quit.
-		vkDeviceWaitIdle(objectRenderSystem.getEngineDevice());
+		vkDeviceWaitIdle(midnight.device());
 	}
 
 

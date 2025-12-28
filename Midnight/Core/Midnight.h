@@ -81,9 +81,6 @@ namespace aveng {
 		InstanceManager<StaticTag>   staticMgr;
 		InstanceManager<AnimatedTag> animMgr;
 
-		ModelAndInstanceCallbacks static_cb{};
-		ModelAndInstanceCallbacks anim_cb{};
-
 		// Input
 		GameInput gameInput;
 

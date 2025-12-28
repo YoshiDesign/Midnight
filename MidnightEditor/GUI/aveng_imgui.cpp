@@ -594,6 +594,7 @@ namespace aveng {
                         /* Windows does understand forward slashes, but std::filesystem preferres backslashes... */
                         std::replace(filePathName.begin(), filePathName.end(), '\\', '/');
 
+                                                            /* This is now the "AssetKey" */
                         if (!modInstData.miModelAddCallbackFunction(filePathName)) {
                             std::printf("%s error: unable to load model file '%s', unknown error \n", __FUNCTION__, filePathName.c_str());
                         }

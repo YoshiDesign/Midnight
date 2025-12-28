@@ -11,22 +11,28 @@ namespace aveng {
 	public:
 		AvengInstance(
 			ModelId mid, 
-			AvengModel* model, 
 			glm::vec3 position = glm::vec3(0.0f), 
 			glm::vec3 rotation = glm::vec3(0.0f), 
 			float modelScale = 1.0f);
 
-		AvengModel* getModel() { return mAvengModel; }
-		InstanceSettings getInstanceSettings() { return mInstanceSettings; };
-		void setInstanceSettings(const InstanceSettings& is) { mInstanceSettings = is; };
-
 		ModelId modelId() const { return modelId_; }
-
+		InstanceSettings instanceSettings() const { return mInstanceSettings; };
+		void setInstanceSettings(const InstanceSettings& is) { mInstanceSettings = is; };
+		void updateModelRootMatrix();
+		
 	private:
 
-		ModelId modelId_ = 0; // Never derive it from AvengModel*, never ask the model for it later.
-		AvengModel* mAvengModel;
+		ModelId modelId_ = 0;
 		InstanceSettings mInstanceSettings{};
+
+		glm::mat4 mLocalTranslationMatrix = glm::mat4(1.0f);
+		glm::mat4 mLocalRotationMatrix = glm::mat4(1.0f);
+		glm::mat4 mLocalScaleMatrix = glm::mat4(1.0f);
+		glm::mat4 mLocalSwapAxisMatrix = glm::mat4(1.0f);
+
+		glm::mat4 mLocalTransformMatrix = glm::mat4(1.0f);
+
+		glm::mat4 mInstanceRootMatrix = glm::mat4(1.0f);
 		glm::mat4 mModelRootMatrix = glm::mat4(1.0f);
 	};
 }

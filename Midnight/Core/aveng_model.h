@@ -26,6 +26,12 @@ namespace aveng {
 
 	public:
 
+		/*
+			This class caters to every type of 3D model that we load.
+			That could become unwieldy but for now its not a
+			priority to address this.
+		*/
+
 		AvengModel(EngineDevice& device);
 
 		~AvengModel();

@@ -14,6 +14,7 @@ namespace aveng {
 
 		int isInstanceIndexPosition = -1;
 
+		size_t isAnimClipSize = 0;
 		unsigned int isAnimClipNr = 0;
 		float isAnimPlayTimePos = 0.0f;
 		float isAnimSpeedFactor = 1.0f;

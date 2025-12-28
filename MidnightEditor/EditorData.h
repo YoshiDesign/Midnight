@@ -7,11 +7,6 @@
 
 namespace aveng {
 
-    using StaticH = InstanceHandle<StaticTag>;
-    using AnimatedH = InstanceHandle<AnimatedTag>;
-
-    using AnyHandle = std::variant<AnimatedHandle, StaticHandle>;
-
     // Editor sink to emit commands to XOne
     struct EditorCommand {
         enum class Type { RequestPlay, RequestStop, RequestPause, RequestResume } type;
@@ -19,9 +14,10 @@ namespace aveng {
     };
 
     struct EditorData {
-
+        std::vector<AnyInstanceHandle> selectedMany; // For future reference
+        int selectedEditorInstance = 0;
         // AssimpInstance* eCurrentSelectedInstance = nullptr;
-        AnyHandle selectedInstance{};
+        AnyInstanceHandle selectedInstance{};
         bool highlight = false;
         float blink = 0.1f;
 

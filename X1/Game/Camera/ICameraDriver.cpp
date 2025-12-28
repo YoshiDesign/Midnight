@@ -10,7 +10,7 @@ namespace aveng {
 		float lookSpeed{ 2.0f };
 		float rollSpeed{ 8.0f };
 
-		// Note: glfwGetKey polls cached state, and won't tell you about key repeat status
+		// Note: glfwGetKey polls cached state, and won't tell you about key repeat status. Don't use it for player controls.
 		// but that's not relevant here anymore. What's for dinner?
 
 		if (input.keyDown[GLFW_KEY_UP]) // look up

@@ -24,7 +24,6 @@ namespace aveng {
 	class AvengWindow;
 	class Renderer;
 	class InputState;
-	class InstanceManager<>;
 
 	class Editor {
 	public:
@@ -89,7 +88,7 @@ namespace aveng {
 			aveng::InstanceManager<Tag>& mgr,
 			const std::vector<InstanceHandle<Tag>>& drawOrder,
 			std::vector<glm::vec2>& out,
-			const AnyHandle& selectedAny,
+			const AnyInstanceHandle& selectedAny,
 			bool highlight,
 			float blinkValue);
 
@@ -128,7 +127,7 @@ namespace aveng {
 		VkResult result;
 		VkRenderData& renderData;
 		GameData& gameData;
-		ModelAndInstanceData& mModelInstanceData;
+		// ModelAndInstanceData& mModelInstanceData;
 		EngineDevice& engineDevice;
 		AvengWindow& window;
 		Renderer& renderer;

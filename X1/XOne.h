@@ -1,13 +1,16 @@
 #pragma once
 #include <vector>
 #include "Game/data.h"
-#include "System/Render/ObjectRenderSystem.h"
+#include "Core/Midnight.h"
 #include "Core/app_object.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVk/aveng_buffer.h"
 #include "System/Peripheral/KeyboardController.h"
 #include "Runtime/Play/PlayManager.h"
+#ifdef ENABLE_EDITOR
+#include "Editor.h"
+#endif
 
 namespace xone {
 
@@ -21,12 +24,27 @@ namespace xone {
 		XOne(const XOne&) = delete;
 		XOne& operator=(const XOne&) = delete;
 		void run();
+
+		VkDevice getEngineDevice() { return midnight.device(); }
+
+		bool shouldClose() { return midnight.shouldClose(); }
+
+		const aveng::InputState& inputState() { return midnight.inputState(); }
+		// void updateInputState() {  }
+
+
+#ifdef ENABLE_EDITOR
+		aveng::EditorData& editorData() { return midnight.editorData(); }
+#endif
 		// void pendulum(EngineDevice& engineDevice, int _max_rows);
 
 	private:
 
 		float frameTime;
+		int player_camera_id;
 		ObjectRenderSystem objectRenderSystem{};
+		aveng::GameData gameData; // This is a big design flaw at the moment. Don't rely on it
+		aveng::Midnight midnight{ gameData };
 
 		/*
 		* !! Order of member initialization matters !!

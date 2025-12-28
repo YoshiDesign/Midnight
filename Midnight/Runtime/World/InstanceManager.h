@@ -1,24 +1,14 @@
 #pragma once
 #include "avpch.h"
+#include "Services/ModelServices.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "Core/Modeling/InstanceSettings.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/VkRenderData.h"
 #include "Core/Modeling/ModelRegistry.h"
 #include "Core/aveng_model.h"
-namespace aveng {
 
-    /*
-    * TODO Maybe - safety checks
-    * Slot* tryGetSlot(Handle h) {
-            if (!h) return nullptr;
-            if (h.index >= instanceData_.slots.size()) return nullptr;
-            auto& slot = instanceData_.slots[h.index];
-            if (!slot.alive) return nullptr;
-            if (slot.generation != h.generation) return nullptr;
-            return &slot;
-        }
-    */
+namespace aveng {
 
     class AvengModel;
     class EngineDevice;
@@ -37,95 +27,70 @@ namespace aveng {
             callbacks_ = std::move(callbacks);
         }
 
-        /* */
-        InstanceData& data()                { return instanceData_; }
+        // DEBUG
+        void validateState() {
+        
+        }
 
-        /* */
-        const InstanceData& data() const    { return instanceData_; }
+        /* API - Danger */
+        // InstanceData& data()                { return instanceData_; } // Not exactly a narrow API
 
-        /* */
+        /* API -  */
+        const InstanceData& data() const    { return instanceData_; } // Not exactly a narrow API
+
+        /* API -  */
         const std::vector<Handle>& instancesInOrder() const { return instanceData_.instancesInOrder; }
 
-        /* */
+        /* API -  */
         const std::vector<Slot>& slots() const { return instanceData_.slots; }
 
-        /* If renderer needs per-model groups: */ 
+        /* API - If renderer needs per-model groups: */ 
         const std::unordered_map<ModelId, std::vector<Handle>>& instancesPerModel() const { return instanceData_.instancesPerModel; }
 
-        /* Ctor */
-        explicit InstanceManager(VkRenderData& renderData_, EngineDevice& engineDevice_)
-            : renderData(renderData_), engineDevice(engineDevice_) {
+        /* Ctor - Each instance manager manages a null instance */
+        explicit InstanceManager(const IModelQuery& models)
+            : models_(models) {
+        
+            // Note: Manually setting the modelId for the null-instance
+            Instance nullInstance = Instance(NullModelId);
 
-            {
-                /* Null model instance - Utility */
-                std::shared_ptr<AvengModel> nullModel = std::make_shared<AvengModel>(engineDevice);
-                modelData_.models.emplace_back(nullModel);
+            Slot slot = {
+                nullInstance, // instance
+                1, // generation
+                true // alive
+            };
 
-                // Note: Manually setting the modelId for the null-instance
-                Instance nullInstance = Instance(0, nullModel.get());
+            Handle handle = {
+                instanceData_.slots.size(), // index
+                1 // generation
+            };
 
-                Slot slot = {
-                    nullInstance, // instance
-                    1, // generation
-                    true // alive
-                };
-
-                Handle handle = {
-                    instanceData_.slots.size(), // index
-                    1 // generation
-                };
-
-                // NOTE: We probably won't need to keep null instance in instancesPerModel anymore - test later
-                instanceData_.instancesPerModel[0].emplace_back(handle);
-                instanceData_.slots.emplace_back(slot);
-                // assignInstanceIndices();
-            }
-
+            // NOTE: We probably won't need to keep null instance in instancesPerModel anymore - test later
+            instanceData_.instancesPerModel[NullModelId].emplace_back(handle);
+            instanceData_.slots.emplace_back(slot);
+        
         }
 
     private:
 
+        /* Get a free slot's index or create a new one and return its index */
         uint32_t acquireSlotIndex() {
+
             if (!instanceData_.free.empty()) {
+                // Acquire an unused slot
                 uint32_t idx = instanceData_.free.back();
                 instanceData_.free.pop_back();
                 return idx;
             }
+
             uint32_t idx = static_cast<uint32_t>(instanceData_.slots.size());
             instanceData_.slots.emplace_back(); // default Slot: instance=nullopt, alive=false, generation=1
             return idx;
         }
 
-        // Note: Broken
-        void updateTriangleCount(unsigned int triangles) {
-            // renderData.rdTriangleCount = 0;
-            //for (const auto& instanceSlot : data_.miInstanceSlots) {
-                renderData.rdTriangleCount += triangles;
-            //}
-        }
-
-        //// Note: also broken
-        //void assignInstanceIndices() {
-        //    std::cout << "ASSINGING INDICES:" << std::endl;
-        //    for (size_t i = 0; i < instanceData_.instancesInOrder.size(); ++i) {
-        //        std::cout
-        //            << "modInstanceData.miAssimpInstances["
-        //            << i << "] "
-        //            << instanceData_.slots[instanceData_.instancesInOrder[i].index].instance.getModel()->getModelFileName()
-        //            << std::endl;
-
-        //        InstanceSettings instSettings =
-        //            instanceData_.slots[instanceData_.instancesInOrder[i].index]
-        //            .instance.getInstanceSettings();
-
-        //        instSettings.isInstanceIndexPosition = i;
-        //        data_.miInstanceSlots[data_.miInstancesInOrder[i].index].instance.setInstanceSettings(instSettings);
-        //    }
-        //}
-
     public:
 
-        /* get() */
+        /* get() - With a lot validation */
         Instance* get(Handle h) {
             if (h.generation == 0) return nullptr;
             if (h.index >= instanceData_.slots.size()) return nullptr;
@@ -144,46 +109,48 @@ namespace aveng {
             return const_cast<InstanceManager*>(this)->get(h);
         }
 
-        /* TODO - We probably need a new method to achieve this same result [See]: IModelSource.h */
-        bool hasModel(const std::string& modelFileName) {
-            auto modelIter = std::find_if(modelData_.models.begin(), modelData_.models.end(),
-                [modelFileName](const auto& model) {
-                return model->getModelFileNamePath() == modelFileName || model->getModelFileName() == modelFileName;
-            });
-            return modelIter != modelData_.models.end();
-        }
-
-        /* TODO - We probably need a new method to achieve this same result [See]: IModelSource.h */
-        std::shared_ptr<AvengModel> getModel(const std::string& modelFileName) {
-            auto modelIter = std::find_if(modelData_.models.begin(), modelData_.models.end(),
-                [modelFileName](const auto& model) {
-                return model->getModelFileNamePath() == modelFileName || model->getModelFileName() == modelFileName;
-            });
-            if (modelIter != modelData_.models.end()) {
-                return *modelIter;
-            }
-            return nullptr;
-        }
-
-        /* */
+        /*
+         deleteInstance(span) expects the handle to refer to an external stable handle.
+         Don't ever do something like: deleteInstance(instanceData_.instancesInOrder[i])
+         or you'll potentially end up with UB. Handles are cheap. Copy them
+        */
         void deleteInstance(const Handle& h)
         {
             // --- 1) Validate handle/index/generation/alive ---
-            if (h.generation == 0) return;
-            if (h.index >= instanceData_.slots.size()) return;
+            if (h.generation == 0) {
+                std::cout << "InstanceManager::deleteInstance [0] Fail - no generation for handle\n";
+                return;
+            }
+            if (h.index >= instanceData_.slots.size()) {
+                std::cout << "InstanceManager::deleteInstance [0 again] Fail - handle index out of slots range\n";
+                return;
+            }
 
             Slot& slot = instanceData_.slots[h.index];
 
-            if (!slot.alive) return;
-            if (slot.generation != h.generation) return;
-            if (!slot.instance.has_value()) return; // should be true if alive, but keep it defensive
+            if (!slot.alive) {
+                std::cout << "InstanceManager::deleteInstance [1] Fail - Slot was not alive\n";
+                return;
+            }
+            if (slot.generation != h.generation) {
+                std::cout << "InstanceManager::deleteInstance [2] Fail - No Generation in slot\n";
+                return;
+            }
+            if (!slot.instance.has_value()) {
+                std::cout << "InstanceManager::deleteInstance [2] Fail - No instance in slot\n";
+                return;
+            }
 
             // --- 2) Capture model key BEFORE destroying the instance ---
-            // (Your Instance stores AvengModel*; this may become nullptr on destruction/reset.)
+            // (The Instance stores AvengModel* this may become nullptr on destruction/reset.)
             Instance& inst = slot.instance.value();
             ModelId mid = inst.modelId();
-            auto& vec = instanceData_.instancesPerModel[mid];
-            vec.erase(std::remove(vec.begin(), vec.end(), h), vec.end());
+            // Long-winded but safest way to remove without accidental pollution
+            if (auto it = instanceData_.instancesPerModel.find(mid); it != instanceData_.instancesPerModel.end()) {
+                auto& vec = it->second;
+                vec.erase(std::remove(vec.begin(), vec.end(), h), vec.end());
+                if (vec.empty()) instanceData_.instancesPerModel.erase(it); // optional cleanup
+            }
 
             // --- 3) Remove handle from "instancesInOrder" ---
             // O(n), but simple and correct. You can later optimize with a back-pointer index.
@@ -192,126 +159,112 @@ namespace aveng {
                 auto& v = instanceData_.instancesInOrder;
                 v.erase(std::remove(v.begin(), v.end(), h), v.end());
             }
-
-            // --- 4) Remove handle from "instancesPerModel[modelKey]" ---
-            // Only if we have a modelKey (model might be null if something went wrong).
-            if (!modelKey.empty()) {
-                auto it = instanceData_.instancesPerModel.find(modelKey);
-                if (it != instanceData_.instancesPerModel.end()) {
-                    auto& vec = it->second;
-                    vec.erase(std::remove(vec.begin(), vec.end(), h), vec.end());
-
-                    // Optional cleanup: remove the map entry if now empty
-                    if (vec.empty()) {
-                        instanceData_.instancesPerModel.erase(it);
-                    }
-                }
+            {
+                auto& v = instanceData_.active;
+                v.erase(std::remove(v.begin(), v.end(), h.index), v.end());
             }
 
-            // --- 5) Destroy the instance in the slot ---
-            // This runs Instance's destructor. (If Instance just owns pointers, destructor is trivial.)
+            // --- 4) Destroy the ~Instance()
             slot.instance.reset();
 
-            // --- 6) Invalidate slot + recycle index ---
+            // --- 5) Invalidate slot + recycle index ---
             slot.alive = false;
 
             // Bump generation so old handles become stale.
-            // (Be mindful of overflow; see note below.)
             slot.generation = (slot.generation == std::numeric_limits<uint32_t>::max())
                 ? 1u
                 : slot.generation + 1u;
 
+#ifdef M_DEBUG
+            // DEBUG
+            assert(std::find(instanceData_.free.begin(), instanceData_.free.end(), 
+                h.index) != instanceData_.free.end() 
+                && "Duplicate index found in instanceData_.free!");
+#endif
             instanceData_.free.push_back(h.index);
 
-            // --- 7) Optional: callbacks / bookkeeping ---
-            // If you have callbacks per pool:
-            // if (callbacks_.onDelete) callbacks_.onDelete(h);
-
-            // assignInstanceIndices()
-            // updateTriangleCount()
         }
 
-
-        void deleteInstances(std::vector<const Handle& h> instances) {
-        
+        /*
+         deleteInstances(span) expects the span to refer to external stable storage 
+         don't ever do something like: deleteInstances(instanceData_.instancesInOrder[i])
+         or you'll end up modifying the span internally. Handles are cheap, copy them
+         and let deleteInstance take care of our storage types
+        */
+        void deleteInstances(std::span<const Handle> handles) {
+            for (const Handle& h : handles) {
+                deleteInstance(h);
+            }
         }
 
         Handle createInstance(const ModelRef& m) {
+#ifdef M_DEBUG
+            assert(m.id != 0 && "Attempting to create instance from invalid modelRef");
+#endif
+            ModelMeta meta{};
+            if (!models_.tryGetModelMeta(m.id, meta)) {
+                return {}; // invalid handle (or throw/assert)
+            }
 
-            assert(m.model != nullptr && m.id != 0 && "Attempting to create instance from invalid modelRef");
+#ifdef M_DEBUG
+            // Optional safety: don't let the wrong pool create the wrong kind of model
+            if constexpr (TagTraits<Tag>::kAnimated) {
+                if (!meta.animated) return {}; // or route to static mgr at a higher layer
+            }
+            else {
+                if (meta.animated) return {};
+            }
+#endif
+            std::cout << "Creating Instance Datas...\n";
+            uint32_t slotIndex = acquireSlotIndex(); // side-effects: Creates a slot if none are free
 
-            uint32_t slotIndex = acquireSlotIndex(); // side-effects
-
-            InstanceSlot& slot = instanceData_.slots[slotIndex];
+            // Via newly created index
+            Slot& slot = instanceData_.slots[slotIndex];
             
-            slot.instance = Instance(model);
+            // Construct instance 
+            slot.instance.emplace(m.id);
             slot.alive = true;
 
+            auto& inst = slot.instance.value();
+            inst.setModelId(m.id);
+            inst.setModelRootMatrix(meta.root);
+
+            if constexpr (TagTraits<Tag>::kAnimated) {
+                inst.resizeNodeTransformData(meta.boneCount);
+            }
+
             // NOTE: generation already bumped on delete
-            return InstanceHandle{
+            return Handle{
                 slotIndex,
                 slot.generation
             };
         }
 
-        //void addInstance(const ModelId& model) {
-        //    createInstance(model.get());
+        Handle addInstanceOfModel(const  ModelRef& modelRef, const InstanceSettings& s) {
+#ifdef M_DEBUG
 
-        //    // assignInstanceIndices(); Replaced with slots / handles
+            assert(instanceData_.instancesPerModel.find(modelRef.id)
+                != instanceData_.instancesPerModel.end() && 
+                "InstanceManager::addInstanceOfModel Model does not exist for this instance.");
+#endif
+            std::cout << "Adding Instance...\n";
+            Handle h = createInstance(modelRef);
+            instanceData_.instancesInOrder.push_back(h);
+            instanceData_.instancesPerModel[modelRef.id].push_back(h);
+        }
+        
+        /* Add multiple instances of a given model - Note, use span when usage is minimal - no resizes, etc. */
+        std::vector<Handle> addInstancesOfModel(const ModelRef& modelRef, std::span<const InstanceSettings> settings, unsigned int n) {
 
-        //    // Update triangles in the scene
-        //    updateTriangleCount(model->getTriangleCount());
-        //}
+            std::cout << "Adding Multiple Instance...\n";
+            std::vector<Handle> out;
+            out.reserve(n);
 
-
-        void addInstances(std::vector<const ModelId&> h, unsigned int n) {
-            //if (model->hasAnimations()) {
-            //    size_t animClipNum = model->getAnimClips().size();
-            //    for (int i = 0; i < numInstances; ++i) {
-            //        int xPos = std::rand() % 50 - 25;
-            //        int zPos = std::rand() % 50 - 25;
-            //        int rotation = std::rand() % 360 - 180;
-            //        int clipNr = std::rand() % animClipNum;
-
-            //        Instance newInstance = Instance(model.get(), glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
-            //        if (animClipNum > 0) {
-            //            InstanceSettings instSettings = newInstance.getInstanceSettings();
-            //            instSettings.isAnimClipNr = clipNr;
-            //            newInstance.setInstanceSettings(instSettings);
-            //        }
-
-            //        InstanceHandle handle{
-
-            //        };
-
-            //        InstanceSlot slot{
-            //            newInstance,
-            //            1,
-            //            true
-            //        };
-
-            //        data_.miInstancesInOrder.emplace_back(handle);
-            //        data_.miInstanceSlots.emplace_back(slot);
-            //        data_.miInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
-            //    }
-            //}
-            //else {
-
-            //    for (int i = 0; i < numInstances; ++i) {
-            //        int xPos = std::rand() % 50 - 25;
-            //        int zPos = std::rand() % 50 - 25;
-            //        int rotation = std::rand() % 360 - 180;
-
-            //        std::shared_ptr<Instance> newInstance = std::make_shared<Instance>(model, glm::vec3(xPos, 0.0f, zPos), glm::vec3(0.0f, rotation, 0.0f));
-
-            //        data_.miAssimpInstances.emplace_back(newInstance);
-            //        data_.miAssimpInstancesPerModel[model->getModelFileName()].emplace_back(newInstance);
-            //    }
-
-            //}
-
-            //assignInstanceIndices();
-            //updateTriangleCount();
+            for (unsigned i = 0; i < n; ++i) {
+                const InstanceSettings& s = settings[i % settings.size()];
+                out.push_back(addInstanceOfModel(modelRef, s));
+            }
+            return out;
         }
 
         /*
@@ -319,65 +272,61 @@ namespace aveng {
         * Cant this just be combined with cloneInstances?
         * There's no diff between this fn and passing numClones = 1 in cloneInstances
         */
-        void cloneInstanceFrom(const Handle& handle, AvengModel* model, const InstanceSettings& settings) {
+        Handle cloneInstance(const Handle& handle) {
+            
+            std::cout << "Cloning: Fetching clone pointer...\n";
+            // Fetch the clone
+            Instance* clone = get(handle);
+            ModelId mid = clone->modelId();
+            InstanceSettings cloneSettings = clone->instanceSettings();
 
+            // New slot
             uint32_t slotIndex = acquireSlotIndex();
             auto& slot = instanceData_.slots[slotIndex];
 
-            // bump generation on reuse
             if (slot.alive) {
                 // should never happen if your free list is correct
                 std::cout << "ANOMALY [1]" << std::endl;
             }
 
+            // bump generation on reuse
             slot.generation = std::max(slot.generation + 1, 1u);
             slot.alive = true;
 
-            slot.instance.emplace(model);          // construct Instance in-place
-            slot.instance->setInstanceSettings(settings);
+            slot.instance.emplace(mid); // constructs Instance{mid} in-place
+            slot.instance->setInstanceSettings(cloneSettings);
 
             Handle h{ slotIndex, slot.generation };
   
             instanceData_.instancesInOrder.push_back(h);
-            instanceData_.instancesPerModel[model->getModelFileName()].push_back(h); // <-- I recommend storing handles, not copies
-
-            // assignInstanceIndices();
-            // updateTriangleCount();
+            instanceData_.instancesPerModel[mid].push_back(h);
+            clone = nullptr;
             return h;
         }
-        
-        void cloneInstances(const Handle& handle, int numClones) {
 
-            auto& src = instanceData_.slots[handle.index].instance.value();
-            AvengModel* currentModel = src.getModel();
-           
-            size_t animClipNum = model->getAnimClips().size();
+        std::vector<Handle> cloneInstances(const Handle& handle, unsigned int nClones)
+        {
+            std::cout << "Cloning: Requested " << nClones << " clones\n";
+            if (nClones == 0) nClones = 1;
 
-            for (int i = 0; i < numClones; ++i) {
-                InstanceSettings instSettings = instance->getInstanceSettings();
-                int xPos = std::rand() % 50 - 25;
-                int zPos = std::rand() % 50 - 25;
-                int rotation = std::rand() % 360 - 180;
+            std::vector<Handle> cloneHandles;
 
-                instSettings.isWorldPosition = glm::vec3(xPos, 0.0f, zPos);
-                instSettings.isWorldRotation = glm::vec3(0.0f, rotation, 0.0f);
-
-                if (animClipNum > 0) 
-                {
-
-                    int clipNr = std::rand() % animClipNum;
-                    float animSpeed = (std::rand() % 50 + 75) / 100.0f;
-                    instSettings.isAnimClipNr = clipNr;
-                    instSettings.isAnimSpeedFactor = animSpeed;
-
-                }
-
-                cloneOneFrom(handle, model, instSettings);
-
+            for (int i = 0; i < nClones; i++) {
+                cloneHandles.push_back(cloneInstance(handle));
             }
 
-            // assignInstanceIndices();
-            // updateTriangleCount();
+            return cloneHandles;
+        }
+
+        /// Set transform for one instance.
+        void setTransform(AnyInstanceHandle h, const Transform& t) {
+        
+        }
+
+        /// Optional convenience for batch transforms (future-friendly).
+        void setTransforms(std::span<const AnyInstanceHandle> handles,
+            std::span<const Transform> transforms) {
+        
         }
 
         /* Some settings modifiers */
@@ -398,12 +347,8 @@ namespace aveng {
         }
 
     private:
-
+        const IModelQuery&  models_; // This is "technically" the entire Renderer. Just a constrained API from it
         InstanceCallbacks   callbacks_{};
         InstanceData        instanceData_{};
-        ModelRegistryData   modelData_{};
-        VkRenderData& renderData;
-        EngineDevice& engineDevice;
-
     };
 }

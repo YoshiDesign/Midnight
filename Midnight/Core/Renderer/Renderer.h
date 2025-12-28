@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include "Core/Modeling/ModelRegistry.h"
+#include "Services/ModelServices.h"
 #include "Core/Modeling/Sources/IModelSource.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/VkRenderData.h"
@@ -27,8 +28,8 @@ namespace aveng {
 	class CameraManager;
 	struct CameraTransform;
 
-	// The renderer is something of a "ModelManager" too, for now
-	class Renderer {
+	// The renderer is something of a "ModelManager" too, for now, hence the IModelQuery
+	class Renderer : public IModelQuery {
 
 	public:
 
@@ -37,8 +38,14 @@ namespace aveng {
 
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
-		//bool queueModelLoad(const std::string& filepath);
-		// std::shared_ptr<AvengModel> getOrLoadModelPtr(std::string_view assetKeyView);
+	
+		/* IModelQuery */
+		bool tryGetModelMeta(ModelId id, ModelMeta& out) const override;
+		bool isModelAnimated(ModelId id, ModelMeta& out) const override;
+		bool isModelLoaded(ModelId id, ModelMeta& out) const override;
+
+		const IModelAnimQuery& animQuery() const { return modelDb_; }
+
 
 		/* Callback definitions */
 		ModelRef getOrLoadModel(const AssetKey& key);
@@ -51,7 +58,7 @@ namespace aveng {
 		void processPendingModelLoads();  // Call this in between frames
 		std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
 		bool hasModel(const std::string& modelFileName);
-		std::shared_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
+		std::unique_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
 
 		bool isFrameInProgress() const { return isFrameStarted; }
 

@@ -27,14 +27,28 @@ namespace aveng {
 	/*
 	 * These two tags allow us to safely use typed instances of InstanceManager(or whoever needs em)
 	 * We're creating 2 unique type-aliases to satisfy a specific template type for ModelAndInstanceCallbacks.
-	 * In short: Give InstanceManager a way to differentiate its internals.
-	 * Note that InstanceManager only uses <Tag> to specialize or template other types.
+	 * In short: Give InstanceManager a way to differentiate its internal types
 	 */
 	struct AnimatedTag {}; // 1 These two types are used to define the template on `InstanceManager<AnimatedTag>`
 	using AnimatedHandle = InstanceHandle<AnimatedTag>;
 
 	struct StaticTag {}; // 2 These two types are used to define the template on `InstanceManager<StaticTag>`
 	using StaticHandle = InstanceHandle<StaticTag>;
+
+	/* Traits for anything that needs to differentiate mid-method/def. See: InstanceManager */
+	template<class Tag> struct TagTraits;
+	template<> struct TagTraits<StaticTag> { static constexpr bool kAnimated = false; };
+	template<> struct TagTraits<AnimatedTag> { static constexpr bool kAnimated = true; };
+
+	template<class... Handles>
+	using AnyHandle = std::variant<std::monostate, Handles...>;			// Reusable variant pattern 
+	using AnyInstanceHandle = AnyHandle<StaticHandle, AnimatedHandle>;	// Add handles here as we create more flavors
+
+	// Handle validation helpers - TODO audit their usage
+	inline bool isValid(const AnyInstanceHandle& h) {
+		return !std::holds_alternative<std::monostate>(h);
+	}
+	inline void clear(AnyInstanceHandle& h) { h = std::monostate{}; }
 
    /*
 	* This comprises a strategy for creating a templated type alias in `InstanceManager`
@@ -76,30 +90,15 @@ namespace aveng {
 	constexpr bool operator!=(const InstanceHandle<Tag>& a, const InstanceHandle<Tag>& b) noexcept {
 		return !(a == b);
 	}
+	// The above operator overloads allow us to do do things like:
+	// vec.erase(std::remove(vec.begin(), vec.end(), handle), vec.end());
 
 	// Important: Tag is not required here, but it prevents accidental cross-pool misuse. The compiler will catch it.
 	template <class InstanceT>
 	struct InstanceSlot {
 		std::optional<InstanceT> instance;
 		uint32_t generation = 1;
-		bool alive = false;
-	};
-
-	/* 
-	* TODO: refactoring- 
-	*	instanceSettings.isInstanceIndexPosition == index in miInstancesInOrder
-	* Audit this prior relationship
-	*/
-
-	struct ModelRegistryData {
-		std::vector<ModelEntry> models;
-		std::unordered_map<AssetKey, ModelId> idByKey;
-		std::unordered_map<ModelId, size_t> indexById;
-
-		std::vector<AssetKey> pendingLoads;
-		std::vector<ModelId> pendingUnload;
-
-		std::optional<ModelId> selectedModel;
+		bool alive = false; //  invariant: if alive -> instance.hasValue() == true
 	};
 
 	template<class Tag>
@@ -108,15 +107,14 @@ namespace aveng {
 		using Instance = InstanceFor<Tag>;
 		using Slot = InstanceSlot<Instance>;
 
-
-		std::vector<Slot> slots{};
-		std::vector<uint32_t> free{};
-		std::vector<uint32_t> active{};
+		std::vector<Slot> slots{};		// Access to the instance and its generation / alive status
+		std::vector<uint32_t> free{};	// Indices of available `slots`
+		std::vector<uint32_t> active{};	// Indices of active `slots`
 
 		std::vector<Handle> instancesInOrder{};
 		std::unordered_map<ModelId, std::vector<Handle>> instancesPerModel;
 
-		int selectedEditorInstance = 0;
+		
 	};
 
 	// Templated callbacks - Instances
@@ -142,7 +140,6 @@ namespace aveng {
 
 	template<class HandleT>
 	struct InstanceCallbacksPerPool {
-		
 		instanceDeleteCallback<HandleT>     onDelete;
 		instanceDeleteManyCallback<HandleT> onDeleteMany;
 		instanceCloneCallback<HandleT>      onClone;
@@ -152,13 +149,13 @@ namespace aveng {
 		instanceAddManyCallback<HandleT>		onInstanceAddMany;
 	};
 
-	// This goes to Midnight
-	struct ModelAndInstanceCallbacks {
+	// This goes to Renderer
+	struct ModelCallbacks {
 		modelCheckCallback  onModelCheck;
 		modelAddCallback    onModelAdd;
 		modelDeleteCallback onModelDelete;
 
-		// TODO - This isn't the right place for this
+		// This probably doesn't need to be in here
 		//InstanceCallbacksPerPool<AnimatedHandle> anim;
 		//InstanceCallbacksPerPool<StaticHandle>   stat;
 	};

@@ -1,29 +1,29 @@
 #pragma once
 #include "avpch.h"
-
+#include "Services/ModelServices.h"
 
 /*For now, simplest rule: models stay loaded until shutdown.*/
 
 namespace aveng {
 
-	using AssetKey = std::string; // Identifies a model - Used to request a model that hasn't been loaded into memory yet
-	using ModelId = uint32_t; // Used internally by renderer / instance managers for fast lookups
-
 	// This is private to the model registry mechanics.
 	struct ModelEntry {
+		std::unique_ptr<AvengModel> model;
 		ModelId id;                 // runtime identity
 		AssetKey key;               // external identity
-		std::shared_ptr<AvengModel> model;
-		bool isAnimated = false;    // determined at load
+		bool isAnimated = false;		// Model Constant
+		uint32_t boneCount;				// Model Constant
+		glm::mat4 rootTransform{1.f};	// Model Constant
 	};
 
-	// This is public for callers who create models
+	// This is public for callers who create models - 
+	// AvengModel* creates invariance: if there's a ModelRef, there had better be a corresponding ModelEntry or it must be nullptr
+	// Also, ModelId 0 is always the Null Model.
 	struct ModelRef {
 		ModelId id = 0;
-		AvengModel* model = nullptr;   // or std::shared_ptr<AvengModel>
 		bool isAnimated = false;
 
-		explicit operator bool() const { return id != 0 && model != nullptr; }
+		explicit operator bool() const { return id != 0; } // Might need updated bc the NullModel could be nullptr in the future
 	};
 
 	//struct ModelDb {
@@ -32,6 +32,83 @@ namespace aveng {
 	//	std::unordered_map<ModelId, size_t> indexById;   // ModelId  -> entries index
 	//};
 
+	/* The ModelDB - Consider inheriting from the classes that the Renderer is currently inheriting */
+	struct ModelRegistryData : public IModelAnimQuery {
+		std::vector<ModelEntry> models;
+		std::unordered_map<AssetKey, ModelId> idByKey;
+		std::unordered_map<ModelId, size_t> indexById; // To look up the ModelEntry's index from models
+
+		std::vector<AssetKey> pendingLoads;
+		std::vector<ModelId> pendingUnload;
+
+		std::optional<ModelId> selectedModel;
+
+		const ModelEntry* get(ModelId id) const { 
+			std::cout << "ModelEntry::get(): " << id << std::endl;
+			return &models.at(indexById.at(id)); 
+		};
+
+		bool tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const {
+			std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
+			const ModelEntry* e = get(id);
+			if (!e || !e->isAnimated) return false;
+
+			const auto& clips = e->model->getAnimClips();
+			if (clipIndex >= clips.size()) return false;
+
+			out.durationTicks = clips[clipIndex]->getClipDuration();
+			out.ticksPerSecond = clips[clipIndex]->getClipTicksPerSecond();
+			out.animChannels = clips[clipIndex]->getChannels();
+		}
+
+		/*  */
+		/* IModelAnimQuery */
+		//bool tryGetClipTicksPerSecond(ModelId id, uint32_t clipIndex, float& outTPS) const {
+		//	std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
+		//	const ModelEntry* e = get(id);
+		//	if (!e || !e->isAnimated) return false;
+
+		//	const auto& clips = e->model->getAnimClips();
+		//	if (clipIndex >= clips.size()) return false;
+
+		//	outTPS = clips[clipIndex]->getClipTicksPerSecond();
+		//	return true;
+		//}
+
+		//bool tryGetClipDuration(ModelId id, uint32_t clipIndex, float& outDuration) const {
+		//	std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
+		//	const ModelEntry* e = get(id);
+		//	if (!e || !e->isAnimated) return false;
+
+		//	const auto& clips = e->model->getAnimClips();
+		//	if (clipIndex >= clips.size()) return false;
+
+		//	outDuration = clips[clipIndex]->getClipDuration();
+		//	return true;
+		//}
+
+		//bool tryGetClipChannels(ModelId id, uint32_t clipIndex, std::vector<std::shared_ptr<AssimpAnimChannel>> outChannels) const {
+		//	std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
+		//	const ModelEntry* e = get(id);
+		//	if (!e || !e->isAnimated) return false;
+
+		//	const auto& clips = e->model->getAnimClips();
+		//	if (clipIndex >= clips.size()) return false;
+
+		//	outChannels = clips[clipIndex]->getChannels();
+		//	return true;
+		//}
+
+
+		//bool tryGetClipCount(ModelId modelId, uint32_t& outCount) const {
+		//	return true;
+		//}
+
+		//bool tryGetClipDurationTicks(ModelId modelId, uint32_t clipIndex, float& outDurationTicks) const {
+		//	return true;
+		//}
+
+	};
 
 	constexpr ModelId NullModelId = 0;
 

@@ -54,6 +54,15 @@ namespace aveng {
 		}
 	}
 
+
+	// Note: Broken - Move this to Editor
+//void updateTriangleCount(unsigned int triangles) {
+//    // renderData.rdTriangleCount = 0;
+//    //for (const auto& instanceSlot : data_.miInstanceSlots) {
+//        renderData.rdTriangleCount += triangles;
+//    //}
+//}
+
 	Editor::~Editor() 
 	{
 		cleanup();
@@ -387,10 +396,10 @@ namespace aveng {
 
 	template<class Tag>
 	void Editor::updateSelectionForPool(
-		aveng::InstanceManager<Tag>& mgr,
+		InstanceManager<Tag>& mgr,
 		const std::vector<InstanceHandle<Tag>>& drawOrder,
 		std::vector<glm::vec2>& out,
-		const AnyHandle& selectedAny,
+		const AnyInstanceHandle& selectedAny,
 		bool highlight,
 		float blinkValue)
 	{
