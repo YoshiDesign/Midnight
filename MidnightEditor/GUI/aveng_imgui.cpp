@@ -27,10 +27,20 @@ namespace aveng {
         }
     */
 
-    AvengImgui::AvengImgui(VkRenderData& _renderData, GameData& _gameData, EditorData& editorData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData)
-        : renderData{ _renderData }, gameData{ _gameData }, 
-        editorData{ editorData }, engineDevice { _engineDevice}, 
-        modInstData{ _modInstData }, window{ _window }
+    AvengImgui::AvengImgui(
+        VkRenderData& _renderData, 
+        GameData& _gameData, 
+        EditorData& editorData, 
+        AvengWindow& _window, 
+        EngineDevice& _engineDevice, 
+        SceneFacade& scene)
+        : 
+        renderData{ _renderData }, 
+        gameData{ _gameData }, 
+        editorData{ editorData }, 
+        engineDevice { _engineDevice}, 
+        window{ _window },
+        scene_{ scene }
     {
         // Initialize all the timing vectors with their proper sizes
         mFPSValues.resize(mNumFPSValues, 0.0f);

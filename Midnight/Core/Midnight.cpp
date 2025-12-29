@@ -3,24 +3,45 @@
 namespace aveng {
 
 	Midnight::Midnight(GameData& gd)
+		// Just remember that initialization order is the member declaration order, not your initializer list order
 		: game_data(gd)
 		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
 		, engineDevice(aveng_window)
-		, modelSource_(createModelSource())
-		, renderer(engineDevice, aveng_window, std::move(modelSource_), renderData, cameraManager, modelLib_.query(), modelLib_.animQuery())
-		, staticMgr(modelLib_.query())
-		, animMgr(modelLib_.query())
+		, modelLib_(engineDevice, renderData)
+		, worldScene()
+		, renderer(engineDevice, aveng_window, renderData, cameraManager)
+#ifdef ENABLE_EDITOR
+		, editor_{ std::make_unique<Editor>(renderData,
+			renderer,
+			game_data,
+			engineDevice,
+			aveng_window,
+			cameraManager )
+		}
+		, editorInput_( std::make_unique<EditorInput>(*editor_) )
+		, inputRouter_( std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, *gameInput_) )
+		, inputSystem_( std::make_unique<InputSystem>(*inputRouter_, game_data))
+		, frame_(std::make_unique<AvengFrame>(
+			renderer,
+			renderData,
+			game_data,
+			engineDevice,
+			editor_.get()
+		))
+#else
+		, gameInput_(std::make_unique<GameInput>())
+		, inputSystem_(std::make_unique<InputSystem>(*gameInput_, game_data))
+		, frame_(std::make_unique<AvengFrame>(
+			renderer,
+			renderData,
+			game_data,
+			engineDevice,
+			nullptr
+		))
+#endif
 	{
 		initializeDependencies();
 		initialize();
-	}
-
-	std::unique_ptr<IModelSource> Midnight::createModelSource() {
-#ifdef ENABLE_EDITOR
-		return std::make_unique<FilesystemModelSource>();
-#else
-		return std::make_unique<PackModelSource>("assets.pak");
-#endif
 	}
 
 	void Midnight::render(float frameTime) {
@@ -39,7 +60,7 @@ namespace aveng {
 		frame_->render(frameTime); 
 	}
 
-	// This is the game's camera updates, not the editor's. It's more convenient to do this here at the moment
+	/* */
 	void Midnight::updateCamera(float frameTime)
 	{
 		// Fetched all the way from downtown (the swapchain)
@@ -63,76 +84,83 @@ namespace aveng {
 
 	}
 
+	/* */
 	int Midnight::registerCamera(std::string name, std::unique_ptr<ICameraDriver> cameraDriver) {
 		return cameraManager.createCamera(std::move(name), std::move(cameraDriver));
 	}
 
+#ifdef ENABLE_EDITOR
+	/* */
 	void Midnight::updateGUI(const InputState& state) {
 		editor_->updateInputState(state);
 	}
+#endif
 
 	void Midnight::registerInstanceManagerCallbacks()
 	{
 
-		/*
-		    // Clean Example or whatever you prefer...
-
-			static_cb.onInstanceSelected = [&](InstanceHandle<StaticTag> h) {
-				// do selection stuff
-			};
-
-			staticMgr.setCallbacks(static_cb);
-
-			// Example: animated callbacks
-			anim_cb.onInstanceSelected = [&](InstanceHandle<AnimatedTag> h) {
-				// do selection stuff
-			};
-
-			animMgr.setCallbacks(anim_cb);
-		*/
-
-		/* You're setting the class's own methods as its callbacks lol */
-
-		// Note the cool C++20 designated initialization syntax (fun fact: concept was borrowed from C99). Works for simple aggregate types
+		// Note the cool C++20 designated initialization syntax (fun fact: concept was borrowed from C99). 
+		// Works for simple aggregate types (InstanceCallbacksPerPool here)
 		staticMgr.setCallbacks({
 			.onDelete = [&](const StaticHandle& h) { staticMgr.deleteInstance(h); },
+
 			.onDeleteMany = [&](std::span<const StaticHandle> h) { staticMgr.deleteInstances(h); },
+
 			.onClone = [&](const StaticHandle& h) { staticMgr.cloneInstance(h);  },
+
 			.onCloneMany = [&](const StaticHandle& h, int n) { staticMgr.cloneInstances(h, n); },
+
 			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
+
 			.onInstanceAdd = [&](const ModelRef& h) { staticMgr.createInstance(h); },
-			.onInstanceAddMany = [&](const ModelRef& ref, std::span<const InstanceSettings> sett, unsigned int n) { staticMgr.addInstancesOfModel(ref, sett, n); }
+
+			.onInstanceAddMany = [&](
+				const ModelRef& ref, 
+				std::span<const InstanceSettings> sett, 
+				unsigned int n) { staticMgr.addInstancesOfModel(ref, sett, n); }
 		});
 
 		animMgr.setCallbacks({
 			.onDelete = [&](const AnimatedHandle& h) { animMgr.deleteInstance(h); },
+
 			.onDeleteMany = [&](std::span<const AnimatedHandle> h) { animMgr.deleteInstances(h); },
+
 			.onClone = [&](const AnimatedHandle& h) { animMgr.cloneInstance(h);  },
+
 			.onCloneMany = [&](const AnimatedHandle& h, int n) { animMgr.cloneInstances(h, n); },
-			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
+
 			.onInstanceAdd = [&](const ModelRef& h) { animMgr.createInstance(h); },
-			.onInstanceAddMany = [&](const ModelRef& ref, std::span<const InstanceSettings> sett, unsigned int n) { animMgr.addInstancesOfModel(ref, sett, n); }
+
+			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
+
+			.onInstanceAddMany = [&](
+				const ModelRef& ref, 
+				std::span<const InstanceSettings> sett, 
+				unsigned int n) { animMgr.addInstancesOfModel(ref, sett, n); }
 		});
 
 	}
 
 	void Midnight::initializeDependencies() {
-#ifdef ENABLE_EDITOR
-		editor_ = std::make_unique<Editor>(renderData, renderer, game_data, engineDevice, aveng_window, cameraManager);
-		editorInput_ = std::make_unique<EditorInput>(editor_.get());
-		inputRouter_ = std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, gameInput);
-
-		inputSystem_ = std::make_unique<InputSystem>(*inputRouter_, game_data);
-		frame_ = std::make_unique<AvengFrame>(renderer, renderData, game_data, engineDevice, editor_.get());
-#else
-		inputSystem_ = std::make_unique<InputSystem>(gameInput, game_data);
-		frame_ = std::make_unique<AvengFrame>(renderer, renderData, game_data, engineDevice, nullptr);
-#endif
+//#ifdef ENABLE_EDITOR - For reference, for now
+//		editor_ = std::make_unique<Editor>(renderData, renderer, game_data, engineDevice, aveng_window, cameraManager);
+//		editorInput_ = std::make_unique<EditorInput>(editor_.get());
+//		inputRouter_ = std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, gameInput);
+//
+//		inputSystem_ = std::make_unique<InputSystem>(*inputRouter_, game_data);
+//		frame_ = std::make_unique<AvengFrame>(renderer, renderData, game_data, engineDevice, editor_.get());
+//#else
+//		inputSystem_ = std::make_unique<InputSystem>(gameInput, game_data);
+//		frame_ = std::make_unique<AvengFrame>(renderer, renderData, game_data, engineDevice, nullptr);
+//#endif
 
 		aveng_window.setInputSystem(inputSystem_.get());
+
 		registerInstanceManagerCallbacks();
 
+#ifdef M_DEBUG
 		assert(frame_ && "Frame not initialized");
+#endif
 
 	}
 

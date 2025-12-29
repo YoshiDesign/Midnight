@@ -2,7 +2,7 @@
 #include "avpch.h"
 
 #include "GameRegistry.h"
-#include "Runtime/Facade/ISceneFacade.h"
+#include "Runtime/Facade/SceneFacade.h"
 
 namespace xone {
 

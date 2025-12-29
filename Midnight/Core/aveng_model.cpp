@@ -50,7 +50,7 @@ namespace aveng {
 		  mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
 		  mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
 		  mMatrixMultPerModelDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT)
-	{/*Keep in mind the null model instance if logic should find its way here*/ }
+	{ /*Keep the null model in mind if logic should find its way here - see <ModelLibrary> */ }
 
 	AvengModel::~AvengModel() {}
 
@@ -115,7 +115,14 @@ namespace aveng {
 		return mModelFilenamePath;
 	}
 
-	/*V2 of V2*/
+	/*V2 of V2
+	
+		Big TODO: Clean this sh*t up.
+		const VkRenderData& renderData (if possible) not VkRenderData& renderData!
+		renderData has been factored out of many of the places it propagates through.
+		It will receive an overhaul sooner than later
+	
+	*/
 	bool AvengModel::loadModelV2(
 		VkRenderData& renderData,
 		const AssetKey& key,                        // keep for debug + extension hint
@@ -342,193 +349,6 @@ namespace aveng {
 		return true;
 
 	}
-
-	//bool AvengModel::loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags)
-	//{
-	//	Assimp::Importer importer;
-
-	//	// Essential flags for proper mesh loading and deformation debugging
-	//	const aiScene* scene = importer.ReadFile(filepath,
-	//		aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_ValidateDataStructure | aiProcess_FlipUVs | extraImportFlags);
-
-	//	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-	//		std::printf("AssimpModel: Error loading '%s': %s\n", filepath.c_str(), importer.GetErrorString());
-	//		return false;
-	//	}
-
-	//	unsigned int numMeshes = scene->mNumMeshes;
-	//	std::printf("AssimpModel: Found %d mesh%s in '%s'\n", numMeshes, numMeshes == 1 ? "" : "es", filepath.c_str());
-
-	//	// Count vertices and faces
-	//	for (unsigned int i = 0; i < numMeshes; ++i) {
-	//		unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
-	//		unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
-
-	//		mVertexCount += numVertices;
-	//		mTriangleCount += numFaces;
-
-	//		// std::printf("%s: mesh %i contains %i vertices and %i faces\n", __FUNCTION__, i, numVertices, numFaces);
-	//	}
-	//	std::printf("AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
-
-	//	aiNode* rootNode = scene->mRootNode;
-
-	//	// Only for Embedded textures.
-	//	if (scene->HasTextures()) {
-	//		unsigned int numTextures = scene->mNumTextures;
-
-	//		std::cout << "Model has an embedded texture!!" << std::endl;
-
-	//		for (int i = 0; i < scene->mNumTextures; ++i) {
-	//			std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
-
-	//			int height = scene->mTextures[i]->mHeight;
-	//			int width = scene->mTextures[i]->mWidth;
-	//			aiTexel* data = scene->mTextures[i]->pcData;
-
-	//			VkTextureData newTex{};
-	//			if (!Texture::loadTexture(engineDevice, renderData, newTex, texName, data, width, height)) {
-	//				return false;
-	//			}
-
-	//			std::string internalTexName = "*" + std::to_string(i);
-
-	//			mTextures.insert({ internalTexName, newTex });
-	//		}
-
-	//		std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
-	//	}
-
-	//	/* add a white texture in case there is no diffuse tex but colors */
-	//	std::string whiteTexName = "textures/white.png";
-	//	if (!Texture::loadTexture(engineDevice, renderData, mWhiteTexture, whiteTexName)) {
-	//		// std::printf("%s error: could not load white default texture '%s'\n", __FUNCTION__, whiteTexName.c_str());
-	//		return false;
-	//	}
-
-	//	/* add a placeholder texture in case there is no diffuse tex */
-	//	std::string placeholderTexName = "textures/missing_tex.png";
-	//	if (!Texture::loadTexture(engineDevice, renderData, mPlaceholderTexture, placeholderTexName)) {
-	//		// std::printf("%s error: could not load placeholder texture '%s'\n", __FUNCTION__, placeholderTexName.c_str());
-	//		return false;
-	//	}
-
-	//	/* the textures are stored directly or relative to the model file */
-	//	std::string assetDirectory = filepath.substr(0, filepath.find_last_of('/'));
-
-
-	//	std::string rootNodeName = rootNode->mName.C_Str();
-	//	mRootNode = AssimpNode::createNode(rootNodeName);
-	//	std::printf("%s: root node name: '%s'\n", __FUNCTION__, rootNodeName.c_str());
-
-	//	processNode(renderData, mRootNode, rootNode, scene, assetDirectory);
-
-	//	/**
-	//	  * Check your work
-	//	  */
-	//	for (const auto& entry : mNodeList) {
-	//		std::vector<std::shared_ptr<AssimpNode>> childNodes = entry->getChilds();
-
-	//		std::string parentName = entry->getParentNodeName();
-	//		// std::printf("%s: --- found node %s in node list, it has %i children, parent is %s\n", __FUNCTION__, entry->getNodeName().c_str(), childNodes.size(), parentName.c_str());
-
-	//		for (const auto& node : childNodes) {
-	//			// std::printf("%s: ---- child: %s\n", __FUNCTION__, node->getNodeName().c_str());
-	//		}
-	//	}
-
-	//	std::vector<glm::mat4> boneOffsetMatricesList{};
-	//	std::vector<int32_t> boneParentIndexList{};
-
-	//	for (const auto& bone : mBoneList) {
-	//		boneOffsetMatricesList.emplace_back(bone->getOffsetMatrix());
-
-	//		std::string parentNodeName = mNodeMap.at(bone->getBoneName())->getParentNodeName();
-	//		const auto boneIter = std::find_if(mBoneList.begin(), mBoneList.end(), [parentNodeName](std::shared_ptr<AssimpBone>& bone) { return bone->getBoneName() == parentNodeName; });
-	//		if (boneIter == mBoneList.end()) {
-	//			boneParentIndexList.emplace_back(-1); // root node gets a -1 to identify
-	//		}
-	//		else {
-	//			boneParentIndexList.emplace_back(std::distance(mBoneList.begin(), boneIter));
-	//		}
-	//	}
-
-	//	// std::printf("%s: -- bone parents --\n", __FUNCTION__);
-	//	// for (unsigned int i = 0; i < mBoneList.size(); ++i) {
-	//		// std::printf("%s: bone %i (%s) has parent %i (%s)\n", __FUNCTION__, i, mBoneList.at(i)->getBoneName().c_str(), boneParentIndexList.at(i),
-	//			// boneParentIndexList.at(i) < 0 ? "invalid" : mBoneList.at(boneParentIndexList.at(i))->getBoneName().c_str());
-	//	// }
-	//	// std::printf("%s: -- bone parents --\n", __FUNCTION__);
-
-	//	/* create vertex buffers for the meshes */
-	//	for (const auto& mesh : mModelMeshes) {
-	//		VkVertexBufferData vertexBuffer;
-	//		VertexBuffer::init(engineDevice, vertexBuffer, mesh.vertices.size() * sizeof(VkVertex));
-	//		VertexBuffer::uploadData(engineDevice, vertexBuffer, mesh);
-	//		mVertexBuffers.emplace_back(vertexBuffer);
-
-	//		VkIndexBufferData indexBuffer;
-	//		IndexBuffer::init(engineDevice, indexBuffer, mesh.indices.size() * sizeof(uint32_t));
-	//		IndexBuffer::uploadData(engineDevice, indexBuffer, mesh);
-	//		mIndexBuffers.emplace_back(indexBuffer);
-	//	}
-
-	//	for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-
-	//		size_t boneMatBufferSize = boneOffsetMatricesList.size() * sizeof(glm::mat4);
-	//		size_t boneParentBufferSize = boneParentIndexList.size() * sizeof(int32_t);
-
-	//		ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
-	//		ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
-
-	//		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList))
-	//		{
-	//			throw std::runtime_error("model buffer allocation size was incorrect");
-	//		};
-
-	//		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList))
-	//		{
-	//			throw std::runtime_error("model buffer allocation size was incorrect");
-	//		};
-
-	//	}
-
-	//	/* create descriptor set (for each available frame in flight) for per-model data */
-	//	createDescriptorSet(renderData);
-
-	//	/* animations */
-	//	unsigned int numAnims = scene->mNumAnimations;
-	//	for (unsigned int i = 0; i < numAnims; ++i) {
-	//		aiAnimation* animation = scene->mAnimations[i];
-
-	//		// std::printf("%s: -- animation clip %i has %i skeletal channels, %i mesh channels, and %i morph mesh channels\n",
-	//			// __FUNCTION__, i, animation->mNumChannels, animation->mNumMeshChannels, animation->mNumMorphMeshChannels);
-
-	//		std::shared_ptr<AssimpAnimClip> animClip = std::make_shared<AssimpAnimClip>();
-	//		animClip->addChannels(animation, mBoneList);
-	//		if (animClip->getClipName().empty()) {
-	//			animClip->setClipName(std::to_string(i));
-	//		}
-	//		mAnimClips.emplace_back(animClip);
-	//	}
-
-	//	mModelFilenamePath = filepath;
-	//	mModelFilename = std::filesystem::path(filepath).filename().generic_string();
-
-	//	/* get root transformation matrix from model's root node */
-	//	glm::mat4 local_gltf = Tools::convertAiToGLM(rootNode->mTransformation);
-	//	glm::mat4 local_engine =
-	//		Tools::gltfToEngine * local_gltf * glm::inverse(Tools::gltfToEngine);
-
-	//	mRootTransformMatrix = local_engine;
-
-	//	Logger::log(1, "%s: - model has a total of %i texture%s\n", __FUNCTION__, mTextures.size(), mTextures.size() == 1 ? "" : "s");
-	//	std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
-	//	std::printf("%s: - model has a total of %zi animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
-	//	std::printf("%s: successfully loaded model '%s' (%s)\n", __FUNCTION__, filepath.c_str(), mModelFilename.c_str());
-	//	return true;
-
-	//}
 
 	bool AvengModel::createDescriptorSet(VkRenderData& renderData) {
 

@@ -2,22 +2,21 @@
 
 namespace aveng {
 
-    AvengInstance::AvengInstance(
-        ModelId mid, 
-        glm::vec3 position, 
-        glm::vec3 rotation, 
-        float modelScale) 
-        : modelId_{ mid }
+    AvengInstance::AvengInstance()
 	{
-
-        mInstanceSettings.isWorldPosition = position;
-        mInstanceSettings.isWorldRotation = rotation;
-        mInstanceSettings.isScale = modelScale;
-
-        // Not sure if this is necessary yet
-        updateModelRootMatrix();
 	
 	}
+
+    void AvengInstance::init(ModelId id, const ModelMeta& meta, const TransformSettings& ts) {
+        InstanceTransform t{};
+        t.pos = ts.worldPosition;
+        t.rotEuler = ts.worldRotation;
+        t.scale = ts.scale;
+
+        // Note: We're ignoring the swapYZ flag for now.
+
+        common.init(id, meta.root, t);
+    }
     void AvengInstance::updateModelRootMatrix() {
         mLocalScaleMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(mInstanceSettings.isScale));
 

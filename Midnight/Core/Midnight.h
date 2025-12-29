@@ -6,7 +6,8 @@
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
 #include "Runtime/World/InstanceManager.h"
-#include "Core/Modeling/Sources/FilesystemModelSource.h"
+#include "Runtime/Facade/SceneFacade.h"
+
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
 #include "Editor.h"
@@ -76,28 +77,22 @@ namespace aveng {
 		std::unique_ptr<IModelSource> modelSource_;
 
 		ModelLibrary modelLib_;
+		SceneFacade worldScene;
 
 		// Renderer consumes device/window/renderData/cameraManager/modelSource
 		Renderer renderer;
 
-		// Instance managers depend on `renderer`
-		InstanceManager<StaticTag>   staticMgr;
-		InstanceManager<AnimatedTag> animMgr;
-
-		// Input
-		GameInput gameInput;
+		std::unique_ptr<GameInput> gameInput_;
 
 #ifdef ENABLE_EDITOR
 		// Prefer pointers/optional to avoid duplicating big member-init lists
 		std::unique_ptr<Editor> editor_;
 		std::unique_ptr<EditorInput> editorInput_;
-		std::unique_ptr<EditorGameRouter> inputRouter_;
+		std::unique_ptr<EditorGameRouter> inputRouter_; // Used when toggling between game/editor modes
 #endif
 
 		std::unique_ptr<InputSystem> inputSystem_;
 		std::unique_ptr<AvengFrame>  frame_;
-
-		// std::shared_ptr<AvengFrame> someFrame // do not do this elsewhere!!
 
 		/*
 		* Note to self:

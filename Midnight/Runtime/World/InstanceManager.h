@@ -53,12 +53,13 @@ namespace aveng {
             : models_(models) {
         
             // Note: Manually setting the modelId for the null-instance
-            Instance nullInstance = Instance(NullModelId);
+            Instance nullInstance = Instance();
+            nullInstance.setModelId(NullModelId);
 
             Slot slot = {
                 nullInstance, // instance
                 1, // generation
-                true // alive
+                true // alive - arbitrary
             };
 
             Handle handle = {
@@ -198,22 +199,25 @@ namespace aveng {
             }
         }
 
-        Handle createInstance(const ModelRef& m) {
+        Handle createInstance(const ModelId& mid, const ModelMeta& meta, const CreateSettingsFor<Tag>& settings) {
 #ifdef M_DEBUG
-            assert(m.id != 0 && "Attempting to create instance from invalid modelRef");
+            assert(mid != 0 && "Attempting to create instance from invalid modelRef");
 #endif
-            ModelMeta meta{};
-            if (!models_.tryGetModelMeta(m.id, meta)) {
-                return {}; // invalid handle (or throw/assert)
-            }
 
 #ifdef M_DEBUG
             // Optional safety: don't let the wrong pool create the wrong kind of model
             if constexpr (TagTraits<Tag>::kAnimated) {
-                if (!meta.animated) return {}; // or route to static mgr at a higher layer
+                if (!meta.animated) {
+                    std::cout << "[GLARING ERROR] wtf 1 - InstanceManager Anomaly\n";
+                    return {};
+                }
             }
             else {
-                if (meta.animated) return {};
+                if (meta.animated) {
+                    std::cout << "[GLARING ERROR] wtf 2 - InstanceManager Anomaly\n";
+                    return {};
+                }
+                
             }
 #endif
             std::cout << "Creating Instance Datas...\n";
@@ -223,17 +227,20 @@ namespace aveng {
             Slot& slot = instanceData_.slots[slotIndex];
             
             // Construct instance 
-            slot.instance.emplace(m.id);
+            auto& inst = slot.instance.emplace(); // Note: emplace is only for create paths.
             slot.alive = true;
 
             // Initialize instance's model constants
-            auto& inst = slot.instance.value();
-            inst.setModelId(m.id);      // Apply model's ID
-            inst.setModelRootMatrix(meta.root); // Apply Model's root matrix 
+            if constexpr (InstanceTypeFor<Tag>::kAnimated) {
+                inst.init(mid, meta, settings.transform, settings.anim);
+            }
+            else {
+                inst.init(mid, meta, settings);
+            }
 
             // Technically we could have used models_.isModelAnimated() but this is more educational and one less stack frame, so...
             if constexpr (TagTraits<Tag>::kAnimated) {
-                inst.resizeNodeTransformData(meta.boneCount);
+                inst.resizeNodeTransformData(meta.boneCount); // TODO
             }
 
             // NOTE: generation already bumped on delete
@@ -243,32 +250,27 @@ namespace aveng {
             };
         }
 
-        Handle addInstanceOfModel(const  ModelRef& modelRef, const InstanceSettings& s) {
-#ifdef M_DEBUG
-
-            assert(instanceData_.instancesPerModel.find(modelRef.id)
-                != instanceData_.instancesPerModel.end() && 
-                "InstanceManager::addInstanceOfModel Model does not exist for this instance.");
-#endif
-            std::cout << "Adding Instance...\n";
-            Handle h = createInstance(modelRef);
+        Handle addInstanceOfModel(const  ModelId& mid, const CreateSettingsFor<Tag>& settings, const ModelMeta& m) {
+            // Do not assert here.
+            std::cout << "InstanceManager - Adding Instance...\n";
+            Handle h = createInstance(mid, m, settings);
             instanceData_.instancesInOrder.push_back(h);
-            instanceData_.instancesPerModel[modelRef.id].push_back(h);
+            instanceData_.instancesPerModel[mid].push_back(h);
         }
         
-        /* Add multiple instances of a given model - Note, use span when usage is minimal - no resizes, etc. */
-        std::vector<Handle> addInstancesOfModel(const ModelRef& modelRef, std::span<const InstanceSettings> settings, unsigned int n) {
+        ///* Add multiple instances of a given model - Note, use span when usage is minimal - no resizes, etc. */
+        //std::vector<Handle> addInstancesOfModel(const ModelRef& modelRef, std::span<const InstanceSettings> settings, unsigned int n) {
 
-            std::cout << "Adding Multiple Instance...\n";
-            std::vector<Handle> out;
-            out.reserve(n);
+        //    std::cout << "InstanceManager - Adding Multiple Instance...\n";
+        //    std::vector<Handle> out;
+        //    out.reserve(n);
 
-            for (unsigned i = 0; i < n; ++i) {
-                const InstanceSettings& s = settings[i % settings.size()];
-                out.push_back(addInstanceOfModel(modelRef, s));
-            }
-            return out;
-        }
+        //    for (unsigned i = 0; i < n; ++i) {
+        //        const InstanceSettings& s = settings[i % settings.size()];
+        //        out.push_back(addInstanceOfModel(modelRef, s));
+        //    }
+        //    return out;
+        //}
 
         /*
         * Very tutorial with the get/set of settings
@@ -281,7 +283,7 @@ namespace aveng {
             // Fetch the clone
             Instance* clone = get(handle);
             ModelId mid = clone->modelId();
-            InstanceSettings cloneSettings = clone->instanceSettings();
+            CreateSettingsFor<Tag> settings = clone->instanceSettings();
 
             // New slot
             uint32_t slotIndex = acquireSlotIndex();
@@ -296,9 +298,14 @@ namespace aveng {
             slot.generation = std::max(slot.generation + 1, 1u);
             slot.alive = true;
 
-            slot.instance.emplace(mid); // constructs Instance{mid} in-place
-            slot.instance->setInstanceSettings(cloneSettings);
-
+            auto& inst = slot.instance.emplace(); // Note: emplace is only for create paths.
+            if constexpr (InstanceTypeFor<Tag>::kAnimated) {
+                inst.init(mid, meta, settings.transform, settings.anim);
+            }
+            else {
+                inst.init(mid, meta, settings);
+            }
+            
             Handle h{ slotIndex, slot.generation };
   
             instanceData_.instancesInOrder.push_back(h);
@@ -322,13 +329,13 @@ namespace aveng {
         }
 
         /// Set transform for one instance.
-        void setTransform(AnyInstanceHandle h, const Transform& t) {
+        void setTransform(AnyInstanceHandle h, const InstanceTransform& t) {
         
         }
 
         /// Optional convenience for batch transforms (future-friendly).
         void setTransforms(std::span<const AnyInstanceHandle> handles,
-            std::span<const Transform> transforms) {
+            std::span<const InstanceTransform> transforms) {
         
         }
 

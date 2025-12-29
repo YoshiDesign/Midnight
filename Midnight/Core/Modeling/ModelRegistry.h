@@ -27,7 +27,7 @@ namespace aveng {
 	};
 
 	/* The ModelDB - Consider inheriting from the classes that the Renderer is currently inheriting */
-	struct ModelRegistryData : public IModelAnimQuery, IModelQuery {
+	struct ModelRegistryData final : public IModelAnimQuery, public IModelQuery {
 		std::vector<ModelEntry> models;
 		std::unordered_map<AssetKey, ModelId> idByKey;
 		std::unordered_map<ModelId, size_t> indexById; // To look up the ModelEntry's index from models
@@ -54,19 +54,30 @@ namespace aveng {
 			out.durationTicks = clips[clipIndex]->getClipDuration();
 			out.ticksPerSecond = clips[clipIndex]->getClipTicksPerSecond();
 			out.animChannels = clips[clipIndex]->getChannels();
+			out.boneCount = e->boneCount;
 
 			return true;
 		}
 
 		// IModelQuery
-		bool isModelAnimated(ModelId id, ModelMeta& out) const { 
+		bool isModelAnimated(ModelId id) const { 
 			const ModelEntry* e = get(id);
 			if (!e) return false;
+
+			/* */
+
 			return e->isAnimated;
 		}
 
 		// IModelQuery
-		bool isModelLoaded(ModelId id, ModelMeta& out) const { return false; }
+		bool isModelLoaded(ModelId id, ModelMeta& out) const { 
+			const ModelEntry* e = get(id);
+			if (!e) return false;
+			out.animated = e->isAnimated;
+			out.boneCount = e->boneCount;
+			out.root = e->rootTransform;
+			return true;
+		}
 
 		// IModelQuery
 		bool tryGetModelMeta(ModelId id, ModelMeta& out) const {

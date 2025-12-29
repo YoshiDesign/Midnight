@@ -34,6 +34,6 @@ namespace aveng {
 		VkRenderData& renderData;
 		GameData& gameData;
 		Renderer& renderer;
-		Editor* pEditor;
+		Editor* pEditor; // fwd declare
 	};
 }

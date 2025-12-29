@@ -24,10 +24,19 @@ namespace aveng {
 	class AvengWindow;
 	class Renderer;
 	class InputState;
+	class SceneFacade;
 
 	class Editor {
 	public:
-		Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, CameraManager& _cameraManager);
+		Editor(
+			VkRenderData& _renderData, 
+			Renderer& _renderer, 
+			GameData& _gameData, 
+			EngineDevice& _engineDevice, 
+			AvengWindow& window, 
+			CameraManager& _cameraManager,
+			SceneFacade& _sceneFacade
+		);
 		~Editor();
 
 
@@ -131,10 +140,11 @@ namespace aveng {
 		EngineDevice& engineDevice;
 		AvengWindow& window;
 		Renderer& renderer;
+		SceneFacade& scene_;
 		EditorData editorData;
 		AvengAppObject editorViewerObject{ AvengAppObject::createAppObject(1001) };
 		KeyboardController keyboardController{ editorViewerObject, gameData };
-		AvengImgui aveng_imgui{ renderData, gameData, editorData, window, engineDevice, mModelInstanceData };
+		AvengImgui aveng_imgui{ renderData, gameData, editorData, window, engineDevice, scene_ };
 		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 	};
 

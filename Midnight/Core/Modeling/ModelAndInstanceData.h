@@ -12,9 +12,6 @@
 #include "Core/Modeling/Sources/IModelSource.h"
 
 namespace aveng {
-	// forward declaration
-	class AvengModel;
-	class AssimpInstance;
 
 	// Used to identifiy model instances via InstanceSlot
 	template<class Tag>
@@ -57,14 +54,18 @@ namespace aveng {
 	template<class Tag>
 	struct InstanceTypeFor; // primary template
 
-	template<> // explicit specialization
+	template<>
 	struct InstanceTypeFor<StaticTag> {
 		using instance_type = AvengInstance;
+		using create_settings = TransformSettings; // Just the transform settings
+		static constexpr bool kAnimated = false;
 	};
 
-	template<> // explicit specialization
+	template<>
 	struct InstanceTypeFor<AnimatedTag> {
 		using instance_type = AssimpInstance;
+		using create_settings = AnimatedCreateSettings; // Both the transform and animation settings
+		static constexpr bool kAnimated = true;
 	};
 
 	// A readability wrapper.
@@ -74,6 +75,9 @@ namespace aveng {
 	// Fun fact: (example) `AddPointer<int>::type` was the norm before `using` hit the scene in C++11
 	/* */ /* */ /* */
 	
+	template<class Tag>
+	using CreateSettingsFor = typename InstanceTypeFor<Tag>::create_settings;
+
 	// Declaring this outside of the struct to symbolize their lack of functional logic
 	// They carry no behavior, and don't mutate. They are simple values. Keeps InstanceHandles purely data.
 	// It also decouples us from comparison semantics becoming breaking changes.

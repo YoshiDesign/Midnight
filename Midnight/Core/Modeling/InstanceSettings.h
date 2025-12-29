@@ -6,6 +6,33 @@
 #include "Utils/glm_includes.h"
 
 namespace aveng {
+
+    struct AnimatedCreateSettings {
+        TransformSettings transform;
+        AnimSettings      anim;
+    };
+
+
+    struct InstanceTransform {
+        glm::vec3 pos{ 0.f };
+        glm::vec3 rotEuler{ 0.f };   // keep for now; later consider quat
+        float     scale{ 1.f };
+    };
+
+    struct TransformSettings {
+        glm::vec3 worldPosition{ 0.f };
+        glm::vec3 worldRotation{ 0.f };
+        float     scale{ 1.f };
+        bool      swapYZ{ false }; // if this is truly per-instance, keep it; otherwise move to import/meta
+    };
+
+    struct AnimSettings {
+        size_t animClipSize = 0;
+        uint32_t clipNr{ 0 };
+        float    playTime{ 0.f };
+        float    speed{ 1.f };
+    };
+
 	struct InstanceSettings {
 		glm::vec3 isWorldPosition = glm::vec3(0.0f);
 		glm::vec3 isWorldRotation = glm::vec3(0.0f);

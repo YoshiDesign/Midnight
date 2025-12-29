@@ -6,7 +6,15 @@
 
 namespace aveng {
 
-	/* A Facade should always be `final` as well as its `overrides`
+	/* 
+	 * Note that SceneFacade's own their instances through an InstanceManager
+	 * for each flavor of instance (which is based on their model characteristics).
+	 * We should in theory be able to hot-swap scenes and get entirely different scenes
+	 * in front of our eyes.
+	 * 
+	 * For this reason, this should be a SceneWorld, or simply Scene
+	 * 
+	 * A Facade should always be `final` as well as its `overrides`
 	 * This enables the compiler to inline & devirtualize and skip vtable indirection.
 	 * This way facades begin their design in a hot-path friendly shape.
 	 * 
@@ -35,11 +43,12 @@ namespace aveng {
 		};
 
 		/* IModelLibrary */
-		ModelId getOrLoadModel(const AssetKey& key);
-		bool    unloadModel(const AssetKey& key);
+		ModelRef getOrLoadModel(const AssetKey& key) override;
+		bool    unloadModel(const AssetKey& key) override;
 
 		/* Instance Ops */
-		AnyInstanceHandle spawn(ModelRef modelRef, const InstanceSettings& s);
+		AnyInstanceHandle spawn(ModelRef modelRef, const TransformSettings& s);
+		AnyInstanceHandle spawn(ModelRef modelRef, const AnimatedCreateSettings& s);
 		/// Spawn many instances. `settings.size()` can be 1 (repeat) or N (cycled/repeated).
 		std::vector<AnyInstanceHandle> spawnMany(ModelRef modelRef,
 			std::span<const InstanceSettings> settings,
@@ -52,10 +61,10 @@ namespace aveng {
 		void destroyMany(std::span<const AnyInstanceHandle> handles);
 
 		/* Transform Ops */
-		void setTransform(AnyInstanceHandle handle, std::span<const Transform> transforms);
+		void setTransform(AnyInstanceHandle handle, const TransformSettings& transforms);
 		void setTransforms(
 			std::span<const AnyInstanceHandle> handles,
-			std::span<const Transform> transforms);
+			std::span<const TransformSettings> transforms);
 
 		/// Call this when you *know* a model became invalid in this scene (e.g., after unload).
 		/// If you always go through SceneFacade::unloadModel, it will call this for you.
@@ -74,10 +83,11 @@ namespace aveng {
 
 		// Validates modelId and returns cached pool kind.
 		// If invalid: returns std::nullopt.
+		/* Unused at the moment! */
 		std::optional<ModelValidation> validateModel(ModelId id) const;
 
 		// Dispatch helpers
-		AnyInstanceHandle spawnValidated(PoolKind pool, ModelId id, const InstanceSettings& settings);
+		AnyInstanceHandle spawnValidated(PoolKind pool, ModelId id, const InstanceSettings& settings, const ModelMeta& m);
 
 		void destroyStatic(StaticHandle h);
 		void destroyAnimated(AnimatedHandle h);
@@ -89,7 +99,7 @@ namespace aveng {
 			This class is a decorator of IModelQuery calls, 
 			hence the inheritance of this member's type
 		*/
-		const IModelQuery& modelQuery_; 
+		const IModelQuery& modelQuery_;
 		Config cfg_{};
 
 		// Instance pools (you can also inject references if you don’t want ownership here)

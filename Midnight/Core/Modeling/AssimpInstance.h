@@ -9,7 +9,7 @@
 #include "Core/aveng_model.h"
 #include "./AssimpNode.h"
 #include "./AssimpBone.h"
-#include "InstanceSettings.h"
+#include "Core/Modeling/InstanceCommon.h"
 
 namespace aveng {
     class AssimpInstance {
@@ -20,14 +20,13 @@ namespace aveng {
         */
 
     public:
-        AssimpInstance(
-            ModelId mid, 
-            glm::vec3 position = glm::vec3(0.0f), 
-            glm::vec3 rotation = glm::vec3(0.0f), 
-            float modelScale = 1.0f);
 
-        //AvengModel* getModel() { return mAvengModel; }
-        //const AvengModel* getModel() const { return mAvengModel; }
+        InstanceCommon common;
+        AnimSettings anim{};
+
+        AssimpInstance();
+
+        void init(ModelId id, const ModelMeta& meta, const TransformSettings& ts, const AnimSettings& as);
 
         ModelId modelId() const { return modelId_; }
 
@@ -59,7 +58,9 @@ namespace aveng {
         // Used by the InstanceManager
         void setModelId(ModelId id) { modelId_ = id; };
         void setModelRootMatrix(glm::mat4 rootMatrix) { mModelRootMatrix = rootMatrix; };
+        void ensurePoseStorage(size_t boneCount);
         void resizeNodeTransformData(unsigned int boneCount) { mNodeTransformData.resize(boneCount); };
+        void clearPoseFast();
         
     private:
 
@@ -68,7 +69,8 @@ namespace aveng {
         //float tps = 0.0f;
         //float animationDuration = 0.0f;
         //std::vector<std::shared_ptr<AssimpAnimChannel>> animChannels;
-        struct AnimationMeta animationMeta {};
+
+        struct AnimationMeta animationMeta {}; // Used for queries
 
         glm::mat4 mLocalTranslationMatrix = glm::mat4(1.0f);
         glm::mat4 mLocalRotationMatrix = glm::mat4(1.0f);

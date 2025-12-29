@@ -12,13 +12,28 @@
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/AvengStorageBuffer.h"
 #include "Runtime/World/InstanceManager.h"
+#include "Runtime/Facade/SceneFacade.h"
 #include <cassert>
 #include <stdexcept>
 
 namespace aveng {
 
-	Editor::Editor(VkRenderData& _renderData, Renderer& _renderer, GameData& _gameData, EngineDevice& _engineDevice, AvengWindow& window, CameraManager& _cameraManager)
-		: renderData{ _renderData }, renderer{ _renderer }, gameData{ _gameData }, engineDevice{ _engineDevice }, window{ window }, cameraManager{ _cameraManager }
+	Editor::Editor(
+		VkRenderData& _renderData, 
+		Renderer& _renderer, 
+		GameData& _gameData, 
+		EngineDevice& _engineDevice, 
+		AvengWindow& window, 
+		CameraManager& _cameraManager,
+		SceneFacade& _sceneFacade)
+		: 
+		renderData{ _renderData }, 
+		renderer{ _renderer }, 
+		gameData{ _gameData }, 
+		engineDevice{ _engineDevice }, 
+		window{ window }, 
+		cameraManager{ _cameraManager },
+		scene_{_sceneFacade}
 	{
 
 		// Register a camera

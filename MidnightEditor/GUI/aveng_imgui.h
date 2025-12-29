@@ -3,6 +3,7 @@
 #include "Utils/window_callbacks.h"
 #include "Utils/Timer.h"
 #include "Game/data.h"
+#include "Runtime/Facade/SceneFacade.h"
 #include "Core/Input/InputState.h"
 #include "Utils/glm_includes.h"
 #include "GUI/imgui.h"
@@ -35,9 +36,17 @@ namespace aveng {
 
 	public:
 
-		AvengImgui(VkRenderData& _renderData, GameData& _gameData, EditorData& editorData, AvengWindow& _window, EngineDevice& _engineDevice, ModelAndInstanceData& _modInstData);
-		void init(VkRenderPass renderPass, uint32_t imageCount);
+		AvengImgui(
+            VkRenderData& _renderData, 
+            GameData& _gameData, 
+            EditorData& editorData, 
+            AvengWindow& _window, 
+            EngineDevice& _engineDevice, 
+            SceneFacade& scene);
+
 		~AvengImgui();
+
+		void init(VkRenderPass renderPass, uint32_t imageCount);
 
 		void newFrame();
 		void render(int frameIndex);
@@ -56,12 +65,12 @@ namespace aveng {
 		// EngineDevice& device;
 		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 		VkRenderData& renderData;
-        ModelAndInstanceData& modInstData;
 		GameData& gameData;
 		EngineDevice& engineDevice;
         AvengWindow& window;
         EditorData& editorData;
         InputState inputState;
+        SceneFacade& scene_;
 
         VkRenderPass mSelectionRenderpass = VK_NULL_HANDLE;
         VkRenderPass mLineRenderpass = VK_NULL_HANDLE;

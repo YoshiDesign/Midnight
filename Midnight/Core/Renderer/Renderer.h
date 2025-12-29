@@ -14,12 +14,6 @@
 #include "Utils/glm_includes.h"
 #include "Utils/Timer.h"
 
-/*
-* Convention I'm learning/acquiring:
-* If a member variable ends with an underscore, it's owned
-* by this class and, more importantly, exposed via methods.
-*/
-
 namespace aveng {
 
 	class EngineDevice;
@@ -28,7 +22,6 @@ namespace aveng {
 	class CameraManager;
 	struct CameraTransform;
 
-	// The renderer is something of a "ModelManager" too, for now, hence the IModelQuery
 	class Renderer {
 
 	public:
@@ -36,31 +29,15 @@ namespace aveng {
 		Renderer(
 			EngineDevice& engineDevice, 
 			AvengWindow& window, 
-			std::unique_ptr<IModelSource> modelSource, 
 			VkRenderData& renderData, 
-			CameraManager& cameraManager,
-			const IModelQuery& q,	// Access into ModelDB (via ModelLibrary)
-			const IModelAnimQuery& animQ // Access into ModelDB (via ModelLlibrary)
+			CameraManager& cameraManager
 		);
 		~Renderer();
 
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
 
-		// const IModelAnimQuery& animQuery() const { return modelDb_; } // Replace this
-
-		/* Callback definitions */
-		ModelRef getOrLoadModel(const AssetKey& key);
-		bool addModel(const std::string& modelFileName); // OLD
-		void deleteModel(const std::string& modelFileName);
-
 		void initialize();
-		void setInstanceViews(const InstancePoolData<StaticTag>& stat, const InstancePoolData<AnimatedTag>& anim);
-		std::string baseDirForAssetKey(const AssetKey& key) const;
-		void processPendingModelLoads();  // Call this in between frames
-		std::shared_ptr<AvengModel> getModel(const std::string& modelFileName);
-		bool hasModel(const std::string& modelFileName);
-		std::unique_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
 
 		bool isFrameInProgress() const { return isFrameStarted; }
 
@@ -112,15 +89,6 @@ namespace aveng {
 			return currentFrameIndex;
 		}
 
-		inline ModelRef makeModelRef(const ModelEntry& e)
-		{
-			return ModelRef{
-				e.id,
-				e.model.get(),   // raw pointer view
-				e.isAnimated
-			};
-		}
-
 		void setRenderpassBypass(bool _state) { mRenderpassBypass = _state; }
 
 		bool createDescriptorLayouts();
@@ -131,10 +99,6 @@ namespace aveng {
 		void updateLightingDescriptorSets(int frameIndex);
 
 		bool createSyncObjects();
-		
-		// Descriptor set accessors
-		//VkDescriptorSet getGlobalDescriptorSet(int frameIndex) const { return globalDescriptorSets[frameIndex]; }
-		//VkDescriptorSet getLightsDescriptorSet(int frameIndex) const { return lightsDescriptorSets[frameIndex]; }
 
 		int draw(float deltaTime);
 		bool drawModels(
@@ -163,9 +127,6 @@ namespace aveng {
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();
 
-		// void loadScenes(const char* filepath);
-		const CameraTransform& activeCameraTransform();
-
 		// Newest methods:
 		void beginGraphicsCommands(int currentFrameIndex);
 		void endGraphicsCommands(int currentFrameIndex);
@@ -180,9 +141,6 @@ namespace aveng {
 		void createCommandBuffers();
 		void freeCommandBuffers();
 		size_t calculateDynamicUBOStride() const;
-
-		const IModelQuery& modelQuery_;
-		const IModelAnimQuery& animQuery_;
 
 		VkRenderData& renderData;
 		size_t boneMatrixBufferSize;
@@ -232,21 +190,6 @@ namespace aveng {
 		std::vector<glm::mat4> mWorldPosMatrices{};
 		std::vector<NodeTransformData> mNodeTransFormData{};
 		PointLightData mPointLightData{};
-
-		// Model Registry and Management
-
-		// ModelRegistryData modelDb_;
-		std::unique_ptr<IModelSource> modelSource_;
-		std::unordered_map<AssetKey, ModelId> keyToId;
-		std::vector<ModelEntry>              entriesById; // index = id (or id-1), or unordered_map<ModelId, ModelEntry>
-		ModelId nextModelId_ = 1; // 0 reserved as "invalid"
-
-
-		std::string contentRoot_ = "Assets"; // or "." or absolute
-		std::string textureRoot_ = "textures"; // relative to contentRoot_
-
-		const InstancePoolData<StaticTag>* stat_ = nullptr;
-		const InstancePoolData<AnimatedTag>* anim_ = nullptr;
 
 	};
 

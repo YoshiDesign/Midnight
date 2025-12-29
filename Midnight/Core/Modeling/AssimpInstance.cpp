@@ -3,22 +3,24 @@
 
 namespace aveng {
 
-    AssimpInstance::~AssimpInstance() { }
+    AssimpInstance::~AssimpInstance() {}
 
-    AssimpInstance::AssimpInstance(
-        ModelId mid, 
-        glm::vec3 position, 
-        glm::vec3 rotation, 
-        float modelScale)
-        : modelId_{ mid }
-    {
+    AssimpInstance::AssimpInstance() {}
 
-        mInstanceSettings.isWorldPosition = position;
-        mInstanceSettings.isWorldRotation = rotation;
-        mInstanceSettings.isScale = modelScale;
+    void AssimpInstance::init(ModelId id, const ModelMeta& meta, const TransformSettings& ts, const AnimSettings& as) {
+        InstanceTransform t{};
+        t.pos = ts.worldPosition;
+        t.rotEuler = ts.worldRotation;
+        t.scale = ts.scale;
 
-        // Not sure if this is necessary yet
-        updateModelRootMatrix();
+        common.init(id, meta.root, t);
+        anim = as;
+
+        resizeNodeTransformData(meta.boneCount);
+#ifdef M_DEBUG
+        // For sanity's sake
+        ensurePoseStorage(meta.boneCount);
+#endif
     }
 
     void AssimpInstance::updateModelRootMatrix() {
@@ -45,46 +47,73 @@ namespace aveng {
         mInstanceRootMatrix = mLocalTransformMatrix * mModelRootMatrix;
     }
 
+    void AssimpInstance::ensurePoseStorage(size_t boneCount) {
+        if (mNodeTransformData.size() != boneCount) {
+            std::cout << "Resizing NodeTransformData\n";
+            resizeNodeTransformData(boneCount);
+        }
+    }
+
     void AssimpInstance::updateAnimation(float deltaTime, const IModelAnimQuery& animQ) {
+        /* Clip metadata + channel list should be stable per (modelId, clipNr) */
 
         /*
             Consider this: animation data is finally decoupled from the model after introducing IModelAnimQuery.
             This creates a bottleneck, and in inefficient pattern, but it's ok for now.
             There are several ways to improve this. Cacheing + SoA design
+
+            This gets called every update because the animation clipNr could change to begin a different animation.
         */
-        if(!animQ.tryGetClipMeta(modelId_, mInstanceSettings.isAnimClipNr, animationMeta))
+        if(!animQ.tryGetClipMeta(modelId_, anim.clipNr, animationMeta))
         {
-            std::cout << "AssimpInstance::updateAnimation - Failed to retrieve clip meta returned false\n";
+            std::cout << "AssimpInstance::updateAnimation - Failed to retrieve clip meta\n";
             return;
         }
 
         if (animationMeta.durationTicks <= 0.0f) return; // avoid fmod by zero / negative durations
 
-        mInstanceSettings.isAnimPlayTimePos += deltaTime * animationMeta.ticksPerSecond * mInstanceSettings.isAnimSpeedFactor;
-        if (mInstanceSettings.isAnimPlayTimePos < 0.0f) mInstanceSettings.isAnimPlayTimePos += animationMeta.durationTicks;
-        mInstanceSettings.isAnimPlayTimePos = std::fmod(mInstanceSettings.isAnimPlayTimePos, animationMeta.durationTicks);
+        anim.playTime += deltaTime * animationMeta.ticksPerSecond * anim.speed;
+        if (anim.playTime < 0.0f) anim.playTime += animationMeta.durationTicks;
+        anim.playTime = std::fmod(anim.playTime, animationMeta.durationTicks);
 
         // std::vector<std::shared_ptr<AssimpAnimChannel>> animChannels = mAvengModel->getAnimClips().at(mInstanceSettings.isAnimClipNr)->getChannels();
 
-        std::fill(mNodeTransformData.begin(), mNodeTransformData.end(), NodeTransformData{});
-
+        clearPoseFast();
+        
         /* animate clip via channels */
         for (const auto& channel : animationMeta.animChannels) {
+
+            const int boneId = channel->getBoneId();
+            if (boneId < 0) continue;
+
             NodeTransformData nodeTransform;
+            nodeTransform.translation = channel->getTranslation(anim.playTime);
+            nodeTransform.rotation = channel->getRotation(anim.playTime);
+            nodeTransform.scale = channel->getScaling(anim.playTime);
 
-            nodeTransform.translation = channel->getTranslation(mInstanceSettings.isAnimPlayTimePos);
-            nodeTransform.rotation = channel->getRotation(mInstanceSettings.isAnimPlayTimePos);
-            nodeTransform.scale = channel->getScaling(mInstanceSettings.isAnimPlayTimePos);
-
-            int boneId = channel->getBoneId();
-            if (boneId >= 0) {
-                mNodeTransformData.at(boneId) = nodeTransform;
-            }
+            mNodeTransformData[boneId] = nodeTransform;
+            
         }
 
         /* set root node transform matrix, enabling instance movement */
-        updateModelRootMatrix();
+        //updateModelRootMatrix();
     }
+
+    void AssimpInstance::clearPoseFast() {
+        /*
+         * Optimization Path:
+         *  Instead of clearing the whole vector:
+         *  track which bones were written this frame
+         *  treat all others as implicit identity
+         * 
+         * But this is great for now.
+         * Buut if we have the default pose, we could also memcpy it for a slight boost
+         */
+        std::fill(mNodeTransformData.begin(),
+            mNodeTransformData.end(),
+            NodeTransformData{});
+    }
+
 
     void AssimpInstance::setInstanceSettings(const InstanceSettings& settings) {
         // Determine whether we actually need to recompute transforms
