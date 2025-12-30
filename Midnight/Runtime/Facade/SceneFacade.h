@@ -1,8 +1,6 @@
 #pragma once
-#include "Core/Modeling/ModelRegistry.h"
-#include "Core/Modeling/ModelAndInstanceData.h"
 #include "Runtime/World/InstanceManager.h"
-#include "Services/ModelServices.h"
+#include "Services/InstanceServices.h"	// Instance Queries and InstanceView
 
 namespace aveng {
 
@@ -25,10 +23,9 @@ namespace aveng {
 	 * but I'm also willing to bite my tongue on this someday
 	 */
 
-
 	/* */
 	class SceneFacade final
-		: public IModelLibrary
+		: public IModelLibrary, IInstanceQuery
 	{
 
 	public:
@@ -55,9 +52,20 @@ namespace aveng {
 			bool failSoft = true;
 		};
 
+		/* IInstanceQuery */
+		// Accessor
+		const IInstanceQuery& instanceQuery() const noexcept { return *this; }
+
+		bool tryGetInstance(AnyInstanceHandle h, InstanceView& out) const override;
+		std::vector<AnyInstanceHandle> listAllInstances() const override;
+		std::vector<AnyInstanceHandle> listInstancesForModel(ModelId id) const override;
+		bool isAlive(AnyInstanceHandle h) const override;
+		/* IInstanceQuery */
+
 		/* IModelLibrary */
 		ModelRef getOrLoadModel(const AssetKey& key) override;
 		bool    unloadModel(const AssetKey& key) override;
+		/* IModelLibrary */
 
 		/* Instance Ops - 1 overload for each type of model which an instance can represent */
 		AnyInstanceHandle spawn(ModelRef modelRef, const TransformSettings& s);

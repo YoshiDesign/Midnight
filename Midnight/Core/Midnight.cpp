@@ -16,7 +16,12 @@ namespace aveng {
 			game_data,
 			engineDevice,
 			aveng_window,
-			cameraManager )
+			cameraManager, 
+			sceneFacade_,
+			modelLib_.query(),
+			modelLib_.animQuery(),
+			sceneFacade_.instanceQuery()
+		)
 		}
 		, editorInput_( std::make_unique<EditorInput>(*editor_) )
 		, inputRouter_( std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, *gameInput_) )

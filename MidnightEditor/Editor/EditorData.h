@@ -38,8 +38,6 @@ namespace aveng {
 
         /* color hightlight for selection etc */
         std::vector<glm::vec2> eSelectedInstance{}; // Shader Uniform Data
-        std::vector<glm::vec2> selectedStatic;   // x = highlight factor, y = instanceIndexPosition (or whatever)
-        std::vector<glm::vec2> selectedAnim;
 
         bool eHighlightSelectedInstance = false;
         bool eHasSelection = false;

@@ -21,9 +21,6 @@
     <ClCompile Include="XOne.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="System\Render\ObjectRenderSystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Game\Math\aveng_math.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -48,6 +45,9 @@
     <ClCompile Include="Game\Instance\Starfield.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="System\FramePacketBuilder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XOne.h">
@@ -57,9 +57,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="vendor\GLFW\glfw3native.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="System\Render\ObjectRenderSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Math\aveng_math.h">
@@ -96,6 +93,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Instance\Starfield.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="System\FramePacketBuilder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

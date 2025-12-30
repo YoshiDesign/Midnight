@@ -1,10 +1,9 @@
 #include "AvengFrame.h"
 #ifdef ENABLE_EDITOR
-#include "Editor.h"
+#include "Editor/Editor.h"
 #endif
 #include "Core/Renderer/Renderer.h"
 #include <cassert>
-
 
 namespace aveng {
 
@@ -38,6 +37,7 @@ namespace aveng {
 
 		// Load new models if any are pending. Side-Effect: Creates descriptor sets for this model
 		renderer.processPendingModelLoads();
+		// TODO: Implement processPendingModelUnloads
 
 		// Wait for fences, vkAcquireNextImageKH
 		if (!renderer.beginFrame())

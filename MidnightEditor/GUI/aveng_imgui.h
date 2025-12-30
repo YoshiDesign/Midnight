@@ -13,7 +13,7 @@
 #include "GUI/models/CoordArrowsModel.h"
 #include "GUI/models/RotationArrowsModel.h"
 #include "GUI/models/ScaleArrowsModel.h"
-#include "EditorData.h"
+#include "Editor/EditorData.h"
 
 #include "Core/Modeling/ModelAndInstanceData.h"
 

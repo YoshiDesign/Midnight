@@ -6,25 +6,190 @@
 #include <variant>      // std::visit
 #include <type_traits>  // std::is_same_v
 
-// NOTE:
-// This .cpp assumes IModelQuery exposes something like:
-//   bool isModelLoaded(ModelId) const;
-//   bool isAnimated(ModelId) const;          // or isModelAnimated(...)
-// If your actual names differ, just rename the calls in validateModel().
-//
-// It also assumes InstanceManager exposes something like:
-//   Handle create(ModelId, const InstanceSettings&);
-//   Handle clone(Handle);
-//   void   destroy(Handle);
-//   void   destroyMany(std::span<const Handle>);   // optional, we don't require it
-//   void   setTransform(Handle, const Transform&); // or setTransform(Handle, span<Transform>) etc.
-// Adjust those few call sites to match your concrete API.
+namespace {
+
+    /* Helpers for this TU */
+
+    template<class Tag>
+    bool isAliveInPool(const aveng::InstancePoolData<Tag>& pool,
+        const aveng::InstanceHandle<Tag>& h)
+    {
+        if (h.generation == 0) return false;
+        if (h.index >= pool.slots.size()) return false;
+
+        const auto& slot = pool.slots[h.index];
+        if (!slot.alive) return false;
+        if (slot.generation != h.generation) return false;
+        if (!slot.instance.has_value()) return false;
+
+        return true;
+    }
+
+    template<class Tag>
+    bool tryGetInstanceFromPool(const aveng::InstancePoolData<Tag>& pool,
+        const aveng::InstanceHandle<Tag>& h,
+        aveng::InstanceView& out,
+        bool animatedFlag)
+    {
+        if (!isAliveInPool(pool, h)) return false;
+
+        const auto& inst = pool.slots[h.index].instance.value();
+
+        out.modelId = inst.common.modelId;
+        out.xf = inst.common.xf;
+        out.animated = animatedFlag; // Implied given the caller semantics
+        return true;
+    }
+
+    template<class Tag>
+    std::vector<aveng::AnyInstanceHandle> listAllFromPool(const aveng::InstancePoolData<Tag>& pool)
+    {
+        std::vector<aveng::AnyInstanceHandle> out;
+        out.reserve(pool.instancesInOrder.size());
+
+        for (const auto& h : pool.instancesInOrder) {
+            // instancesInOrder should only contain live handles, but be defensive:
+            if (isAliveInPool(pool, h)) out.emplace_back(h);
+        }
+        return out;
+    }
+
+    template<class Tag>
+    std::vector<aveng::AnyInstanceHandle> listForModelFromPool(const aveng::InstancePoolData<Tag>& pool,
+        aveng::ModelId id)
+    {
+        std::vector<aveng::AnyInstanceHandle> out;
+
+        auto it = pool.instancesPerModel.find(id);
+        if (it == pool.instancesPerModel.end()) return out;
+
+        const auto& vec = it->second;
+        out.reserve(vec.size());
+        for (const auto& h : vec) {
+            if (isAliveInPool(pool, h)) out.emplace_back(h);
+        }
+        return out;
+    }
+
+}
+
+// Notes:
+/*
+    The scene facade's getters should not be accessed directly, though you can absolutely do that.
+    To keep the architecture clean, any class that needs to read data should have an interface
+    injected for a tight read only API:
+
+    For Instances: sceneFacade_.instanceQuery()
+    For Models: 
+        - To load/unload, use these decorators: getOrLoadModel(), unloadModel()
+        - To inspect models from the registry use `modelQuery_`
+        - `modelLib` only serves to forward from overridden decorators. In other words, don't inject it
+           anywhere via this class because this class overrides it, you Took.
+
+*/
 namespace aveng {
     SceneFacade::SceneFacade(IModelLibrary& modelLib, const IModelQuery& modelQuery)
         : modelLib_(modelLib)
         , modelQuery_(modelQuery)
     {
     }
+
+    /* IInstanceQuery */
+    bool SceneFacade::tryGetInstance(AnyInstanceHandle h, InstanceView& out) const
+    {
+        /* O(1) friendly */
+        const auto& statPool = staticMgr_.data();
+        const auto& animPool = animatedMgr_.data();
+
+        return std::visit([&](auto&& hh) -> bool {
+            using H = std::decay_t<decltype(hh)>;
+
+            if constexpr (std::is_same_v<H, std::monostate>) {
+                return false;
+            }
+            else if constexpr (std::is_same_v<H, StaticHandle>) {
+                return tryGetInstanceFromPool(statPool, hh, out, /*animatedFlag=*/false);
+            }
+            else if constexpr (std::is_same_v<H, AnimatedHandle>) {
+                return tryGetInstanceFromPool(animPool, hh, out, /*animatedFlag=*/true);
+            }
+            else {
+                if (!cfg_.failSoft) assert(false);
+                return false;
+            }
+        }, h);
+    }
+    /* IInstanceQuery */
+    std::vector<AnyInstanceHandle> SceneFacade::listAllInstances() const
+    {
+        /*
+         * Return an exhaustive list of all instances from 
+         * static through animated instances (presently)
+         */
+
+        const auto& statPool = staticMgr_.data();
+        const auto& animPool = animatedMgr_.data();
+
+        auto a = listAllFromPool(statPool);
+        auto b = listAllFromPool(animPool);
+
+        a.reserve(a.size() + b.size());
+        a.insert(a.end(), b.begin(), b.end());
+        return a;
+    }
+
+    /* IInstanceQuery */
+    std::vector<AnyInstanceHandle> SceneFacade::listInstancesForModel(ModelId id) const
+    {
+
+        /*
+         * Retrieve a list of every instance that exists
+         * for a given model id
+         */
+
+        const auto& statPool = staticMgr_.data();
+        const auto& animPool = animatedMgr_.data();
+
+        auto a = listForModelFromPool(statPool, id);
+        auto b = listForModelFromPool(animPool, id);
+
+        a.reserve(a.size() + b.size());
+        a.insert(a.end(), b.begin(), b.end());
+        return a;
+    }
+
+    /* IInstanceQuery */
+    bool SceneFacade::isAlive(AnyInstanceHandle h) const
+    {
+
+        /*
+         * alive if: 
+         * handle.generation == slot.generation && slot.instance.has_value() && slot.alive == true
+         */
+
+        const auto& statPool = staticMgr_.data();
+        const auto& animPool = animatedMgr_.data();
+
+        return std::visit([&](auto&& hh) -> bool {
+            using H = std::decay_t<decltype(hh)>;
+
+            if constexpr (std::is_same_v<H, std::monostate>) {
+                return false;
+            }
+            else if constexpr (std::is_same_v<H, StaticHandle>) {
+                return isAliveInPool(statPool, hh);
+            }
+            else if constexpr (std::is_same_v<H, AnimatedHandle>) {
+                return isAliveInPool(animPool, hh);
+            }
+            else {
+                if (!cfg_.failSoft) assert(false);
+                return false;
+            }
+        }, h);
+    }
+    /* IInstanceQuery */
+
 
     /* IModelLibrary */
     ModelRef SceneFacade::getOrLoadModel(const AssetKey& key)
@@ -37,6 +202,7 @@ namespace aveng {
         // (You can remove validated_ from the header later if desired.)
         return ref;
     }
+    /* IModelLibrary */
 
     bool SceneFacade::unloadModel(const AssetKey& key)
     {

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Modeling/ModelRegistry.h"
+// #include "Core/Modeling/ModelRegistry.h" provided by InstanceCommon (and aveng_model)
 #include "Core/Modeling/InstanceCommon.h"
 #include "Core/aveng_model.h"
 #include "InstanceSettings.h"

@@ -10,7 +10,7 @@
 
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
-#include "Editor.h"
+#include "Editor/Editor.h"
 #endif
 #include "avpch.h"
 

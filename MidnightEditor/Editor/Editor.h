@@ -1,15 +1,14 @@
 #pragma once
 #include <cassert>
-#include "System/Peripheral/KeyboardController.h"
-#include "Core/Modeling/ModelAndInstanceData.h"
+#include "Editor/API/IEditorUIAPI.h"
 #include "Core/PointLightSystem.h"
 #include "Core/Camera/aveng_camera.h"
 #include "Core/Input/EventPayloads.h"
 #include "Game/Camera/CameraManager.h"
-#include "Game/data.h"
 #include "GUI/aveng_imgui.h"
 #include "EditorCamera.h"
 #include "EditorData.h"
+#include "Game/data.h"
 
 /**
 * Note: At the moment, this class shares the currentFrameIndex held by the renderer.
@@ -25,17 +24,36 @@ namespace aveng {
 	class Renderer;
 	class InputState;
 	class SceneFacade;
+	class IModelQuery;
+	class IModelAnimQuery;
+	class IInstanceQuery;
 
-	class Editor {
+	class Editor : public IEditorUIAPI {
+
+	/*
+	* The Editor is a(n):
+	* 1. Policy layer
+	*	- Decides when something is allowed (e.g. model not loaded yet -> don't spawn)
+	*	- Decides what to do when UI asks for something
+	* 2. Adapter layer
+	*	- Delegates getters -> const IInstanceQuery&
+	*	- Delegates setters -> SceneFacade&
+	* 3. UI API provider
+	*	- Implements IEditorUIAPI and injects it into AvengImgui
+	*/
+
 	public:
 		Editor(
-			VkRenderData& _renderData, 
-			Renderer& _renderer, 
-			GameData& _gameData, 
-			EngineDevice& _engineDevice, 
-			AvengWindow& window, 
+			VkRenderData& _renderData,
+			Renderer& _renderer,
+			GameData& _gameData,
+			EngineDevice& _engineDevice,
+			AvengWindow& window,
 			CameraManager& _cameraManager,
-			SceneFacade& _sceneFacade
+			SceneFacade& _sceneFacade,		// Use the scene_ member to utilize any operation that isn't a getter of scene data. (getOrLoadModel, unloadModel, spaw, spawnMany, destroyInstance, setTransform, etc.)
+			const IModelQuery& modelQ,		// Getters of model metadata via ModelRegistry as injected from ModelLibrary
+			const IModelAnimQuery& animQ,	// Getters of animation metadata via ModelRegistry as injected from ModelLibrary
+			const IInstanceQuery& instQ		// Getters of SceneFacade strictly on behalf of instance metadata and lists as injected by SceneFacade
 		);
 		~Editor();
 
@@ -136,14 +154,18 @@ namespace aveng {
 		VkResult result;
 		VkRenderData& renderData;
 		GameData& gameData;
-		// ModelAndInstanceData& mModelInstanceData;
+		// TODO : Make these const& ?
 		EngineDevice& engineDevice;
 		AvengWindow& window;
 		Renderer& renderer;
-		SceneFacade& scene_;
+
+		// Model & Instance Ops
+		SceneFacade& scene_;			// Set Scene Data
+		const IInstanceQuery& instQ_;	// Query Instances. From sceneFacade_.instanceQuery()
+		const IModelQuery& modelQ_;		// Query Models.	From modelLib.query()
+		const IModelAnimQuery& animQ_;	// Query Animation Data. From modelLib.animQuery()
+
 		EditorData editorData;
-		AvengAppObject editorViewerObject{ AvengAppObject::createAppObject(1001) };
-		KeyboardController keyboardController{ editorViewerObject, gameData };
 		AvengImgui aveng_imgui{ renderData, gameData, editorData, window, engineDevice, scene_ };
 		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
 	};

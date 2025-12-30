@@ -1,12 +1,6 @@
 /* separate settings file to avoid cicrula dependecies */
 #pragma once
-#include <variant>
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-#include <functional>
-#include <string>
+#include "avpch.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/Modeling/AvengInstance.h"
 #include "Core/Modeling/Sources/IModelSource.h"
@@ -15,7 +9,6 @@ namespace aveng {
 
 
 	/* Q: why do InstanceHandles still use basic <class Tag> and not a more complex variant? */
-
 
 	// Used to identifiy model instances via InstanceSlot
 	template<class Tag>
@@ -139,6 +132,11 @@ namespace aveng {
 
 	};
 
+	// Model Callbacks
+	//using modelCheckCallback = std::function<bool(std::string)>;
+	//using modelAddCallback = std::function<bool(std::string)>;
+	//using modelDeleteCallback = std::function<void(std::string)>;
+
 	// Templated callbacks - Instances
 	//template<class HandleT>
 	//using instanceAddCallback = std::function<void(const ModelRef&)>;
@@ -154,12 +152,7 @@ namespace aveng {
 	//using instanceCloneManyCallback = std::function<void(const HandleT&, unsigned int)>;
 	//template<class HandleT>
 	//using instanceCenterCallbackEditor = std::function<void(const HandleT&)>;
-
-	// Model Callbacks
-	//using modelCheckCallback = std::function<bool(std::string)>;
-	//using modelAddCallback = std::function<bool(std::string)>;
-	//using modelDeleteCallback = std::function<void(std::string)>;
-
+	// 
 	//template<class HandleT>
 	//struct InstanceCallbacksPerPool {
 		//instanceDeleteCallback<HandleT>     onDelete;

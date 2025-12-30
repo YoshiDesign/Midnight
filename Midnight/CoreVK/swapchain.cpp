@@ -220,7 +220,11 @@ namespace aveng {
             1
         };
 
-        renderData.rdSelectionFormat = VK_FORMAT_R32_SFLOAT;
+        renderData.rdSelectionFormat = VK_FORMAT_R32_SFLOAT; // Update this to VK_FORMAT_R32_UINT for the new selection design 
+                                                                // - Fragment shader output must be uint 
+                                                                // - Attachment description must not have blending enabled 
+                                                                // - Your subpass attachment reference must match integer format rules
+                                                                // - Layout transitions still use COLOR_ATTACHMENT_OPTIMAL
 
         VkImageCreateInfo selecImageInfo{};
         selecImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;

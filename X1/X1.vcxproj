@@ -110,7 +110,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ENABLE_EDITOR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ENABLE_EDITOR;M_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -160,9 +160,9 @@
     <ClCompile Include="Game\Math\aveng_math.cpp" />
     <ClCompile Include="Game\Player\GameplayFunctions.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="System\FramePacketBuilder.cpp" />
     <ClCompile Include="System\Peripheral\Controller.cpp" />
     <ClCompile Include="System\Peripheral\KeyboardController.cpp" />
-    <ClCompile Include="System\Render\ObjectRenderSystem.cpp" />
     <ClCompile Include="XOne.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -175,9 +175,9 @@
     <ClInclude Include="Game\Player\Action.h" />
     <ClInclude Include="Game\Player\Command.h" />
     <ClInclude Include="Game\Player\GameplayFunctions.h" />
+    <ClInclude Include="System\FramePacketBuilder.h" />
     <ClInclude Include="System\Peripheral\Controller.h" />
     <ClInclude Include="System\Peripheral\KeyboardController.h" />
-    <ClInclude Include="System\Render\ObjectRenderSystem.h" />
     <ClInclude Include="Utils\threadpool.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />
     <ClInclude Include="vendor\GLFW\glfw3native.h" />

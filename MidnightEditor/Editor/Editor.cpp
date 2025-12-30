@@ -25,7 +25,11 @@ namespace aveng {
 		EngineDevice& _engineDevice, 
 		AvengWindow& window, 
 		CameraManager& _cameraManager,
-		SceneFacade& _sceneFacade)
+		SceneFacade& _sceneFacade,
+		const IModelQuery& modelQ,
+		const IModelAnimQuery& animQ,
+		const IInstanceQuery& instQ
+		)
 		: 
 		renderData{ _renderData }, 
 		renderer{ _renderer }, 
@@ -33,7 +37,10 @@ namespace aveng {
 		engineDevice{ _engineDevice }, 
 		window{ window }, 
 		cameraManager{ _cameraManager },
-		scene_{_sceneFacade}
+		scene_{ _sceneFacade },
+		modelQ_{ modelQ },
+		animQ_{ animQ },
+		instQ_{ instQ } 
 	{
 
 		// Register a camera
@@ -409,43 +416,43 @@ namespace aveng {
 		aveng_imgui.handleMousePositionEvents(e.x, e.y, e.rmbDown);
 	}
 
-	template<class Tag>
-	void Editor::updateSelectionForPool(
-		InstanceManager<Tag>& mgr,
-		const std::vector<InstanceHandle<Tag>>& drawOrder,
-		std::vector<glm::vec2>& out,
-		const AnyInstanceHandle& selectedAny,
-		bool highlight,
-		float blinkValue)
-	{
-		ensureSize(out, drawOrder.size());
+	//template<class Tag>
+	//void Editor::updateSelectionForPool(
+	//	InstanceManager<Tag>& mgr,
+	//	const std::vector<InstanceHandle<Tag>>& drawOrder,
+	//	std::vector<glm::vec2>& out,
+	//	const AnyInstanceHandle& selectedAny,
+	//	bool highlight,
+	//	float blinkValue)
+	//{
+	//	ensureSize(out, drawOrder.size());
 
-		// default fill
-		for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
-			out[drawIdx].x = 1.0f;
+	//	// default fill
+	//	for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
+	//		out[drawIdx].x = 1.0f;
 
-			if (auto* inst = mgr.get(drawOrder[drawIdx])) {
-				const auto s = inst->getInstanceSettings();
-				out[drawIdx].y = float(s.isInstanceIndexPosition);
-			}
-			else {
-				out[drawIdx].y = -1.0f;
-			}
-		}
+	//		if (auto* inst = mgr.get(drawOrder[drawIdx])) {
+	//			const auto s = inst->getInstanceSettings();
+	//			out[drawIdx].y = float(s.isInstanceIndexPosition);
+	//		}
+	//		else {
+	//			out[drawIdx].y = -1.0f;
+	//		}
+	//	}
 
-		if (!highlight) return;
+	//	if (!highlight) return;
 
-		// only highlight if the variant holds this pool's handle type
-		if (const auto* sel = std::get_if<InstanceHandle<Tag>>(&selectedAny)) {
-			// O(n) search in draw order (fine)
-			for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
-				if (drawOrder[drawIdx] == *sel) {
-					out[drawIdx].x = blinkValue;
-					break;
-				}
-			}
-		}
-	}
+	//	// only highlight if the variant holds this pool's handle type
+	//	if (const auto* sel = std::get_if<InstanceHandle<Tag>>(&selectedAny)) {
+	//		// O(n) search in draw order (fine)
+	//		for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
+	//			if (drawOrder[drawIdx] == *sel) {
+	//				out[drawIdx].x = blinkValue;
+	//				break;
+	//			}
+	//		}
+	//	}
+	//}
 
 
 

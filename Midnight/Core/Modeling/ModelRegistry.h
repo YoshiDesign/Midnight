@@ -1,10 +1,13 @@
 #pragma once
 #include "avpch.h"
-#include "Services/ModelServices.h"
-
-/*For now, simplest rule: models stay loaded until shutdown.*/
+#include "Core/Modeling/AssimpAnimChannel.h"
 
 namespace aveng {
+
+	class AvengModel; // Note: this is causing a benign include cycle in aveng_model.h. Ownership must live elsewhere
+
+	using AssetKey = std::string; // Identifies a model - Used to request a model that hasn't been loaded into memory yet
+	using ModelId = uint32_t; // Used internally by renderer / instance managers for fast lookups
 
 	// This is private to the model registry mechanics.
 	struct ModelEntry {
@@ -14,6 +17,8 @@ namespace aveng {
 		bool isAnimated = false;		// Model Constant
 		uint32_t boneCount;				// Model Constant
 		glm::mat4 rootTransform{1.f};	// Model Constant
+
+		~ModelEntry();
 	};
 
 	// This is public for callers who create models - 
@@ -26,7 +31,48 @@ namespace aveng {
 		explicit operator bool() const { return id != 0; } // Might need updated bc the NullModel could be nullptr in the future
 	};
 
-	/* The ModelDB */
+	struct AnimationMeta {
+		float durationTicks = 0.0f;
+		float ticksPerSecond = 0.0f;
+		uint32_t boneCount = 0;
+		// Why are these shared_ptr?
+		std::vector<AssimpAnimChannel> animChannels;
+	};
+
+	struct ModelMeta {
+		glm::mat4 root;          // model-space -> engine-space correction created at model load
+		uint32_t  boneCount = 0; // 0 for static models
+		bool      animated = false;
+	};
+
+	struct IModelLibrary {
+		virtual ~IModelLibrary() = default;
+		virtual ModelRef getOrLoadModel(const AssetKey& key) = 0;
+		virtual bool unloadModel(const AssetKey& key) = 0; // "delete" is too strong a word here
+	};
+
+	/// Renderer/modelDb should implement this without exposing the whole DB.
+	struct IModelQuery {
+		virtual ~IModelQuery() = default;
+
+		/// Returns true if modelId is currently loaded/valid.
+		virtual bool isModelLoaded(ModelId id, ModelMeta& out) const = 0;
+
+		/// Returns true if the loaded model is animated. Only called when isModelLoaded(id) == true.
+		virtual bool isModelAnimated(ModelId id, ModelMeta& out) const = 0;
+
+		virtual bool tryGetModelMeta(ModelId id, ModelMeta& out) const = 0;
+	};
+
+	struct IModelAnimQuery {
+		virtual ~IModelAnimQuery() = default;
+
+		// Should derive duration, ticks, channels, channel size, etc...
+		virtual bool tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const = 0;
+	};
+
+
+	/* The ModelDB - Note: Don't ever template a class that inherits virtual interfaces */
 	struct ModelRegistryData final : public IModelAnimQuery, public IModelQuery {
 		std::vector<ModelEntry> models;
 		std::unordered_map<AssetKey, ModelId> idByKey;
@@ -37,108 +83,12 @@ namespace aveng {
 
 		std::optional<ModelId> selectedModel;
 
-		const ModelEntry* get(ModelId id) const { 
-			std::cout << "ModelEntry::get(): " << id << std::endl;
-			auto it = indexById.find(id);
-			if (it == indexById.end()) return nullptr;
-			return &models[it->second];
-		};
+		const ModelEntry* get(ModelId id) const;
 
-		// IModelAnimQuery
-		bool tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const {
-			std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
-			const ModelEntry* e = get(id);
-			if (!e || !e->isAnimated) return false;
-
-			const auto& clips = e->model->getAnimClips();
-			if (clipIndex >= clips.size()) return false;
-
-			out.durationTicks = clips[clipIndex]->getClipDuration();
-			out.ticksPerSecond = clips[clipIndex]->getClipTicksPerSecond();
-			out.animChannels = clips[clipIndex]->getChannels();
-			out.boneCount = e->boneCount;
-
-			return true;
-		}
-
-		// IModelQuery
-		bool isModelAnimated(ModelId id, ModelMeta& out) const {
-			const ModelEntry* e = get(id);
-			if (!e) return false;
-
-			/* Todo - cater to the ModelMeta */
-
-			return e->isAnimated;
-		}
-
-		// IModelQuery
-		bool isModelLoaded(ModelId id, ModelMeta& out) const { 
-			const ModelEntry* e = get(id);
-			if (!e) return false;
-			out.animated = e->isAnimated;
-			out.boneCount = e->boneCount;
-			out.root = e->rootTransform;
-			return true;
-		}
-
-		// IModelQuery
-		bool tryGetModelMeta(ModelId id, ModelMeta& out) const {
-			std::cout << "Renderer::tryGetModelMeta - Querying\n";
-			const ModelEntry* e = get(id);
-			if (!e) return false;
-
-			out.root = e->rootTransform;
-			out.boneCount = e->boneCount;
-			out.animated = e->isAnimated;
-			return true;
-		}
-
-		/* Individual getters, from before ModelMeta was a thing */
-		/* IModelAnimQuery */
-		//bool tryGetClipTicksPerSecond(ModelId id, uint32_t clipIndex, float& outTPS) const {
-		//	std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
-		//	const ModelEntry* e = get(id);
-		//	if (!e || !e->isAnimated) return false;
-
-		//	const auto& clips = e->model->getAnimClips();
-		//	if (clipIndex >= clips.size()) return false;
-
-		//	outTPS = clips[clipIndex]->getClipTicksPerSecond();
-		//	return true;
-		//}
-
-		//bool tryGetClipDuration(ModelId id, uint32_t clipIndex, float& outDuration) const {
-		//	std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
-		//	const ModelEntry* e = get(id);
-		//	if (!e || !e->isAnimated) return false;
-
-		//	const auto& clips = e->model->getAnimClips();
-		//	if (clipIndex >= clips.size()) return false;
-
-		//	outDuration = clips[clipIndex]->getClipDuration();
-		//	return true;
-		//}
-
-		//bool tryGetClipChannels(ModelId id, uint32_t clipIndex, std::vector<std::shared_ptr<AssimpAnimChannel>> outChannels) const {
-		//	std::cout << "ModelRegistryData::tryGetClipTicksPerSecond - Querying\n";
-		//	const ModelEntry* e = get(id);
-		//	if (!e || !e->isAnimated) return false;
-
-		//	const auto& clips = e->model->getAnimClips();
-		//	if (clipIndex >= clips.size()) return false;
-
-		//	outChannels = clips[clipIndex]->getChannels();
-		//	return true;
-		//}
-
-
-		//bool tryGetClipCount(ModelId modelId, uint32_t& outCount) const {
-		//	return true;
-		//}
-
-		//bool tryGetClipDurationTicks(ModelId modelId, uint32_t clipIndex, float& outDurationTicks) const {
-		//	return true;
-		//}
+		bool tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const override;
+		bool isModelAnimated(ModelId id, ModelMeta& out) const override;
+		bool isModelLoaded(ModelId id, ModelMeta& out) const override;
+		bool tryGetModelMeta(ModelId id, ModelMeta& out) const override;
 
 	};
 

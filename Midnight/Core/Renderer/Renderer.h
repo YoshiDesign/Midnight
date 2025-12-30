@@ -4,7 +4,6 @@
 #include <vector>
 #include <unordered_map>
 #include "Core/Modeling/ModelRegistry.h"
-#include "Services/ModelServices.h"
 #include "Core/Modeling/Sources/IModelSource.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/VkRenderData.h"

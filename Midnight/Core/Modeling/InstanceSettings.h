@@ -7,20 +7,6 @@
 
 namespace aveng {
     
-    /* */
-    struct AnimatedCreateSettings {
-        TransformSettings transform;
-        AnimSettings      anim;
-    };
-
-    /* */
-    struct TransformSettings {
-        glm::vec3 worldPosition{ 0.f };
-        glm::vec3 worldRotation{ 0.f };
-        float     scale{ 1.f };
-        bool      swapYZ{ false };
-    };
-
     /* The instance's copy of its settings */
     struct InstanceTransform {
         glm::vec3 pos{ 0.f };
@@ -33,6 +19,20 @@ namespace aveng {
         uint32_t clipNr{ 0 };
         float    playTime{ 0.f }; // Somewhere between 0 and duration
         float    speed{ 1.f };
+    };
+
+    /* */
+    struct TransformSettings {
+        glm::vec3 worldPosition{ 0.f };
+        glm::vec3 worldRotation{ 0.f };
+        float     scale{ 1.f };
+        bool      swapYZ{ false };
+    };
+
+    /* */
+    struct AnimatedCreateSettings {
+        TransformSettings transform;
+        AnimSettings      anim;
     };
 
 	//struct InstanceSettings {

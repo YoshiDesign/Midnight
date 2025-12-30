@@ -42,23 +42,18 @@ namespace xone {
 
 		float frameTime;
 		int player_camera_id;
-		ObjectRenderSystem objectRenderSystem{};
 		aveng::GameData gameData; // This is a big design flaw at the moment. Don't rely on it
 		aveng::Midnight midnight{ gameData };
 
-		/*
-		* !! Order of member initialization matters !!
-		* See: � 12.6.2 of the C++ Standard
-		*/
-		
 	};
 
 }
 
 /*
+* Old notes from like 2021
 	Things to keep in mind:
 	Object Space - Objects initially exist at the origin of object space
-	World Space  - The model matrix created by the AppObject's transform component coordinates objects with World Space
+	World Space  - The model matrix created by the <>'s transform component, coordinates objects with World Space
 	Camera Space - The view transformation, applied to our objects, moves objects from World Space into the camera's perspective,
 				   where the camera is at the origin and all object's coord's are relative to their position and orientation
 

@@ -1,11 +1,9 @@
 #pragma once
 #include "avpch.h"
-#include "Services/ModelServices.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "Core/Modeling/InstanceSettings.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/VkRenderData.h"
-#include "Core/Modeling/ModelRegistry.h"
 #include "Core/aveng_model.h"
 
 namespace aveng {
@@ -89,15 +87,9 @@ namespace aveng {
         // InstanceData& data()                { return instanceData_; } // Not exactly a narrow API
 
         /* API -  */
-        const InstanceData& data() const    { return instanceData_; } // Still not exactly a narrow API
-
-        /* API -  */
+        const InstanceData& data() const    { return instanceData_; } // Not exactly a narrow API
         const std::vector<Handle>& instancesInOrder() const { return instanceData_.instancesInOrder; }
-
-        /* API -  */
         const std::vector<Slot>& slots() const { return instanceData_.slots; }
-
-        /* API - If renderer needs per-model groups: */ 
         const std::unordered_map<ModelId, std::vector<Handle>>& instancesPerModel() const { return instanceData_.instancesPerModel; }
 
         /* Ctor - Each instance manager manages a null instance */
