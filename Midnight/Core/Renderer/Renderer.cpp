@@ -1247,7 +1247,7 @@ namespace aveng {
 			}
 
 			// End command recording for Compute Queue
-			if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersCompute.at(currentFrameIndex))) {
+			if (!engineDevice.endCommandBuffer(renderData.rdCommandBuffersCompute[currentFrameIndex])) {
 				std::printf("%s error: failed to end compute command buffer\n", __FUNCTION__);
 				return WTF_BOOM;
 			}
@@ -1258,14 +1258,14 @@ namespace aveng {
 			VkSubmitInfo computeSubmitInfo{};
 			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			computeSubmitInfo.commandBufferCount = 1;
-			computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute.at(currentFrameIndex);
+			computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute[currentFrameIndex];
 			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore.at(currentFrameIndex);
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
 			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore.at(currentFrameIndex);
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
 			computeSubmitInfo.pWaitDstStageMask = &waitStage;
 
-			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence.at(currentFrameIndex));
+			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
 				return WTF_BOOM;
@@ -1279,20 +1279,18 @@ namespace aveng {
 			VkSubmitInfo computeSubmitInfo{};
 			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore.at(currentFrameIndex);
+			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
 			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore.at(currentFrameIndex);
+			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
 			computeSubmitInfo.pWaitDstStageMask = &waitStage;
 
 			// Compute submission and fence signaling
-			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence.at(currentFrameIndex));
+			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
 				return WTF_BOOM;
 			};
 		}
-
-
 
 	}
 
@@ -1345,7 +1343,6 @@ namespace aveng {
 		int frameIndex)
 	{
 
-
 		/*
 			v1: Frame Packet tells renderer which models & instance ranges to draw, in order.
 			renderer asks ModelLibrary for model render access (ptr or view)
@@ -1386,7 +1383,13 @@ namespace aveng {
 
 					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-					model->drawInstancedV2(renderData, basicLayout, animationLayout, numberOfInstances, frameIndex);
+					model->drawInstancedV2(
+						renderData.rdCommandBuffersGraphics[frameIndex], 
+						basicLayout, 
+						animationLayout, 
+						numberOfInstances, 
+						frameIndex);
+
 					worldPosOffset += numberOfInstances;
 					skinMatOffset += numberOfInstances * numberOfBones;
 
@@ -1407,7 +1410,13 @@ namespace aveng {
 					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
 					// Note: We pass the animation layout here even though its implicitly basic
-					model->drawInstancedV2(renderData, basicLayout, animationLayout, numberOfInstances, frameIndex);
+					model->drawInstancedV2(
+						renderData.rdCommandBuffersGraphics[frameIndex], 
+						basicLayout, 
+						animationLayout, 
+						numberOfInstances, 
+						frameIndex);
+
 					worldPosOffset += numberOfInstances;
 
 				}
@@ -1656,14 +1665,14 @@ namespace aveng {
 
 		destroyTrash();
 
-		/* delete models to destroy Vulkan objects */
-		for (const auto& model : mModelInstanceData.miModelList) {
-			model->cleanup(engineDevice, renderData, aveng_swapchain->MAX_FRAMES_IN_FLIGHT);
-		}
+		///* Moved to ModelLibrary */
+		//for (const auto& model : mModelInstanceData.miModelList) {
+		//	model->cleanup(engineDevice, renderData);
+		//}
 
-		for (const auto& model : mModelInstanceData.miPendingDeleteAvengModels) {
-			model->cleanup(engineDevice, renderData, aveng_swapchain->MAX_FRAMES_IN_FLIGHT);
-		}
+		//for (const auto& model : mModelInstanceData.miPendingDeleteAvengModels) {
+		//	model->cleanup(engineDevice, renderData);
+		//}
 
 		SyncObjects::cleanup(engineDevice, renderData, SwapChain::MAX_FRAMES_IN_FLIGHT);
 

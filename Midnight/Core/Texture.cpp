@@ -5,7 +5,7 @@
 
 namespace aveng {
     /* This signature is used if we're loading a texture from a file */
-    bool Texture::loadTexture(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData, std::string textureFilename,
+    bool Texture::loadTexture(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData, std::string textureFilename,
         bool generateMipmaps, bool flipImage) {
         // Check if texture is already loaded (defensive check to prevent double-loading)
         if (texData.image != VK_NULL_HANDLE) {
@@ -76,7 +76,7 @@ namespace aveng {
     }
 
     /* This signature is used if we're loading an embedded texture */
-    bool Texture::loadTexture(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData, std::string textureName, aiTexel* textureData, int width, int height, bool generateMipmaps, bool flipImage) {
+    bool Texture::loadTexture(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData, std::string textureName, aiTexel* textureData, int width, int height, bool generateMipmaps, bool flipImage) {
         // Check if texture is already loaded (defensive check to prevent double-loading)
         if (texData.image != VK_NULL_HANDLE) {
             std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureName.c_str());
@@ -157,7 +157,7 @@ namespace aveng {
         return true;
     }
 
-    bool Texture::uploadToGPU(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData, VkTextureStagingBuffer& stagingData,
+    bool Texture::uploadToGPU(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData, VkTextureStagingBuffer& stagingData,
         uint32_t width, uint32_t height, bool generateMipmaps, uint32_t mipmapLevels) {
         /* upload */
         VkCommandBuffer uploadCommandBuffer = engineDevice.createSingleShotBuffer();
@@ -416,7 +416,7 @@ namespace aveng {
         return true;
     }
 
-    void Texture::cleanup(EngineDevice& engineDevice, VkRenderData& renderData, VkTextureData& texData) {
+    void Texture::cleanup(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData) {
         // Note: stylistically, for handle-like things it is simpler to make getPool() return by value
         // e.g. VkDescriptorPool getPool() const { return mPool; }
         vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &texData.descriptorSet);

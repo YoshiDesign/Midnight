@@ -13,7 +13,8 @@ namespace aveng {
     class AssimpAnimClip {
     public:
         void addChannels(aiAnimation* animation, std::vector<std::shared_ptr<AssimpBone>> boneList);
-        const std::vector<std::shared_ptr<AssimpAnimChannel>>& getChannels();
+        // const std::vector<std::shared_ptr<AssimpAnimChannel>>& getChannels(); // old
+        std::vector<AssimpAnimChannel> getChannels();
 
         std::string getClipName();
         float getClipDuration();
@@ -26,7 +27,8 @@ namespace aveng {
         float mClipDuration = 0.0f;
         float mClipTicksPerSecond = 0.0f;
 
-        std::vector<std::shared_ptr<AssimpAnimChannel>> mAnimChannels{};
+        std::vector<AssimpAnimChannel> mAnimChannels{};
+        //std::vector<std::shared_ptr<AssimpAnimChannel>> mAnimChannels{};
     };
 
 }

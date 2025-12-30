@@ -131,7 +131,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ENABLE_EDITOR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;ENABLE_EDITOR;M_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -204,10 +204,12 @@
     <ClCompile Include="Core\Modeling\AssimpNode.cpp" />
     <ClCompile Include="Core\Modeling\Tools.cpp" />
     <ClCompile Include="Core\Renderer\AvengFrame.cpp" />
+    <ClCompile Include="Core\Renderer\ModelLibrary.cpp" />
     <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp" />
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
     <ClCompile Include="Core\Texture.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
+    <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
     <ClCompile Include="Utils\AssetResolution.cpp" />
     <ClCompile Include="Utils\Logger.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />
@@ -237,6 +239,7 @@
     <ClInclude Include="Core\Input\InputSystem.h" />
     <ClInclude Include="Core\Midnight.h" />
     <ClInclude Include="Core\Modeling\AvengInstance.h" />
+    <ClInclude Include="Core\Modeling\InstanceCommon.h" />
     <ClInclude Include="Core\Modeling\ModelRegistry.h" />
     <ClInclude Include="Core\Modeling\Sources\FilesystemModelSource.h" />
     <ClInclude Include="Core\Modeling\Sources\IModelSource.h" />
@@ -258,15 +261,18 @@
     <ClInclude Include="Core\Modeling\ModelAndInstanceData.h" />
     <ClInclude Include="Core\Modeling\Tools.h" />
     <ClInclude Include="Core\Renderer\AvengFrame.h" />
+    <ClInclude Include="Core\Renderer\ModelLibrary.h" />
     <ClInclude Include="Core\Renderer\PipelineConfigManager.h" />
     <ClInclude Include="Core\Renderer\Renderer.h" />
     <ClInclude Include="Core\Renderer\TextureStreamingManager.h" />
     <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\UUID.h" />
+    <ClInclude Include="Runtime\Facade\SceneFacade.h" />
     <ClInclude Include="Runtime\Play\GameRegistry.h" />
     <ClInclude Include="Runtime\Play\IGameInstance.h" />
     <ClInclude Include="Runtime\Play\PlayManager.h" />
     <ClInclude Include="Runtime\World\InstanceManager.h" />
+    <ClInclude Include="Services\ModelServices.h" />
     <ClInclude Include="stb\stb_connected_components.h" />
     <ClInclude Include="stb\stb_c_lexer.h" />
     <ClInclude Include="stb\stb_divide.h" />

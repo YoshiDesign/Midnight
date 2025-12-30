@@ -43,12 +43,19 @@ namespace aveng {
         const bool ok = modelLib_.unloadModel(key);
 
         // We only have the key here, and SceneFacade has no key->ModelId mapping in this header.
-        // So we can’t precisely invalidate a single ModelId unless IModelQuery supports lookup by key.
+        // So we can't precisely invalidate a single ModelId unless IModelQuery supports lookup by key.
         //
-        // Safe conservative choice: clear cached validation (even though we’re not relying on it).
+        // Safe conservative choice: clear cached validation (even though weï¿½re not relying on it).
         clearValidationCache();
 
         return ok;
+    }
+
+    void SceneFacade::destroyAllInstancesForModel(ModelId mid)
+    {
+        staticMgr_.deleteAllInstancesForModel(mid);
+        animatedMgr_.deleteAllInstancesForModel(mid);
+        
     }
 
     /* Instance Ops */
@@ -85,18 +92,17 @@ namespace aveng {
             return AnyInstanceHandle{};
         }
 
-        // Prefer receipt (ModelRef) for intent; meta is authority if you want to sanity-check.
-        const PoolKind pool = modelRef.isAnimated ? PoolKind::Animated : PoolKind::Static;
-
         // Optional: sanity check in debug builds (helps catch stale/corrupt ModelRef).
 #ifndef NDEBUG
         if (modelRef.isAnimated != m.animated) {
             // If this ever fires, it means ModelRef receipt is inconsistent with registry.
             assert(false && "SceneFacade::spawn: ModelRef.isAnimated disagrees with ModelMeta.animated");
         }
+        // Catch animated models being spawned with static settings
+        assert(!m.animated && "SceneFacade::spawn: Use AnimatedCreateSettings overload for animated models");
 #endif
 
-        return spawnValidated(pool, modelRef.id, s, m);
+        return spawnValidated<StaticTag>(modelRef.id, s, m);
     }
 
     AnyInstanceHandle SceneFacade::spawn(ModelRef modelRef, const AnimatedCreateSettings& s)
@@ -117,9 +123,6 @@ namespace aveng {
             return AnyInstanceHandle{};
         }
 
-        // Prefer receipt (ModelRef) for intent; meta is authority if you want to sanity-check.
-        const PoolKind pool = modelRef.isAnimated ? PoolKind::Animated : PoolKind::Static;
-
         // Optional: sanity check in debug builds (helps catch stale/corrupt ModelRef).
 #ifndef NDEBUG
         if (modelRef.isAnimated != m.animated) {
@@ -128,13 +131,13 @@ namespace aveng {
         }
 #endif
 
-        return spawnValidated(pool, modelRef.id, s, m);
+        return spawnValidated<AnimatedTag>(modelRef.id, s, m);
     }
 
 
     std::vector<AnyInstanceHandle> SceneFacade::spawnMany(
         ModelRef modelRef,
-        std::span<const InstanceSettings> settings,
+        std::span<const TransformSettings> settings,
         std::uint32_t count)
     {
         std::vector<AnyInstanceHandle> out;
@@ -158,7 +161,45 @@ namespace aveng {
             return out;
         }
 
-        const PoolKind pool = modelRef.isAnimated ? PoolKind::Animated : PoolKind::Static;
+#ifndef NDEBUG
+        if (modelRef.isAnimated != m.animated) {
+            assert(false && "SceneFacade::spawnMany: ModelRef.isAnimated disagrees with ModelMeta.animated");
+        }
+#endif
+
+        for (std::uint32_t i = 0; i < count; ++i) {
+            const TransformSettings& s = settings[i % settings.size()];
+            out.emplace_back(spawnValidated<StaticTag>(modelRef.id, s, m));
+        }
+
+        return out;
+    }
+
+    std::vector<AnyInstanceHandle> SceneFacade::spawnMany(
+        ModelRef modelRef,
+        std::span<const AnimatedCreateSettings> settings,
+        std::uint32_t count)
+    {
+        std::vector<AnyInstanceHandle> out;
+        out.reserve(count);
+
+        if (count == 0) return out;
+
+        if (!modelRef) {
+            if (!cfg_.failSoft) assert(false && "SceneFacade::spawnMany: null ModelRef");
+            return out;
+        }
+
+        if (settings.empty()) {
+            if (!cfg_.failSoft) assert(false && "SceneFacade::spawnMany: settings span empty");
+            return out;
+        }
+
+        ModelMeta m{};
+        if (!modelQuery_.isModelLoaded(modelRef.id, m)) {
+            if (!cfg_.failSoft) assert(false && "SceneFacade::spawnMany: model id not loaded");
+            return out;
+        }
 
 #ifndef NDEBUG
         if (modelRef.isAnimated != m.animated) {
@@ -167,37 +208,25 @@ namespace aveng {
 #endif
 
         for (std::uint32_t i = 0; i < count; ++i) {
-            const InstanceSettings& s = settings[i % settings.size()];
-            out.emplace_back(spawnValidated(pool, modelRef.id, s, m));
+            const AnimatedCreateSettings& s = settings[i % settings.size()];
+            out.emplace_back(spawnValidated<AnimatedTag>(modelRef.id, s, m));
         }
 
         return out;
     }
 
-
-    AnyInstanceHandle SceneFacade::spawnValidated(PoolKind pool, ModelId id, const InstanceSettings& settings, const ModelMeta& m)
-    {
-        switch (pool) {
-        case PoolKind::Static: {
-            // Adjust create(...) signature to your InstanceManager API.
-            const StaticHandle h = staticMgr_.addInstanceOfModel(id, settings, m);
-            return AnyInstanceHandle{ h };
-        }
-        case PoolKind::Animated: {
-            const AnimatedHandle h = animatedMgr_.addInstanceOfModel(id, settings, m);
-            return AnyInstanceHandle{ h };
-        }
-        default:
-            break;
-        }
-
-        if (cfg_.failSoft) return AnyInstanceHandle{};
-        assert(false && "SceneFacade::spawnValidated: unknown pool kind");
-        return AnyInstanceHandle{};
-    }
-
+    /* 
+        We always use the plural `cloneInstances` path because we don't want the
+        individual path to resize our dirtyGpu arrays if a new slot is created.
+    */
     AnyInstanceHandle SceneFacade::clone(AnyInstanceHandle src)
     {
+
+        tmpStaticHandles_.clear();
+        tmpAnimatedHandles_.clear();
+        tmpStaticHandles_.reserve(1);
+        tmpAnimatedHandles_.reserve(1);
+
         return std::visit([&](auto&& h) -> AnyInstanceHandle {
             using H = std::decay_t<decltype(h)>;
 
@@ -205,12 +234,14 @@ namespace aveng {
                 return AnyInstanceHandle{};
             }
             else if constexpr (std::is_same_v<H, StaticHandle>) {
-                const StaticHandle nh = staticMgr_.cloneInstance(h);
-                return AnyInstanceHandle{ nh };
+                tmpStaticHandles_.push_back(h);
+                const std::vector<StaticHandle> nh = staticMgr_.cloneInstances(tmpStaticHandles_);
+                return AnyInstanceHandle{ nh[0] };
             }
             else if constexpr (std::is_same_v<H, AnimatedHandle>) {
-                const AnimatedHandle nh = animatedMgr_.cloneInstance(h);
-                return AnyInstanceHandle{ nh };
+                tmpAnimatedHandles_.push_back(h);
+                const std::vector <AnimatedHandle> nh = animatedMgr_.cloneInstances(tmpAnimatedHandles_);
+                return AnyInstanceHandle{ nh[0] };
             }
             else {
                 // If you later add more handle types, you'll land here until you update.
@@ -221,16 +252,67 @@ namespace aveng {
         }, src);
     }
 
-    std::vector<AnyInstanceHandle> SceneFacade::cloneMany(std::span<const AnyInstanceHandle> srcHandles)
+    // If cloning becomes a hot commodity, this needs to be updated
+    std::vector<AnyInstanceHandle>
+        SceneFacade::cloneMany(std::span<const AnyInstanceHandle> srcHandles)
     {
+        tmpStaticHandles_.clear();
+        tmpAnimatedHandles_.clear();
+        tmpStaticHandles_.reserve(srcHandles.size());
+        tmpAnimatedHandles_.reserve(srcHandles.size());
+
+        // Keep output aligned with input ordering:
+        // Store ï¿½which pool + which index within that poolï¿½s outputï¿½.
+        struct MapEntry { uint8_t pool; uint32_t idx; }; // pool: 0=none,1=static,2=anim
+        std::vector<MapEntry> map;
+        map.reserve(srcHandles.size());
+
+        for (const auto& h : srcHandles) {
+            MapEntry me{ 0, 0 };
+            std::visit([&](auto&& hh) {
+                using H = std::decay_t<decltype(hh)>;
+                if constexpr (std::is_same_v<H, std::monostate>) {
+                    me.pool = 0;
+                }
+                else if constexpr (std::is_same_v<H, StaticHandle>) {
+                    me.pool = 1;
+                    me.idx = (uint32_t)tmpStaticHandles_.size();
+                    tmpStaticHandles_.push_back(hh);
+                }
+                else if constexpr (std::is_same_v<H, AnimatedHandle>) {
+                    me.pool = 2;
+                    me.idx = (uint32_t)tmpAnimatedHandles_.size();
+                    tmpAnimatedHandles_.push_back(hh);
+                }
+            }, h);
+            map.push_back(me);
+        }
+
+        // Clone per pool once
+        std::vector<StaticHandle> statOut;
+        std::vector<AnimatedHandle> animOut;
+
+        if (!tmpStaticHandles_.empty()) {
+            statOut = staticMgr_.cloneInstances(tmpStaticHandles_);
+        }
+        if (!tmpAnimatedHandles_.empty()) {
+            animOut = animatedMgr_.cloneInstances(tmpAnimatedHandles_);
+        }
+
+        // Reassemble in input order
         std::vector<AnyInstanceHandle> out;
         out.reserve(srcHandles.size());
 
-        for (const auto& h : srcHandles) {
-            out.emplace_back(clone(h));
+        // Return all the handles *in the same vector*
+        for (const auto& me : map) {
+            if (me.pool == 1) out.emplace_back(AnyInstanceHandle{ statOut[me.idx] });
+            else if (me.pool == 2) out.emplace_back(AnyInstanceHandle{ animOut[me.idx] });
+            else out.emplace_back(AnyInstanceHandle{}); // monostate / invalid
         }
+
         return out;
     }
+
 
     void SceneFacade::destroyStatic(StaticHandle h)
     {
@@ -273,63 +355,150 @@ namespace aveng {
         }
     }
 
-    /* Transform Ops */
-
-    void SceneFacade::setTransform(AnyInstanceHandle handle, const Transform& transform)
-    {
-
-        std::visit([&](auto&& h) {
-            using H = std::decay_t<decltype(h)>;
-
-            if constexpr (std::is_same_v<H, std::monostate>) {
-                // no-op
-            }
-            else if constexpr (std::is_same_v<H, StaticHandle>) {
-                staticMgr_.setTransform(h, transform);
-            }
-            else if constexpr (std::is_same_v<H, AnimatedHandle>) {
-                animatedMgr_.setTransform(h, transform);
-            }
-            else {
-                if (!cfg_.failSoft) {
-                    assert(false && "SceneFacade::setTransform: unhandled handle alternative");
-                }
-            }
-        }, handle);
-    }
-
     void SceneFacade::setTransforms(
         std::span<const AnyInstanceHandle> handles,
-        std::span<const Transform> transforms)
+        std::span<const TransformSettings> transforms)
     {
         if (handles.size() != transforms.size()) {
             if (cfg_.failSoft) return;
-            assert(false && "SceneFacade::setTransforms: handles/transforms size mismatch");
+            assert(false && "handles/transforms size mismatch");
             return;
         }
 
-        for (std::size_t i = 0; i < handles.size(); ++i) {
-            const AnyInstanceHandle& h = handles[i];
-            const Transform& t = transforms[i];
+        // Clear scratch (keep capacity)
+        tmpStaticHandles_.clear();
+        tmpStaticXforms_.clear();
+        tmpAnimatedHandles_.clear();
+        tmpAnimatedXforms_.clear();
 
-            std::visit([&](auto&& hh) {
-                using H = std::decay_t<decltype(hh)>;
+        // Reserve once (best-effort; avoids growth)
+        tmpStaticHandles_.reserve(handles.size());
+        tmpStaticXforms_.reserve(handles.size());
+        tmpAnimatedHandles_.reserve(handles.size());
+        tmpAnimatedXforms_.reserve(handles.size());
+
+        for (size_t i = 0; i < handles.size(); ++i) {
+            const TransformSettings it = transforms[i];
+
+            std::visit([&](auto&& h) {
+                using H = std::decay_t<decltype(h)>;
 
                 if constexpr (std::is_same_v<H, std::monostate>) {
-                    // no-op
+                    // skip
                 }
                 else if constexpr (std::is_same_v<H, StaticHandle>) {
-                    staticMgr_.setTransform(hh, t);
+                    tmpStaticHandles_.push_back(h);
+                    tmpStaticXforms_.push_back(toInstanceTransform(it));
                 }
                 else if constexpr (std::is_same_v<H, AnimatedHandle>) {
-                    animatedMgr_.setTransform(hh, t);
+                    tmpAnimatedHandles_.push_back(h);
+                    tmpAnimatedXforms_.push_back(toInstanceTransform(it));
                 }
                 else {
-                    if (!cfg_.failSoft) {
-                        assert(false && "SceneFacade::setTransforms: unhandled handle alternative");
-                    }
+                    if (!cfg_.failSoft) assert(false && "Unhandled handle alternative");
                 }
-            }, h);
+            }, handles[i]);
+        }
+
+        if (!tmpStaticHandles_.empty()) {
+            staticMgr_.setTransforms(tmpStaticHandles_, tmpStaticXforms_);
+        }
+        if (!tmpAnimatedHandles_.empty()) {
+            animatedMgr_.setTransforms(tmpAnimatedHandles_, tmpAnimatedXforms_);
         }
     }
+    
+    // Overload in case you have hot code and would like to 
+    // skip the conversion from TransformSettings -> InstanceTransform
+    void SceneFacade::setTransforms(
+        std::span<const AnyInstanceHandle> handles,
+        std::span<const InstanceTransform> transforms)
+    {
+        if (handles.size() != transforms.size()) {
+            if (cfg_.failSoft) return;
+            assert(false && "handles/transforms size mismatch");
+            return;
+        }
+
+        // Clear scratch (keep capacity)
+        tmpStaticHandles_.clear();
+        tmpStaticXforms_.clear();
+        tmpAnimatedHandles_.clear();
+        tmpAnimatedXforms_.clear();
+
+        // Reserve once (best-effort; avoids growth)
+        tmpStaticHandles_.reserve(handles.size());
+        tmpStaticXforms_.reserve(handles.size());
+        tmpAnimatedHandles_.reserve(handles.size());
+        tmpAnimatedXforms_.reserve(handles.size());
+
+        for (size_t i = 0; i < handles.size(); ++i) {
+
+            std::visit([&](auto&& h) {
+                using H = std::decay_t<decltype(h)>;
+
+                if constexpr (std::is_same_v<H, std::monostate>) {
+                    // skip
+                }
+                else if constexpr (std::is_same_v<H, StaticHandle>) {
+                    tmpStaticHandles_.push_back(h);
+                    tmpStaticXforms_.push_back(transforms[i]);
+                }
+                else if constexpr (std::is_same_v<H, AnimatedHandle>) {
+                    tmpAnimatedHandles_.push_back(h);
+                    tmpAnimatedXforms_.push_back(transforms[i]);
+                }
+                else {
+                    if (!cfg_.failSoft) assert(false && "Unhandled handle alternative");
+                }
+            }, handles[i]);
+        }
+
+        if (!tmpStaticHandles_.empty()) {
+            staticMgr_.setTransforms(tmpStaticHandles_, tmpStaticXforms_);
+        }
+        if (!tmpAnimatedHandles_.empty()) {
+            animatedMgr_.setTransforms(tmpAnimatedHandles_, tmpAnimatedXforms_);
+        }
+    }
+
+    /*
+    * This pattern scales cleanly
+
+        If later you add:
+            InstancedParticleTag
+            SkinnedClothTag
+        You just add:
+            another handle type
+            another manager
+            another set of typed overloads
+        No changes to gameplay code that already uses typed handles.
+    */
+
+    /// TODO
+    //void SceneFacade::setTransform(StaticHandle h, const InstanceTransform& it) {
+    //    staticMgr_.setTransform(h, it);
+    //}
+
+    //void SceneFacade::setTransform(AnimatedHandle h, const InstanceTransform& it) {
+    //    animatedMgr_.setTransform(h, it);
+    //}
+
+    //StaticHandle SceneFacade::clone(StaticHandle h) {
+    //    return staticMgr_.cloneInstance(h);
+    //}
+
+    //AnimatedHandle SceneFacade::clone(AnimatedHandle h) {
+    //    return animatedMgr_.cloneInstance(h);
+    //}
+
+    //void SceneFacade::deleteInstance(StaticHandle h) {
+    //    staticMgr_.deleteInstance(h);
+    //}
+
+    //void SceneFacade::deleteInstance(AnimatedHandle h) {
+    //    animatedMgr_.deleteInstance(h);
+    //}
+    /// TODO
+
 }

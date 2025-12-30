@@ -13,6 +13,10 @@
 
 namespace aveng {
 
+
+	/* Q: why do InstanceHandles still use basic <class Tag> and not a more complex variant? */
+
+
 	// Used to identifiy model instances via InstanceSlot
 	template<class Tag>
 	struct InstanceHandle {
@@ -27,10 +31,27 @@ namespace aveng {
 	 * In short: Give InstanceManager a way to differentiate its internal types
 	 */
 	struct AnimatedTag {}; // 1 These two types are used to define the template on `InstanceManager<AnimatedTag>`
-	using AnimatedHandle = InstanceHandle<AnimatedTag>;
+	using AnimatedHandle = InstanceHandle<AnimatedTag>; // Use these types wherever you declare Handles in game code to avoid variant signatures. Perf++
 
 	struct StaticTag {}; // 2 These two types are used to define the template on `InstanceManager<StaticTag>`
-	using StaticHandle = InstanceHandle<StaticTag>;
+	using StaticHandle = InstanceHandle<StaticTag>; // Use these types wherever you declare Handles in game code to avoid variant signatures. Perf++
+
+	// Declaring this outside of the struct to symbolize their lack of functional logic
+	// They carry no behavior, and don't mutate. They are simple values. Keeps InstanceHandles purely data.
+	// It also decouples us from comparison semantics becoming breaking changes.
+	// Non-member operators participate more cleanly in argument-dependent lookup (ADL)
+	// etc.
+	// C++ Guidelines: Value types should prefer non-member operators unless the operation 
+	//				   conceptually modifies the object or relies on private invariants.
+	template<class Tag>
+	inline bool operator==(const InstanceHandle<Tag>& a, const InstanceHandle<Tag>& b) {
+		return a.index == b.index && a.generation == b.generation;
+	}
+
+	template<class Tag>
+	constexpr bool operator!=(const InstanceHandle<Tag>& a, const InstanceHandle<Tag>& b) noexcept {
+		return !(a == b);
+	}
 
 	/* Traits for anything that needs to differentiate mid-method/def. See: InstanceManager */
 	template<class Tag> struct TagTraits;
@@ -78,22 +99,7 @@ namespace aveng {
 	template<class Tag>
 	using CreateSettingsFor = typename InstanceTypeFor<Tag>::create_settings;
 
-	// Declaring this outside of the struct to symbolize their lack of functional logic
-	// They carry no behavior, and don't mutate. They are simple values. Keeps InstanceHandles purely data.
-	// It also decouples us from comparison semantics becoming breaking changes.
-	// Non-member operators participate more cleanly in argument-dependent lookup (ADL)
-	// etc.
-	// C++ Guidelines: Value types should prefer non-member operators unless the operation 
-	//				   conceptually modifies the object or relies on private invariants.
-	template<class Tag>
-	inline bool operator==(const InstanceHandle<Tag>& a, const InstanceHandle<Tag>& b) {
-		return a.index == b.index && a.generation == b.generation;
-	}
 
-	template<class Tag>
-	constexpr bool operator!=(const InstanceHandle<Tag>& a, const InstanceHandle<Tag>& b) noexcept {
-		return !(a == b);
-	}
 	// The above operator overloads allow us to do do things like:
 	// vec.erase(std::remove(vec.begin(), vec.end(), handle), vec.end());
 
@@ -107,6 +113,17 @@ namespace aveng {
 
 	template<class Tag>
 	struct InstancePoolData {
+		/*
+			Next step without a rewrite: keep AoS for gameplay logic, 
+			but maintain a parallel SoA buffer just for GPU upload:
+
+			<unordered_map> instancesPerModel can get expensive if you:
+				- push/erase a lot (churn),
+				- access it during render submission every frame.
+				- vector-of-vectors is often faster than unordered_map, key by modelId
+				This isn't SoA per se, but it's a data-oriented improvement.
+
+		 */
 		using Handle = InstanceHandle<Tag>;
 		using Instance = InstanceFor<Tag>;
 		using Slot = InstanceSlot<Instance>;
@@ -117,51 +134,49 @@ namespace aveng {
 
 		std::vector<Handle> instancesInOrder{};
 		std::unordered_map<ModelId, std::vector<Handle>> instancesPerModel;
+		std::vector<uint8_t> dirtyGpu;          // 0 or 1 per slot index
+		std::vector<uint32_t> dirtyGpuList;     // slot indices that changed this tick
 
-		
 	};
 
 	// Templated callbacks - Instances
-	template<class HandleT>
-	using instanceAddCallback = std::function<void(const ModelRef&)>;
-	template<class HandleT>
-	using instanceAddManyCallback = std::function<void(const ModelRef&, std::span<const InstanceSettings>, unsigned int )>;
-	template<class HandleT>
-	using instanceDeleteCallback = std::function<void(const HandleT&)>;
-	template<class HandleT>
-	using instanceDeleteManyCallback = std::function<void(std::span<const HandleT>)>;
-	template<class HandleT>
-	using instanceCloneCallback = std::function<void(const HandleT&)>;
-	template<class HandleT>
-	using instanceCloneManyCallback = std::function<void(const HandleT&, unsigned int)>;
-	template<class HandleT>
-	using instanceCenterCallbackEditor = std::function<void(const HandleT&)>;
+	//template<class HandleT>
+	//using instanceAddCallback = std::function<void(const ModelRef&)>;
+	//template<class HandleT>
+	//using instanceAddManyCallback = std::function<void(const ModelRef&, std::span<const InstanceSettings>, unsigned int )>;
+	//template<class HandleT>
+	//using instanceDeleteCallback = std::function<void(const HandleT&)>;
+	//template<class HandleT>
+	//using instanceDeleteManyCallback = std::function<void(std::span<const HandleT>)>;
+	//template<class HandleT>
+	//using instanceCloneCallback = std::function<void(const HandleT&)>;
+	//template<class HandleT>
+	//using instanceCloneManyCallback = std::function<void(const HandleT&, unsigned int)>;
+	//template<class HandleT>
+	//using instanceCenterCallbackEditor = std::function<void(const HandleT&)>;
 
 	// Model Callbacks
-	using modelCheckCallback = std::function<bool(std::string)>;
-	using modelAddCallback = std::function<bool(std::string)>;
-	using modelDeleteCallback = std::function<void(std::string)>;
+	//using modelCheckCallback = std::function<bool(std::string)>;
+	//using modelAddCallback = std::function<bool(std::string)>;
+	//using modelDeleteCallback = std::function<void(std::string)>;
 
-	template<class HandleT>
-	struct InstanceCallbacksPerPool {
-		instanceDeleteCallback<HandleT>     onDelete;
-		instanceDeleteManyCallback<HandleT> onDeleteMany;
-		instanceCloneCallback<HandleT>      onClone;
-		instanceCloneManyCallback<HandleT>  onCloneMany;
-		instanceCenterCallbackEditor<HandleT>	onCenter;
-		instanceAddCallback<HandleT>			onInstanceAdd;
-		instanceAddManyCallback<HandleT>		onInstanceAddMany;
-	};
+	//template<class HandleT>
+	//struct InstanceCallbacksPerPool {
+		//instanceDeleteCallback<HandleT>     onDelete;
+		//instanceDeleteManyCallback<HandleT> onDeleteMany;
+		//instanceCloneCallback<HandleT>      onClone;
+		//instanceCloneManyCallback<HandleT>  onCloneMany;
+		//instanceCenterCallbackEditor<HandleT>	onCenter;
+		//instanceAddCallback<HandleT>			onInstanceAdd;
+		//instanceAddManyCallback<HandleT>		onInstanceAddMany;
+	// };
 
 	// This goes to Renderer
-	struct ModelCallbacks {
-		modelCheckCallback  onModelCheck;
-		modelAddCallback    onModelAdd;
-		modelDeleteCallback onModelDelete;
+	//struct ModelCallbacks {
+	//	modelCheckCallback  onModelCheck;
+	//	modelAddCallback    onModelAdd;
+	//	modelDeleteCallback onModelDelete;
 
-		// This probably doesn't need to be in here
-		//InstanceCallbacksPerPool<AnimatedHandle> anim;
-		//InstanceCallbacksPerPool<StaticHandle>   stat;
-	};
+	//};
 
 }

@@ -51,7 +51,7 @@ namespace aveng {
 		bool shouldClose() { return aveng_window.shouldClose(); }
 		float getAspectRatio() { return renderer.getAspectRatio(); }
 
-		void registerInstanceManagerCallbacks();
+		void registerCallbacks();
 
 #ifdef ENABLE_EDITOR
 		void updateGUI(const InputState& state);
@@ -77,7 +77,7 @@ namespace aveng {
 		std::unique_ptr<IModelSource> modelSource_;
 
 		ModelLibrary modelLib_;
-		SceneFacade worldScene;
+		SceneFacade sceneFacade_;
 
 		// Renderer consumes device/window/renderData/cameraManager/modelSource
 		Renderer renderer;

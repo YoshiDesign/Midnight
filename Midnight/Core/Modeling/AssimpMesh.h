@@ -16,7 +16,7 @@ namespace aveng {
     public:
         
         bool processMesh(
-            VkRenderData& renderData, 
+            const VkRenderData& renderData, 
             EngineDevice& engineDevice,
             aiMesh* mesh, 
             const aiScene* scene,

@@ -36,6 +36,19 @@ namespace aveng {
 		SceneFacade(IModelLibrary& modelLib, const IModelQuery& modelQuery);
 		~SceneFacade() {}
 
+		/// TODO
+		// ----- Hot-path, typed APIs -----
+		//void setTransform(StaticHandle h, const InstanceTransform& it);
+		//void setTransform(AnimatedHandle h, const InstanceTransform& it);
+
+		//StaticHandle   clone(StaticHandle h);
+		//AnimatedHandle clone(AnimatedHandle h);
+
+		//// Optional: delete, setAnimClip, etc.
+		//void deleteInstance(StaticHandle h);
+		//void deleteInstance(AnimatedHandle h);
+		/// TODO
+
 		struct Config {
 			// If true, spawn/clone/destroy will no-op and return monostate/empty on invalid handles/models.
 			// If false, you might assert/throw depending on your engine policy.
@@ -46,25 +59,37 @@ namespace aveng {
 		ModelRef getOrLoadModel(const AssetKey& key) override;
 		bool    unloadModel(const AssetKey& key) override;
 
-		/* Instance Ops */
+		/* Instance Ops - 1 overload for each type of model which an instance can represent */
 		AnyInstanceHandle spawn(ModelRef modelRef, const TransformSettings& s);
 		AnyInstanceHandle spawn(ModelRef modelRef, const AnimatedCreateSettings& s);
 		/// Spawn many instances. `settings.size()` can be 1 (repeat) or N (cycled/repeated).
 		std::vector<AnyInstanceHandle> spawnMany(ModelRef modelRef,
-			std::span<const InstanceSettings> settings,
+			std::span<const TransformSettings> settings,
+			std::uint32_t count);
+		std::vector<AnyInstanceHandle> spawnMany(ModelRef modelRef,
+			std::span<const AnimatedCreateSettings> settings,
 			std::uint32_t count);
 
+		/* */
 		AnyInstanceHandle clone(AnyInstanceHandle src);
 		std::vector<AnyInstanceHandle> cloneMany(std::span<const AnyInstanceHandle> srcHandles);
 
+		/* dIE */
 		void destroy(AnyInstanceHandle h);
 		void destroyMany(std::span<const AnyInstanceHandle> handles);
+		void destroyAllInstancesForModel(ModelId id);
+
+		/* This is a callback registered on the ModelLibrary */
+		bool purgeAllInstancesForModel(ModelId id);
 
 		/* Transform Ops */
-		void setTransform(AnyInstanceHandle handle, const TransformSettings& transforms);
 		void setTransforms(
 			std::span<const AnyInstanceHandle> handles,
 			std::span<const TransformSettings> transforms);
+		
+		void setTransforms(
+			std::span<const AnyInstanceHandle> handles,
+			std::span<const InstanceTransform> transforms);
 
 		/// Call this when you *know* a model became invalid in this scene (e.g., after unload).
 		/// If you always go through SceneFacade::unloadModel, it will call this for you.
@@ -72,6 +97,14 @@ namespace aveng {
 
 		/// Clears all cached validation (safe, cheap).
 		void clearValidationCache() noexcept { validated_.clear(); }
+
+		inline InstanceTransform toInstanceTransform(const TransformSettings& s) {
+			return InstanceTransform{
+				.pos = s.worldPosition,
+				.rotEuler = s.worldRotation,
+				.scale = s.scale
+			};
+		}
 
 	private:
 
@@ -81,26 +114,45 @@ namespace aveng {
 			PoolKind pool = PoolKind::Static;
 		};
 
+		/* spawn() remains an overload, but this one shouldn't care */
+		template <class Tag>
+		AnyInstanceHandle spawnValidated( ModelId id, const CreateSettingsFor<Tag>& s, const ModelMeta& m)
+		{
+			
+			if constexpr (InstanceTypeFor<Tag>::kAnimated) {
+				const AnimatedHandle h = animatedMgr_.addInstanceOfModel(id, s, m);
+				return AnyInstanceHandle{ h };
+			}
+			else {
+				const StaticHandle h = staticMgr_.addInstanceOfModel(id, s, m);
+				return AnyInstanceHandle{ h };
+			}
+
+			if (cfg_.failSoft) return AnyInstanceHandle{};
+			assert(false && "SceneFacade::spawnValidated: unknown pool kind");
+			return AnyInstanceHandle{};
+		}
+
 		// Validates modelId and returns cached pool kind.
 		// If invalid: returns std::nullopt.
 		/* Unused at the moment! */
 		std::optional<ModelValidation> validateModel(ModelId id) const;
 
 		// Dispatch helpers
-		AnyInstanceHandle spawnValidated(PoolKind pool, ModelId id, const InstanceSettings& settings, const ModelMeta& m);
+		// AnyInstanceHandle spawnValidated(PoolKind pool, ModelId id, const TransformSettings& s, const ModelMeta& m);
 
 		void destroyStatic(StaticHandle h);
 		void destroyAnimated(AnimatedHandle h);
 
-		// Dependencies (owned elsewhere)
 		IModelLibrary& modelLib_;
-
-		/*
-			This class is a decorator of IModelQuery calls, 
-			hence the inheritance of this member's type
-		*/
 		const IModelQuery& modelQuery_;
 		Config cfg_{};
+
+		std::vector<StaticHandle>   tmpStaticHandles_;
+		std::vector<InstanceTransform> tmpStaticXforms_;
+
+		std::vector<AnimatedHandle> tmpAnimatedHandles_;
+		std::vector<InstanceTransform> tmpAnimatedXforms_;
 
 		// Instance pools (you can also inject references if you don’t want ownership here)
 		InstanceManager<StaticTag>   staticMgr_{ modelQuery_ };

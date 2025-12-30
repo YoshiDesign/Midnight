@@ -26,7 +26,7 @@ namespace aveng {
 		explicit operator bool() const { return id != 0; } // Might need updated bc the NullModel could be nullptr in the future
 	};
 
-	/* The ModelDB - Consider inheriting from the classes that the Renderer is currently inheriting */
+	/* The ModelDB */
 	struct ModelRegistryData final : public IModelAnimQuery, public IModelQuery {
 		std::vector<ModelEntry> models;
 		std::unordered_map<AssetKey, ModelId> idByKey;
@@ -39,7 +39,9 @@ namespace aveng {
 
 		const ModelEntry* get(ModelId id) const { 
 			std::cout << "ModelEntry::get(): " << id << std::endl;
-			return &models.at(indexById.at(id)); 
+			auto it = indexById.find(id);
+			if (it == indexById.end()) return nullptr;
+			return &models[it->second];
 		};
 
 		// IModelAnimQuery
@@ -60,11 +62,11 @@ namespace aveng {
 		}
 
 		// IModelQuery
-		bool isModelAnimated(ModelId id) const { 
+		bool isModelAnimated(ModelId id, ModelMeta& out) const {
 			const ModelEntry* e = get(id);
 			if (!e) return false;
 
-			/* */
+			/* Todo - cater to the ModelMeta */
 
 			return e->isAnimated;
 		}

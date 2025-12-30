@@ -5,7 +5,7 @@
 #include "Tools.h"
 namespace aveng {
 
-    bool AssimpMesh::processMesh(VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, /*std::string assetDirectory*/const std::string modelBaseDir, const std::string contentRoot, std::unordered_map<std::string, VkTextureData>& textures) {
+    bool AssimpMesh::processMesh(const VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, /*std::string assetDirectory*/const std::string modelBaseDir, const std::string contentRoot, std::unordered_map<std::string, VkTextureData>& textures) {
         mMeshName = mesh->mName.C_Str();
 
         mTriangleCount = mesh->mNumFaces;

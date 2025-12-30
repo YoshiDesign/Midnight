@@ -11,15 +11,16 @@ namespace aveng {
 
     class AssimpAnimChannel {
     public:
-        void loadChannelData(aiNodeAnim* nodeAnim);
+        // old sig was: aiNodeAnim* nodeAnim
+        void loadChannelData(const aiNodeAnim* nodeAnim);
         std::string getTargetNodeName();
         float getMaxTime();
 
-        glm::vec4 getTranslation(float time); // last element is ignored
-        glm::vec4 getScaling(float time); // last element is ignored
-        glm::vec4 getRotation(float time); // is a quaternion, but return vec4 for shader
+        glm::vec4 getTranslation(float time) const; // last element is ignored
+        glm::vec4 getScaling(float time) const; // last element is ignored
+        glm::vec4 getRotation(float time) const; // is a quaternion, but return vec4 for shader
 
-        int getBoneId();
+        int getBoneId() const;
         void setBoneId(unsigned int id);
 
     private:

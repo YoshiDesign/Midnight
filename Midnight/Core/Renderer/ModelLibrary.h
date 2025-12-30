@@ -3,23 +3,36 @@
 #include "Core/aveng_model.h"
 #include "Core/Modeling/ModelRegistry.h"
 #include "Core/Modeling/Sources/FilesystemModelSource.h"
+#include "Core/Modeling/Sources/PackModelSource.h"
 
 namespace aveng {
 
     class EngineDevice;
 
+    /* 
+        Important to note that if a model is queued for load AND unload 
+    *   there will be UB
+    */
+
     class ModelLibrary final : public IModelLibrary {
     public:
 
+        using DestroyInstancesForModelFn = std::function<void(ModelId)>;
+
+        void setDestroyInstancesForModelCallback(DestroyInstancesForModelFn fn) {
+            onDestroyInstancesForModel_ = std::move(fn);
+        }
+
         ModelLibrary(EngineDevice& engineDevice, VkRenderData& renderData);
 
-        ModelRef getOrLoadModel(const AssetKey& key) override;
-        bool unloadModel(const AssetKey& key) override;
+        ModelRef getOrLoadModel(const AssetKey& assetKey) override;
+        bool unloadModel(const AssetKey& assetKey) override;
 
         std::unique_ptr<IModelSource> createModelSource();
         std::unique_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
         std::string baseDirForAssetKey(const AssetKey& key) const;
         void processPendingModelLoads();
+        void processPendingUnloads();
 
         inline ModelRef makeModelRef(const ModelEntry& e)
         {
@@ -41,11 +54,11 @@ namespace aveng {
         void cleanup();
 
     private:
-        EngineDevice& engineDevice_;
         ModelRegistryData registry_;
-        ModelId nextModelId_ = 1; // 0 reserved for the NullModelId
-
+        EngineDevice& engineDevice_;
         VkRenderData& renderData_;
+        ModelId nextModelId_ = 1; // 0 reserved for the NullModelId
+        DestroyInstancesForModelFn onDestroyInstancesForModel_;
 
         // ModelRegistryData modelDb_;
         std::unique_ptr<IModelSource> modelSource_;

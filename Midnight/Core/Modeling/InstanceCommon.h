@@ -27,6 +27,8 @@ namespace aveng {
         void setRot(glm::vec3 r) { xf.rotEuler = r; dirty = true; }
         void setScale(float s) { xf.scale = s; dirty = true; }
 
+        InstanceTransform& getTransform() { return xf; }
+
         const glm::mat4& modelMatrix() const {
             if (!dirty) return cachedModelMatrix;
 
@@ -47,6 +49,5 @@ namespace aveng {
             return cachedModelMatrix;
         }
     };
-
 
 }

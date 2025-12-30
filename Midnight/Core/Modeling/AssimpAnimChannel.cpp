@@ -2,13 +2,35 @@
 #include "Tools.h"
 
 namespace aveng {
-    void AssimpAnimChannel::loadChannelData(aiNodeAnim* nodeAnim) {
+    // old sig was: aiNodeAnim* nodeAnim
+    void AssimpAnimChannel::loadChannelData(const aiNodeAnim* nodeAnim) {
+
+        mNodeName.clear();
+
+        mTranslationTimings.clear();
+        mTranslations.clear();
+        mRotationTiminigs.clear();
+        mRotations.clear();
+        mScaleTimings.clear();
+        mScalings.clear();
+
+        mInverseTranslationTimeDiffs.clear();
+        mInverseRotationTimeDiffs.clear();
+        mInverseScaleTimeDiffs.clear();
+
         mNodeName = nodeAnim->mNodeName.C_Str();
         unsigned int numTranslations = nodeAnim->mNumPositionKeys;
         unsigned int numRotations = nodeAnim->mNumRotationKeys;
         unsigned int numScalings = nodeAnim->mNumScalingKeys;
         unsigned int preState = nodeAnim->mPreState;
         unsigned int postState = nodeAnim->mPostState;
+
+        mTranslationTimings.reserve(numTranslations);
+        mTranslations.reserve(numTranslations);
+        mRotationTiminigs.reserve(numRotations);
+        mRotations.reserve(numRotations);
+        mScaleTimings.reserve(numScalings);
+        mScalings.reserve(numScalings);
 
         //std::printf("%s: - loading animation channel for node '%s', with %i translation keys, %i rotation keys, %i scaling keys (preState %i, postState %i)\n",
         //    __FUNCTION__, mNodeName.c_str(), numTranslations, numRotations, numScalings, preState, postState);
@@ -45,15 +67,23 @@ namespace aveng {
             mScalings.emplace_back(glm::vec3(nodeAnim->mScalingKeys[i].mValue.x, nodeAnim->mScalingKeys[i].mValue.y, nodeAnim->mScalingKeys[i].mValue.z));
         }
 
-        /* precalcuate the inverse offset to avoid divisions when scaling the section */
-        for (unsigned int i = 0; i < mTranslationTimings.size() - 1; ++i) {
-            mInverseTranslationTimeDiffs.emplace_back(1.0f / (mTranslationTimings.at(i + 1) - mTranslationTimings.at(i)));
+        if (mTranslationTimings.size() >= 2) {
+            /* precalcuate the inverse offset to avoid divisions when scaling the section */
+            for (unsigned int i = 0; i < mTranslationTimings.size() - 1; ++i) {
+                mInverseTranslationTimeDiffs.emplace_back(1.0f / (mTranslationTimings.at(i + 1) - mTranslationTimings.at(i)));
+            }
         }
-        for (unsigned int i = 0; i < mRotationTiminigs.size() - 1; ++i) {
-            mInverseRotationTimeDiffs.emplace_back(1.0f / (mRotationTiminigs.at(i + 1) - mRotationTiminigs.at(i)));
+
+        if (mRotationTiminigs.size() >= 2) {
+            for (unsigned int i = 0; i < mRotationTiminigs.size() - 1; ++i) {
+                mInverseRotationTimeDiffs.emplace_back(1.0f / (mRotationTiminigs.at(i + 1) - mRotationTiminigs.at(i)));
+            }
         }
-        for (unsigned int i = 0; i < mScaleTimings.size() - 1; ++i) {
-            mInverseScaleTimeDiffs.emplace_back(1.0f / (mScaleTimings.at(i + 1) - mScaleTimings.at(i)));
+
+        if (mScaleTimings.size() >= 2) {
+            for (unsigned int i = 0; i < mScaleTimings.size() - 1; ++i) {
+                mInverseScaleTimeDiffs.emplace_back(1.0f / (mScaleTimings.at(i + 1) - mScaleTimings.at(i)));
+            }
         }
 
         mPreState = preState;
@@ -72,7 +102,7 @@ namespace aveng {
         return std::max(std::max(maxRotationTime, maxTranslationTime), maxScaleTime);
     }
 
-    glm::vec4 AssimpAnimChannel::getTranslation(float time) {
+    glm::vec4 AssimpAnimChannel::getTranslation(float time) const {
         if (mTranslations.empty()) {
             return glm::vec4(0.0f);
         }
@@ -121,7 +151,7 @@ namespace aveng {
         return glm::vec4(glm::mix(mTranslations.at(timeIndex), mTranslations.at(timeIndex + 1), interpolatedTime), 1.0f);
     }
 
-    glm::vec4 AssimpAnimChannel::getScaling(float time) {
+    glm::vec4 AssimpAnimChannel::getScaling(float time) const {
         if (mScalings.empty()) {
             return glm::vec4(1.0f);
         }
@@ -169,7 +199,7 @@ namespace aveng {
         return glm::vec4(glm::mix(mScalings.at(timeIndex), mScalings.at(timeIndex + 1), interpolatedTime), 1.0f);
     }
 
-    glm::vec4 AssimpAnimChannel::getRotation(float time) {
+    glm::vec4 AssimpAnimChannel::getRotation(float time) const {
         if (mRotations.empty()) {
             return glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
         }
@@ -224,7 +254,7 @@ namespace aveng {
         return glm::vec4(rotation.x, rotation.y, rotation.z, rotation.w);
     }
 
-    int AssimpAnimChannel::getBoneId() {
+    int AssimpAnimChannel::getBoneId() const {
         return mBoneId;
     }
 

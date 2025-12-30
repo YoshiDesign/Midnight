@@ -15,18 +15,14 @@ namespace aveng {
 		AvengInstance();
 		void init(ModelId id, const ModelMeta& meta, const TransformSettings& ts);
 		ModelId modelId() const { return modelId_; }
-		InstanceSettings instanceSettings() const { return mInstanceSettings; };
-		void setInstanceSettings(const InstanceSettings& is) { mInstanceSettings = is; };
-		void updateModelRootMatrix();
 
 		// Used by the InstanceManager
 		void setModelId(ModelId id) { modelId_ = id; };
-		void setModelRootMatrix(glm::mat4 rootMatrix) { mModelRootMatrix = rootMatrix; };
+		// void setModelRootMatrix(glm::mat4 rootMatrix) { mModelRootMatrix = rootMatrix; };
 		
 	private:
 
 		ModelId modelId_ = 0;
-		InstanceSettings mInstanceSettings{};
 
 		glm::mat4 mLocalTranslationMatrix = glm::mat4(1.0f);
 		glm::mat4 mLocalRotationMatrix = glm::mat4(1.0f);

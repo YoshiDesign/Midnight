@@ -8,7 +8,7 @@ namespace aveng {
 		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
 		, engineDevice(aveng_window)
 		, modelLib_(engineDevice, renderData)
-		, worldScene()
+		, sceneFacade_(modelLib_, modelLib_.query()) // intentionally injecting registry via getter
 		, renderer(engineDevice, aveng_window, renderData, cameraManager)
 #ifdef ENABLE_EDITOR
 		, editor_{ std::make_unique<Editor>(renderData,
@@ -96,53 +96,19 @@ namespace aveng {
 	}
 #endif
 
-	void Midnight::registerInstanceManagerCallbacks()
+	void Midnight::registerCallbacks()
 	{
 
-		// Note the cool C++20 designated initialization syntax (fun fact: concept was borrowed from C99). 
-		// Works for simple aggregate types (InstanceCallbacksPerPool here)
-		staticMgr.setCallbacks({
-			.onDelete = [&](const StaticHandle& h) { staticMgr.deleteInstance(h); },
-
-			.onDeleteMany = [&](std::span<const StaticHandle> h) { staticMgr.deleteInstances(h); },
-
-			.onClone = [&](const StaticHandle& h) { staticMgr.cloneInstance(h);  },
-
-			.onCloneMany = [&](const StaticHandle& h, int n) { staticMgr.cloneInstances(h, n); },
-
-			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
-
-			.onInstanceAdd = [&](const ModelRef& h) { staticMgr.createInstance(h); },
-
-			.onInstanceAddMany = [&](
-				const ModelRef& ref, 
-				std::span<const InstanceSettings> sett, 
-				unsigned int n) { staticMgr.addInstancesOfModel(ref, sett, n); }
-		});
-
-		animMgr.setCallbacks({
-			.onDelete = [&](const AnimatedHandle& h) { animMgr.deleteInstance(h); },
-
-			.onDeleteMany = [&](std::span<const AnimatedHandle> h) { animMgr.deleteInstances(h); },
-
-			.onClone = [&](const AnimatedHandle& h) { animMgr.cloneInstance(h);  },
-
-			.onCloneMany = [&](const AnimatedHandle& h, int n) { animMgr.cloneInstances(h, n); },
-
-			.onInstanceAdd = [&](const ModelRef& h) { animMgr.createInstance(h); },
-
-			// .onCenter = [&](const StaticHandle& h) { editor_->centerOn(h); },
-
-			.onInstanceAddMany = [&](
-				const ModelRef& ref, 
-				std::span<const InstanceSettings> sett, 
-				unsigned int n) { animMgr.addInstancesOfModel(ref, sett, n); }
-		});
+		modelLib_.setDestroyInstancesForModelCallback(
+			[this](ModelId id) {
+				return sceneFacade_.destroyAllInstancesForModel(id);
+			}
+		);
 
 	}
 
 	void Midnight::initializeDependencies() {
-//#ifdef ENABLE_EDITOR - For reference, for now
+//#ifdef ENABLE_EDITOR - Moved these to the constructor
 //		editor_ = std::make_unique<Editor>(renderData, renderer, game_data, engineDevice, aveng_window, cameraManager);
 //		editorInput_ = std::make_unique<EditorInput>(editor_.get());
 //		inputRouter_ = std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, gameInput);
@@ -156,7 +122,7 @@ namespace aveng {
 
 		aveng_window.setInputSystem(inputSystem_.get());
 
-		registerInstanceManagerCallbacks();
+		registerCallbacks();
 
 #ifdef M_DEBUG
 		assert(frame_ && "Frame not initialized");

@@ -1,5 +1,6 @@
 #pragma once
 #include "avpch.h"
+#include "Core/Modeling/AssimpAnimChannel.h"
 
 namespace aveng {
 
@@ -11,7 +12,7 @@ namespace aveng {
 		float ticksPerSecond = 0.0f;
 		uint32_t boneCount = 0;
 		// Why are these shared_ptr?
-		std::span<AssimpAnimChannel*> animChannels;
+		std::vector<AssimpAnimChannel> animChannels;
 	};
 
 	struct ModelMeta {

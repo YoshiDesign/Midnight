@@ -40,7 +40,7 @@ namespace aveng {
 		AvengModel& operator=(const AvengModel&) = delete;
 
 		bool loadModelV2(
-			VkRenderData& renderData,
+			const VkRenderData& renderData,
 			const AssetKey& key,                       // keep for debug + extension hint
 			std::span<const std::byte> bytes,          // data from IModelSource
 			unsigned int extraImportFlags,
@@ -48,10 +48,10 @@ namespace aveng {
 			const std::string& contentRoot = ""
 		);
 
-		bool loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags = 0);
-		bool createDescriptorSet(VkRenderData& renderData);
+		// bool loadModelV2(VkRenderData& renderData, const std::string& filepath, unsigned int extraImportFlags = 0);
+		bool createDescriptorSet(const VkRenderData& renderData);
 		void processNode(
-			VkRenderData& renderData, 
+			const VkRenderData& renderData, 
 			std::shared_ptr<AssimpNode> node, 
 			aiNode* aNode, 
 			const aiScene* scene, 
@@ -73,9 +73,9 @@ namespace aveng {
 		unsigned int getTriangleCount();
 		unsigned int getTriangleCount() const;
 
-		void drawInstancedV2(VkRenderData& renderData, VkPipelineLayout basicLayout, VkPipelineLayout animationLayout, uint32_t instanceCount, int frameIndex);
+		void drawInstancedV2(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout basicLayout, VkPipelineLayout animationLayout, uint32_t instanceCount, int frameIndex);
 
-		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames);
+		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData);
 	
 		std::string path; 
 
@@ -112,6 +112,21 @@ namespace aveng {
 		std::vector<std::shared_ptr<AssimpBone>> mBoneList;
 
 		std::vector<std::shared_ptr<AssimpAnimClip>> mAnimClips{};
+
+
+		/*
+		 FOR REFACTOR
+		std::vector<AssimpNode>     mNodes;
+		std::unordered_map<std::string, uint32_t> mNodeIdByName;
+
+		std::vector<AssimpBone>     mBones;
+		std::unordered_map<std::string, uint32_t> mBoneIdByName;
+
+		std::vector<AssimpAnimClip> mAnimClips;
+
+		
+		*/
+
 
 		glm::mat4 mRootTransformMatrix = glm::mat4(1.0f);
 

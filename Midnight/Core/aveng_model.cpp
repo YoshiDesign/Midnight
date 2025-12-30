@@ -54,7 +54,13 @@ namespace aveng {
 
 	AvengModel::~AvengModel() {}
 
-	void AvengModel::drawInstancedV2(VkRenderData& renderData, VkPipelineLayout basicLayout, VkPipelineLayout animationLayout, uint32_t instanceCount, int frameIndex) {
+	void AvengModel::drawInstancedV2(
+		VkCommandBuffer graphicsCommandBuffer, 
+		VkPipelineLayout basicLayout, 
+		VkPipelineLayout animationLayout, 
+		uint32_t instanceCount, 
+		int frameIndex) 
+	{
 		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
 			VkMesh& mesh = mModelMeshes.at(i);
 
@@ -86,24 +92,24 @@ namespace aveng {
 
 			if (diffuseTex.image != VK_NULL_HANDLE) {
 				
-				vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 					renderLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
 			}
 			else {
 				if (mesh.usesPBRColors) {
-					vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 						renderLayout, 0, 1, &mWhiteTexture.descriptorSet, 0, nullptr);
 				}
 				else {
-					vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 						renderLayout, 0, 1, &mPlaceholderTexture.descriptorSet, 0, nullptr);
 				}
 			}
 
 			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(renderData.rdCommandBuffersGraphics[frameIndex], 0, 1, &mVertexBuffers.at(i).buffer, &offset);
-			vkCmdBindIndexBuffer(renderData.rdCommandBuffersGraphics[frameIndex], mIndexBuffers.at(i).buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(renderData.rdCommandBuffersGraphics[frameIndex], static_cast<uint32_t>(mesh.indices.size()), instanceCount, 0, 0, 0);
+			vkCmdBindVertexBuffers(graphicsCommandBuffer, 0, 1, &mVertexBuffers.at(i).buffer, &offset);
+			vkCmdBindIndexBuffer(graphicsCommandBuffer, mIndexBuffers.at(i).buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(graphicsCommandBuffer, static_cast<uint32_t>(mesh.indices.size()), instanceCount, 0, 0, 0);
 		}
 	}
 
@@ -124,7 +130,7 @@ namespace aveng {
 	
 	*/
 	bool AvengModel::loadModelV2(
-		VkRenderData& renderData,
+		const VkRenderData& renderData,
 		const AssetKey& key,                        // keep for debug + extension hint
 		std::span<const std::byte> bytes,           // data from IModelSource
 		unsigned int extraImportFlags,
@@ -350,7 +356,7 @@ namespace aveng {
 
 	}
 
-	bool AvengModel::createDescriptorSet(VkRenderData& renderData) {
+	bool AvengModel::createDescriptorSet(const VkRenderData& renderData) {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
@@ -411,7 +417,7 @@ namespace aveng {
 	}
 
 	void AvengModel::processNode(
-		VkRenderData& renderData, 
+		const VkRenderData& renderData, 
 		std::shared_ptr<AssimpNode> node, 
 		aiNode* aNode,
 		const aiScene* scene, 
@@ -499,13 +505,27 @@ namespace aveng {
 		return mMatrixMultPerModelDescriptorSets[frameIndex];
 	}
 
-	void AvengModel::cleanup(EngineDevice& engineDevice, VkRenderData& renderData, int frames) {
+	void AvengModel::cleanup(EngineDevice& engineDevice, VkRenderData& renderData) {
 
 		VkDescriptorPool pool = renderData.avengDescriptorPool;
 
-		for (int i = 0; i < frames; i++) {
-			vkFreeDescriptorSets(engineDevice.device(), pool, 1, &mMatrixMultPerModelDescriptorSets[i]);
-		}
+		// This is identical to...
+		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+		//	vkFreeDescriptorSets(engineDevice.device(), pool, 1, &mMatrixMultPerModelDescriptorSets[i]);
+		//}
+
+		// this... But just do
+		//for (const auto& set : mMatrixMultPerModelDescriptorSets) {
+		//	vkFreeDescriptorSets(engineDevice.device(), pool, 1, &set);
+		//}
+
+		/// ...this:
+		vkFreeDescriptorSets(
+			engineDevice.device(),
+			pool,
+			static_cast<uint32_t>(mMatrixMultPerModelDescriptorSets.size()),
+			mMatrixMultPerModelDescriptorSets.data()
+		);
 
 		for (auto buffer : mVertexBuffers) {
 			VertexBuffer::cleanup(engineDevice, buffer);
@@ -515,10 +535,8 @@ namespace aveng {
 		}
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixOffsetBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mBoneParentMatrixBuffers[i]);
-
 		}
 
 		for (auto& tex : mTextures) {

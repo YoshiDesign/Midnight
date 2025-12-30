@@ -141,6 +141,12 @@
     <ClCompile Include="Utils\AssetResolution.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Runtime\Facade\SceneFacade.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Renderer\ModelLibrary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1305,6 +1311,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Utils\AssetResolution.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Runtime\Facade\SceneFacade.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Services\ModelServices.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Renderer\ModelLibrary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Modeling\InstanceCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
