@@ -11,6 +11,16 @@ namespace aveng {
 	};
 
 	struct IInstanceQuery {
+
+		/*
+			IInstanceQuery is great for editor tools (select this handle, center camera, list all instances), 
+			but it's the wrong shape for building draw batches:
+
+			It forces per-handle lookups (N calls, branchy, cache-ugly).
+			It hides the SoA-ish containers we've already built (instancesPerModel, dirtyGpuList, etc.).
+			It encourages reconstructing what we already have.
+		*/
+
 		virtual ~IInstanceQuery() = default;
 
 		// Single-instance read

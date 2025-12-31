@@ -56,13 +56,12 @@ namespace aveng {
 
 	void AvengModel::drawInstancedV2(
 		VkCommandBuffer graphicsCommandBuffer, 
-		VkPipelineLayout basicLayout, 
-		VkPipelineLayout animationLayout, 
+		VkPipelineLayout pipelineLayout,
 		uint32_t instanceCount, 
-		int frameIndex) 
+		int frameIndex) const
 	{
 		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
-			VkMesh& mesh = mModelMeshes.at(i);
+			const VkMesh& mesh = mModelMeshes.at(i);
 
 			/*
 			* @Note
@@ -81,28 +80,19 @@ namespace aveng {
 				}
 			}
 
-			/* switch between animated and non-animated pipeline layout */
-			VkPipelineLayout renderLayout;
-			if (hasAnimations()) {
-				renderLayout = animationLayout;
-			}
-			else {
-				renderLayout = basicLayout;
-			}
-
 			if (diffuseTex.image != VK_NULL_HANDLE) {
 				
 				vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					renderLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
+					pipelineLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
 			}
 			else {
 				if (mesh.usesPBRColors) {
 					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						renderLayout, 0, 1, &mWhiteTexture.descriptorSet, 0, nullptr);
+						pipelineLayout, 0, 1, &mWhiteTexture.descriptorSet, 0, nullptr);
 				}
 				else {
 					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						renderLayout, 0, 1, &mPlaceholderTexture.descriptorSet, 0, nullptr);
+						pipelineLayout, 0, 1, &mPlaceholderTexture.descriptorSet, 0, nullptr);
 				}
 			}
 
@@ -473,6 +463,10 @@ namespace aveng {
 		return mBoneList;
 	}
 
+	const std::vector<std::shared_ptr<AssimpBone>>& AvengModel::getBoneList() const {
+		return mBoneList;
+	}
+
 	const std::vector<std::shared_ptr<AssimpAnimClip>>& AvengModel::getAnimClips() {
 		return mAnimClips;
 	}
@@ -502,6 +496,9 @@ namespace aveng {
 	}
 
 	VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) {
+		return mMatrixMultPerModelDescriptorSets[frameIndex];
+	}
+	VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) const {
 		return mMatrixMultPerModelDescriptorSets[frameIndex];
 	}
 

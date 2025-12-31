@@ -45,6 +45,7 @@ namespace aveng {
 
         // Bone transforms
         std::vector<NodeTransformData> getNodeTransformData();
+        const std::vector<NodeTransformData> getNodeTransformData() const;
 
         void updateModelRootMatrix();
         void updateAnimation(float deltaTime, const IModelAnimQuery& animQ);

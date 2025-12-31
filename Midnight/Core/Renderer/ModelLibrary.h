@@ -36,6 +36,7 @@ namespace aveng {
 
         ModelRef getOrLoadModel(const AssetKey& assetKey) override;
         bool unloadModel(const AssetKey& assetKey) override;
+        const AvengModel* pModel(ModelId id) const override;
 
         std::unique_ptr<IModelSource> createModelSource();
         std::unique_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);

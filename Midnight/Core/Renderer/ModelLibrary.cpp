@@ -42,6 +42,15 @@ namespace aveng {
 		modelSource_ = createModelSource();
 	}
 
+	/* IModelLibrary Overload */
+	const AvengModel* ModelLibrary::pModel(ModelId id) const {
+		auto it = registry_.indexById.find(id); // Required when const qualified and working with unordered_map indices
+		if (it == registry_.indexById.end()) return nullptr;
+
+		const size_t idx = it->second;
+		return registry_.models[idx].model.get();
+	}
+
 	/* Add model to pending deletes */
 	bool ModelLibrary::unloadModel(const AssetKey& assetKey) 
 	{

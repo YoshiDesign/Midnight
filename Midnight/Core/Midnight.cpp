@@ -9,7 +9,7 @@ namespace aveng {
 		, engineDevice(aveng_window)
 		, modelLib_(engineDevice, renderData)
 		, sceneFacade_(modelLib_, modelLib_.query()) // intentionally injecting registry via getter
-		, renderer(engineDevice, aveng_window, renderData, cameraManager)
+		, renderer(engineDevice, aveng_window, renderData, cameraManager, modelLib_.query())
 #ifdef ENABLE_EDITOR
 		, editor_{ std::make_unique<Editor>(renderData,
 			renderer,
@@ -28,6 +28,8 @@ namespace aveng {
 		, inputSystem_( std::make_unique<InputSystem>(*inputRouter_, game_data))
 		, frame_(std::make_unique<AvengFrame>(
 			renderer,
+			sceneFacade_,
+			modelLib_,
 			renderData,
 			game_data,
 			engineDevice,
@@ -38,6 +40,8 @@ namespace aveng {
 		, inputSystem_(std::make_unique<InputSystem>(*gameInput_, game_data))
 		, frame_(std::make_unique<AvengFrame>(
 			renderer,
+			sceneFacade_,
+			modelLib_,
 			renderData,
 			game_data,
 			engineDevice,

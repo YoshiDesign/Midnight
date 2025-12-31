@@ -29,7 +29,7 @@ namespace aveng {
 
 	int AvengFrame::currentFrameIndex() { return renderer.getFrameIndex(); }
 
-	bool AvengFrame::render(float deltaTime)
+	bool AvengFrame::render(const IModelLibrary& modelLib, float deltaTime)
 	{
 
 		// Clear the vector of buffers we'll be submitting to the graphics queue
@@ -67,7 +67,7 @@ namespace aveng {
 		* Update Model Buffer Data - Does not record commands
 		* Side-effects: Buffers resizes cause descriptor sets to update
 		*/
-		renderer.draw(deltaTime);
+		renderer.draw(sceneView, modelLib, deltaTime);
 
 #ifdef ENABLE_EDITOR
 		if (gameData.currentAppMode == AppMode::Editor) {
@@ -137,6 +137,7 @@ namespace aveng {
 			renderer.updateLights();
 
 			renderer.drawModels(
+				modelLib,
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
 				renderData.rdAvengAnimationPipeline,

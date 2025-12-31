@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "avpch.h"
 #include "Utils/AssetResolution.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/SkinningPipeline.h"
@@ -10,13 +11,9 @@
 #include "CoreVK/SyncObjects.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/aveng_window.h"
+#include "Runtime/Facade/SceneFacade.h" // IRenderSceneView, currently
 #include "Game/Camera/CameraManager.h"
-#include <filesystem>
-#include <stdexcept>
-#include <iostream>
-#include <cassert>
-#include <cstdio>
-#include <array>
+
 
 #define LOG(a) std::cout<<a<<std::endl;
 #define DESTROY_UNIFORM_BUFFERS 1	// Unused as far as I can tell
@@ -30,14 +27,18 @@ namespace aveng {
 		EngineDevice& engineDevice, 
 		AvengWindow& window,
 		VkRenderData& renderData, 
-		CameraManager& _cameraManager)
+		CameraManager& _cameraManager,
+		const IModelQuery& mq)
 		:   engineDevice	{ engineDevice }, 
 			aveng_window	{ window }, 
 			renderData		{ renderData }, 
-			cameraManager	{ _cameraManager }
+			cameraManager	{ _cameraManager },
+			modelQuery_		{ mq }
 	{
 
 		buffer_trash.clear();
+		//mWorldPosMatrices.clear();
+		//mNodeTransFormData.clear();
 
 		// Define buffer vec's that are managed by the Renderer
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
@@ -122,6 +123,9 @@ namespace aveng {
 
 	void Renderer::initialize() {
 		initializePointLights();
+
+		framePacketBuilder_.setModelQuery(&modelQuery_);
+		framePacketBuilder_.setFramesInFlight(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		addLight(
 			glm::vec3(20.0f, 0.0f, 20.0f),
@@ -880,7 +884,7 @@ namespace aveng {
 		return 0;
 	}
 
-	void Renderer::runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset) {
+	void Renderer::runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset) {
 		uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
 		// VkCommandBuffer computeCommandBuffer = getCurrentCommandBufferCompute();
 
@@ -958,7 +962,7 @@ namespace aveng {
 	* - Primary Graphics Command buffer is reset and in a recording state.
 	* - Primary graphics renderpass has begun
 	*/
-	int Renderer::draw(float deltaTime) {
+	int Renderer::draw(const IRenderSceneView& sceneView, const IModelLibrary& modelLib, float deltaTime) {
 
 		/* no update on zero diff. This caused an issue */
 		if (deltaTime == 0.0f && !firstFrame) {
@@ -970,106 +974,32 @@ namespace aveng {
 		mFrameTimer.start();
 
 		/* reset timers and other values */
+		animatedModelLoaded = false;
 		renderData.rdMatricesSize = 0;
 		renderData.rdUploadToUBOTime = 0.0f;
 		renderData.rdUploadToVBOTime = 0.0f;
 		renderData.rdMatrixGenerateTime = 0.0f;
-		renderData.rdUIGenerateTime = 0.0f;
-
-		// beginFrame(); // This is now managed by Frame
+		renderData.rdUIGenerateTime = 0.0f;\
 
 		if (!isFrameStarted) {
 			std::printf("beginFrame failed/skipped (swapchain recreation), skipping frame\n");
 			return 0;  // Skip this frame gracefully
 		}
 
-		/* calculate the size of the node matrix buffer over all animated instances */
-		boneMatrixBufferSize = 0;
-		for (const auto& model : mModelInstanceData.miModelList) {
-			size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size();
-			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
+		auto stat = sceneView.staticPoolInputs();
+		auto anim = sceneView.animatedPoolInputs();
+		const auto& stat_slots = *stat.slots;
+		const auto& anim_slots = *anim.slots;
 
-				/* animated models */
-				if (model->hasAnimations() && !model->getBoneList().empty()) {
-					size_t numberOfBones = model->getBoneList().size();
-
-					/* buffer size must always be a multiple of "local_size_y" instances to avoid undefined behavior */
-					boneMatrixBufferSize += numberOfBones * ((numberOfInstances - 1) / 32 + 1) * 32;
-				}
-			}
-		}
-
-		/* clear and resize world pos matrices */
-		mWorldPosMatrices.clear();
-		mWorldPosMatrices.resize(mModelInstanceData.miInstanceSlots.size());
-		mNodeTransFormData.clear();
-		mNodeTransFormData.resize(boneMatrixBufferSize);
-
-		/* we need to track the presence of animated models */
-		bool animatedModelLoaded = false;
-		size_t instanceToStore = 0;
-		size_t animatedInstancesToStore = 0; // This will be the total number of bones across all model instances.
-
-		for (const auto& model : mModelInstanceData.miModelList) { //
-
-			size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size(); // second is the vector of <shared_ptr> AssimpInstance
-
-			if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
-				/* animated models */
-				if (model->hasAnimations() && !model->getBoneList().empty()) {
-
-					// Collect the number of bones
-					size_t numberOfBones = model->getBoneList().size();
-					animatedModelLoaded = true;
-
-					mMatrixGenerateTimer.start();
-					// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
-
-					int instIndex = 0;
-					
-					// For each instance
-					//for (unsigned int i = 0; i < numberOfInstances; ++i) {
-					for (const auto& instanceHandle : mModelInstanceData.miInstancesPerModel[model->getModelFileName()]) {
-
-						mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.updateAnimation(deltaTime, animQuery());
-
-						std::vector<NodeTransformData> instanceNodeTransform = mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.getNodeTransformData();
-
-						// Copy the NodeTransform Data to the vector of NodeTransform datas. I didn't know you can use arithmetic with iterator access patterns. Nice
-						// STORAGE BUFFER DATA - Packed with every instance's data
-						std::copy(instanceNodeTransform.begin(), instanceNodeTransform.end(), mNodeTransFormData.begin() + animatedInstancesToStore + instIndex * numberOfBones);
-
-						// STORAGE BUFFER DATA - Packed with every instance's data
-						mWorldPosMatrices.at(instanceToStore + instIndex) = mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.getWorldTransformMatrix(); // model Root Matrix SSBO data 
-						instIndex++;
-					}
-
-					size_t trsMatrixSize = numberOfBones * numberOfInstances * sizeof(glm::mat4); // CPU miss
-
-					renderData.rdMatrixGenerateTime += mMatrixGenerateTimer.stop();
-					renderData.rdMatricesSize += trsMatrixSize;
-
-					instanceToStore += numberOfInstances;
-					animatedInstancesToStore += numberOfInstances * numberOfBones;
-				}
-				else {
-					/* non-animated models */
-					mMatrixGenerateTimer.start();
-					int instIndex = 0;
-
-					for (const auto& instanceHandle : mModelInstanceData.miInstancesPerModel[model->getModelFileName()]) {
-		
-						mWorldPosMatrices.at(instanceToStore + instIndex) = mModelInstanceData.miInstanceSlots[instanceHandle.index].instance.getWorldTransformMatrix(); // model Root Matrix SSBO data 
-						instIndex++;
-					}
-
-					renderData.rdMatrixGenerateTime += mMatrixGenerateTimer.stop();
-					renderData.rdMatricesSize += numberOfInstances * sizeof(glm::mat4);
-
-					instanceToStore += numberOfInstances;
-				}
-			}
-		}
+		// Fetch the next frame packet and construct it
+		const FramePacket& pkt =
+			framePacketBuilder_.build<AvengInstance, AssimpInstance>(
+				stat,
+				anim,
+				currentFrameIndex,
+				0 // tmp/unused frame number
+				// , opts
+			);
 
 		mUploadToUBOTimer.start();
 
@@ -1081,12 +1011,12 @@ namespace aveng {
 
 		bool bufferResized = false;
 		// TODO - This upload only needs to occur if there are Animated Models!
-		bufferResized = ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), mNodeTransFormData);
+		bufferResized = ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), pkt.nodeTransformData);
 		// Upload every instance's current transform data (translation, scale, rotation)
 		// If it resized, no data was uploaded
 		if (bufferResized) {
 
-			size_t newBufferSize = std::max(mNodeTransFormData.size() * (sizeof NodeTransformData), mNodeTransformBuffers.at(currentFrameIndex).bufferSize * 2);
+			size_t newBufferSize = std::max(pkt.nodeTransformData.size() * (sizeof NodeTransformData), mNodeTransformBuffers.at(currentFrameIndex).bufferSize * 2);
 
 			// Queue the old buffers for destruction within the next frame
 			buffer_trash.push_back(
@@ -1100,7 +1030,7 @@ namespace aveng {
 			ShaderStorageBuffer::init(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), MapMode::Persistent, ResidentMode::CPU, newBufferSize);
 
 			// Retry the upload - true == it resized again after we just tried to reallocate it. That would be bad
-			if (ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), mNodeTransFormData))
+			if (ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), pkt.nodeTransformData))
 			{
 				std::printf("[1] Failed to accommodate resized buffer.\n");
 				throw std::runtime_error("[1] Failed to accommodate resized buffer.");
@@ -1177,8 +1107,8 @@ namespace aveng {
 		UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), mWorldPosMatrices)) {
-			size_t newBufferSize = std::max(mWorldPosMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
+		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
+			size_t newBufferSize = std::max(pkt.worldMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
 			buffer_trash.push_back(
 				PendingBufferDestroy{
@@ -1196,7 +1126,7 @@ namespace aveng {
 				newBufferSize // New buffer size
 			);
 
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), mWorldPosMatrices)) {
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
 				std::printf("[2] Failed to accommodate resized buffer.\n");
 				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
 			}
@@ -1229,21 +1159,16 @@ namespace aveng {
 				return WTF_BOOM;
 			}
 
-			uint32_t computeShaderModelOffset = 0;
-			for (const auto& model : mModelInstanceData.miModelList) {
-				size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size();
-				
-				if (numberOfInstances > 0 && model->getTriangleCount() > 0) {
+			// Dispatch compute shaders for all animated batches in the FramePacket
+			for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
+				const DrawBatch& b = pkt.batches[i];
+				if (b.boneCount == 0 || b.instanceCount == 0) continue;
 
-					/* compute shader for animated models only */
-					if (model->hasAnimations() && !model->getBoneList().empty()) {
-						size_t numberOfBones = model->getBoneList().size();
+				// TODO: Replace with actual model registry lookup: modelRegistry_.get(b.modelId)
+				const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
+				if (!model) continue;
 
-						runComputeShaders(model, numberOfInstances, computeShaderModelOffset);
-
-						computeShaderModelOffset += numberOfInstances * numberOfBones;
-					}
-				}
+				runComputeShaders(model, b.alignedInstanceCount, b.boneBaseOffset);
 			}
 
 			// End command recording for Compute Queue
@@ -1327,12 +1252,8 @@ namespace aveng {
 		renderLights(pointLightSystem.getPipeline(), pointLightSystem.getPipelineLayout());
 	}
 
-	/**
-	* Note: This method is just for clients to be able to utilize model draws (e.g. the Editor).
-	* For one less stack frame, you could copy/paste this code directly 
-	* into the renderer.draw() method. Args are super lightweight though
-	*/
 	bool Renderer::drawModels(
+		const IModelLibrary& modelLib,
 		VkCommandBuffer commandBuffer,
 		VkPipeline basicPipeline,
 		VkPipeline animationPipeline,
@@ -1342,85 +1263,52 @@ namespace aveng {
 		VkDescriptorSet animationDescriptorSet,
 		int frameIndex)
 	{
+		const auto& pkt = framePacketBuilder_.getFramePacket(frameIndex);
 
-		/*
-			v1: Frame Packet tells renderer which models & instance ranges to draw, in order.
-			renderer asks ModelLibrary for model render access (ptr or view)
-			renderer calls model->drawInstanced() per batch
-		*/
-		/* draw the models */
-		uint32_t worldPosOffset = 0;
-		uint32_t skinMatOffset = 0;
-		for (const auto& model : mModelInstanceData.miModelList)
-		{
-			size_t numberOfInstances = mModelInstanceData.miInstancesPerModel[model->getModelFileName()].size();
-			// std::shared_ptr<AvengModel> model = modelType.second.at(0)->getModel();
+		// ========== STATIC PASS ==========
+		// Bind static pipeline once, then draw all static batches
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			basicLayout, 1, 1, &basicDescriptorSet, 0, nullptr);
 
-			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
-			{
+		for (uint32_t i = 0; i < pkt.staticBatchCount; ++i) {
+			const DrawBatch& b = pkt.batches[i];
+			if (b.instanceCount == 0) continue;
 
-				/* animated models */
-				if (model->hasAnimations() && !model->getBoneList().empty()) 
-				{
-					uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
+			// TODO: Replace with actual model registry lookup: modelRegistry_.get(b.modelId)
+			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
+			if (!model) continue;
 
-					vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, animationPipeline);
+			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
+			mModelPushConst.pkModelStride = 0;
+			mModelPushConst.pkSkinMatOffset = 0;
+			vkCmdPushConstants(commandBuffer, basicLayout,
+				VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
 
-					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						animationLayout, 1, 1, &animationDescriptorSet, 0, nullptr);
+			model->drawInstancedV2(commandBuffer, basicLayout, b.instanceCount, frameIndex);
+		}
 
-					mUploadToUBOTimer.start();
+		// ========== ANIMATED PASS ==========
+		// Bind animated pipeline once, then draw all animated batches
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, animationPipeline);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			animationLayout, 1, 1, &animationDescriptorSet, 0, nullptr);
 
-					// The number of bones in the model
-					mModelPushConst.pkModelStride = numberOfBones;
-					// An index to the first location of this model's instances.
-					mModelPushConst.pkWorldPosOffset = worldPosOffset;
-					// An index to the first location of this model's bones.
-					mModelPushConst.pkSkinMatOffset = skinMatOffset;
+		for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
+			const DrawBatch& b = pkt.batches[i];
+			if (b.instanceCount == 0) continue;
 
-					vkCmdPushConstants(commandBuffer, animationLayout,
-						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelPushConst);
+			// TODO: Replace with actual model registry lookup: modelRegistry_.get(b.modelId)
+			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
+			if (!model) continue;
 
-					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
+			mModelPushConst.pkModelStride = b.boneCount;
+			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;
+			vkCmdPushConstants(commandBuffer, animationLayout,
+				VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
 
-					model->drawInstancedV2(
-						renderData.rdCommandBuffersGraphics[frameIndex], 
-						basicLayout, 
-						animationLayout, 
-						numberOfInstances, 
-						frameIndex);
-
-					worldPosOffset += numberOfInstances;
-					skinMatOffset += numberOfInstances * numberOfBones;
-
-				} else {
-					/* non-animated models */
-
-					vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
-
-					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						basicLayout, 1, 1, &basicDescriptorSet, 0, nullptr);
-
-					mUploadToUBOTimer.start();
-					mModelPushConst.pkModelStride = 0;
-					mModelPushConst.pkWorldPosOffset = worldPosOffset;
-					mModelPushConst.pkSkinMatOffset = 0;
-					vkCmdPushConstants(commandBuffer, basicLayout,
-						VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(sizeof(VkPushConstants)), &mModelPushConst);
-					renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
-
-					// Note: We pass the animation layout here even though its implicitly basic
-					model->drawInstancedV2(
-						renderData.rdCommandBuffersGraphics[frameIndex], 
-						basicLayout, 
-						animationLayout, 
-						numberOfInstances, 
-						frameIndex);
-
-					worldPosOffset += numberOfInstances;
-
-				}
-			}
+			model->drawInstancedV2(commandBuffer, animationLayout, b.instanceCount, frameIndex);
 		}
 
 		return true;
@@ -1552,8 +1440,8 @@ namespace aveng {
 		Logger::log(1, "%s: updating compute descriptor sets\n", __FUNCTION__);
 
 		{
-			/* transform compute shader */
-			VkDescriptorBufferInfo transformInfo{};
+			/* transform compute shader - assimp_instance_transform.comp */
+			VkDescriptorBufferInfo transformInfo{}; 
 			transformInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
 			transformInfo.offset = 0;
 			transformInfo.range = VK_WHOLE_SIZE;
@@ -1589,7 +1477,7 @@ namespace aveng {
 		{
 			/* matrix multiplication compute shader, global data */
 			VkDescriptorBufferInfo trsInfo{};
-			trsInfo.buffer = mShaderTrsMatrixBuffers[frameIndex].buffer;
+			trsInfo.buffer = mShaderTrsMatrixBuffers[frameIndex].buffer; // Written by assimp_instance_transform.comp, we just ensure size is correct
 			trsInfo.offset = 0;
 			trsInfo.range = VK_WHOLE_SIZE;
 

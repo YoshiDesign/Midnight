@@ -2,6 +2,7 @@
 #include "CoreVK/VkRenderData.h"
 #include "Utils/glm_includes.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
+#include "Services/IRenderSceneView.h"
 #include "Game/data.h"
 
 namespace aveng {
@@ -13,12 +14,14 @@ namespace aveng {
 
 	public:
 		AvengFrame(Renderer& renderer,
+			const IRenderSceneView& sceneView,
+			const IModelLibrary& modelLib_, // used to get Model pointers to the renderer, *for now*
 			VkRenderData& renderData,
 			GameData& gameData,
 			EngineDevice& engineDevice,
 			Editor* editor = nullptr);
 
-		bool render(float deltaTime);
+		bool render(const IModelLibrary& modelLib_, float deltaTime);
 		int currentFrameIndex();
 
 #ifdef ENABLE_EDITOR

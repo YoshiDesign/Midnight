@@ -49,6 +49,7 @@ namespace aveng {
 		virtual ~IModelLibrary() = default;
 		virtual ModelRef getOrLoadModel(const AssetKey& key) = 0;
 		virtual bool unloadModel(const AssetKey& key) = 0; // "delete" is too strong a word here
+		virtual const AvengModel* pModel(ModelId id) const = 0;
 	};
 
 	/// Renderer/modelDb should implement this without exposing the whole DB.

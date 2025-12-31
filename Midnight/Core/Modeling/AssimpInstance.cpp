@@ -118,4 +118,8 @@ namespace aveng {
         return mNodeTransformData;
     }
 
+    const std::vector<NodeTransformData> AssimpInstance::getNodeTransformData() const {
+        return mNodeTransformData;
+    }
+
 }

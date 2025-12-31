@@ -71,6 +71,18 @@ namespace aveng {
         using Instance = InstanceFor<Tag>;
         using Slot = InstanceSlot<Instance>;
         using InstanceData = InstancePoolData<Tag>;
+
+        // This provides the FramePacketBuilder with the exact data it requires
+        using PoolIn = FramePacketBuilder::PoolInputs<Tag, Instance>;
+        PoolIn poolInputs() const noexcept {
+            PoolIn in{};
+            in.instancesInOrder = &instanceData_.instancesInOrder;
+            in.instancesPerModel = &instanceData_.instancesPerModel;
+            in.slots = &instanceData_.slots;
+            in.dirtySlots = std::span<const uint32_t>(instanceData_.dirtyGpuList);
+            return in;
+        }
+
         //using InstanceCallbacks = InstanceCallbacksPerPool<Handle>; // Unused
 
         //void setCallbacks(InstanceCallbacks callbacks) { // Unused
@@ -370,7 +382,7 @@ namespace aveng {
             }
             const ModelId mid = src->common.modelId;
 
-            // You likely already do this on create paths:
+            // TODO : You likely already do this on create paths. This is the ONLY place we're using modelQuery_
             ModelMeta meta{};
             if (!modelQuery_.tryGetModelMeta(mid, meta)) {
                 // if constexpr (!/*failSoft?*/) { assert(false && "cloneInstance: model meta missing"); }
@@ -508,7 +520,7 @@ namespace aveng {
         }
 
     private:
-        const IModelQuery& modelQuery_; // This is "technically" the entire Renderer. Just a constrained API from it
+        const IModelQuery& modelQuery_; // Injected via ModelLibrary -> SceneFacade -> you are here
         // InstanceCallbacks   callbacks_{}; // Unused - enables callbacks to be created on behalf of this class. See: ModelAndInstanceData.h -> InstanceCallbacksPerPool
         InstanceData        instanceData_{};
     };

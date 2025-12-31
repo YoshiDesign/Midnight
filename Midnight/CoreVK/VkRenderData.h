@@ -131,7 +131,7 @@ namespace aveng {
 	struct NodeTransformData {
 		glm::vec4 translation = glm::vec4(0.0f);
 		glm::vec4 scale = glm::vec4(1.0f);
-		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a quaternion
+		glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); // this is a "quaternion"
 	};
 
 	struct PointLightData {

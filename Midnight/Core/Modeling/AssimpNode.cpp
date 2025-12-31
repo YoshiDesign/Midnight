@@ -41,7 +41,7 @@ void AssimpNode::setScaling(glm::vec3 scaling) {
     mScalingMatrix = glm::scale(glm::mat4(1.0f), mScaling);
 }
 
-void AssimpNode::updateTRSMatrix() {
+void AssimpNode::updateTRSMatrix() { // Deprecated
     if (std::shared_ptr<AssimpNode> parentNode = mParentNode.lock()) {
         mParentNodeMatrix = parentNode->getTRSMatrix();
     }

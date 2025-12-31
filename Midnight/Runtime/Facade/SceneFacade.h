@@ -1,6 +1,8 @@
 #pragma once
+#include "Core/Renderer/FramePacketBuilder.h"
 #include "Runtime/World/InstanceManager.h"
 #include "Services/InstanceServices.h"	// Instance Queries and InstanceView
+#include "Services/IRenderSceneView.h"
 
 namespace aveng {
 
@@ -23,15 +25,25 @@ namespace aveng {
 	 * but I'm also willing to bite my tongue on this someday
 	 */
 
+	class AvengModel; // We use the SceneFacade as <IRenderSceneView> to punt a const AvengModel* to the renderer, for now!
+					  // You'll find this same fwd decl in InstanceManager.h
+
 	/* */
 	class SceneFacade final
-		: public IModelLibrary, IInstanceQuery
+		: public IModelLibrary, IInstanceQuery, IRenderSceneView
 	{
 
 	public:
 
 		SceneFacade(IModelLibrary& modelLib, const IModelQuery& modelQuery);
 		~SceneFacade() {}
+
+		/* */
+		struct Config {
+			// If true, spawn/clone/destroy will no-op and return monostate/empty on invalid handles/models.
+			// If false, you might assert/throw depending on your engine policy.
+			bool failSoft = true;
+		};
 
 		/// TODO
 		// ----- Hot-path, typed APIs -----
@@ -46,28 +58,30 @@ namespace aveng {
 		//void deleteInstance(AnimatedHandle h);
 		/// TODO
 
-		struct Config {
-			// If true, spawn/clone/destroy will no-op and return monostate/empty on invalid handles/models.
-			// If false, you might assert/throw depending on your engine policy.
-			bool failSoft = true;
-		};
 
-		/* IInstanceQuery */
-		// Accessor
+		const IModelQuery& modelQuery() const override;
+		/* IRenderSceneView - Used by Renderer to feed FramePacketBuilder::build() with instanceManager pools */
+		FramePacketBuilder::PoolInputs<StaticTag, AvengInstance>
+			staticPoolInputs() const override { return staticMgr_.poolInputs(); }
+		FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance>
+			animatedPoolInputs() const override { return animatedMgr_.poolInputs(); }
+
+		/* IInstanceQuery - Just for the editor. Not a performance friendly way to go about things, but simple */
 		const IInstanceQuery& instanceQuery() const noexcept { return *this; }
 
+		/* IInstanceQuery overrides */
 		bool tryGetInstance(AnyInstanceHandle h, InstanceView& out) const override;
 		std::vector<AnyInstanceHandle> listAllInstances() const override;
 		std::vector<AnyInstanceHandle> listInstancesForModel(ModelId id) const override;
 		bool isAlive(AnyInstanceHandle h) const override;
-		/* IInstanceQuery */
 
-		/* IModelLibrary */
+		/* IModelLibrary overrides */
 		ModelRef getOrLoadModel(const AssetKey& key) override;
 		bool    unloadModel(const AssetKey& key) override;
-		/* IModelLibrary */
+		const AvengModel* pModel(ModelId id) override;
 
-		/* Instance Ops - 1 overload for each type of model which an instance can represent */
+
+		/* Instance Op's - 1 overload for each kind of data an instance can consume - Static vs Animated becomes implicit */
 		AnyInstanceHandle spawn(ModelRef modelRef, const TransformSettings& s);
 		AnyInstanceHandle spawn(ModelRef modelRef, const AnimatedCreateSettings& s);
 		/// Spawn many instances. `settings.size()` can be 1 (repeat) or N (cycled/repeated).
@@ -169,7 +183,7 @@ namespace aveng {
 		// Cache of validated models for this scene:
 		// modelId -> poolKind (static vs animated)
 		// Mutable because validateModel() can fill cache even in const operations.
-		mutable std::unordered_map<ModelId, ModelValidation> validated_;
+		mutable std::unordered_map<ModelId, ModelValidation> validated_; // Unused at the moment. It's an optimization path, but not a very high-priority one
 	};
 
 }

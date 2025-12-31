@@ -1,23 +1,18 @@
 #include "FramePacketBuilder.h"
 
+/*
+Build order guarantees flavor-ordered output:
+1. Process all static instances -> append to drawList, create static batches
+2. Record staticInstanceCount = drawList.size(), staticBatchCount = batches.size()
+3. Process all animated instances -> append to drawList, create animated batches
+4. Record animatedInstanceCount = drawList.size() - staticInstanceCount
+5. Record animatedBatchCount = batches.size() - staticBatchCount
+6. Post-process animated batches for bone info
+7. Assign pick IDs if requested
+8. Store in framePackets_[frameIndex]
+*/
+
 namespace aveng {
-
-    // Include the actual instance types here
-    // #include "AvengInstance.h"
-    // #include "AssimpInstance.h"
-
-    //struct ModelMeta {
-    //    bool animated = false;
-    //    uint32_t boneCount = 0;
-    //    // glm::mat4 root;  // not needed for packet building itself
-    //};
-
-    //struct IModelQuery {
-    //    virtual ~IModelQuery() = default;
-    //    virtual bool tryGetModelMeta(ModelId id, ModelMeta& out) const = 0;
-    //    virtual bool isModelLoaded(ModelId id, ModelMeta& out) const = 0;
-    //    virtual bool isModelAnimated(ModelId id, ModelMeta& out) const = 0;
-    //};
 
     namespace {
 
@@ -39,14 +34,13 @@ namespace aveng {
 
         template<class Tag, class InstanceT>
         ModelId modelIdFromHandle(
-            const std::vector<InstanceSlot<InstanceT>>& slots, 
+            const std::vector<InstanceSlot<InstanceT>>& slots,
             const InstanceHandle<Tag>& h)
         {
-            // Call only after isHandleAlive == true. Optional must not be empty here to use ptr syntax
             return slots[h.index].instance->common.modelId;
         }
 
-        // ---- Deterministic key ordering helpers. Only used if deterministicBatches option is true ----
+        // ---- Deterministic key ordering helper ----
 
         template<class HandleT>
         std::vector<ModelId> sortedModelKeys(const std::unordered_map<ModelId, std::vector<HandleT>>& perModel)
@@ -61,96 +55,82 @@ namespace aveng {
     }
 
     template<class StaticInstanceT, class AnimatedInstanceT>
-    FramePacket FramePacketBuilder::build(
-        const Inputs& in,
+    const FramePacket& FramePacketBuilder::build(
         const PoolInputs<StaticTag, StaticInstanceT>& stat,
         const PoolInputs<AnimatedTag, AnimatedInstanceT>& anim,
         uint32_t frameIndex,
-        uint64_t frameNumber,
+        uint64_t frameNumber, // Could become useful for profiling
         const FramePacketBuildOptions& opt)
     {
-        FramePacket pkt;
+        // Ensure we have storage for this frame index
+        if (frameIndex >= framePackets_.size()) {
+            framePackets_.resize(frameIndex + 1);
+        }
+
+        FramePacket& pkt = framePackets_[frameIndex];
+
+        // Clear previous frame data - we could alternatively clean this up after each frame is completed in a GC step
+        pkt.drawList.clear();
+        pkt.batches.clear();
         pkt.frameIndex = frameIndex;
         pkt.frameNumber = frameNumber;
-
+        pkt.staticInstanceCount = 0;
+        pkt.animatedInstanceCount = 0;
+        pkt.staticBatchCount = 0;
+        pkt.animatedBatchCount = 0;
         pkt.dirtyStaticSlots = stat.dirtySlots;
         pkt.dirtyAnimatedSlots = anim.dirtySlots;
 
         // Defensive: required pointers
-        if (!in.modelQ ||
+        if (!modelQ_ ||
             !stat.slots || !anim.slots ||
             (!stat.instancesInOrder && !stat.instancesPerModel) ||
             (!anim.instancesInOrder && !anim.instancesPerModel))
         {
-            // Return empty packet; caller can treat as "draw nothing"
             return pkt;
         }
 
         const auto& statSlots = *stat.slots;
         const auto& animSlots = *anim.slots;
 
-        auto modelIsDrawable = [&](ModelId mid, DrawFlavor flavor) -> bool {
+        // Model validation helper
+        auto modelIsDrawable = [&](ModelId mid) -> bool {
             if (!opt.requireModelLoaded) return true;
-
             ModelMeta meta{};
-            if (!in.modelQ->isModelLoaded(mid, meta)) return false;
-
-            // Optional sanity: if flavor contradicts meta, you can choose to filter or allow.
-            // I recommend: allow both, because you may have static instances of animated models.
-            // If you want strictness:
-            // if (flavor == DrawFlavor::Animated && !meta.animated) return false;
-
-            (void)flavor;
-            return true;
+            return modelQ_->isModelLoaded(mid, meta);
         };
 
-        // Emit batches from a stream of handles that is already in canonical order.
-        auto emitFromOrderedHandles = [&](auto flavor,
-            const auto& slots,
-            const auto& orderedHandles)
-        {
-            using HandleT = std::decay_t<decltype(orderedHandles.front())>;
+        // ========== STATIC INSTANCES ==========
 
-            // We batch adjacent handles by (modelId, flavor).
-            // This preserves per-pool order and minimizes state changes *if* your pool order is model-grouped.
-            // If pool order is arbitrary, you’ll get more batches — still correct.
+        auto processStaticFromOrdered = [&](const std::vector<StaticHandle>& orderedHandles) {
             ModelId currentModel = 0;
             bool haveBatch = false;
-
             DrawBatch batch{};
-            batch.flavor = flavor;
+            batch.flavor = DrawFlavor::Static;
 
-            for (const HandleT& h : orderedHandles) {
-                if (!isHandleAlive(slots, h)) continue;
+            for (const StaticHandle& h : orderedHandles) {
+                if (!isHandleAlive(statSlots, h)) continue;
 
-                const ModelId mid = modelIdFromHandle(slots, h);
-                if (!modelIsDrawable(mid, flavor)) continue;
+                const ModelId mid = modelIdFromHandle(statSlots, h);
+                if (!modelIsDrawable(mid)) continue;
 
+                // Ensures we create a different batch for each model.
                 if (!haveBatch || mid != currentModel) {
-                    // close previous
                     if (haveBatch) {
                         pkt.batches.push_back(batch);
                     }
-
-                    // start new
                     haveBatch = true;
                     currentModel = mid;
-
                     batch = {};
-                    batch.flavor = flavor;
+                    batch.flavor = DrawFlavor::Static;
                     batch.modelId = mid;
                     batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                     batch.instanceCount = 0;
-                    batch.basePickId = 0; // fill later
+                    batch.basePickId = 0;
                 }
 
-                // Append to canonical draw list
-                if constexpr (std::is_same_v<HandleT, StaticHandle>) {
-                    pkt.drawList.emplace_back(h);
-                }
-                else {
-                    pkt.drawList.emplace_back(h);
-                }
+                pkt.drawList.emplace_back(h);
+                pkt.worldMatrices.push_back(statSlots[h.index].instance->common.modelMatrix());
                 batch.instanceCount++;
             }
 
@@ -159,18 +139,11 @@ namespace aveng {
             }
         };
 
-        // Emit from per-model grouping: batches are naturally per model.
-        auto emitFromPerModel = [&](auto flavor,
-            const auto& slots,
-            const auto& perModelMap)
-        {
-            using HandleT = typename std::decay_t<decltype(perModelMap)>::mapped_type::value_type;
-
+        auto processStaticFromPerModel = [&](const std::unordered_map<ModelId, std::vector<StaticHandle>>& perModelMap) {
             std::vector<ModelId> keys;
             if (opt.deterministicBatches) {
                 keys = sortedModelKeys(perModelMap);
-            }
-            else {
+            } else {
                 keys.reserve(perModelMap.size());
                 for (const auto& kv : perModelMap) keys.push_back(kv.first);
             }
@@ -178,32 +151,22 @@ namespace aveng {
             for (ModelId mid : keys) {
                 auto it = perModelMap.find(mid);
                 if (it == perModelMap.end()) continue;
-
-                if (!modelIsDrawable(mid, flavor)) continue;
+                if (!modelIsDrawable(mid)) continue;
 
                 const auto& vec = it->second;
                 if (vec.empty()) continue;
 
                 DrawBatch batch{};
-                batch.flavor = flavor;
+                batch.flavor = DrawFlavor::Static;
                 batch.modelId = mid;
                 batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                 batch.instanceCount = 0;
                 batch.basePickId = 0;
 
-                for (const HandleT& h : vec) {
-                    if (!isHandleAlive(slots, h)) continue;
-
-                    // Optional: cross-check model id matches map key
-                    // (cheap assertion-style check)
-                    // if (modelIdFromHandle(slots, h) != mid) continue;
-
-                    if constexpr (std::is_same_v<HandleT, StaticHandle>) {
-                        pkt.drawList.emplace_back(h);
-                    }
-                    else {
-                        pkt.drawList.emplace_back(h);
-                    }
+                for (const StaticHandle& h : vec) {
+                    if (!isHandleAlive(statSlots, h)) continue;
+                    pkt.drawList.emplace_back(h);
+                    pkt.worldMatrices.push_back(statSlots[h.index].instance->common.modelMatrix());
                     batch.instanceCount++;
                 }
 
@@ -213,37 +176,165 @@ namespace aveng {
             }
         };
 
-        // --- Build order: choose policy ---
+        // Build static portion
         if (opt.preferInstancesInOrder) {
             if (stat.instancesInOrder && !stat.instancesInOrder->empty()) {
-                emitFromOrderedHandles(DrawFlavor::Static, statSlots, *stat.instancesInOrder);
+                processStaticFromOrdered(*stat.instancesInOrder);
             }
-            if (anim.instancesInOrder && !anim.instancesInOrder->empty()) {
-                emitFromOrderedHandles(DrawFlavor::Animated, animSlots, *anim.instancesInOrder);
-            }
-        }
-        else {
+        } else {
             if (stat.instancesPerModel) {
-                emitFromPerModel(DrawFlavor::Static, statSlots, *stat.instancesPerModel);
+                processStaticFromPerModel(*stat.instancesPerModel);
             }
+        }
+
+        // Record static delineation
+        pkt.staticInstanceCount = static_cast<uint32_t>(pkt.drawList.size());
+        pkt.staticBatchCount = static_cast<uint32_t>(pkt.batches.size());
+
+        // ========== ANIMATED INSTANCES ==========
+
+        auto processAnimatedFromOrdered = [&](const std::vector<AnimatedHandle>& orderedHandles) {
+            ModelId currentModel = 0;
+            bool haveBatch = false;
+            DrawBatch batch{};
+            batch.flavor = DrawFlavor::Animated;
+
+            for (const AnimatedHandle& h : orderedHandles) {
+                if (!isHandleAlive(animSlots, h)) continue;
+
+                const ModelId mid = modelIdFromHandle(animSlots, h);
+                if (!modelIsDrawable(mid)) continue;
+
+                if (!haveBatch || mid != currentModel) {
+                    if (haveBatch) {
+                        pkt.batches.push_back(batch);
+                    }
+                    haveBatch = true;
+                    currentModel = mid;
+                    batch = {};
+                    batch.flavor = DrawFlavor::Animated;
+                    batch.modelId = mid;
+                    batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
+                    batch.instanceCount = 0;
+                    batch.basePickId = 0;
+                }
+
+                pkt.drawList.emplace_back(h);
+                pkt.worldMatrices.push_back(animSlots[h.index].instance->common.modelMatrix());
+
+                batch.instanceCount++;
+            }
+
+            if (haveBatch) {
+                pkt.batches.push_back(batch);
+            }
+        };
+
+        auto processAnimatedFromPerModel = [&](const std::unordered_map<ModelId, std::vector<AnimatedHandle>>& perModelMap) {
+            std::vector<ModelId> keys;
+            if (opt.deterministicBatches) {
+                keys = sortedModelKeys(perModelMap);
+            } else {
+                keys.reserve(perModelMap.size());
+                for (const auto& kv : perModelMap) keys.push_back(kv.first);
+            }
+
+            for (ModelId mid : keys) {
+                auto it = perModelMap.find(mid);
+                if (it == perModelMap.end()) continue;
+                if (!modelIsDrawable(mid)) continue;
+
+                const auto& vec = it->second;
+                if (vec.empty()) continue;
+
+                DrawBatch batch{};
+                batch.flavor = DrawFlavor::Animated;
+                batch.modelId = mid;
+                batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
+                batch.instanceCount = 0;
+                batch.basePickId = 0;
+
+                for (const AnimatedHandle& h : vec) {
+                    if (!isHandleAlive(animSlots, h)) continue;
+                    pkt.drawList.emplace_back(h);
+                    pkt.worldMatrices.push_back(animSlots[h.index].instance->common.modelMatrix());
+                    batch.instanceCount++;
+                }
+
+                if (batch.instanceCount > 0) {
+                    pkt.batches.push_back(batch);
+                }
+            }
+        };
+
+        // Build animated portion
+        if (opt.preferInstancesInOrder) {
+            if (anim.instancesInOrder && !anim.instancesInOrder->empty()) {
+                processAnimatedFromOrdered(*anim.instancesInOrder);
+            }
+        } else {
             if (anim.instancesPerModel) {
-                emitFromPerModel(DrawFlavor::Animated, animSlots, *anim.instancesPerModel);
+                processAnimatedFromPerModel(*anim.instancesPerModel);
             }
         }
 
-        // Optional: allow custom global batch sorting (rarely needed if you preserve submission order).
-        // If you do sort batches, you MUST also rebuild drawList accordingly (or store per-batch handle arrays).
-        // Therefore, by default we do NOT sort batches here.
-        if (customBatchSort_) {
-            // NOTE: Sorting batches alone would invalidate (drawListOffset, instanceCount) mapping.
-            // Only enable this if you also change representation to store handles per batch.
-            // For now: ignore custom sort to preserve correctness.
-            // std::sort(pkt.batches.begin(), pkt.batches.end(), customBatchSort_);
+        // Record animated delineation
+        pkt.animatedInstanceCount = static_cast<uint32_t>(pkt.drawList.size()) - pkt.staticInstanceCount;
+        pkt.animatedBatchCount = static_cast<uint32_t>(pkt.batches.size()) - pkt.staticBatchCount;
+
+        // ========== POST-PROCESSING ==========
+
+        // Add bone information for animated batches (starting at staticBatchCount)
+        uint32_t boneBase = 0;
+        for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
+            auto& b = pkt.batches[i];
+            ModelMeta meta{};
+            if (modelQ_->isModelLoaded(b.modelId, meta) && meta.boneCount > 0) {
+                b.boneCount = meta.boneCount;
+                b.alignedInstanceCount = ((b.instanceCount + 31) / 32) * 32;
+                b.boneBaseOffset = boneBase;
+                boneBase += b.boneCount * b.alignedInstanceCount;
+            }
         }
 
-        // Assign pick IDs per batch (basePickId), if requested.
+        // Resize and fill nodeTransformData (boneBase is the total size needed)
+        pkt.nodeTransformData.resize(boneBase);
+
+        // Copy node transforms for each animated batch
+        for (uint32_t batchIdx = pkt.staticBatchCount; batchIdx < pkt.batches.size(); ++batchIdx) {
+            const DrawBatch& b = pkt.batches[batchIdx];
+            if (b.boneCount == 0) continue;
+
+            // Copy each instance's node transforms
+            for (uint32_t i = 0; i < b.instanceCount; ++i) {
+                const AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
+                AnimatedHandle h = std::get<AnimatedHandle>(ah);
+
+                auto boneSpan = animSlots[h.index].instance->getNodeTransformData();
+                std::copy(
+                    boneSpan.begin(),
+                    boneSpan.end(),
+                    pkt.nodeTransformData.begin() + (b.boneBaseOffset + i * b.boneCount)
+                );
+            }
+
+            // Pad remaining slots up to alignedInstanceCount
+            const NodeTransformData identityTrs{
+                glm::vec4(0.0f),
+                glm::vec4(1.0f),
+                glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+            };
+
+            for (uint32_t i = b.instanceCount; i < b.alignedInstanceCount; ++i) {
+                for (uint32_t bone = 0; bone < b.boneCount; ++bone) {
+                    pkt.nodeTransformData[b.boneBaseOffset + i * b.boneCount + bone] = identityTrs;
+                }
+            }
+        }
+
+        // Assign pick IDs per batch if requested
         if (opt.assignPickIds) {
-            uint32_t next = opt.pickIdStart; // usually 1
+            uint32_t next = opt.pickIdStart;
             for (auto& b : pkt.batches) {
                 b.basePickId = next;
                 next += b.instanceCount;
@@ -255,7 +346,6 @@ namespace aveng {
 
     // Explicit instantiations can live here if you want to compile in one TU.
     // Otherwise include this .cpp in a compilation unit where instance types are known.
-    // template FramePacket FramePacketBuilder::build<AvengInstance, AssimpInstance>(...);
-
+    // template const FramePacket& FramePacketBuilder::build<AvengInstance, AssimpInstance>(...);
 
 }

@@ -1,6 +1,6 @@
 // SceneFacade.cpp
 #include "SceneFacade.h"
-
+#include "Core/aveng_model.h"
 #include <cassert>
 #include <utility>      // std::move
 #include <variant>      // std::visit
@@ -217,6 +217,8 @@ namespace aveng {
         return ok;
     }
 
+    const AvengModel* SceneFacade::pModel(ModelId id) { return modelLib_.pModel(id); }
+
     void SceneFacade::destroyAllInstancesForModel(ModelId mid)
     {
         staticMgr_.deleteAllInstancesForModel(mid);
@@ -334,7 +336,7 @@ namespace aveng {
 #endif
 
         for (std::uint32_t i = 0; i < count; ++i) {
-            const TransformSettings& s = settings[i % settings.size()];
+            const TransformSettings& s = settings[i % settings.size()]; // Cool
             out.emplace_back(spawnValidated<StaticTag>(modelRef.id, s, m));
         }
 
@@ -627,6 +629,8 @@ namespace aveng {
             animatedMgr_.setTransforms(tmpAnimatedHandles_, tmpAnimatedXforms_);
         }
     }
+
+    const IModelQuery& SceneFacade::modelQuery() { return modelQuery_; }
 
     /*
     * This pattern scales cleanly

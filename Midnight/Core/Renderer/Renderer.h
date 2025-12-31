@@ -1,9 +1,6 @@
 #pragma once
-#include <span>
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include "Core/Modeling/ModelRegistry.h"
+#include "avpch.h"
+#include "Core/Renderer/FramePacketBuilder.h"
 #include "Core/Modeling/Sources/IModelSource.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/VkRenderData.h"
@@ -20,6 +17,7 @@ namespace aveng {
 	class AvengWindow;
 	class CameraManager;
 	struct CameraTransform;
+	struct IRenderSceneView;
 
 	class Renderer {
 
@@ -29,7 +27,8 @@ namespace aveng {
 			EngineDevice& engineDevice, 
 			AvengWindow& window, 
 			VkRenderData& renderData, 
-			CameraManager& cameraManager
+			CameraManager& cameraManager,
+			const IModelQuery& mq
 		);
 		~Renderer();
 
@@ -99,8 +98,15 @@ namespace aveng {
 
 		bool createSyncObjects();
 
-		int draw(float deltaTime);
+		// IRenderSceneView as an arg allows us to use different scene sources.
+		// Alternatively you could store IRenderSceneView* but only if your engine guarantees it’s always valid and you prefer a slightly simpler callsite.
+		int draw(
+			const IRenderSceneView& sceneView,
+			const IModelLibrary& modelLib_, // used to get Model pointers, *for now*
+			float deltaTime);
+
 		bool drawModels(
+			const IModelLibrary& modelLib_, // used to get Model pointers, *for now*
 			VkCommandBuffer commandBuffer, 
 			VkPipeline basicPipeline, 
 			VkPipeline animationPipeline, 
@@ -118,7 +124,7 @@ namespace aveng {
 		// New methods for descriptor/buffer management
 		void updateCamera();
 
-		void runComputeShaders(std::shared_ptr<AvengModel> model, int numInstances, uint32_t modelOffset);
+		void runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset);
 		
 		void initializePointLights();
 		void renderLights(const VkPipeline& pipeline, const VkPipelineLayout& layout);
@@ -141,12 +147,13 @@ namespace aveng {
 		void freeCommandBuffers();
 		size_t calculateDynamicUBOStride() const;
 
+		const IModelQuery& modelQuery_;
 		VkRenderData& renderData;
-		size_t boneMatrixBufferSize;
 
 		bool firstFrame = true;
 		bool mRenderpassBypass = false;
 		bool recreatingSwapchain = false;
+		size_t boneMatrixBufferSize;
 
 		// Engine systems
 		AvengWindow& aveng_window;
@@ -170,6 +177,8 @@ namespace aveng {
 		int currentFrameIndex{ 0 }; // Not tied to the image index
 		bool isFrameStarted{ false };
 
+		FramePacketBuilder framePacketBuilder_;
+
 		// Descriptors and Buffers
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
 		std::vector<VkUniformBufferData> mPointLightUBOBuffers;
@@ -182,6 +191,7 @@ namespace aveng {
 
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 		VkPushConstants mModelPushConst{};
+
 		VkComputePushConstants mComputeModelData{};
 
 		/* for animated and non-animated models */
@@ -189,6 +199,8 @@ namespace aveng {
 		std::vector<glm::mat4> mWorldPosMatrices{};
 		std::vector<NodeTransformData> mNodeTransFormData{};
 		PointLightData mPointLightData{};
+
+		bool animatedModelLoaded{false};
 
 	};
 

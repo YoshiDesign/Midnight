@@ -1,9 +1,6 @@
 #pragma once
 
-#include <span>
-#include <array>
-#include <memory>
-#include <vector>
+#include "avpch.h"
 #include "Utils/glm_includes.h"
 #include "Utils/AssetResolution.h"
 #include "Core/Modeling/AssimpNode.h"
@@ -13,6 +10,7 @@
 #include "Core/Modeling/ModelRegistry.h"
 #include "CoreVK/aveng_descriptors.h"
 #include "CoreVK/VkRenderData.h"
+
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
@@ -63,17 +61,21 @@ namespace aveng {
 		std::string getModelFileNamePath();
 
 		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList();
+		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList() const;
+
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
 		const std::vector<VkShaderStorageBufferData>& getBoneMatrixOffsetBuffers() const;
 		const std::vector<VkShaderStorageBufferData>& getBoneParentBuffers() const;
 		std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
+
 		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex);
+		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex) const;
 		glm::mat4 getRootTranformationMatrix();
 		bool hasAnimations();
 		unsigned int getTriangleCount();
 		unsigned int getTriangleCount() const;
 
-		void drawInstancedV2(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout basicLayout, VkPipelineLayout animationLayout, uint32_t instanceCount, int frameIndex);
+		void drawInstancedV2(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout pipelineLayout, uint32_t instanceCount, int frameIndex) const;
 
 		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData);
 	
