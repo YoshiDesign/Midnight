@@ -30,7 +30,7 @@ namespace aveng {
 		ModelEntry entry;
 		entry.id = NullModelId;
 		entry.key = "null/";
-		entry.model.reset();
+		entry.model = nullptr;
 		entry.isAnimated = false;
 		entry.boneCount = 0;
 

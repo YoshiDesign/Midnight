@@ -252,6 +252,7 @@ namespace aveng {
                 }
             };
 
+            
             // Build static portion
             if (opt.preferInstancesInOrder) {
                 if (stat.instancesInOrder && !stat.instancesInOrder->empty()) {
@@ -267,6 +268,7 @@ namespace aveng {
             // Record static delineation
             pkt.staticInstanceCount = static_cast<uint32_t>(pkt.drawList.size());
             pkt.staticBatchCount = static_cast<uint32_t>(pkt.batches.size());
+            
 
             // ========== ANIMATED INSTANCES ==========
 
@@ -345,6 +347,7 @@ namespace aveng {
                 }
             };
 
+
             // Build animated portion
             if (opt.preferInstancesInOrder) {
                 if (anim.instancesInOrder && !anim.instancesInOrder->empty()) {
@@ -360,6 +363,7 @@ namespace aveng {
             // Record animated delineation
             pkt.animatedInstanceCount = static_cast<uint32_t>(pkt.drawList.size()) - pkt.staticInstanceCount;
             pkt.animatedBatchCount = static_cast<uint32_t>(pkt.batches.size()) - pkt.staticBatchCount;
+            
 
             // ========== POST-PROCESSING ==========
 
@@ -368,45 +372,46 @@ namespace aveng {
             for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
                 auto& b = pkt.batches[i];
                 ModelMeta meta{};
+                std::cout << "counting bone base...\n";
                 if (modelQ_->isModelLoaded(b.modelId, meta) && meta.boneCount > 0) {
                     b.boneCount = meta.boneCount;
                     b.alignedInstanceCount = ((b.instanceCount + 31) / 32) * 32;
                     b.boneBaseOffset = boneBase;
                     boneBase += b.boneCount * b.alignedInstanceCount;
                 }
-            }
 
-            // Resize and fill nodeTransformData (boneBase is the total size needed)
-            pkt.nodeTransformData.resize(boneBase);
+                // Resize and fill nodeTransformData (boneBase is the total size needed)
+                pkt.nodeTransformData.resize(boneBase);
 
-            // Copy node transforms for each animated batch
-            for (uint32_t batchIdx = pkt.staticBatchCount; batchIdx < pkt.batches.size(); ++batchIdx) {
-                const DrawBatch& b = pkt.batches[batchIdx];
-                if (b.boneCount == 0) continue;
+                // Copy node transforms for each animated batch
+                for (uint32_t batchIdx = pkt.staticBatchCount; batchIdx < pkt.batches.size(); ++batchIdx) {
+                    const DrawBatch& b = pkt.batches[batchIdx];
+                    if (b.boneCount == 0) continue;
 
-                // Copy each instance's node transforms
-                for (uint32_t i = 0; i < b.instanceCount; ++i) {
-                    const AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
-                    AnimatedHandle h = std::get<AnimatedHandle>(ah);
+                    // Copy each instance's node transforms
+                    for (uint32_t i = 0; i < b.instanceCount; ++i) {
+                        const AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
+                        AnimatedHandle h = std::get<AnimatedHandle>(ah);
 
-                    auto boneSpan = animSlots[h.index].instance->getNodeTransformData();
-                    std::copy(
-                        boneSpan.begin(),
-                        boneSpan.end(),
-                        pkt.nodeTransformData.begin() + (b.boneBaseOffset + i * b.boneCount)
-                    );
-                }
+                        auto boneSpan = animSlots[h.index].instance->getNodeTransformData();
+                        std::copy(
+                            boneSpan.begin(),
+                            boneSpan.end(),
+                            pkt.nodeTransformData.begin() + (b.boneBaseOffset + i * b.boneCount)
+                        );
+                    }
 
-                // Pad remaining slots up to alignedInstanceCount
-                const NodeTransformData identityTrs{
-                    glm::vec4(0.0f),
-                    glm::vec4(1.0f),
-                    glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
-                };
+                    // Pad remaining slots up to alignedInstanceCount
+                    const NodeTransformData identityTrs{
+                        glm::vec4(0.0f),
+                        glm::vec4(1.0f),
+                        glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+                    };
 
-                for (uint32_t i = b.instanceCount; i < b.alignedInstanceCount; ++i) {
-                    for (uint32_t bone = 0; bone < b.boneCount; ++bone) {
-                        pkt.nodeTransformData[b.boneBaseOffset + i * b.boneCount + bone] = identityTrs;
+                    for (uint32_t i = b.instanceCount; i < b.alignedInstanceCount; ++i) {
+                        for (uint32_t bone = 0; bone < b.boneCount; ++bone) {
+                            pkt.nodeTransformData[b.boneBaseOffset + i * b.boneCount + bone] = identityTrs;
+                        }
                     }
                 }
             }

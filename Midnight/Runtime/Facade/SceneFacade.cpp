@@ -233,6 +233,7 @@ namespace aveng {
         // Ignore validated_ map per your request.
         // We treat modelQuery_ as the single source of truth.
         ModelMeta m{};
+        std::cout << "Validating Model...\n";
         if (!modelQuery_.isModelLoaded(id, m)) {
             return std::nullopt;
         }
@@ -254,6 +255,7 @@ namespace aveng {
 
         // Validate modelId is actually loaded (and get authoritative meta if you want).
         ModelMeta m{};
+        std::cout << "Spawn...\n";
         if (!modelQuery_.isModelLoaded(modelRef.id, m)) {
             if (cfg_.failSoft) return AnyInstanceHandle{};
             assert(false && "SceneFacade::spawn: model id not loaded");
@@ -285,6 +287,7 @@ namespace aveng {
 
         // Validate modelId is actually loaded (and get authoritative meta if you want).
         ModelMeta m{};
+        std::cout << "Spawn Animated...\n";
         if (!modelQuery_.isModelLoaded(modelRef.id, m)) {
             if (cfg_.failSoft) return AnyInstanceHandle{};
             assert(false && "SceneFacade::spawn: model id not loaded");

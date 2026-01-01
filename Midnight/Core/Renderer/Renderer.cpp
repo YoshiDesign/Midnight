@@ -124,6 +124,7 @@ namespace aveng {
 	void Renderer::initialize() {
 		initializePointLights();
 
+		/* framePacketBuilder_ dependencies */
 		framePacketBuilder_.setModelQuery(&modelQuery_);
 		framePacketBuilder_.setFramesInFlight(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
