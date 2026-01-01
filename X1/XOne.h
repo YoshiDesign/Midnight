@@ -9,7 +9,7 @@
 #include "System/Peripheral/KeyboardController.h"
 #include "Runtime/Play/PlayManager.h"
 #ifdef ENABLE_EDITOR
-#include "Editor.h"
+#include "Editor/Editor.h"
 #endif
 
 namespace xone {

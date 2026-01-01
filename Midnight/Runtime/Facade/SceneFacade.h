@@ -30,7 +30,7 @@ namespace aveng {
 
 	/* */
 	class SceneFacade final
-		: public IModelLibrary, IInstanceQuery, IRenderSceneView
+		: public IModelLibrary, public IInstanceQuery, public IRenderSceneView
 	{
 
 	public:
@@ -46,7 +46,7 @@ namespace aveng {
 		};
 
 		/// TODO
-		// ----- Hot-path, typed APIs -----
+		// ----- Hot-path, typed APIs - TODO define these when you're working on a game -----
 		//void setTransform(StaticHandle h, const InstanceTransform& it);
 		//void setTransform(AnimatedHandle h, const InstanceTransform& it);
 
@@ -58,9 +58,8 @@ namespace aveng {
 		//void deleteInstance(AnimatedHandle h);
 		/// TODO
 
-
 		const IModelQuery& modelQuery() const override;
-		/* IRenderSceneView - Used by Renderer to feed FramePacketBuilder::build() with instanceManager pools */
+		/* FramePacketBuilder Pool Views */
 		FramePacketBuilder::PoolInputs<StaticTag, AvengInstance>
 			staticPoolInputs() const override { return staticMgr_.poolInputs(); }
 		FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance>
@@ -76,10 +75,9 @@ namespace aveng {
 		bool isAlive(AnyInstanceHandle h) const override;
 
 		/* IModelLibrary overrides */
-		ModelRef getOrLoadModel(const AssetKey& key) override;
-		bool    unloadModel(const AssetKey& key) override;
-		const AvengModel* pModel(ModelId id) override;
-
+		ModelRef getOrLoadModel(const AssetKey& key) override;	// Load a model or retrieve a ref to it
+		bool    unloadModel(const AssetKey& key) override;		// Queue a model for unloading next frame
+		const AvengModel* pModel(ModelId id) const override;	// ptr to model
 
 		/* Instance Op's - 1 overload for each kind of data an instance can consume - Static vs Animated becomes implicit */
 		AnyInstanceHandle spawn(ModelRef modelRef, const TransformSettings& s);
@@ -99,10 +97,10 @@ namespace aveng {
 		/* dIE */
 		void destroy(AnyInstanceHandle h);
 		void destroyMany(std::span<const AnyInstanceHandle> handles);
-		void destroyAllInstancesForModel(ModelId id);
+		void destroyAllInstancesForModel(ModelId id); /* This is also a callback registered on the ModelLibrary */
 
-		/* This is a callback registered on the ModelLibrary */
-		bool purgeAllInstancesForModel(ModelId id);
+		
+		/// TODO bool purgeAllInstancesForModel(ModelId id);
 
 		/* Transform Ops */
 		void setTransforms(

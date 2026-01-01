@@ -1,7 +1,6 @@
 #pragma once
 
 #include "avpch.h"
-#include "Utils/glm_includes.h"
 #include "Utils/AssetResolution.h"
 #include "Core/Modeling/AssimpNode.h"
 #include "Core/Modeling/AssimpMesh.h"
@@ -69,7 +68,7 @@ namespace aveng {
 		std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
 
 		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex);
-		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex) const;
+		const VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex) const;
 		glm::mat4 getRootTranformationMatrix();
 		bool hasAnimations();
 		unsigned int getTriangleCount();
@@ -82,9 +81,6 @@ namespace aveng {
 		std::string path; 
 
 	private:
-
-		//void createVertexBuffers(const std::vector<Vertex>& vertices);
-		//void createIndexBuffers(const std::vector<uint32_t>& indices);
 
 		EngineDevice& engineDevice;
 		bool hasIndexBuffer = false;
@@ -128,7 +124,6 @@ namespace aveng {
 
 		
 		*/
-
 
 		glm::mat4 mRootTransformMatrix = glm::mat4(1.0f);
 

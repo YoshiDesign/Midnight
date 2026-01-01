@@ -44,14 +44,6 @@ namespace aveng {
         void processPendingModelLoads();
         void processPendingUnloads();
 
-        inline ModelRef makeModelRef(const ModelEntry& e)
-        {
-            return ModelRef{
-                e.id,
-                e.isAnimated
-            };
-        }
-
         // ---- Query accessors ----
         const IModelQuery& query() const noexcept {
             return registry_;

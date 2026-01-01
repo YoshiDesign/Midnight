@@ -4,7 +4,7 @@
 #include "Game/Instance/HolyShip.h"
 #include "Game/Instance/Starfield.h"
 #ifdef ENABLE_EDITOR
-#include "EditorData.h"
+#include "Editor/EditorData.h"
 #endif
 
 namespace xone {
@@ -21,10 +21,7 @@ namespace xone {
 		});
 	}
 
-	XOne::XOne()
-	{
-		// objectRenderSystem.initialize();
-	}
+	XOne::XOne() {}
 
 	void XOne::run()
 	{
@@ -36,7 +33,8 @@ namespace xone {
 		/* We need one camera to be active at all times, this is technically a limitation */
 		auto player_camera = std::make_unique<aveng::PlayerCamera>();
 		player_camera_id = midnight.registerCamera("player_camera", std::move(player_camera));
-		// Note: Editor will take precedence if enabled
+
+		// Note: Editor will take precedence when it's enabled
 		midnight.setActiveCamera(player_camera_id);
 
 		// "Yo, Tank..."
@@ -69,8 +67,6 @@ namespace xone {
 
 			midnight.updateCamera(frameTime);
 			midnight.render(frameTime);
-
-			// objectRenderSystem.render(frameTime);
 
 			// Calculate time between frames
 			loopEndTime = std::chrono::steady_clock::now();

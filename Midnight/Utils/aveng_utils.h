@@ -23,9 +23,10 @@ namespace aveng {
 		return true;
 	}
 
-	auto ensureSize = [](std::vector<glm::vec2>& v, size_t n) {
+	inline void ensureSize(std::vector<glm::vec2>& v, size_t n) {
 		if (v.size() != n) v.resize(n);
-	};
+	}
+
 
 	//size_t pad_uniform_buffer_size(size_t originalSize, VkDeviceSize minUniformBufferOffsetAlignment)
 	//{

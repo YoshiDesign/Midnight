@@ -2,17 +2,23 @@
 #ifdef ENABLE_EDITOR
 #include "Editor/Editor.h"
 #endif
+#include "Core/Modeling/ModelAndInstanceData.h"
 #include "Core/Renderer/Renderer.h"
+#include "Services/IRenderSceneView.h"
 #include <cassert>
 
 namespace aveng {
 
 	AvengFrame::AvengFrame(Renderer& renderer,
+		const IRenderSceneView& sceneView,
+		const IModelLibrary& modelLib,
 		VkRenderData& renderData,
 		GameData& gameData,
 		EngineDevice& engineDevice,
 		Editor* editor)
 		: renderer{ renderer }
+		, sceneView_{ sceneView }
+		, modelLib_{ modelLib }
 		, renderData{ renderData }
 		, gameData { gameData }
 		, engineDevice{ engineDevice }
@@ -29,15 +35,15 @@ namespace aveng {
 
 	int AvengFrame::currentFrameIndex() { return renderer.getFrameIndex(); }
 
-	bool AvengFrame::render(const IModelLibrary& modelLib, float deltaTime)
+	bool AvengFrame::render(float deltaTime)
 	{
 
 		// Clear the vector of buffers we'll be submitting to the graphics queue
 		commandBuffers.clear();
 
 		// Load new models if any are pending. Side-Effect: Creates descriptor sets for this model
-		renderer.processPendingModelLoads();
-		// TODO: Implement processPendingModelUnloads
+		/// TODO renderer.processPendingModelLoads();
+		/// TODO Implement processPendingModelUnloads
 
 		// Wait for fences, vkAcquireNextImageKH
 		if (!renderer.beginFrame())
@@ -67,7 +73,7 @@ namespace aveng {
 		* Update Model Buffer Data - Does not record commands
 		* Side-effects: Buffers resizes cause descriptor sets to update
 		*/
-		renderer.draw(sceneView, modelLib, deltaTime);
+		renderer.draw(sceneView_, modelLib_, deltaTime);
 
 #ifdef ENABLE_EDITOR
 		if (gameData.currentAppMode == AppMode::Editor) {
@@ -128,7 +134,7 @@ namespace aveng {
 			pEditor->updateLights();
 
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
-			pEditor->drawModels(currentFrameIndex); 
+			pEditor->drawModels(modelLib_, currentFrameIndex); 
 			
 		}
 		else {
@@ -137,7 +143,7 @@ namespace aveng {
 			renderer.updateLights();
 
 			renderer.drawModels(
-				modelLib,
+				modelLib_,
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
 				renderData.rdAvengAnimationPipeline,

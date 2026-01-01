@@ -45,9 +45,6 @@
     <ClCompile Include="Game\Instance\Starfield.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="System\FramePacketBuilder.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XOne.h">
@@ -93,9 +90,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Instance\Starfield.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="System\FramePacketBuilder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

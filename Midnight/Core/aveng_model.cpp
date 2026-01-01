@@ -498,7 +498,7 @@ namespace aveng {
 	VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) {
 		return mMatrixMultPerModelDescriptorSets[frameIndex];
 	}
-	VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) const {
+	const VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) const {
 		return mMatrixMultPerModelDescriptorSets[frameIndex];
 	}
 

@@ -31,16 +31,19 @@ namespace aveng {
 		const IInstanceQuery& instQ
 		)
 		: 
-		renderData{ _renderData }, 
-		renderer{ _renderer }, 
-		gameData{ _gameData }, 
-		engineDevice{ _engineDevice }, 
-		window{ window }, 
-		cameraManager{ _cameraManager },
-		scene_{ _sceneFacade },
-		modelQ_{ modelQ },
-		animQ_{ animQ },
-		instQ_{ instQ } 
+		 renderData{ _renderData }
+		, renderer{ _renderer }
+		, gameData{ _gameData }
+		, engineDevice{ _engineDevice }
+		, window{ window }
+		, cameraManager{ _cameraManager }
+		, scene_{ _sceneFacade }
+		, modelQ_{ modelQ }
+		, animQ_{ animQ }
+		, instQ_{ instQ }
+		, sceneEdit_{ _sceneFacade }
+		, aveng_imgui{ renderData, sceneEdit_, editorData, window, engineDevice} 
+		, pointLightSystem{ engineDevice, renderData }
 	{
 
 		// Register a camera
@@ -208,13 +211,13 @@ namespace aveng {
 
 			// selectedInstanceId += 1.0f;
 			//std::cout << "True: >= 0.0f - SelectedID\t" << selectedInstanceId << std::endl;
-			mModelInstanceData.miSelectedEditorInstance = static_cast<int>(selectedInstanceId);
+			/// TODO mModelInstanceData.miSelectedEditorInstance = static_cast<int>(selectedInstanceId);
 			editorData.eHasSelection = true;
 		}
 		else {
 			//std::cout << "False: SelectedID\t" << selectedInstanceId << std::endl;
 			// std::cout << "Deselecting instance " << mModelInstanceData.miSelectedEditorInstance << std::endl;
-			mModelInstanceData.miSelectedEditorInstance = 0;
+			/// TODO mModelInstanceData.miSelectedEditorInstance = 0;
 			editorData.eHasSelection = false;
 		}
 
@@ -366,6 +369,7 @@ namespace aveng {
 				return false;
 			}
 		}
+		return true;
 	}
 
 	/*
@@ -389,13 +393,13 @@ namespace aveng {
 		// Selection Data - Q: Does this need to be cleared every frame as it is now?
 		editorData.eSelectedInstance.clear();
 		// Q: Why is eSelectedInstance the size of all instances? A: As we iterate over instances, the selected one is set at that same index
-		editorData.eSelectedInstance.resize(mModelInstanceData.miAssimpInstances.size());
+		/// TODO editorData.eSelectedInstance.resize(mModelInstanceData.miAssimpInstances.size());
 
 		// The actual instance we're selecting
-		editorData.eCurrentSelectedInstance = nullptr;
+		/// TODO editorData.eCurrentSelectedInstance = nullptr;
 		if (editorData.eHighlightSelectedInstance) {
 
-			editorData.eCurrentSelectedInstance = &mModelInstanceData.miAssimpInstances[mModelInstanceData.miSelectedEditorInstance];
+			/// TODO editorData.eCurrentSelectedInstance = &mModelInstanceData.miAssimpInstances[mModelInstanceData.miSelectedEditorInstance];
 			editorData.eSelectHighlightValue += dt * 4.0f;
 
 			if (editorData.eSelectHighlightValue > 2.0f) {
@@ -472,54 +476,55 @@ namespace aveng {
 		}
 
 		// Loop through every model and its instances
-		for (const auto& model : mModelInstanceData.miModelList) {
-			size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
+		/// TODO
+		//for (const auto& model : mModelInstanceData.miModelList) {
+		//	size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
 
-			// If this model has geometry (it's not a "null" instance)
-			if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
-			{
+		//	// If this model has geometry (it's not a "null" instance)
+		//	if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
+		//	{
 
-				// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
-				//if (numberOfInstances > 0) 
-				//{
-				// Iterate through its instances
-				int instIndex = 0;
-				// for (unsigned int i = 0; i < numberOfInstances; ++i) {
-				for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
-					
-					// Safety: Bounds check before access
-					size_t accessIndex = instanceToStore + instIndex;
-					if (accessIndex >= editorData.eSelectedInstance.size()) {
-						Logger::log(1, "%s warning: index %zu out of bounds (size: %zu), skipping\n",
-							__FUNCTION__, accessIndex, editorData.eSelectedInstance.size());
-						instIndex++;
-						continue;  // Skip this instance
-					}
+		//		// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
+		//		//if (numberOfInstances > 0) 
+		//		//{
+		//		// Iterate through its instances
+		//		int instIndex = 0;
+		//		// for (unsigned int i = 0; i < numberOfInstances; ++i) {
+		//		for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
+		//			
+		//			// Safety: Bounds check before access
+		//			size_t accessIndex = instanceToStore + instIndex;
+		//			if (accessIndex >= editorData.eSelectedInstance.size()) {
+		//				Logger::log(1, "%s warning: index %zu out of bounds (size: %zu), skipping\n",
+		//					__FUNCTION__, accessIndex, editorData.eSelectedInstance.size());
+		//				instIndex++;
+		//				continue;  // Skip this instance
+		//			}
 
-					// This is our currently selected instance
-					if (editorData.eCurrentSelectedInstance == instance) 
-					{
-						// []eSelectedInstance.x gets the blinking color value
-						editorData.eSelectedInstance.at(instanceToStore + instIndex).x = editorData.eSelectHighlightValue; // The blinking color
-					} else {
-						// []eSelectedInstance.x gets a standard value
-						editorData.eSelectedInstance.at(instanceToStore + instIndex).x = 1.0f; // color is unchanged
-					}
+		//			// This is our currently selected instance
+		//			if (editorData.eCurrentSelectedInstance == instance) 
+		//			{
+		//				// []eSelectedInstance.x gets the blinking color value
+		//				editorData.eSelectedInstance.at(instanceToStore + instIndex).x = editorData.eSelectHighlightValue; // The blinking color
+		//			} else {
+		//				// []eSelectedInstance.x gets a standard value
+		//				editorData.eSelectedInstance.at(instanceToStore + instIndex).x = 1.0f; // color is unchanged
+		//			}
 
-					// Set the buffer's y - TODO - This probably can be uncommented(?)
-					//if (editorData.eMousePick || editorData.eHasSelection) 
-					//{
-						InstanceSettings instSettings = instance->getInstanceSettings();
-						// This isInstanceIndexPosition should match the shader's gl_InstanceIndex
-						editorData.eSelectedInstance.at(instanceToStore + instIndex).y = static_cast<float>(instSettings.isInstanceIndexPosition);
-					//}
+		//			// Set the buffer's y - TODO - This probably can be uncommented(?)
+		//			//if (editorData.eMousePick || editorData.eHasSelection) 
+		//			//{
+		//				InstanceSettings instSettings = instance->getInstanceSettings();
+		//				// This isInstanceIndexPosition should match the shader's gl_InstanceIndex
+		//				editorData.eSelectedInstance.at(instanceToStore + instIndex).y = static_cast<float>(instSettings.isInstanceIndexPosition);
+		//			//}
 
-					instIndex++;
-				}
-				//}
-				instanceToStore += numberOfInstances;
-			}
-		}
+		//			instIndex++;
+		//		}
+		//		//}
+		//		instanceToStore += numberOfInstances;
+		//	}
+		//}
 	}
 
 	bool Editor::drawInstanceGizmo() {
@@ -529,41 +534,42 @@ namespace aveng {
 		/* draw coordinate lines */
 		mCoordArrowsLineIndexCount = 0;
 		mLineMesh->vertices.clear();
-		if (mModelInstanceData.miSelectedEditorInstance > 0) { // Instance 0 is the null instance
+		/// TODO
+		//if (mModelInstanceData.miSelectedEditorInstance > 0) { // Instance 0 is the null instance
 
-			if (mModelInstanceData.miSelectedEditorInstance >= mModelInstanceData.miAssimpInstances.size()) {
-				Logger::log(1, "%s[INVALID GIZMO INDEX]\n", __FUNCTION__);
-				throw std::runtime_error("Bye");
-			}
+		//	if (mModelInstanceData.miSelectedEditorInstance >= mModelInstanceData.miAssimpInstances.size()) {
+		//		Logger::log(1, "%s[INVALID GIZMO INDEX]\n", __FUNCTION__);
+		//		throw std::runtime_error("Bye");
+		//	}
 
-			InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(mModelInstanceData.miSelectedEditorInstance)->getInstanceSettings();
+		//	InstanceSettings instSettings = mModelInstanceData.miAssimpInstances.at(mModelInstanceData.miSelectedEditorInstance)->getInstanceSettings();
 
-			/* draw coordiante arrows at origin of selected instance */
-			switch (renderData.rdInstanceEditMode) {
-			case instanceEditMode::move:
-				mCoordArrowsMesh = mCoordArrowsModel.getVertexData();
-				break;
-			case instanceEditMode::rotate:
-				mCoordArrowsMesh = mRotationArrowsModel.getVertexData();
-				break;
-			case instanceEditMode::scale:
-				mCoordArrowsMesh = mScaleArrowsModel.getVertexData();
-				break;
-			}
+		//	/* draw coordiante arrows at origin of selected instance */
+		//	switch (renderData.rdInstanceEditMode) {
+		//	case instanceEditMode::move:
+		//		mCoordArrowsMesh = mCoordArrowsModel.getVertexData();
+		//		break;
+		//	case instanceEditMode::rotate:
+		//		mCoordArrowsMesh = mRotationArrowsModel.getVertexData();
+		//		break;
+		//	case instanceEditMode::scale:
+		//		mCoordArrowsMesh = mScaleArrowsModel.getVertexData();
+		//		break;
+		//	}
 
-			mCoordArrowsLineIndexCount += mCoordArrowsMesh.vertices.size();
+		//	mCoordArrowsLineIndexCount += mCoordArrowsMesh.vertices.size();
 
-			// Set to the selected model's position/origin
-			std::for_each(mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end(),
-				[=](auto& n) {
-				n.color /= 2.0f;
-				n.position = glm::quat(glm::radians(instSettings.isWorldRotation)) * n.position;
-				n.position += instSettings.isWorldPosition;
-			});
+		//	// Set to the selected model's position/origin
+		//	std::for_each(mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end(),
+		//		[=](auto& n) {
+		//		n.color /= 2.0f;
+		//		n.position = glm::quat(glm::radians(instSettings.isWorldRotation)) * n.position;
+		//		n.position += instSettings.isWorldPosition;
+		//	});
 
-			mLineMesh->vertices.insert(mLineMesh->vertices.end(),
-				mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end());
-		}
+		//	mLineMesh->vertices.insert(mLineMesh->vertices.end(),
+		//		mCoordArrowsMesh.vertices.begin(), mCoordArrowsMesh.vertices.end());
+		//}
 
 		if (mCoordArrowsLineIndexCount > 0) {
 
@@ -604,9 +610,7 @@ namespace aveng {
 				Logger::log(1, "%s error: failed to end line drawing command buffer\n", __FUNCTION__);
 				return false;
 			}
-
 			return true;
-
 		}
 
 		return false;
@@ -634,10 +638,11 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
-	void Editor::drawModels(int frameIndex)
+	void Editor::drawModels(const IModelLibrary& modelLib, int frameIndex)
 	{
 		//
 		renderer.drawModels(
+			modelLib,
 			renderData.rdCommandBuffersGraphics[frameIndex],
 			renderData.rdAvengSelectionPipeline,
 			renderData.rdAvengAnimationSelectionPipeline,

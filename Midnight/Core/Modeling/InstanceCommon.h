@@ -1,3 +1,4 @@
+#pragma once
 #include "avpch.h"
 #include "Core/Modeling/InstanceSettings.h"
 #include "Core/Modeling/ModelRegistry.h"

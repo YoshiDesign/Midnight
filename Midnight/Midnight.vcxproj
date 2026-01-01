@@ -185,6 +185,7 @@
     <ClCompile Include="Core\Input\InputSystem.cpp" />
     <ClCompile Include="Core\Midnight.cpp" />
     <ClCompile Include="Core\Modeling\AvengInstance.cpp" />
+    <ClCompile Include="Core\Modeling\ModelRegistry.cpp" />
     <ClCompile Include="Core\Modeling\Sources\FilesystemModelSource.cpp" />
     <ClCompile Include="Core\Modeling\Sources\PackModelSource.cpp" />
     <ClCompile Include="Core\PointLightSystem.cpp" />
@@ -204,6 +205,7 @@
     <ClCompile Include="Core\Modeling\AssimpNode.cpp" />
     <ClCompile Include="Core\Modeling\Tools.cpp" />
     <ClCompile Include="Core\Renderer\AvengFrame.cpp" />
+    <ClCompile Include="Core\Renderer\FramePacketBuilder.cpp" />
     <ClCompile Include="Core\Renderer\ModelLibrary.cpp" />
     <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp" />
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
@@ -261,6 +263,7 @@
     <ClInclude Include="Core\Modeling\ModelAndInstanceData.h" />
     <ClInclude Include="Core\Modeling\Tools.h" />
     <ClInclude Include="Core\Renderer\AvengFrame.h" />
+    <ClInclude Include="Core\Renderer\FramePacketBuilder.h" />
     <ClInclude Include="Core\Renderer\ModelLibrary.h" />
     <ClInclude Include="Core\Renderer\PipelineConfigManager.h" />
     <ClInclude Include="Core\Renderer\Renderer.h" />
@@ -272,7 +275,8 @@
     <ClInclude Include="Runtime\Play\IGameInstance.h" />
     <ClInclude Include="Runtime\Play\PlayManager.h" />
     <ClInclude Include="Runtime\World\InstanceManager.h" />
-    <ClInclude Include="Services\ModelServices.h" />
+    <ClInclude Include="Services\InstanceServices.h" />
+    <ClInclude Include="Services\IRenderSceneView.h" />
     <ClInclude Include="stb\stb_connected_components.h" />
     <ClInclude Include="stb\stb_c_lexer.h" />
     <ClInclude Include="stb\stb_divide.h" />

@@ -147,6 +147,12 @@
     <ClCompile Include="Core\Renderer\ModelLibrary.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Core\Renderer\FramePacketBuilder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Modeling\ModelRegistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1316,13 +1322,19 @@
     <ClInclude Include="Runtime\Facade\SceneFacade.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Services\ModelServices.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Renderer\ModelLibrary.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\Modeling\InstanceCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Services\InstanceServices.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Renderer\FramePacketBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Services\IRenderSceneView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

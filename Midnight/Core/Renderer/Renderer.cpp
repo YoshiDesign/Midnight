@@ -924,7 +924,7 @@ namespace aveng {
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeMatrixMultPipeline);
 
-		VkDescriptorSet& modelDescriptorSet = model->getMatrixMultDescriptorSet(currentFrameIndex);
+		const VkDescriptorSet& modelDescriptorSet = model->getMatrixMultDescriptorSet(currentFrameIndex);
 		std::vector<VkDescriptorSet> computeSets = { renderData.rdAvengComputeMatrixMultDescriptorSets.at(currentFrameIndex), modelDescriptorSet }; 
 		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeMatrixMultPipelineLayout, 0, static_cast<uint32_t>(computeSets.size()), computeSets.data(), 0, 0);
@@ -997,8 +997,8 @@ namespace aveng {
 				stat,
 				anim,
 				currentFrameIndex,
-				0 // tmp/unused frame number
-				// , opts
+				0, // tmp/unused frame number
+				FramePacketBuildOptions{} // opts
 			);
 
 		mUploadToUBOTimer.start();
@@ -1167,7 +1167,7 @@ namespace aveng {
 				// TODO: Replace with actual model registry lookup: modelRegistry_.get(b.modelId)
 				const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 				if (!model) continue;
-
+				
 				runComputeShaders(model, b.alignedInstanceCount, b.boneBaseOffset);
 			}
 

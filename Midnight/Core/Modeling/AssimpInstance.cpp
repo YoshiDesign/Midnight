@@ -3,8 +3,6 @@
 
 namespace aveng {
 
-    AssimpInstance::~AssimpInstance() {}
-
     AssimpInstance::AssimpInstance() {}
 
     void AssimpInstance::init(ModelId id, const ModelMeta& meta, const TransformSettings& ts, const AnimSettings& as) {
@@ -59,11 +57,14 @@ namespace aveng {
 
         /*
             Consider this: animation data is finally decoupled from the model after introducing IModelAnimQuery.
-            This creates a bottleneck, and in inefficient pattern, but it's ok for now.
+            This creates a bottleneck, and an inefficient pattern, but it's ok for now.
             There are several ways to improve this. Cacheing + SoA design
 
             This gets called every update because the animation clipNr could change to begin a different animation.
+
+            REMINDER: THIS METHOD IS NOT BEING CALLED ANYWHERE RIGHT NOW
         */
+
         if(!animQ.tryGetClipMeta(modelId_, anim.clipNr, animationMeta))
         {
             std::cout << "AssimpInstance::updateAnimation - Failed to retrieve clip meta\n";

@@ -194,6 +194,8 @@ namespace aveng {
 				// Move last into idx
 				registry_.models[idx] = std::move(registry_.models[last]);
 
+				/* could also have used std::swap to get around move semantics */
+
 				// Fix indexById for the moved entry
 				const ModelId movedId = registry_.models[idx].id; // assuming ModelEntry has id
 				registry_.indexById[movedId] = idx;

@@ -23,13 +23,13 @@ namespace aveng {
 			sceneFacade_.instanceQuery()
 		)
 		}
-		, editorInput_( std::make_unique<EditorInput>(*editor_) )
+		, editorInput_( std::make_unique<EditorInput>(editor_.get()) )
 		, inputRouter_( std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, *gameInput_) )
 		, inputSystem_( std::make_unique<InputSystem>(*inputRouter_, game_data))
 		, frame_(std::make_unique<AvengFrame>(
 			renderer,
-			sceneFacade_,
-			modelLib_,
+			sceneFacade_, /// Interface
+			modelLib_, /// Interface
 			renderData,
 			game_data,
 			engineDevice,
@@ -40,8 +40,8 @@ namespace aveng {
 		, inputSystem_(std::make_unique<InputSystem>(*gameInput_, game_data))
 		, frame_(std::make_unique<AvengFrame>(
 			renderer,
-			sceneFacade_,
-			modelLib_,
+			sceneFacade_, /// Interface
+			modelLib_, /// Interface
 			renderData,
 			game_data,
 			engineDevice,
@@ -56,7 +56,8 @@ namespace aveng {
 	void Midnight::render(float frameTime) {
 
 #ifdef ENABLE_EDITOR
-		updateGUI(inputState());
+		// Give ImGUI the latest input state
+		updateGUI(inputState()); 
 		if (game_data.modeSwitchRequested)
 		{
 			game_data.currentAppMode = game_data.requestedMode;

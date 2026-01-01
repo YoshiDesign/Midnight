@@ -1,11 +1,9 @@
 #pragma once
+
+#include "avpch.h"
 #include "CoreVK/VkRenderData.h"
-#include "Utils/window_callbacks.h"
-#include "Utils/Timer.h"
-#include "Game/data.h"
-#include "Runtime/Facade/SceneFacade.h"
+#include "Editor/EditorData.h"
 #include "Core/Input/InputState.h"
-#include "Utils/glm_includes.h"
 #include "GUI/imgui.h"
 #include "GUI/imgui_impl_glfw.h"
 #include "GUI/imgui_impl_vulkan.h"
@@ -13,18 +11,15 @@
 #include "GUI/models/CoordArrowsModel.h"
 #include "GUI/models/RotationArrowsModel.h"
 #include "GUI/models/ScaleArrowsModel.h"
-#include "Editor/EditorData.h"
-
+#include "Utils/Timer.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
-
-// std
-#include <stdexcept>
 
 namespace aveng {
 
     class EngineDevice;
     class AvengWindow;
-    class InputState;
+    class SceneEditAPI;
+    struct InputState;
 
 	static void check_vk_result(VkResult err) {
 		if (err == 0) return;
@@ -38,11 +33,10 @@ namespace aveng {
 
 		AvengImgui(
             VkRenderData& _renderData, 
-            GameData& _gameData, 
+            SceneEditAPI& api_,
             EditorData& editorData, 
             AvengWindow& _window, 
-            EngineDevice& _engineDevice, 
-            SceneFacade& scene);
+            EngineDevice& _engineDevice);
 
 		~AvengImgui();
 
@@ -64,13 +58,12 @@ namespace aveng {
 	private:
 		// EngineDevice& device;
 		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        InputState inputState;
 		VkRenderData& renderData;
-		GameData& gameData;
 		EngineDevice& engineDevice;
         AvengWindow& window;
         EditorData& editorData;
-        InputState inputState;
-        SceneFacade& scene_;
+        SceneEditAPI& api_;
 
         VkRenderPass mSelectionRenderpass = VK_NULL_HANDLE;
         VkRenderPass mLineRenderpass = VK_NULL_HANDLE;

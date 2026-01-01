@@ -8,9 +8,6 @@
 */
 namespace aveng {
 
-
-	ModelEntry::~ModelEntry() = default;
-
 	const ModelEntry* ModelRegistryData::get(ModelId id) const {
 		std::cout << "ModelEntry::get(): " << id << std::endl;
 		auto it = indexById.find(id);
@@ -65,6 +62,26 @@ namespace aveng {
 		out.boneCount = e->boneCount;
 		out.animated = e->isAnimated;
 		return true;
+	}
+
+	const std::unordered_map<AssetKey, ModelId> ModelRegistryData::mapModels() const {
+		return idByKey;
+	}
+
+	const std::vector<ModelRef> ModelRegistryData::listModels() const {
+		std::vector<ModelRef> refs;
+		for (const auto& entry : models) {
+			refs.emplace_back(makeModelRef(entry));
+		}
+		return refs;
+	}
+
+	const std::vector<AssetKey> ModelRegistryData::listModelKeys() const {
+		std::vector<AssetKey> keys;
+		for (const auto& entry : models) {
+			keys.push_back(entry.key);
+		}
+		return keys;
 	}
 
 }

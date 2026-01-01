@@ -160,7 +160,6 @@
     <ClCompile Include="Game\Math\aveng_math.cpp" />
     <ClCompile Include="Game\Player\GameplayFunctions.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="System\FramePacketBuilder.cpp" />
     <ClCompile Include="System\Peripheral\Controller.cpp" />
     <ClCompile Include="System\Peripheral\KeyboardController.cpp" />
     <ClCompile Include="XOne.cpp" />
@@ -175,7 +174,6 @@
     <ClInclude Include="Game\Player\Action.h" />
     <ClInclude Include="Game\Player\Command.h" />
     <ClInclude Include="Game\Player\GameplayFunctions.h" />
-    <ClInclude Include="System\FramePacketBuilder.h" />
     <ClInclude Include="System\Peripheral\Controller.h" />
     <ClInclude Include="System\Peripheral\KeyboardController.h" />
     <ClInclude Include="Utils\threadpool.h" />

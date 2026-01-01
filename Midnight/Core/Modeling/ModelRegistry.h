@@ -18,7 +18,16 @@ namespace aveng {
 		uint32_t boneCount;				// Model Constant
 		glm::mat4 rootTransform{1.f};	// Model Constant
 
-		~ModelEntry();
+		ModelEntry() = default;
+
+		/* Explicit Move Semantics - so we can reorganize index/key storage */
+		ModelEntry(const ModelEntry&) = delete;
+		ModelEntry& operator=(const ModelEntry&) = delete;
+
+		ModelEntry(ModelEntry&&) noexcept = default;
+		ModelEntry& operator=(ModelEntry&&) noexcept = default;
+
+		~ModelEntry() = default;
 	};
 
 	// This is public for callers who create models - 
@@ -45,6 +54,14 @@ namespace aveng {
 		bool      animated = false;
 	};
 
+	inline ModelRef makeModelRef(const ModelEntry& e)
+	{
+		return ModelRef{
+			e.id,
+			e.isAnimated
+		};
+	}
+
 	struct IModelLibrary {
 		virtual ~IModelLibrary() = default;
 		virtual ModelRef getOrLoadModel(const AssetKey& key) = 0;
@@ -63,6 +80,12 @@ namespace aveng {
 		virtual bool isModelAnimated(ModelId id, ModelMeta& out) const = 0;
 
 		virtual bool tryGetModelMeta(ModelId id, ModelMeta& out) const = 0;
+
+		virtual const std::unordered_map<AssetKey, ModelId> mapModels() const = 0;
+
+		virtual const std::vector<ModelRef> listModels() const = 0;
+		
+		virtual const std::vector<AssetKey> listModelKeys() const = 0;
 	};
 
 	struct IModelAnimQuery {
@@ -71,7 +94,6 @@ namespace aveng {
 		// Should derive duration, ticks, channels, channel size, etc...
 		virtual bool tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const = 0;
 	};
-
 
 	/* The ModelDB - Note: Don't ever template a class that inherits virtual interfaces */
 	struct ModelRegistryData final : public IModelAnimQuery, public IModelQuery {
@@ -90,6 +112,9 @@ namespace aveng {
 		bool isModelAnimated(ModelId id, ModelMeta& out) const override;
 		bool isModelLoaded(ModelId id, ModelMeta& out) const override;
 		bool tryGetModelMeta(ModelId id, ModelMeta& out) const override;
+		virtual const std::unordered_map<AssetKey, ModelId> mapModels() const override;
+		virtual const std::vector<ModelRef> listModels() const override;
+		virtual const std::vector<AssetKey> listModelKeys() const override;
 
 	};
 

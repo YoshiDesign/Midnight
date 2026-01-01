@@ -1,27 +1,29 @@
 #pragma once
 #include "CoreVK/VkRenderData.h"
 #include "Utils/glm_includes.h"
-#include "Core/Modeling/ModelAndInstanceData.h"
-#include "Services/IRenderSceneView.h"
 #include "Game/data.h"
 
 namespace aveng {
 	class Renderer;
 	class Editor;
 	class EngineDevice;
+	struct VkRenderData;
+	struct IRenderSceneView;
+	struct IModelLibrary;
 
 	class AvengFrame {
 
 	public:
-		AvengFrame(Renderer& renderer,
+		AvengFrame(
+			Renderer& renderer,
 			const IRenderSceneView& sceneView,
-			const IModelLibrary& modelLib_, // used to get Model pointers to the renderer, *for now*
+			const IModelLibrary& modelLib, // used to get Model pointers to the renderer, *for now*
 			VkRenderData& renderData,
 			GameData& gameData,
 			EngineDevice& engineDevice,
 			Editor* editor = nullptr);
 
-		bool render(const IModelLibrary& modelLib_, float deltaTime);
+		bool render(float deltaTime);
 		int currentFrameIndex();
 
 #ifdef ENABLE_EDITOR
@@ -30,6 +32,9 @@ namespace aveng {
 #endif
 
 	private:
+		const IModelLibrary& modelLib_;
+		const IRenderSceneView& sceneView_;
+
 		std::vector<VkCommandBuffer> commandBuffers;
 		bool drawGizmo = false;
 		VkResult result;

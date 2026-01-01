@@ -17,7 +17,8 @@ namespace aveng {
         std::vector<AnyInstanceHandle> selectedMany; // For future reference
         int selectedEditorInstance = 0;
         // AssimpInstance* eCurrentSelectedInstance = nullptr;
-        AnyInstanceHandle selectedInstance{};
+        AnyInstanceHandle selectedInstanceHandle{};
+        int selectedModelIndex = 0;
         bool highlight = false;
         float blink = 0.1f;
 

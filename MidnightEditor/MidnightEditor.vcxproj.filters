@@ -39,7 +39,7 @@
     <ClCompile Include="GUI\imgui_widgets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Editor.cpp">
+    <ClCompile Include="Editor\Editor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="GUI\ImGuiFileDialog.cpp">
@@ -54,7 +54,10 @@
     <ClCompile Include="GUI\models\ScaleArrowsModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="EditorCamera.cpp">
+    <ClCompile Include="Editor\EditorCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Editor\API\SceneEditAPI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -86,7 +89,7 @@
     <ClInclude Include="GUI\imstb_truetype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Editor.h">
+    <ClInclude Include="Editor\Editor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GUI\ImGuiFileDialog.h">
@@ -107,10 +110,16 @@
     <ClInclude Include="GUI\models\ScaleArrowsModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="EditorData.h">
+    <ClInclude Include="Editor\EditorData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="EditorCamera.h">
+    <ClInclude Include="Editor\EditorCamera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Editor\API\IEditorUIAPI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Editor\API\SceneEditAPI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

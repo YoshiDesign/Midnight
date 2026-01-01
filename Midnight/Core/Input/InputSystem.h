@@ -2,7 +2,7 @@
 #include "Core/Input/IInputHandler.h"
 #include "Core/Input/InputState.h"
 #include "Game/data.h"
-#include "Editor.h"
+#include "Editor/Editor.h"
 
 namespace aveng {
 	

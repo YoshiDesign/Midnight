@@ -217,7 +217,7 @@ namespace aveng {
         return ok;
     }
 
-    const AvengModel* SceneFacade::pModel(ModelId id) { return modelLib_.pModel(id); }
+    const AvengModel* SceneFacade::pModel(ModelId id) const { return modelLib_.pModel(id); }
 
     void SceneFacade::destroyAllInstancesForModel(ModelId mid)
     {
@@ -576,6 +576,7 @@ namespace aveng {
         }
     }
     
+    /// Good to know - the frontend can present a congruent type.
     // Overload in case you have hot code and would like to 
     // skip the conversion from TransformSettings -> InstanceTransform
     void SceneFacade::setTransforms(
@@ -630,7 +631,7 @@ namespace aveng {
         }
     }
 
-    const IModelQuery& SceneFacade::modelQuery() { return modelQuery_; }
+    const IModelQuery& SceneFacade::modelQuery() const { return modelQuery_; }
 
     /*
     * This pattern scales cleanly
@@ -645,7 +646,7 @@ namespace aveng {
         No changes to gameplay code that already uses typed handles.
     */
 
-    /// TODO
+    /// TODO - with typed handles
     //void SceneFacade::setTransform(StaticHandle h, const InstanceTransform& it) {
     //    staticMgr_.setTransform(h, it);
     //}

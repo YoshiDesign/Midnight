@@ -1,9 +1,4 @@
 #include "aveng_imgui.h"
-
-#include <string>
-#include <limits>
-#include <filesystem>
-
 #include "CoreVK/EngineDevice.h"
 #include "Core/aveng_window.h"
 #include "Core/aveng_model.h"
@@ -11,7 +6,7 @@
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/Modeling/InstanceSettings.h"
 #include "CoreVK/VertexBuffer.h"
-#include "avpch.h"
+#include "Editor/API/SceneEditAPI.h"
 
 namespace aveng {
 
@@ -29,18 +24,16 @@ namespace aveng {
 
     AvengImgui::AvengImgui(
         VkRenderData& _renderData, 
-        GameData& _gameData, 
+        SceneEditAPI& api,
         EditorData& editorData, 
         AvengWindow& _window, 
-        EngineDevice& _engineDevice, 
-        SceneFacade& scene)
+        EngineDevice& _engineDevice)
         : 
         renderData{ _renderData }, 
-        gameData{ _gameData }, 
         editorData{ editorData }, 
         engineDevice { _engineDevice}, 
         window{ _window },
-        scene_{ scene }
+        api_{ api }
     {
         // Initialize all the timing vectors with their proper sizes
         mFPSValues.resize(mNumFPSValues, 0.0f);
@@ -267,19 +260,12 @@ namespace aveng {
 
             ImGui::Text(
                 "Last Click At: (%d, %d)", editorData.eMouseLastClickX, editorData.eMouseLastClickY);
-            ImGui::Text(
-                "App Mode: %s", (gameData.currentAppMode == AppMode::Editor) ? "Editor" : "Other");
 
             ImGui::Text(
                 "Camera Position:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.translation.x, editorData.cameraTransform.translation.y, editorData.cameraTransform.translation.z);
             ImGui::Text(
                 "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.rotation.x, editorData.cameraTransform.rotation.y, editorData.cameraTransform.rotation.z);
-            ImGui::Text(
-                "Player Position:\t(%.03lf, %.03lf, %.03lf)", gameData.playerPos.x, gameData.playerPos.y, gameData.playerPos.z);
-            ImGui::Text(
-                "Forward Direction:\t(%.03lf, %.03lf, %.03lf)", gameData.forwardDir.x, gameData.forwardDir.y, gameData.forwardDir.z);
 
-            ImGui::Text("GFX-Pipe:\t%d", gameData.cur_pipe);
             if (show_all_cameras) {
                 int i = 0;
                 ImGui::Text("_____________________________");
@@ -541,13 +527,15 @@ namespace aveng {
             }
 
             if (ImGui::CollapsingHeader("Models")) {
+                size_t nModels = api_.uiMapModels().size();
                 /* state is changed during model deletion, so save it first */
-                bool modelListEmtpy = modInstData.miModelList.size() == 1;
+                bool modelListEmtpy = nModels == 1; /// Accounting for null model?
                 std::string selectedModelName = "None";
 
                 /* Validate selected model index and reset if invalid */
                 if (!modelListEmtpy) {
-                    selectedModelName = modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str();
+                    /// Asset key for selected instance
+                    selectedModelName = api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str();
                 }
 
                 if (modelListEmtpy) {
@@ -561,11 +549,11 @@ namespace aveng {
                 if (ImGui::BeginCombo("##ModelCombo",
                     // avoid access the empty model vector
                     selectedModelName.c_str())) {
-                    for (int i = 1; i < modInstData.miModelList.size(); ++i) {
-                        const bool isSelected = (modInstData.miSelectedEditorModel == i);
-                        if (ImGui::Selectable(modInstData.miModelList.at(i)->getModelFileName().c_str(), isSelected)) {
-                            modInstData.miSelectedEditorModel = i;
-                            selectedModelName = modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str();
+                    for (int i = 1; i < nModels; ++i) {
+                        const bool isSelected = (editorData.selectedModelIndex == i);
+                        if (ImGui::Selectable(api_.uiListModelKeys().at(i).c_str(), isSelected)) {
+                            editorData.selectedModelIndex = i;
+                            selectedModelName = api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str();
                         }
 
                         if (isSelected) {
@@ -605,7 +593,7 @@ namespace aveng {
                         std::replace(filePathName.begin(), filePathName.end(), '\\', '/');
 
                                                             /* This is now the "AssetKey" */
-                        if (!modInstData.miModelAddCallbackFunction(filePathName)) {
+                        if (!api_.uiGetOrLoadModel(filePathName)) {
                             std::printf("%s error: unable to load model file '%s', unknown error \n", __FUNCTION__, filePathName.c_str());
                         }
                         else {
@@ -627,29 +615,30 @@ namespace aveng {
                 }
 
                 if (ImGui::BeginPopupModal("Delete Model?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                    ImGui::Text("Delete Model '%s'?", modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str());
+                    ImGui::Text("Delete Model '%s'?", api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str());
 
                     /* cheating a bit to get buttons more to the center */
                     ImGui::Indent();
                     ImGui::Indent();
                     if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                        modInstData.miModelDeleteCallbackFunction(modInstData.miModelList.at(modInstData.miSelectedEditorModel)->getModelFileName().c_str());
+                        api_.uiUnloadModel(api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str());
 
                         /* decrement selected model index to point to model that is in list before the deleted one */
-                        if (modInstData.miSelectedEditorModel > 1) {
-                            modInstData.miSelectedEditorModel -= 1;
+                        if (editorData.selectedModelIndex > 1) {
+                            editorData.selectedModelIndex -= 1;
                         }
 
-                        /* reset model instance to first instance - if we have instances */
-                        if (!modInstData.miAssimpInstances.empty()) {
-                            modInstData.miSelectedEditorInstance = 1;
-                        }
+                        /// TODO
+                        ///* reset model instance to first instance - if we have instances */
+                        //if (!modInstData.miAssimpInstances.empty()) {
+                        //    modInstData.miSelectedEditorInstance = 1;
+                        //}
 
-                        /* if we have only the null instance left, disable selection */
-                        if (modInstData.miAssimpInstances.size() == 1) {
-                            modInstData.miSelectedEditorInstance = 0;
-                            editorData.eHighlightSelectedInstance = false;
-                        }
+                        ///* if we have only the null instance left, disable selection */
+                        //if (modInstData.miAssimpInstances.size() == 1) {
+                        //    modInstData.miSelectedEditorInstance = 0;
+                        //    editorData.eHighlightSelectedInstance = false;
+                        //}
 
                         ImGui::CloseCurrentPopup();
                     }
@@ -662,16 +651,30 @@ namespace aveng {
 
                 ImGui::SameLine();
                 if (ImGui::Button("Create Instance")) {
-                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedEditorModel];
-                    modInstData.miInstanceAddCallbackFunction(currentModel);
+                    ModelRef currentModelRef = api_.uiListModelRefs().at(editorData.selectedModelIndex);
+
+                    if (currentModelRef.isAnimated) {
+                        api_.uiSpawn(currentModelRef, AnimatedCreateSettings{});
+                    }
+                    else {
+                        api_.uiSpawn(currentModelRef, TransformSettings{});
+                    }
+
                     /* select new instance */
-                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
+                    /// TODO editorData.selectedInstanceHandle = modInstData.miAssimpInstances.size() - 1;
                 }
 
                 if (ImGui::Button("Create Multiple Instances")) {
-                    std::shared_ptr<AvengModel> currentModel = modInstData.miModelList[modInstData.miSelectedEditorModel];
-                    modInstData.miInstanceAddManyCallbackFunction(currentModel, editorData.eManyInstanceCreateNum);
-                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
+                    ModelRef currentModelRef = api_.uiListModelRefs().at(editorData.selectedModelIndex);
+                    if (currentModelRef.isAnimated) {
+                        std::vector<AnimatedCreateSettings> settings(editorData.eManyInstanceCreateNum);
+                        api_.uiSpawnMany(currentModelRef, settings, settings.size());
+                    }
+                    else {
+                        std::vector<TransformSettings> settings(editorData.eManyInstanceCreateNum);
+                        api_.uiSpawnMany(currentModelRef, settings, settings.size());
+                    }
+                    /// TODO editorData.selectedInstanceHandle = modInstData.miAssimpInstances.size() - 1;
                 }
                 ImGui::SameLine();
                 ImGui::SliderInt("##MassInstanceCreation", &editorData.eManyInstanceCreateNum, 1, 100, "%d", flags);
@@ -682,9 +685,9 @@ namespace aveng {
             }
 
             if (ImGui::CollapsingHeader("Instances")) {
-                bool modelListEmtpy = modInstData.miModelList.size() == 1;
-                bool nullInstanceSelected = modInstData.miSelectedEditorInstance == 0;
-                size_t numberOfInstances = modInstData.miAssimpInstances.size() - 1;
+                bool modelListEmtpy = api_.uiMapModels().size() == 1; /// 
+                bool nullInstanceSelected = editorData.selectedEditorInstance == 0;
+                size_t numberOfInstances = api_.uiListInstances().size() - 1;
 
                 ImGui::Text("Number of Instances: %ld", numberOfInstances);
 
@@ -701,234 +704,243 @@ namespace aveng {
                 ImGui::Text("Selected Instance  :");
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true);
-                if (ImGui::ArrowButton("##Left", ImGuiDir_Left) &&
-                    modInstData.miSelectedEditorInstance > 1) {
-                    modInstData.miSelectedEditorInstance--;
-                }
-                if (modelListEmtpy || nullInstanceSelected) {
-                    ImGui::BeginDisabled();
-                }
 
-                ImGui::SameLine();
-                ImGui::PushItemWidth(30);
-                ImGui::DragInt("##SelInst", &modInstData.miSelectedEditorInstance, 1, 1,
-                    modInstData.miAssimpInstances.size() - 1, "%3d", flags);
-                ImGui::PopItemWidth();
+                /// TODO
+                //if (ImGui::ArrowButton("##Left", ImGuiDir_Left) &&
+                //    modInstData.miSelectedEditorInstance > 1) {
+                //    modInstData.miSelectedEditorInstance--;
+                //}
+                //if (modelListEmtpy || nullInstanceSelected) {
+                //    ImGui::BeginDisabled();
+                //}
+
+                /// TODO
+                //ImGui::SameLine();
+                //ImGui::PushItemWidth(30);
+                //ImGui::DragInt("##SelInst", &modInstData.miSelectedEditorInstance, 1, 1,
+                //    modInstData.miAssimpInstances.size() - 1, "%3d", flags);
+                //ImGui::PopItemWidth();
 
                 if (modelListEmtpy || nullInstanceSelected) 
                 {
                     ImGui::EndDisabled();
                 }
 
-                ImGui::SameLine();
-                if (ImGui::ArrowButton("##Right", ImGuiDir_Right) &&
-                    modInstData.miSelectedEditorInstance < (modInstData.miAssimpInstances.size() - 1)) 
-                {
-                    modInstData.miSelectedEditorInstance++;
-                }
-                ImGui::PopButtonRepeat();
+                /// TODO
+                //ImGui::SameLine();
+                //if (ImGui::ArrowButton("##Right", ImGuiDir_Right) &&
+                //    modInstData.miSelectedEditorInstance < (modInstData.miAssimpInstances.size() - 1)) 
+                //{
+                //    modInstData.miSelectedEditorInstance++;
+                //}
+                //ImGui::PopButtonRepeat();
 
-                if (modelListEmtpy) {
-                    ImGui::EndDisabled();
-                }
+                //if (modelListEmtpy) {
+                //    ImGui::EndDisabled();
+                //}
 
-                if (modelListEmtpy || nullInstanceSelected) {
-                    ImGui::BeginDisabled();
-                }
+                //if (modelListEmtpy || nullInstanceSelected) {
+                //    ImGui::BeginDisabled();
+                //}
 
-                // Clamp here for DragInt
-                modInstData.miSelectedEditorInstance = std::clamp(modInstData.miSelectedEditorInstance, 0,
-                    static_cast<int>(modInstData.miAssimpInstances.size() - 1));
+                //// Clamp here for DragInt
+                //modInstData.miSelectedEditorInstance = std::clamp(modInstData.miSelectedEditorInstance, 0, /// index of Selected editor instance
+                //    static_cast<int>(modInstData.miAssimpInstances.size() - 1)); /// Size of all instances
 
-                InstanceSettings settings;
-                if (numberOfInstances > 0) {
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                }
+                //InstanceSettings settings;
+                //if (numberOfInstances > 0) { /// Query settings of selected instance
+                //    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                //}
 
-                if (ImGui::Button("Center This Instance")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                    // Callback Function - Center Selected Instance
-                    modInstData.miInstanceCenterCallbackFunction(currentInstance);
-                }
+                //if (ImGui::Button("Center This Instance")) {
+                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                //    // Callback Function - Center Selected Instance
+                //    modInstData.miInstanceCenterCallbackFunction(currentInstance);
+                //}
 
-                ImGui::SameLine();
+                // ImGui::SameLine();
+                /// TODO
 
                 /* we MUST retain the last model - caps, I'd heed that sh*t */
-                unsigned int numberOfInstancesPerModel = 0;
-                if (modInstData.miAssimpInstances.size() > 1) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                    std::string currentModelName = currentInstance->getModel()->getModelFileName();
-                    numberOfInstancesPerModel = modInstData.miAssimpInstancesPerModel[currentModelName].size();
-                }
+                //unsigned int numberOfInstancesPerModel = 0;
+                //if (modInstData.miAssimpInstances.size() > 1) {
+                //    /// Editor Selection
+                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                //    /// Get Model AssetKey
+                //    std::string currentModelName = currentInstance->getModel()->getModelFileName();
+                //    /// Num instances per model
+                //    numberOfInstancesPerModel = modInstData.miAssimpInstancesPerModel[currentModelName].size();
+                //}
 
-                if (numberOfInstancesPerModel < 2) {
-                    ImGui::BeginDisabled();
-                }
+                //if (numberOfInstancesPerModel < 2) {
+                //    ImGui::BeginDisabled();
+                //}
 
-                ImGui::SameLine();
-                if (ImGui::Button("Delete Instance")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                    // Callback Function - Delete Instance
-                    modInstData.miInstanceDeleteCallbackFunction(currentInstance);
+                //ImGui::SameLine();
+                //if (ImGui::Button("Delete Instance")) {
+                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                //    // Callback Function - Delete Instance
+                //    modInstData.miInstanceDeleteCallbackFunction(currentInstance);
 
-                    /* hard reset for now */
-                    if (modInstData.miSelectedEditorInstance > 1) {
-                        modInstData.miSelectedEditorInstance -= 1;
-                    }
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                }
+                //    /* hard reset for now */
+                //    if (modInstData.miSelectedEditorInstance > 1) {
+                //        modInstData.miSelectedEditorInstance -= 1;
+                //    }
+                //    /// Get Settings
+                //    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                //}
 
-                if (numberOfInstancesPerModel < 2) {
-                    ImGui::EndDisabled();
-                }
+                //if (numberOfInstancesPerModel < 2) {
+                //    ImGui::EndDisabled();
+                //}
 
-                if (ImGui::Button("Clone Instance")) {
-                    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                    // Callback Function - Clone Instance
-                    modInstData.miInstanceCloneCallbackFunction(currentInstance);
+                //if (ImGui::Button("Clone Instance")) {
+                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                //    // Callback Function - Clone Instance
+                //    modInstData.miInstanceCloneCallbackFunction(currentInstance);
 
-                    /* reset to last position for now */
-                    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
+                //    /* reset to last position for now */
+                //    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
 
-                    /* read back settings for UI */
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                }
+                //    /* read back settings for UI */
+                //    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                //}
 
-                if (ImGui::Button("Create Multiple Clones")) {
+                //if (ImGui::Button("Create Multiple Clones")) {
 
-                    if (editorData.eManyInstanceCloneNum > 1) {
-                     
-                        std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
+                //    if (editorData.eManyInstanceCloneNum > 1) {
+                //     
+                //        std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
 
-                        // Callback function - Clone Many
-                        modInstData.miInstanceCloneManyCallbackFunction(currentInstance, editorData.eManyInstanceCloneNum);
+                //        // Callback function - Clone Many
+                //        modInstData.miInstanceCloneManyCallbackFunction(currentInstance, editorData.eManyInstanceCloneNum);
 
-                        /* reset to last position for now */
-                        modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
+                //        /* reset to last position for now */
+                //        modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
 
-                        /* read back settings for UI */
-                        settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                    }
+                //        /* read back settings for UI */
+                //        settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                //    }
    
-                }
-                ImGui::SameLine();
-                ImGui::SliderInt("##MassInstanceCloning", &editorData.eManyInstanceCloneNum, 1, 100, "%d", flags);
+                //}
+                //ImGui::SameLine();
+                //ImGui::SliderInt("##MassInstanceCloning", &editorData.eManyInstanceCloneNum, 1, 100, "%d", flags);
 
-                if (modelListEmtpy || nullInstanceSelected) {
-                    ImGui::EndDisabled();
-                }
+                //if (modelListEmtpy || nullInstanceSelected) {
+                //    ImGui::EndDisabled();
+                //}
 
-                /* get the new size, in case of a deletion */
-                numberOfInstances = modInstData.miAssimpInstances.size() - 1;
+                ///* get the new size, in case of a deletion */
+                //numberOfInstances = modInstData.miAssimpInstances.size() - 1;
 
-                std::string baseModelName = "None";
-                if (numberOfInstances > 0 && !nullInstanceSelected) {
-                    baseModelName = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getModelFileName();
-                }
-                ImGui::Text("Base Model: %s", baseModelName.c_str());
+                //std::string baseModelName = "None";
+                //if (numberOfInstances > 0 && !nullInstanceSelected) {
+                //    baseModelName = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getModelFileName();
+                //}
+                //ImGui::Text("Base Model: %s", baseModelName.c_str());
 
-                if (numberOfInstances == 0 || nullInstanceSelected) {
-                    ImGui::BeginDisabled();
-                }
+                //if (numberOfInstances == 0 || nullInstanceSelected) {
+                //    ImGui::BeginDisabled();
+                //}
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Swap Y and Z axes:     ");
-                ImGui::SameLine();
-                ImGui::Checkbox("##ModelAxisSwap", &settings.isSwapYZAxis);
+                ////ImGui::AlignTextToFramePadding();
+                ////ImGui::Text("Swap Y and Z axes:     ");
+                ////ImGui::SameLine();
+                ////ImGui::Checkbox("##ModelAxisSwap", &settings.isSwapYZAxis);
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Model Pos (X/Y/Z):     ");
-                ImGui::SameLine();
-                ImGui::SliderFloat3("##ModelPos", glm::value_ptr(settings.isWorldPosition),
-                    -25.0f, 25.0f, "%.3f", flags);
+                //ImGui::AlignTextToFramePadding();
+                //ImGui::Text("Model Pos (X/Y/Z):     ");
+                //ImGui::SameLine();
+                //ImGui::SliderFloat3("##ModelPos", glm::value_ptr(settings.isWorldPosition), /// Setting. Fetch from .common.xf.pos
+                //    -25.0f, 25.0f, "%.3f", flags);
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Model Rotation (X/Y/Z):");
-                ImGui::SameLine();
-                ImGui::SliderFloat3("##ModelRot", glm::value_ptr(settings.isWorldRotation),
-                    -180.0f, 180.0f, "%.3f", flags);
+                //ImGui::AlignTextToFramePadding();
+                //ImGui::Text("Model Rotation (X/Y/Z):");
+                //ImGui::SameLine();
+                //ImGui::SliderFloat3("##ModelRot", glm::value_ptr(settings.isWorldRotation), /// Setting. Fetch from .common.xf.rotEuler
+                //    -180.0f, 180.0f, "%.3f", flags);
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Model Scale:           ");
-                ImGui::SameLine();
-                ImGui::SliderFloat("##ModelScale", &settings.isScale,
-                    0.001f, 10.0f, "%.4f", flags);
+                //ImGui::AlignTextToFramePadding();
+                //ImGui::Text("Model Scale:           ");
+                //ImGui::SameLine();
+                //ImGui::SliderFloat("##ModelScale", &settings.isScale,
+                //    0.001f, 10.0f, "%.4f", flags);
 
-                if (ImGui::Button("Reset Instance Values")) {
-                    InstanceSettings defaultSettings{};
+                //if (ImGui::Button("Reset Instance Values")) {
+                //    InstanceSettings defaultSettings{};
 
-                    /* save and restore index positions */
-                    int instanceIndex = settings.isInstanceIndexPosition;
-                    settings = defaultSettings;
-                    settings.isInstanceIndexPosition = instanceIndex;
-                }
+                //    /* save and restore index positions */
+                //    int instanceIndex = settings.isInstanceIndexPosition;
+                //    settings = defaultSettings;
+                //    settings.isInstanceIndexPosition = instanceIndex;
+                //}
 
-                if (numberOfInstances == 0 || nullInstanceSelected) {
-                    ImGui::EndDisabled();
-                }
+                //if (numberOfInstances == 0 || nullInstanceSelected) {
+                //    ImGui::EndDisabled();
+                //}
 
-                if (numberOfInstances > 0) {
-                    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
-                }
+                //if (numberOfInstances > 0) {
+                //    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
+                //}
             }
 
             if (ImGui::CollapsingHeader("Animations")) {
-                size_t numberOfInstances = modInstData.miAssimpInstances.size() - 1;
+                //size_t numberOfInstances = modInstData.miAssimpInstances.size() - 1;
 
-                InstanceSettings settings;
-                size_t numberOfClips = 0;
-                if (numberOfInstances > 0) {
-                    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                    numberOfClips = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getAnimClips().size();
-                }
+                //InstanceSettings settings;
+                //size_t numberOfClips = 0;
+                //if (numberOfInstances > 0) {
+                //    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+                //    numberOfClips = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getAnimClips().size();
+                //}
 
-                if (numberOfInstances > 0 && numberOfClips > 0) {
-                    std::vector<std::shared_ptr<AssimpAnimClip>> animClips = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getAnimClips();
+                //if (numberOfInstances > 0 && numberOfClips > 0) {
+                //    std::vector<std::shared_ptr<AssimpAnimClip>> animClips = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getAnimClips();
 
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Animation Clip:");
-                    ImGui::SameLine();
-                    if (ImGui::BeginCombo("##ClipCombo",
-                        animClips.at(settings.isAnimClipNr)->getClipName().c_str())) {
-                        for (int i = 0; i < animClips.size(); ++i) {
-                            const bool isSelected = (settings.isAnimClipNr == i);
-                            if (ImGui::Selectable(animClips.at(i)->getClipName().c_str(), isSelected)) {
-                                settings.isAnimClipNr = i;
-                            }
+                //    ImGui::AlignTextToFramePadding();
+                //    ImGui::Text("Animation Clip:");
+                //    ImGui::SameLine();
+                //    if (ImGui::BeginCombo("##ClipCombo",
+                //        animClips.at(settings.isAnimClipNr)->getClipName().c_str())) {
+                //        for (int i = 0; i < animClips.size(); ++i) {
+                //            const bool isSelected = (settings.isAnimClipNr == i);
+                //            if (ImGui::Selectable(animClips.at(i)->getClipName().c_str(), isSelected)) {
+                //                settings.isAnimClipNr = i;
+                //            }
 
-                            if (isSelected) {
-                                ImGui::SetItemDefaultFocus();
-                            }
-                        }
-                        ImGui::EndCombo();
-                    }
+                //            if (isSelected) {
+                //                ImGui::SetItemDefaultFocus();
+                //            }
+                //        }
+                //        ImGui::EndCombo();
+                //    }
 
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Replay Speed:  ");
-                    ImGui::SameLine();
-                    ImGui::SliderFloat("##ClipSpeed", &settings.isAnimSpeedFactor, 0.0f, 2.0f, "%.3f", flags);
-                }
-                else {
-                    /* TODO: better solution if no instances or no clips are found */
-                    ImGui::BeginDisabled();
+                //    ImGui::AlignTextToFramePadding();
+                //    ImGui::Text("Replay Speed:  ");
+                //    ImGui::SameLine();
+                //    ImGui::SliderFloat("##ClipSpeed", &settings.isAnimSpeedFactor, 0.0f, 2.0f, "%.3f", flags);
+                //}
+                //else {
+                //    /* TODO: better solution if no instances or no clips are found */
+                //    ImGui::BeginDisabled();
 
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Animation Clip:");
-                    ImGui::SameLine();
-                    ImGui::BeginCombo("##ClipComboDisabled", "None");
+                //    ImGui::AlignTextToFramePadding();
+                //    ImGui::Text("Animation Clip:");
+                //    ImGui::SameLine();
+                //    ImGui::BeginCombo("##ClipComboDisabled", "None");
 
-                    float playSpeed = 1.0f;
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Replay Speed:  ");
-                    ImGui::SameLine();
-                    ImGui::SliderFloat("##ClipSpeedDisabled", &playSpeed, 0.0f, 2.0f, "%.3f", flags);
+                //    float playSpeed = 1.0f;
+                //    ImGui::AlignTextToFramePadding();
+                //    ImGui::Text("Replay Speed:  ");
+                //    ImGui::SameLine();
+                //    ImGui::SliderFloat("##ClipSpeedDisabled", &playSpeed, 0.0f, 2.0f, "%.3f", flags);
 
-                    ImGui::EndDisabled();
-                }
+                //    ImGui::EndDisabled();
+                //}
 
-                if (numberOfInstances > 0) {
-                    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
-                }
+                //if (numberOfInstances > 0) {
+                //    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
+                //}
             }
 
             ImGui::End();
@@ -1042,71 +1054,71 @@ namespace aveng {
 
         if (editorData.eMouseMove) {
             std::cout << "True" << std::endl;
-            if (modInstData.miSelectedEditorInstance != 0) {
-                std::cout << "miSelectedEditorInstance != 0" << std::endl;
-                InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
+            //if (modInstData.miSelectedEditorInstance != 0) {
+            //    std::cout << "miSelectedEditorInstance != 0" << std::endl;
+            //    InstanceSettings settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
 
-                float mouseXScaled = mouseMoveRelX / 20.0f; // This divosor makes the movement more subtle
-                float mouseYScaled = mouseMoveRelY / 20.0f;
-                float sinAzimuth = std::sin(glm::radians(renderData.rdViewAzimuth));
-                float cosAzimuth = std::cos(glm::radians(renderData.rdViewAzimuth));
+            //    float mouseXScaled = mouseMoveRelX / 20.0f; // This divosor makes the movement more subtle
+            //    float mouseYScaled = mouseMoveRelY / 20.0f;
+            //    float sinAzimuth = std::sin(glm::radians(renderData.rdViewAzimuth));
+            //    float cosAzimuth = std::cos(glm::radians(renderData.rdViewAzimuth));
 
-                float modelDistance = glm::length(renderData.rdCameraWorldPosition - settings.isWorldPosition) / 50.0f;
+            //    float modelDistance = glm::length(renderData.rdCameraWorldPosition - settings.isWorldPosition) / 50.0f;
 
-                if (editorData.eMouseMoveVertical) {
-                    switch (renderData.rdInstanceEditMode) {
-                    case instanceEditMode::move:
-                        settings.isWorldPosition.y -= mouseYScaled * modelDistance;
-                        break;
-                    case instanceEditMode::rotate:
-                        settings.isWorldRotation.y -= mouseXScaled * 5.0f;
-                        /* keep between -180 and 180 degree */
-                        if (settings.isWorldRotation.y < -180.0f) {
-                            settings.isWorldRotation.y += 360.0f;
-                        }
-                        if (settings.isWorldRotation.y >= 180.0f) {
-                            settings.isWorldRotation.y -= 360.0f;
-                        }
-                        break;
-                    case instanceEditMode::scale:
-                        /* uniform scale, do nothing here  */
-                        break;
-                    }
-                }
-                else {
-                    switch (renderData.rdInstanceEditMode) {
-                    case instanceEditMode::move:
-                        settings.isWorldPosition.x += mouseXScaled * modelDistance * cosAzimuth - mouseYScaled * modelDistance * sinAzimuth;
-                        settings.isWorldPosition.z += mouseXScaled * modelDistance * sinAzimuth + mouseYScaled * modelDistance * cosAzimuth;
-                        break;
-                    case instanceEditMode::rotate:
-                        settings.isWorldRotation.z -= (mouseXScaled * cosAzimuth - mouseYScaled * sinAzimuth) * 5.0f;
-                        settings.isWorldRotation.x += (mouseXScaled * sinAzimuth + mouseYScaled * cosAzimuth) * 5.0f;
+            //    if (editorData.eMouseMoveVertical) {
+            //        switch (renderData.rdInstanceEditMode) {
+            //        case instanceEditMode::move:
+            //            settings.isWorldPosition.y -= mouseYScaled * modelDistance;
+            //            break;
+            //        case instanceEditMode::rotate:
+            //            settings.isWorldRotation.y -= mouseXScaled * 5.0f;
+            //            /* keep between -180 and 180 degree */
+            //            if (settings.isWorldRotation.y < -180.0f) {
+            //                settings.isWorldRotation.y += 360.0f;
+            //            }
+            //            if (settings.isWorldRotation.y >= 180.0f) {
+            //                settings.isWorldRotation.y -= 360.0f;
+            //            }
+            //            break;
+            //        case instanceEditMode::scale:
+            //            /* uniform scale, do nothing here  */
+            //            break;
+            //        }
+            //    }
+            //    else {
+            //        switch (renderData.rdInstanceEditMode) {
+            //        case instanceEditMode::move:
+            //            settings.isWorldPosition.x += mouseXScaled * modelDistance * cosAzimuth - mouseYScaled * modelDistance * sinAzimuth;
+            //            settings.isWorldPosition.z += mouseXScaled * modelDistance * sinAzimuth + mouseYScaled * modelDistance * cosAzimuth;
+            //            break;
+            //        case instanceEditMode::rotate:
+            //            settings.isWorldRotation.z -= (mouseXScaled * cosAzimuth - mouseYScaled * sinAzimuth) * 5.0f;
+            //            settings.isWorldRotation.x += (mouseXScaled * sinAzimuth + mouseYScaled * cosAzimuth) * 5.0f;
 
-                        /* keep between -180 and 180 degree */
-                        if (settings.isWorldRotation.z < -180.0f) {
-                            settings.isWorldRotation.z += 360.0f;
-                        }
-                        if (settings.isWorldRotation.z >= 180.0f) {
-                            settings.isWorldRotation.z -= 360.0f;
-                        }
+            //            /* keep between -180 and 180 degree */
+            //            if (settings.isWorldRotation.z < -180.0f) {
+            //                settings.isWorldRotation.z += 360.0f;
+            //            }
+            //            if (settings.isWorldRotation.z >= 180.0f) {
+            //                settings.isWorldRotation.z -= 360.0f;
+            //            }
 
-                        if (settings.isWorldRotation.x < -180.0f) {
-                            settings.isWorldRotation.x += 360.0f;
-                        }
-                        if (settings.isWorldRotation.x >= 180.0f) {
-                            settings.isWorldRotation.x -= 360.0f;
-                        }
-                        break;
-                    case instanceEditMode::scale:
-                        settings.isScale -= mouseYScaled / 2.0f;
-                        settings.isScale = std::max(0.001f, settings.isScale);
-                        break;
-                    }
-                }
+            //            if (settings.isWorldRotation.x < -180.0f) {
+            //                settings.isWorldRotation.x += 360.0f;
+            //            }
+            //            if (settings.isWorldRotation.x >= 180.0f) {
+            //                settings.isWorldRotation.x -= 360.0f;
+            //            }
+            //            break;
+            //        case instanceEditMode::scale:
+            //            settings.isScale -= mouseYScaled / 2.0f;
+            //            settings.isScale = std::max(0.001f, settings.isScale);
+            //            break;
+            //        }
+            //    }
 
-                modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
-            }
+            //    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
+            //}
         }
 
         /* save old values */

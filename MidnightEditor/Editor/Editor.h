@@ -9,6 +9,7 @@
 #include "EditorCamera.h"
 #include "EditorData.h"
 #include "Game/data.h"
+#include "Editor/API/SceneEditAPI.h"
 
 /**
 * Note: At the moment, this class shares the currentFrameIndex held by the renderer.
@@ -22,13 +23,13 @@ namespace aveng {
 	class EngineDevice;
 	class AvengWindow;
 	class Renderer;
-	class InputState;
 	class SceneFacade;
-	class IModelQuery;
-	class IModelAnimQuery;
-	class IInstanceQuery;
+	struct InputState;
+	struct IModelQuery;
+	struct IModelAnimQuery;
+	struct IInstanceQuery;
 
-	class Editor : public IEditorUIAPI {
+	class Editor {
 
 	/*
 	* The Editor is a(n):
@@ -62,7 +63,7 @@ namespace aveng {
 		void update(float frameTime, unsigned int frameIndex);
 		void renderGUI(float frameTime);
 		void updateLights();
-		void drawModels(int frameIndex);
+		void drawModels(const IModelLibrary& modelLib, int frameIndex);
 		void cleanup();
 		void destroyTrash();
 		void recreateFrameBuffers(SwapChain* swapchain);
@@ -110,14 +111,14 @@ namespace aveng {
 
 		void updateInputState(const InputState& state);
 
-		template<class Tag>
-		void updateSelectionForPool(
-			aveng::InstanceManager<Tag>& mgr,
-			const std::vector<InstanceHandle<Tag>>& drawOrder,
-			std::vector<glm::vec2>& out,
-			const AnyInstanceHandle& selectedAny,
-			bool highlight,
-			float blinkValue);
+		//template<class Tag>
+		//void updateSelectionForPool(
+		//	aveng::InstanceManager<Tag>& mgr,
+		//	const std::vector<InstanceHandle<Tag>>& drawOrder,
+		//	std::vector<glm::vec2>& out,
+		//	const AnyInstanceHandle& selectedAny,
+		//	bool highlight,
+		//	float blinkValue);
 
 
 
@@ -158,16 +159,19 @@ namespace aveng {
 		EngineDevice& engineDevice;
 		AvengWindow& window;
 		Renderer& renderer;
-
+		
 		// Model & Instance Ops
 		SceneFacade& scene_;			// Set Scene Data
+
 		const IInstanceQuery& instQ_;	// Query Instances. From sceneFacade_.instanceQuery()
 		const IModelQuery& modelQ_;		// Query Models.	From modelLib.query()
 		const IModelAnimQuery& animQ_;	// Query Animation Data. From modelLib.animQuery()
 
+		SceneEditAPI sceneEdit_;
+
 		EditorData editorData;
-		AvengImgui aveng_imgui{ renderData, gameData, editorData, window, engineDevice, scene_ };
-		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff
+		AvengImgui aveng_imgui;
+		PointLightSystem pointLightSystem;	// Light stuff
 	};
 
 }
