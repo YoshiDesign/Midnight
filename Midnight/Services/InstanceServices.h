@@ -2,14 +2,7 @@
 #include "Core/Modeling/ModelAndInstanceData.h"
 
 namespace aveng {
-
-	struct InstanceView {
-		ModelId modelId;
-		InstanceTransform xf;
-		glm::mat4 modelRoot;
-		bool animated;
-	};
-
+	/* Currently implemented only by the SceneFacade */
 	struct IInstanceQuery {
 
 		/*

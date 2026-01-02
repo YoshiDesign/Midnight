@@ -52,8 +52,6 @@ namespace aveng {
 		  mMatrixMultPerModelDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT)
 	{ /*Keep the null model in mind if logic should find its way here - see <ModelLibrary> */ }
 
-	AvengModel::~AvengModel() {}
-
 	void AvengModel::drawInstancedV2(
 		VkCommandBuffer graphicsCommandBuffer, 
 		VkPipelineLayout pipelineLayout,
@@ -491,14 +489,15 @@ namespace aveng {
 		return mBoneParentMatrixBuffers;
 	}
 
-	std::vector<VkDescriptorSet>& AvengModel::getMatrixMultDescriptorSets() {
-		return mMatrixMultPerModelDescriptorSets;
-	}
+	//std::vector<VkDescriptorSet>& AvengModel::getMatrixMultDescriptorSets() {
+	//	return mMatrixMultPerModelDescriptorSets;
+	//}
 
-	VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) {
-		return mMatrixMultPerModelDescriptorSets[frameIndex];
-	}
-	const VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) const {
+	//VkDescriptorSet& AvengModel::getMatrixMultDescriptorSet(int frameIndex) {
+	//	return mMatrixMultPerModelDescriptorSets[frameIndex];
+	//}
+
+	VkDescriptorSet AvengModel::getMatrixMultDescriptorSet(int frameIndex) const {
 		return mMatrixMultPerModelDescriptorSets[frameIndex];
 	}
 
@@ -506,23 +505,23 @@ namespace aveng {
 
 		VkDescriptorPool pool = renderData.avengDescriptorPool;
 
+		std::cout << "Model: self destruction sequence activated\n";
 		// This is identical to...
-		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-		//	vkFreeDescriptorSets(engineDevice.device(), pool, 1, &mMatrixMultPerModelDescriptorSets[i]);
-		//}
+		/*for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			vkFreeDescriptorSets(engineDevice.device(), pool, 1, &mMatrixMultPerModelDescriptorSets[i]);
+		}*/
 
 		// this... But just do
-		//for (const auto& set : mMatrixMultPerModelDescriptorSets) {
-		//	vkFreeDescriptorSets(engineDevice.device(), pool, 1, &set);
-		//}
-
+		for (const auto& set : mMatrixMultPerModelDescriptorSets) {
+			vkFreeDescriptorSets(engineDevice.device(), pool, 1, &set);
+		}
 		/// ...this:
-		vkFreeDescriptorSets(
-			engineDevice.device(),
-			pool,
-			static_cast<uint32_t>(mMatrixMultPerModelDescriptorSets.size()),
-			mMatrixMultPerModelDescriptorSets.data()
-		);
+		//vkFreeDescriptorSets(
+		//	engineDevice.device(),
+		//	pool,
+		//	static_cast<uint32_t>(mMatrixMultPerModelDescriptorSets.size()),
+		//	mMatrixMultPerModelDescriptorSets.data()
+		//);
 
 		for (auto buffer : mVertexBuffers) {
 			VertexBuffer::cleanup(engineDevice, buffer);

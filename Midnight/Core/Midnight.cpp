@@ -17,10 +17,7 @@ namespace aveng {
 			engineDevice,
 			aveng_window,
 			cameraManager, 
-			sceneFacade_,
-			modelLib_.query(),
-			modelLib_.animQuery(),
-			sceneFacade_.instanceQuery()
+			sceneFacade_
 		)
 		}
 		, editorInput_( std::make_unique<EditorInput>(editor_.get()) )
@@ -55,7 +52,12 @@ namespace aveng {
 
 	void Midnight::render(float frameTime) {
 
+		// Load new models if any are pending. Side-Effect: Creates descriptor sets for this model
 #ifdef ENABLE_EDITOR
+
+		modelLib_.processPendingModelLoads();
+		modelLib_.processPendingUnloads();
+
 		// Give ImGUI the latest input state
 		updateGUI(inputState()); 
 		if (game_data.modeSwitchRequested)
@@ -148,6 +150,19 @@ namespace aveng {
 			editor_->initialize(renderer.pGetSwapChain());
 		}
 #endif
+	}
+
+	void Midnight::shutdown() {
+	
+		VkResult result = vkDeviceWaitIdle(engineDevice.device());
+		if (result != VK_SUCCESS) {
+			std::printf("%s fatal error: could not wait for device idle (error: %i)\n", __FUNCTION__, result);
+			return;
+		}
+
+		modelLib_.cleanup();
+		renderer.cleanup();
+
 	}
 
 }

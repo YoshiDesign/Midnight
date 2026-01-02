@@ -14,13 +14,26 @@ namespace aveng {
     };
 
     struct EditorData {
-        std::vector<AnyInstanceHandle> selectedMany; // For future reference
-        int selectedEditorInstance = 0;
-        // AssimpInstance* eCurrentSelectedInstance = nullptr;
-        AnyInstanceHandle selectedInstanceHandle{};
-        int selectedModelIndex = 0;
-        bool highlight = false;
-        float blink = 0.1f;
+
+        // --- model selection ---
+        ModelId selectedModelId = 0;          // authoritative
+        AssetKey selectedModelKey{};
+        int selectedModelIndex = 0;           // For UI lists, to enable highlighted rows and whatnot.
+
+        // --- instance selection ---
+        AnyInstanceHandle primarySelection{}; // last clicked / active
+        std::vector<AnyInstanceHandle> selectedMany; // multi-select set (unique)
+
+        bool eHasSelection = false;
+        AnyInstanceHandle curInstSelect{};
+        ModelRef curModelSelect{};
+        std::vector<AnyInstanceHandle> selectedInstances;
+
+        bool eHighlightSelectedInstance = false;
+        float eSelectHighlightValue = 1.0f;
+
+        int eManyInstanceCreateNum = 1;
+        int eManyInstanceCloneNum = 1;
 
         std::vector<EditorCommand> commands;
 
@@ -40,12 +53,7 @@ namespace aveng {
         /* color hightlight for selection etc */
         std::vector<glm::vec2> eSelectedInstance{}; // Shader Uniform Data
 
-        bool eHighlightSelectedInstance = false;
-        bool eHasSelection = false;
-        float eSelectHighlightValue = 1.0f;
 
-        int eManyInstanceCreateNum = 1;
-        int eManyInstanceCloneNum = 1;
 
 
         //int miSelectedEditorInstance = 0;

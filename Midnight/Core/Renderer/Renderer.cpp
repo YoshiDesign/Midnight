@@ -113,14 +113,6 @@ namespace aveng {
 
 	}
 
-	Renderer::~Renderer()
-	{
-		std::cout << "Destroying Renderer..." << std::endl;
-		freeCommandBuffers();
-		cleanup();
-		// vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
-	}
-
 	void Renderer::initialize() {
 		initializePointLights();
 
@@ -925,7 +917,7 @@ namespace aveng {
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeMatrixMultPipeline);
 
-		const VkDescriptorSet& modelDescriptorSet = model->getMatrixMultDescriptorSet(currentFrameIndex);
+		VkDescriptorSet modelDescriptorSet = model->getMatrixMultDescriptorSet(currentFrameIndex);
 		std::vector<VkDescriptorSet> computeSets = { renderData.rdAvengComputeMatrixMultDescriptorSets.at(currentFrameIndex), modelDescriptorSet }; 
 		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeMatrixMultPipelineLayout, 0, static_cast<uint32_t>(computeSets.size()), computeSets.data(), 0, 0);
@@ -1546,13 +1538,10 @@ namespace aveng {
 	}
 
 	void Renderer::cleanup() {
-		VkResult result = vkDeviceWaitIdle(engineDevice.device());
-		if (result != VK_SUCCESS) {
-			std::printf("%s fatal error: could not wait for device idle (error: %i)\n", __FUNCTION__, result);
-			return;
-		}
 
 		destroyTrash();
+
+		freeCommandBuffers();
 
 		///* Moved to ModelLibrary */
 		//for (const auto& model : mModelInstanceData.miModelList) {

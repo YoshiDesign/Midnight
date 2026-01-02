@@ -41,9 +41,7 @@ namespace aveng {
 		// Clear the vector of buffers we'll be submitting to the graphics queue
 		commandBuffers.clear();
 
-		// Load new models if any are pending. Side-Effect: Creates descriptor sets for this model
-		/// TODO renderer.processPendingModelLoads();
-		/// TODO Implement processPendingModelUnloads
+		/// Process Pending Models
 
 		// Wait for fences, vkAcquireNextImageKH
 		if (!renderer.beginFrame())

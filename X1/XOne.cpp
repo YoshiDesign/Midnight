@@ -86,8 +86,8 @@ namespace xone {
 
 		}
 
-		// Block until all GPU operations quit.
-		vkDeviceWaitIdle(midnight.device());
+		midnight.shutdown();
+
 	}
 
 

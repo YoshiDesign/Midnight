@@ -6,7 +6,7 @@
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/Modeling/InstanceSettings.h"
 #include "CoreVK/VertexBuffer.h"
-#include "Editor/API/SceneEditAPI.h"
+#include "Editor/API/IEditorUIAPI.h"
 
 namespace aveng {
 
@@ -22,9 +22,22 @@ namespace aveng {
         }
     */
 
+    static void sanitizeSelection(EditorData& ed, const IEditorUIAPI& api) {
+        auto alive = [&](AnyInstanceHandle h) {
+            InstanceView v{};
+            return api.uiTryGetInstance(h, v);
+        };
+
+        erase_if(ed.selectedMany, [&](auto h) { return !alive(h); });
+
+        if (!alive(ed.primarySelection)) {
+            ed.primarySelection = ed.selectedMany.empty() ? AnyInstanceHandle{} : ed.selectedMany.back();
+        }
+    }
+
     AvengImgui::AvengImgui(
         VkRenderData& _renderData, 
-        SceneEditAPI& api,
+        IEditorUIAPI& api,
         EditorData& editorData, 
         AvengWindow& _window, 
         EngineDevice& _engineDevice)
@@ -526,47 +539,11 @@ namespace aveng {
                 ImGui::SliderInt("##FOV", &renderData.rdFieldOfView, 40, 150, "%d", flags);
             }
 
-            if (ImGui::CollapsingHeader("Models")) {
-                size_t nModels = api_.uiMapModels().size();
-                /* state is changed during model deletion, so save it first */
-                bool modelListEmtpy = nModels == 1; /// Accounting for null model?
-                std::string selectedModelName = "None";
-
-                /* Validate selected model index and reset if invalid */
-                if (!modelListEmtpy) {
-                    /// Asset key for selected instance
-                    selectedModelName = api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str();
-                }
-
-                if (modelListEmtpy) {
-                    ImGui::BeginDisabled();
-                }
+            if (ImGui::CollapsingHeader("Models", ImGuiTreeNodeFlags_DefaultOpen)) {
 
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("Models :");
-                ImGui::SameLine();
-                ImGui::PushItemWidth(200);
-                if (ImGui::BeginCombo("##ModelCombo",
-                    // avoid access the empty model vector
-                    selectedModelName.c_str())) {
-                    for (int i = 1; i < nModels; ++i) {
-                        const bool isSelected = (editorData.selectedModelIndex == i);
-                        if (ImGui::Selectable(api_.uiListModelKeys().at(i).c_str(), isSelected)) {
-                            editorData.selectedModelIndex = i;
-                            selectedModelName = api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str();
-                        }
+                ImGui::Text("%d Models in memory", api_.nModels());
 
-                        if (isSelected) {
-                            ImGui::SetItemDefaultFocus();
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-                ImGui::PopItemWidth();
-
-                if (modelListEmtpy) {
-                    ImGui::EndDisabled();
-                }
 
                 if (ImGui::Button("Import Model")) {
                     IGFD::FileDialogConfig config;
@@ -592,7 +569,7 @@ namespace aveng {
                         /* Windows does understand forward slashes, but std::filesystem preferres backslashes... */
                         std::replace(filePathName.begin(), filePathName.end(), '\\', '/');
 
-                                                            /* This is now the "AssetKey" */
+                        /* This is now the "AssetKey" */
                         if (!api_.uiGetOrLoadModel(filePathName)) {
                             std::printf("%s error: unable to load model file '%s', unknown error \n", __FUNCTION__, filePathName.c_str());
                         }
@@ -605,41 +582,73 @@ namespace aveng {
                     ImGuiFileDialog::Instance()->Close();
                 }
 
-                if (modelListEmtpy) {
+                /* Acquire Model List */
+                const std::vector<UiModelRow> models = api_.uiListModels();
+
+                // Build display string for current selection
+                std::string selectedLabel = "<none>";
+                if (editorData.selectedModelId != 0) {
+                    auto it = std::find_if(models.begin(), models.end(),
+                        [&](const UiModelRow& r) { return r.id == editorData.selectedModelId; });
+                    if (it != models.end()) {
+                        selectedLabel = std::string(it->key.c_str());
+                        selectedLabel += it->animated ? " [Animated]" : " [Static]";
+                    }
+                    else {
+                        // Selected model no longer exists
+                        editorData.selectedModelId = NullModelId;
+                        editorData.selectedModelKey = "[No Selection]";
+                    }
+                }
+                // ImGui::PopItemWidth();
+
+                if (ImGui::BeginCombo("Selected Model", selectedLabel.c_str()))
+                {
+                    for (const UiModelRow& r : models)
+                    {
+                        if (r.id == NullModelId) continue;
+
+                        const bool isSelected = (r.id == editorData.selectedModelId);
+
+                        std::string label = std::string(r.key.c_str());
+                        label += r.animated ? " [Animated]" : " [Static]";
+
+                        if (ImGui::Selectable(label.c_str(), isSelected))
+                        {
+                            editorData.selectedModelId = r.id;
+                            editorData.selectedModelKey = r.key;
+
+                            // Optional: clear instance selection when switching models (feel free to remove)
+                            // editorData.selectedMany.clear();
+                            // editorData.primarySelection = AnyInstanceHandle{};
+                        }
+
+                        if (isSelected) ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+
+                if (api_.nModels() == 1) {
                     ImGui::BeginDisabled();
                 }
 
-                ImGui::SameLine();
+                /// Destroy Models
                 if (ImGui::Button("Delete Model")) {
                     ImGui::OpenPopup("Delete Model?");
                 }
 
                 if (ImGui::BeginPopupModal("Delete Model?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                    ImGui::Text("Delete Model '%s'?", api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str());
+                    ImGui::Text("Delete Model '%s'?", editorData.selectedModelKey.c_str());
 
                     /* cheating a bit to get buttons more to the center */
                     ImGui::Indent();
                     ImGui::Indent();
                     if (ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                        api_.uiUnloadModel(api_.uiListModelKeys().at(editorData.selectedModelIndex).c_str());
+                        api_.uiUnloadModel(editorData.selectedModelKey);
 
-                        /* decrement selected model index to point to model that is in list before the deleted one */
-                        if (editorData.selectedModelIndex > 1) {
-                            editorData.selectedModelIndex -= 1;
-                        }
-
-                        /// TODO
-                        ///* reset model instance to first instance - if we have instances */
-                        //if (!modInstData.miAssimpInstances.empty()) {
-                        //    modInstData.miSelectedEditorInstance = 1;
-                        //}
-
-                        ///* if we have only the null instance left, disable selection */
-                        //if (modInstData.miAssimpInstances.size() == 1) {
-                        //    modInstData.miSelectedEditorInstance = 0;
-                        //    editorData.eHighlightSelectedInstance = false;
-                        //}
-
+                        editorData.selectedModelKey = "";
+                        editorData.selectedModelId = NullModelId;
+     
                         ImGui::CloseCurrentPopup();
                     }
                     ImGui::SameLine();
@@ -649,22 +658,26 @@ namespace aveng {
                     ImGui::EndPopup();
                 }
 
-                ImGui::SameLine();
-                if (ImGui::Button("Create Instance")) {
-                    ModelRef currentModelRef = api_.uiListModelRefs().at(editorData.selectedModelIndex);
-
-                    if (currentModelRef.isAnimated) {
-                        api_.uiSpawn(currentModelRef, AnimatedCreateSettings{});
-                    }
-                    else {
-                        api_.uiSpawn(currentModelRef, TransformSettings{});
-                    }
-
-                    /* select new instance */
-                    /// TODO editorData.selectedInstanceHandle = modInstData.miAssimpInstances.size() - 1;
+                if (api_.nModels() == 1) {
+                    ImGui::EndDisabled();
                 }
 
-                if (ImGui::Button("Create Multiple Instances")) {
+                //ImGui::SameLine();
+                //if (ImGui::Button("Create Instance")) {
+                //    ModelRef currentModelRef = api_.uiListModelRefs().at(editorData.selectedModelIndex);
+
+                //    if (currentModelRef.isAnimated) {
+                //        api_.uiSpawn(currentModelRef, AnimatedCreateSettings{});
+                //    }
+                //    else {
+                //        api_.uiSpawn(currentModelRef, TransformSettings{});
+                //    }
+
+                //    /* select new instance */
+                //    /// TODO editorData.selectedInstanceHandle = modInstData.miAssimpInstances.size() - 1;
+                //}
+
+      /*          if (ImGui::Button("Create Multiple Instances")) {
                     ModelRef currentModelRef = api_.uiListModelRefs().at(editorData.selectedModelIndex);
                     if (currentModelRef.isAnimated) {
                         std::vector<AnimatedCreateSettings> settings(editorData.eManyInstanceCreateNum);
@@ -678,210 +691,159 @@ namespace aveng {
                 }
                 ImGui::SameLine();
                 ImGui::SliderInt("##MassInstanceCreation", &editorData.eManyInstanceCreateNum, 1, 100, "%d", flags);
+                */
 
-                if (modelListEmtpy) {
-                    ImGui::EndDisabled();
-                }
+                /// END MODELS
             }
 
             if (ImGui::CollapsingHeader("Instances")) {
-                bool modelListEmtpy = api_.uiMapModels().size() == 1; /// 
-                bool nullInstanceSelected = editorData.selectedEditorInstance == 0;
-                size_t numberOfInstances = api_.uiListInstances().size() - 1;
+                
 
-                ImGui::Text("Number of Instances: %ld", numberOfInstances);
+                const std::vector<UiInstanceRow> rows = api_.uiListInstances();
 
-                if (modelListEmtpy) {
-                    ImGui::BeginDisabled();
-                }
+                // Multi-select rules
+                const bool ctrl = ImGui::GetIO().KeyCtrl;
+                const bool shift = ImGui::GetIO().KeyShift; // (range selection later)
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Hightlight Instance:");
-                ImGui::SameLine();
-                ImGui::Checkbox("##HighlightInstance", &editorData.eHighlightSelectedInstance);
+                // Optional: filter to selected model
+                static bool filterToSelectedModel = false;
+                ImGui::Checkbox("Filter to selected model", &filterToSelectedModel);
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Selected Instance  :");
-                ImGui::SameLine();
-                ImGui::PushButtonRepeat(true);
+                ImGui::Separator();
 
-                /// TODO
-                //if (ImGui::ArrowButton("##Left", ImGuiDir_Left) &&
-                //    modInstData.miSelectedEditorInstance > 1) {
-                //    modInstData.miSelectedEditorInstance--;
-                //}
-                //if (modelListEmtpy || nullInstanceSelected) {
-                //    ImGui::BeginDisabled();
-                //}
+                // Header line
+                ImGui::TextUnformatted("Type");
+                ImGui::SameLine(60.0f);
+                ImGui::TextUnformatted("ModelId");
+                ImGui::SameLine(140.0f);
+                ImGui::TextUnformatted("Position");
+                ImGui::Separator();
 
-                /// TODO
-                //ImGui::SameLine();
-                //ImGui::PushItemWidth(30);
-                //ImGui::DragInt("##SelInst", &modInstData.miSelectedEditorInstance, 1, 1,
-                //    modInstData.miAssimpInstances.size() - 1, "%3d", flags);
-                //ImGui::PopItemWidth();
+                // Scrollable list region
+                ImGui::BeginChild("##InstanceList", ImVec2(0, 220), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-                if (modelListEmtpy || nullInstanceSelected) 
+                int visibleIndex = 0;
+                for (const UiInstanceRow& r : rows)
                 {
-                    ImGui::EndDisabled();
+                    if (filterToSelectedModel && editorData.selectedModelId != 0 && r.modelId != editorData.selectedModelId)
+                        continue;
+
+                    const bool isSelected = containsHandle(editorData.selectedMany, r.handle);
+
+                    // Build a readable label (must be unique per row for ImGui)
+                    // NOTE: we include "##" with a unique suffix so display text can be pretty.
+                    std::string display =
+                        std::string(r.animated ? "[A] " : "[S] ")
+                        + "Model " + std::to_string((uint32_t)r.modelId)
+                        + "  pos(" + std::to_string(r.position.x) + ", "
+                        + std::to_string(r.position.y) + ", "
+                        + std::to_string(r.position.z) + ")";
+
+                    // Make ID unique using the handle (index/generation)
+                    // We can’t easily stringify variant cleanly without a helper, so we use a stable-ish suffix:
+                    // You can replace uiHandleDebugId(...) with your own helper later.
+                    display += "##";
+                    display += std::to_string(visibleIndex++);
+
+                    if (ImGui::Selectable(display.c_str(), isSelected, ImGuiSelectableFlags_SpanAllColumns))
+                    {
+                        // Selection semantics
+                        if (!ctrl && !shift)
+                        {
+                            editorData.selectedMany.clear();
+                            addUnique(editorData.selectedMany, r.handle);
+                            editorData.primarySelection = r.handle;
+                        }
+                        else if (ctrl)
+                        {
+                            if (isSelected) {
+                                eraseHandle(editorData.selectedMany, r.handle);
+
+                                // Keep primarySelection valid-ish
+                                if (editorData.primarySelection == r.handle) {
+                                    editorData.primarySelection = editorData.selectedMany.empty()
+                                        ? AnyInstanceHandle{} : editorData.selectedMany.back();
+                                }
+                            }
+                            else {
+                                addUnique(editorData.selectedMany, r.handle);
+                                editorData.primarySelection = r.handle;
+                            }
+                        }
+                        else if (shift)
+                        {
+                            // Range selection later once you commit to a stable visible ordering + anchor index
+                            // For now, behave like single-select:
+                            editorData.selectedMany.clear();
+                            addUnique(editorData.selectedMany, r.handle);
+                            editorData.primarySelection = r.handle;
+                        }
+                    }
+
+                    // Right click context menu (optional but useful)
+                    if (ImGui::BeginPopupContextItem())
+                    {
+                        if (ImGui::MenuItem("Select Only"))
+                        {
+                            editorData.selectedMany.clear();
+                            addUnique(editorData.selectedMany, r.handle);
+                            editorData.primarySelection = r.handle;
+                        }
+                        if (ImGui::MenuItem("Toggle Selection"))
+                        {
+                            if (containsHandle(editorData.selectedMany, r.handle)) {
+                                eraseHandle(editorData.selectedMany, r.handle);
+                            }
+                            else {
+                                addUnique(editorData.selectedMany, r.handle);
+                                editorData.primarySelection = r.handle;
+                            }
+                        }
+                        if (ImGui::MenuItem("Destroy"))
+                        {
+                            api_.uiDestroy(r.handle);
+                            // Optionally call sanitizeSelection(editorData, api_) after you implement it
+                        }
+                        ImGui::EndPopup();
+                    }
                 }
 
-                /// TODO
-                //ImGui::SameLine();
-                //if (ImGui::ArrowButton("##Right", ImGuiDir_Right) &&
-                //    modInstData.miSelectedEditorInstance < (modInstData.miAssimpInstances.size() - 1)) 
-                //{
-                //    modInstData.miSelectedEditorInstance++;
-                //}
-                //ImGui::PopButtonRepeat();
+                ImGui::EndChild();
 
-                //if (modelListEmtpy) {
-                //    ImGui::EndDisabled();
-                //}
+                ImGui::Separator();
 
-                //if (modelListEmtpy || nullInstanceSelected) {
-                //    ImGui::BeginDisabled();
-                //}
+                // Action buttons on current selection
+                const int selCount = (int)editorData.selectedMany.size();
+                ImGui::Text("Selected: %d", selCount);
 
-                //// Clamp here for DragInt
-                //modInstData.miSelectedEditorInstance = std::clamp(modInstData.miSelectedEditorInstance, 0, /// index of Selected editor instance
-                //    static_cast<int>(modInstData.miAssimpInstances.size() - 1)); /// Size of all instances
+                ImGui::BeginDisabled(selCount == 0);
+                if (ImGui::Button("Destroy Selected"))
+                {
+                    api_.uiDestroyMany(editorData.selectedMany);
+                    // sanitizeSelection(editorData, api_);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Clear Selection"))
+                {
+                    editorData.selectedMany.clear();
+                    editorData.primarySelection = AnyInstanceHandle{};
+                }
+                ImGui::EndDisabled();
 
-                //InstanceSettings settings;
-                //if (numberOfInstances > 0) { /// Query settings of selected instance
-                //    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                //}
+                // Optional: show primary selection details (queries happen via API, not direct pool access)
+                if (editorData.primarySelection.index() != 0) // not monostate
+                {
+                    InstanceView view{};
+                    if (api_.uiTryGetInstance(editorData.primarySelection, view))
+                    {
+                        ImGui::Separator();
+                        ImGui::TextUnformatted("Primary Selection");
+                        ImGui::Text("ModelId: %u", (uint32_t)view.modelId);
+                        ImGui::Text("Animated: %s", view.animated ? "true" : "false");
+                        // Add transform fields here once you wire set/get transform through api_
+                    }
+                }
 
-                //if (ImGui::Button("Center This Instance")) {
-                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                //    // Callback Function - Center Selected Instance
-                //    modInstData.miInstanceCenterCallbackFunction(currentInstance);
-                //}
-
-                // ImGui::SameLine();
-                /// TODO
-
-                /* we MUST retain the last model - caps, I'd heed that sh*t */
-                //unsigned int numberOfInstancesPerModel = 0;
-                //if (modInstData.miAssimpInstances.size() > 1) {
-                //    /// Editor Selection
-                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                //    /// Get Model AssetKey
-                //    std::string currentModelName = currentInstance->getModel()->getModelFileName();
-                //    /// Num instances per model
-                //    numberOfInstancesPerModel = modInstData.miAssimpInstancesPerModel[currentModelName].size();
-                //}
-
-                //if (numberOfInstancesPerModel < 2) {
-                //    ImGui::BeginDisabled();
-                //}
-
-                //ImGui::SameLine();
-                //if (ImGui::Button("Delete Instance")) {
-                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                //    // Callback Function - Delete Instance
-                //    modInstData.miInstanceDeleteCallbackFunction(currentInstance);
-
-                //    /* hard reset for now */
-                //    if (modInstData.miSelectedEditorInstance > 1) {
-                //        modInstData.miSelectedEditorInstance -= 1;
-                //    }
-                //    /// Get Settings
-                //    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                //}
-
-                //if (numberOfInstancesPerModel < 2) {
-                //    ImGui::EndDisabled();
-                //}
-
-                //if (ImGui::Button("Clone Instance")) {
-                //    std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-                //    // Callback Function - Clone Instance
-                //    modInstData.miInstanceCloneCallbackFunction(currentInstance);
-
-                //    /* reset to last position for now */
-                //    modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
-
-                //    /* read back settings for UI */
-                //    settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                //}
-
-                //if (ImGui::Button("Create Multiple Clones")) {
-
-                //    if (editorData.eManyInstanceCloneNum > 1) {
-                //     
-                //        std::shared_ptr<AssimpInstance> currentInstance = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance);
-
-                //        // Callback function - Clone Many
-                //        modInstData.miInstanceCloneManyCallbackFunction(currentInstance, editorData.eManyInstanceCloneNum);
-
-                //        /* reset to last position for now */
-                //        modInstData.miSelectedEditorInstance = modInstData.miAssimpInstances.size() - 1;
-
-                //        /* read back settings for UI */
-                //        settings = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getInstanceSettings();
-                //    }
-   
-                //}
-                //ImGui::SameLine();
-                //ImGui::SliderInt("##MassInstanceCloning", &editorData.eManyInstanceCloneNum, 1, 100, "%d", flags);
-
-                //if (modelListEmtpy || nullInstanceSelected) {
-                //    ImGui::EndDisabled();
-                //}
-
-                ///* get the new size, in case of a deletion */
-                //numberOfInstances = modInstData.miAssimpInstances.size() - 1;
-
-                //std::string baseModelName = "None";
-                //if (numberOfInstances > 0 && !nullInstanceSelected) {
-                //    baseModelName = modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->getModel()->getModelFileName();
-                //}
-                //ImGui::Text("Base Model: %s", baseModelName.c_str());
-
-                //if (numberOfInstances == 0 || nullInstanceSelected) {
-                //    ImGui::BeginDisabled();
-                //}
-
-                ////ImGui::AlignTextToFramePadding();
-                ////ImGui::Text("Swap Y and Z axes:     ");
-                ////ImGui::SameLine();
-                ////ImGui::Checkbox("##ModelAxisSwap", &settings.isSwapYZAxis);
-
-                //ImGui::AlignTextToFramePadding();
-                //ImGui::Text("Model Pos (X/Y/Z):     ");
-                //ImGui::SameLine();
-                //ImGui::SliderFloat3("##ModelPos", glm::value_ptr(settings.isWorldPosition), /// Setting. Fetch from .common.xf.pos
-                //    -25.0f, 25.0f, "%.3f", flags);
-
-                //ImGui::AlignTextToFramePadding();
-                //ImGui::Text("Model Rotation (X/Y/Z):");
-                //ImGui::SameLine();
-                //ImGui::SliderFloat3("##ModelRot", glm::value_ptr(settings.isWorldRotation), /// Setting. Fetch from .common.xf.rotEuler
-                //    -180.0f, 180.0f, "%.3f", flags);
-
-                //ImGui::AlignTextToFramePadding();
-                //ImGui::Text("Model Scale:           ");
-                //ImGui::SameLine();
-                //ImGui::SliderFloat("##ModelScale", &settings.isScale,
-                //    0.001f, 10.0f, "%.4f", flags);
-
-                //if (ImGui::Button("Reset Instance Values")) {
-                //    InstanceSettings defaultSettings{};
-
-                //    /* save and restore index positions */
-                //    int instanceIndex = settings.isInstanceIndexPosition;
-                //    settings = defaultSettings;
-                //    settings.isInstanceIndexPosition = instanceIndex;
-                //}
-
-                //if (numberOfInstances == 0 || nullInstanceSelected) {
-                //    ImGui::EndDisabled();
-                //}
-
-                //if (numberOfInstances > 0) {
-                //    modInstData.miAssimpInstances.at(modInstData.miSelectedEditorInstance)->setInstanceSettings(settings);
-                //}
             }
 
             if (ImGui::CollapsingHeader("Animations")) {

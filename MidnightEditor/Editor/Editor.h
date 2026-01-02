@@ -1,15 +1,15 @@
 #pragma once
-#include <cassert>
-#include "Editor/API/IEditorUIAPI.h"
+#include "avpch.h"
 #include "Core/PointLightSystem.h"
 #include "Core/Camera/aveng_camera.h"
 #include "Core/Input/EventPayloads.h"
-#include "Game/Camera/CameraManager.h"
-#include "GUI/aveng_imgui.h"
+#include "Editor/API/IEditorUIAPI.h"
+#include "Editor/API/SceneEditAPI.h"
+#include "Editor/GUI/aveng_imgui.h"
 #include "EditorCamera.h"
 #include "EditorData.h"
+#include "Game/Camera/CameraManager.h"
 #include "Game/data.h"
-#include "Editor/API/SceneEditAPI.h"
 
 /**
 * Note: At the moment, this class shares the currentFrameIndex held by the renderer.
@@ -51,13 +51,9 @@ namespace aveng {
 			EngineDevice& _engineDevice,
 			AvengWindow& window,
 			CameraManager& _cameraManager,
-			SceneFacade& _sceneFacade,		// Use the scene_ member to utilize any operation that isn't a getter of scene data. (getOrLoadModel, unloadModel, spaw, spawnMany, destroyInstance, setTransform, etc.)
-			const IModelQuery& modelQ,		// Getters of model metadata via ModelRegistry as injected from ModelLibrary
-			const IModelAnimQuery& animQ,	// Getters of animation metadata via ModelRegistry as injected from ModelLibrary
-			const IInstanceQuery& instQ		// Getters of SceneFacade strictly on behalf of instance metadata and lists as injected by SceneFacade
+			SceneFacade& _sceneFacade // Composition root - Editor doesn't need this, we just pass it to the SceneEditAPI in the init list
 		);
 		~Editor();
-
 
 		void initialize(SwapChain* swapchain);
 		void update(float frameTime, unsigned int frameIndex);
@@ -120,8 +116,6 @@ namespace aveng {
 		//	bool highlight,
 		//	float blinkValue);
 
-
-
 	private:
 
 		CameraManager& cameraManager;
@@ -159,15 +153,9 @@ namespace aveng {
 		EngineDevice& engineDevice;
 		AvengWindow& window;
 		Renderer& renderer;
-		
+
 		// Model & Instance Ops
-		SceneFacade& scene_;			// Set Scene Data
-
-		const IInstanceQuery& instQ_;	// Query Instances. From sceneFacade_.instanceQuery()
-		const IModelQuery& modelQ_;		// Query Models.	From modelLib.query()
-		const IModelAnimQuery& animQ_;	// Query Animation Data. From modelLib.animQuery()
-
-		SceneEditAPI sceneEdit_;
+		SceneEditAPI sceneEdit_;		// We pass the sceneFacade to the SceneEditAPI
 
 		EditorData editorData;
 		AvengImgui aveng_imgui;

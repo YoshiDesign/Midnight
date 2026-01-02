@@ -1,9 +1,14 @@
+#include "avpch.h"
 #include "SceneEditAPI.h"
 #include "Runtime/Facade/SceneFacade.h"
 
 namespace aveng {
 
 	SceneEditAPI::SceneEditAPI(SceneFacade& scene) : scene_{ scene } {}
+
+	const uint32_t SceneEditAPI::nModels() const {
+		return scene_.modelQuery().nModels();
+	}
 
 	ModelRef SceneEditAPI::uiGetOrLoadModel(const AssetKey& key) {
 		return scene_.getOrLoadModel(key);
@@ -58,25 +63,76 @@ namespace aveng {
 	// Num Models loaded
 	// Num instances loaded, per model & total
 	
-	const std::unordered_map<AssetKey, ModelId> SceneEditAPI::uiMapModels() const {
-		return scene_.modelQuery().mapModels();
+	const std::unordered_map<AssetKey, ModelMeta> SceneEditAPI::uiMapModels() const {
+		return scene_.modelQuery().mapModelMeta();
 	}
 
+	/* This might not be useful to the UI */
 	const std::vector<ModelRef>  SceneEditAPI::uiListModelRefs() const {
 		return scene_.modelQuery().listModels();
 	}
-
+	/* This might not be useful to the UI */
 	const std::vector<AssetKey> SceneEditAPI::uiListModelKeys() const {
-		
 		return scene_.modelQuery().listModelKeys();
 	}
 
-	const std::vector<AnyInstanceHandle> SceneEditAPI::uiListInstances() const {
-		return scene_.listAllInstances();
+	bool SceneEditAPI::uiTryGetInstance(AnyInstanceHandle h, InstanceView& out) const {
+		return false;
+	}
+
+	const std::vector<UiInstanceRow> SceneEditAPI::uiListInstances() const {
+
+		std::vector<AnyInstanceHandle> handles = scene_.listAllInstances();
+		std::vector<UiInstanceRow> rows{};
+		rows.reserve(handles.size());
+
+		for (const auto& h : handles) {
+
+			// Populate instance views
+			InstanceView v{};
+			scene_.tryGetInstance(h, v);
+			
+			// Create output for UI
+			rows.emplace_back(UiInstanceRow{ 
+				h, 
+				v.modelId, 
+				v.animated, 
+				v.xf.pos, 
+				v.xf.rotEuler, 
+				v.xf.scale }
+			);
+		}
+
+		return rows;
+	}
+
+	const std::vector<UiModelRow> SceneEditAPI::uiListModels() const {
+
+		const std::unordered_map<AssetKey, ModelMeta> modelMap = uiMapModels();
+		std::vector<UiModelRow> rows{};
+		rows.reserve(modelMap.size());
+
+		for (const auto& [key, meta] : modelMap) {
+			rows.push_back(UiModelRow{
+				meta.id,
+				key,
+				meta.animated
+			});
+		}
+
+		return rows;
 	}
 
 	const std::vector<AnyInstanceHandle> SceneEditAPI::uiListInstancesForModel(ModelId id) const {
 		return scene_.listInstancesForModel(id);
 	}
+
+	void SceneEditAPI::uiSetInstanceTransform(AnyInstanceHandle h, const InstanceTransform& t) {
+		return;
+	}
+	bool SceneEditAPI::uiTryGetInstanceTransform(AnyInstanceHandle h, InstanceTransform& out) const {
+		return false;
+	}
+
 
 }

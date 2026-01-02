@@ -37,7 +37,7 @@ namespace {
 
         out.modelId = inst.common.modelId;
         out.xf = inst.common.xf;
-        out.animated = animatedFlag; // Implied given the caller semantics
+        out.animated = animatedFlag; // Implied from args / caller semantics
         return true;
     }
 
@@ -119,12 +119,15 @@ namespace aveng {
             }
         }, h);
     }
+
     /* IInstanceQuery */
     std::vector<AnyInstanceHandle> SceneFacade::listAllInstances() const
     {
         /*
          * Return an exhaustive list of all instances from 
          * static through animated instances (presently)
+         * 
+         * Sorted from static -> animated. No available sorting logic otherwise
          */
 
         const auto& statPool = staticMgr_.data();

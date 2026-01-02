@@ -24,7 +24,6 @@ namespace aveng {
 
 	PointLightSystem::~PointLightSystem()
 	{
-		std::cout << "Destroying PointLight System" << std::endl;
 		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
 		vkDestroyPipeline(engineDevice.device(), pipeline, nullptr);
 	}

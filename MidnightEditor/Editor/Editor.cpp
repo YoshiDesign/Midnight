@@ -13,8 +13,6 @@
 #include "CoreVK/AvengStorageBuffer.h"
 #include "Runtime/World/InstanceManager.h"
 #include "Runtime/Facade/SceneFacade.h"
-#include <cassert>
-#include <stdexcept>
 
 namespace aveng {
 
@@ -25,10 +23,7 @@ namespace aveng {
 		EngineDevice& _engineDevice, 
 		AvengWindow& window, 
 		CameraManager& _cameraManager,
-		SceneFacade& _sceneFacade,
-		const IModelQuery& modelQ,
-		const IModelAnimQuery& animQ,
-		const IInstanceQuery& instQ
+		SceneFacade& _sceneFacade
 		)
 		: 
 		 renderData{ _renderData }
@@ -37,11 +32,7 @@ namespace aveng {
 		, engineDevice{ _engineDevice }
 		, window{ window }
 		, cameraManager{ _cameraManager }
-		, scene_{ _sceneFacade }
-		, modelQ_{ modelQ }
-		, animQ_{ animQ }
-		, instQ_{ instQ }
-		, sceneEdit_{ _sceneFacade }
+		, sceneEdit_{ _sceneFacade } // Composition root
 		, aveng_imgui{ renderData, sceneEdit_, editorData, window, engineDevice} 
 		, pointLightSystem{ engineDevice, renderData }
 	{

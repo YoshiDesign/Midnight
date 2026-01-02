@@ -49,6 +49,7 @@ namespace aveng {
 	};
 
 	struct ModelMeta {
+		ModelId id;
 		glm::mat4 root;          // model-space -> engine-space correction created at model load
 		uint32_t  boneCount = 0; // 0 for static models
 		bool      animated = false;
@@ -73,6 +74,8 @@ namespace aveng {
 	struct IModelQuery {
 		virtual ~IModelQuery() = default;
 
+		virtual const uint32_t nModels() const = 0;
+
 		/// Returns true if modelId is currently loaded/valid.
 		virtual bool isModelLoaded(ModelId id, ModelMeta& out) const = 0;
 
@@ -81,7 +84,7 @@ namespace aveng {
 
 		virtual bool tryGetModelMeta(ModelId id, ModelMeta& out) const = 0;
 
-		virtual const std::unordered_map<AssetKey, ModelId> mapModels() const = 0;
+		virtual const std::unordered_map<AssetKey, ModelMeta> mapModelMeta() const = 0;
 
 		virtual const std::vector<ModelRef> listModels() const = 0;
 		
@@ -108,11 +111,13 @@ namespace aveng {
 
 		const ModelEntry* get(ModelId id) const;
 
+		const uint32_t nModels() const;
+
 		bool tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const override;
 		bool isModelAnimated(ModelId id, ModelMeta& out) const override;
 		bool isModelLoaded(ModelId id, ModelMeta& out) const override;
 		bool tryGetModelMeta(ModelId id, ModelMeta& out) const override;
-		virtual const std::unordered_map<AssetKey, ModelId> mapModels() const override;
+		virtual const std::unordered_map<AssetKey, ModelMeta> mapModelMeta() const override;
 		virtual const std::vector<ModelRef> listModels() const override;
 		virtual const std::vector<AssetKey> listModelKeys() const override;
 

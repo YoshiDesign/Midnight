@@ -7,6 +7,7 @@
 
 namespace aveng {
 
+	enum class PoolKind : std::uint8_t { Static, Animated };
 
 	/* Q: why do InstanceHandles still use basic <class Tag> and not a more complex variant? */
 
@@ -130,6 +131,13 @@ namespace aveng {
 		std::vector<uint8_t> dirtyGpu;          // 0 or 1 per slot index
 		std::vector<uint32_t> dirtyGpuList;     // slot indices that changed this tick
 
+	};
+
+	struct InstanceView {
+		ModelId modelId;
+		InstanceTransform xf;
+		glm::mat4 modelRoot;
+		bool animated;
 	};
 
 	// Model Callbacks

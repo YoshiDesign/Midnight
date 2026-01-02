@@ -15,43 +15,43 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="GUI\aveng_imgui.cpp">
+    <ClCompile Include="Editor\GUI\aveng_imgui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\imgui.cpp">
+    <ClCompile Include="Editor\GUI\imgui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\imgui_demo.cpp">
+    <ClCompile Include="Editor\GUI\imgui_demo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\imgui_draw.cpp">
+    <ClCompile Include="Editor\GUI\imgui_draw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\imgui_impl_glfw.cpp">
+    <ClCompile Include="Editor\GUI\imgui_impl_glfw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\imgui_impl_vulkan.cpp">
+    <ClCompile Include="Editor\GUI\imgui_impl_vulkan.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\imgui_tables.cpp">
+    <ClCompile Include="Editor\GUI\imgui_tables.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\imgui_widgets.cpp">
+    <ClCompile Include="Editor\GUI\imgui_widgets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Editor\Editor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\ImGuiFileDialog.cpp">
+    <ClCompile Include="Editor\GUI\ImGuiFileDialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\models\CoordArrowsModel.cpp">
+    <ClCompile Include="Editor\GUI\models\CoordArrowsModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\models\RotationArrowsModel.cpp">
+    <ClCompile Include="Editor\GUI\models\RotationArrowsModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GUI\models\ScaleArrowsModel.cpp">
+    <ClCompile Include="Editor\GUI\models\ScaleArrowsModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Editor\EditorCamera.cpp">
@@ -62,52 +62,52 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="GUI\aveng_imgui.h">
+    <ClInclude Include="Editor\GUI\aveng_imgui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imconfig.h">
+    <ClInclude Include="Editor\GUI\imconfig.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imgui.h">
+    <ClInclude Include="Editor\GUI\imgui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imgui_impl_glfw.h">
+    <ClInclude Include="Editor\GUI\imgui_impl_glfw.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imgui_impl_vulkan.h">
+    <ClInclude Include="Editor\GUI\imgui_impl_vulkan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imgui_internal.h">
+    <ClInclude Include="Editor\GUI\imgui_internal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imstb_rectpack.h">
+    <ClInclude Include="Editor\GUI\imstb_rectpack.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imstb_textedit.h">
+    <ClInclude Include="Editor\GUI\imstb_textedit.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\imstb_truetype.h">
+    <ClInclude Include="Editor\GUI\imstb_truetype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Editor\Editor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\ImGuiFileDialog.h">
+    <ClInclude Include="Editor\GUI\ImGuiFileDialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\ImGuiFileDialogConfig.h">
+    <ClInclude Include="Editor\GUI\ImGuiFileDialogConfig.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\dirent\dirent.h">
+    <ClInclude Include="Editor\GUI\dirent\dirent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\models\CoordArrowsModel.h">
+    <ClInclude Include="Editor\GUI\models\CoordArrowsModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\models\RotationArrowsModel.h">
+    <ClInclude Include="Editor\GUI\models\RotationArrowsModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GUI\models\ScaleArrowsModel.h">
+    <ClInclude Include="Editor\GUI\models\ScaleArrowsModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Editor\EditorData.h">
@@ -120,6 +120,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Editor\API\SceneEditAPI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Editor\Utils\selection_utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

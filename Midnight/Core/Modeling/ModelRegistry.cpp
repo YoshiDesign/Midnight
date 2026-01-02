@@ -30,9 +30,14 @@ namespace aveng {
 	}
 
 	// IModelQuery
+	const uint32_t ModelRegistryData::nModels() const {
+		return models.size();
+	}
+
 	bool ModelRegistryData::isModelAnimated(ModelId id, ModelMeta& out) const {
 		const ModelEntry* e = get(id); // Micro-Optimization - quit early if nullModelId
 		if (!e || e->id == NullModelId || e->model == nullptr) return false;
+		out.id = e->id;
 		out.animated = e->isAnimated;
 		out.boneCount = e->boneCount;
 		out.root = e->rootTransform;
@@ -43,6 +48,7 @@ namespace aveng {
 	bool ModelRegistryData::isModelLoaded(ModelId id, ModelMeta& out) const {
 		const ModelEntry* e = get(id);
 		if (!e || e->id == NullModelId || e->model == nullptr) return false;
+		out.id = e->id;
 		out.animated = e->isAnimated;
 		out.boneCount = e->boneCount;
 		out.root = e->rootTransform;
@@ -53,15 +59,25 @@ namespace aveng {
 	bool ModelRegistryData::tryGetModelMeta(ModelId id, ModelMeta& out) const {
 		const ModelEntry* e = get(id);
 		if (!e || e->id == NullModelId || e->model == nullptr) return false;
-
+		out.id = e->id;
 		out.root = e->rootTransform;
 		out.boneCount = e->boneCount;
 		out.animated = e->isAnimated;
 		return true;
 	}
 
-	const std::unordered_map<AssetKey, ModelId> ModelRegistryData::mapModels() const {
-		return idByKey;
+	const std::unordered_map<AssetKey, ModelMeta> ModelRegistryData::mapModelMeta() const {
+		
+		std::unordered_map<AssetKey, ModelMeta> modelMeta{};
+		modelMeta.reserve(idByKey.size());
+
+		ModelMeta meta{};
+		for (const auto& [key, id] : idByKey) {
+			tryGetModelMeta(id, meta);
+			modelMeta.try_emplace(key, meta);
+		}
+		
+		return modelMeta;
 	}
 
 	const std::vector<ModelRef> ModelRegistryData::listModels() const {

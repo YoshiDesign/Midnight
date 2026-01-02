@@ -58,6 +58,9 @@ namespace aveng {
 		const EditorData&	editorData() const	{ return editor_->data(); }
 		EditorData&			editorData()		{ return editor_->data(); }
 #endif
+
+		void shutdown();
+
 	private:
 		// ---- External state
 		GameData& game_data;

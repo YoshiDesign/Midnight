@@ -90,6 +90,11 @@ namespace aveng {
 	ModelRef ModelLibrary::getOrLoadModel(const AssetKey& assetKey)
 	{
 		const AssetKey key = normalizeAssetKey(assetKey);
+
+		/* TODO - clean this up
+				- Normalize the asset directory if loading from file source
+		*/
+
 		std::cout << "[Renderer::getOrLoadModel] Loading Model: " << assetKey << std::endl;
 
 		// Already known?
@@ -225,7 +230,7 @@ namespace aveng {
 		for (const AssetKey& key : queue) {
 			auto it = registry_.idByKey.find(key);
 			if (it == registry_.idByKey.end()) {
-				// Key got removed or never registered (should be rare) - implies model was loaded through another means than this class
+				// Key got removed or never registered (should be rare) - implies model bypassed other registry entries
 				std::printf("[ModelLibrary] Pending load key missing from registry: %s\n", key.c_str());
 				continue;
 			}
@@ -252,6 +257,7 @@ namespace aveng {
 			// 2) Build/import
 			std::unique_ptr<AvengModel> model = buildModelFromSource(key, bytes);
 			if (!model) {
+				ejectModel(registry_.idByKey[key], key);
 				std::printf("[ModelLibrary] Failed to load model: %s\n", key.c_str());
 				// Policy: do NOT requeue automatically (avoid infinite spam).
 				// If you want retry-once, you can push_back(key) here conditionally.
@@ -302,13 +308,16 @@ namespace aveng {
 		auto model = std::make_unique<AvengModel>(engineDevice_);
 
 		// Base directory policy for resolving external refs (textures/bin/etc)
-		const std::string baseDir = baseDirForAssetKey(key);
-
 		// Import flags�keep your existing defaults, pass extra if needed
 		constexpr unsigned int extraImportFlags = 0;
 
 		const std::string modelBaseDir = baseDirForAssetKey(key);                // e.g. "Assets/Models/House"
-		const std::string engineTextureDir = joinPath(contentRoot_, textureRoot_); // e.g. "Assets/textures"
+		const std::string engineTextureDir = normalizeAssetKey(joinPath(contentRoot_, textureRoot_)); // e.g. "Assets/textures"
+		const std::string baseDir = baseDirForAssetKey(key);
+
+		std::cout << "baseDir:\t" << baseDir << "\n";
+		std::cout << "ModelBaseDir:\t" << modelBaseDir << "\n";
+		std::cout << "EngineTextureDir:\t" << engineTextureDir<< "\n";
 
 		// NOTE: AvengModel now does "import/build", not IO.
 		const bool ok = model->loadModelV2(
@@ -328,9 +337,47 @@ namespace aveng {
 		return model;
 	}
 
+	/* Note: Does not preserve insertion order */
+	void ModelLibrary::ejectModel(ModelId id, AssetKey key) {
+
+		auto itIdx = registry_.indexById.find(id);
+		if (itIdx == registry_.indexById.end()) {
+			// not found; either no-op or assert/log
+			return;
+		}
+
+		const size_t idx = itIdx->second;
+		const size_t last = registry_.models.size() - 1;
+
+		if (auto itKey = registry_.idByKey.find(key); itKey != registry_.idByKey.end()) {
+			if (itKey->second == id) {
+				registry_.idByKey.erase(itKey);
+			}
+			// else: key exists but maps to a different id
+		}
+
+		assert(registry_.models[idx].key == key);
+
+		// Remove from models with swap-erase
+		if (idx != last) {
+			// Move last element into the hole at idx
+			registry_.models[idx] = std::move(registry_.models[last]);
+
+			// Fix indexById for the moved model
+			const ModelId movedId = registry_.models[idx].id; // ModelEntry must have .id
+			registry_.indexById[movedId] = idx;
+		}
+		registry_.models.pop_back();
+
+		// Remove id->index mapping for the removed model (O(1))
+		registry_.indexById.erase(itIdx);
+	}
+
 	void ModelLibrary::cleanup() {
 
+		std::cout << "CLEANING UP MODEL-LIBRARY\n";
 		for (const auto& entry : registry_.models) {
+			if (entry.id == NullModelId) continue;
 			entry.model->cleanup(engineDevice_, renderData_);
 		}
 

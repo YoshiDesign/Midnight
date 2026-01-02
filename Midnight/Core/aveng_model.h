@@ -31,10 +31,11 @@ namespace aveng {
 
 		AvengModel(EngineDevice& device);
 
-		~AvengModel();
-
 		AvengModel(const AvengModel&) = delete;
 		AvengModel& operator=(const AvengModel&) = delete;
+		AvengModel(AvengModel&&) noexcept = default;
+		AvengModel& operator=(AvengModel&&) noexcept = default;
+		~AvengModel() = default;
 
 		bool loadModelV2(
 			const VkRenderData& renderData,
@@ -65,10 +66,11 @@ namespace aveng {
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
 		const std::vector<VkShaderStorageBufferData>& getBoneMatrixOffsetBuffers() const;
 		const std::vector<VkShaderStorageBufferData>& getBoneParentBuffers() const;
-		std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
 
-		VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex);
-		const VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex) const;
+		//std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
+		//VkDescriptorSet& getMatrixMultDescriptorSet(int frameIndex);
+		VkDescriptorSet getMatrixMultDescriptorSet(int frameIndex) const;
+
 		glm::mat4 getRootTranformationMatrix();
 		bool hasAnimations();
 		unsigned int getTriangleCount();

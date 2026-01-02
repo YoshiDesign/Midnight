@@ -100,7 +100,7 @@ SOFTWARE.
 #ifdef IMGUI_INTERNAL_INCLUDE
 #include IMGUI_INTERNAL_INCLUDE
 #else  // IMGUI_INTERNAL_INCLUDE
-#include "GUI/imgui_internal.h"
+#include "Editor/GUI/imgui_internal.h"
 #endif  // IMGUI_INTERNAL_INCLUDE
 
 // legacy compatibility 1.89

@@ -33,6 +33,7 @@ namespace aveng {
         }
 
         ModelLibrary(EngineDevice& engineDevice, VkRenderData& renderData);
+        ~ModelLibrary() = default;
 
         ModelRef getOrLoadModel(const AssetKey& assetKey) override;
         bool unloadModel(const AssetKey& assetKey) override;
@@ -63,8 +64,11 @@ namespace aveng {
         DestroyInstancesForModelFn onDestroyInstancesForModel_;
         std::unique_ptr<IModelSource> modelSource_;
 
-        std::string contentRoot_ = "Assets";    // or "." or absolute
-        std::string textureRoot_ = "textures";  // relative to contentRoot_
+        std::string contentRoot_ = "";    // or "." or absolute
+        std::string textureRoot_ = "";  // relative to contentRoot_
+
+        /* Note: Does not preserve insertion order */
+        void ejectModel(ModelId id, AssetKey key);
     };
 
 }

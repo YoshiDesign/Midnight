@@ -25,7 +25,7 @@ namespace aveng {
 	 * but I'm also willing to bite my tongue on this someday
 	 */
 
-	class AvengModel; // We use the SceneFacade as <IRenderSceneView> to punt a const AvengModel* to the renderer, for now!
+	class AvengModel; // We use the SceneFacade as <IRenderSceneView> to punt a `const AvengModel*` directly to the renderer, for now!
 					  // You'll find this same fwd decl in InstanceManager.h
 
 	/* */
@@ -127,8 +127,6 @@ namespace aveng {
 		}
 
 	private:
-
-		enum class PoolKind : std::uint8_t { Static, Animated };
 
 		struct ModelValidation {
 			PoolKind pool = PoolKind::Static;

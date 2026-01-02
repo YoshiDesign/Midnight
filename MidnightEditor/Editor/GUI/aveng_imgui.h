@@ -4,21 +4,28 @@
 #include "CoreVK/VkRenderData.h"
 #include "Editor/EditorData.h"
 #include "Core/Input/InputState.h"
-#include "GUI/imgui.h"
-#include "GUI/imgui_impl_glfw.h"
-#include "GUI/imgui_impl_vulkan.h"
-#include "GUI/ImGuiFileDialog.h"
-#include "GUI/models/CoordArrowsModel.h"
-#include "GUI/models/RotationArrowsModel.h"
-#include "GUI/models/ScaleArrowsModel.h"
+#include "Editor/GUI/models/CoordArrowsModel.h"
+#include "Editor/GUI/models/RotationArrowsModel.h"
+#include "Editor/GUI/models/ScaleArrowsModel.h"
 #include "Utils/Timer.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
+#include "Editor/Utils/selection_utils.h"
+
+#include "Editor/GUI/imgui.h"
+#include "Editor/GUI/imgui_impl_glfw.h"
+#include "Editor/GUI/imgui_impl_vulkan.h"
+#include "Editor/GUI/imgui_internal.h"
+#include "Editor/GUI/ImGuiFileDialog.h"
+/*
+    UI state should only store stable identifiers (ModelId, AnyInstanceHandle),
+    and UI presentation should be built from query snapshots (IModelQuery, IInstanceQuery)
+*/
 
 namespace aveng {
 
     class EngineDevice;
     class AvengWindow;
-    class SceneEditAPI;
+    struct IEditorUIAPI;
     struct InputState;
 
 	static void check_vk_result(VkResult err) {
@@ -33,7 +40,7 @@ namespace aveng {
 
 		AvengImgui(
             VkRenderData& _renderData, 
-            SceneEditAPI& api_,
+            IEditorUIAPI& api_,
             EditorData& editorData, 
             AvengWindow& _window, 
             EngineDevice& _engineDevice);
@@ -63,7 +70,7 @@ namespace aveng {
 		EngineDevice& engineDevice;
         AvengWindow& window;
         EditorData& editorData;
-        SceneEditAPI& api_;
+        IEditorUIAPI& api_;
 
         VkRenderPass mSelectionRenderpass = VK_NULL_HANDLE;
         VkRenderPass mLineRenderpass = VK_NULL_HANDLE;
