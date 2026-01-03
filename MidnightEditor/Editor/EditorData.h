@@ -23,11 +23,10 @@ namespace aveng {
         // --- instance selection ---
         AnyInstanceHandle primarySelection{}; // last clicked / active
         std::vector<AnyInstanceHandle> selectedMany; // multi-select set (unique)
+        AnyInstanceHandle noSelect{};
 
         bool eHasSelection = false;
-        AnyInstanceHandle curInstSelect{};
         ModelRef curModelSelect{};
-        std::vector<AnyInstanceHandle> selectedInstances;
 
         bool eHighlightSelectedInstance = false;
         float eSelectHighlightValue = 1.0f;
@@ -52,12 +51,6 @@ namespace aveng {
 
         /* color hightlight for selection etc */
         std::vector<glm::vec2> eSelectedInstance{}; // Shader Uniform Data
-
-
-
-
-        //int miSelectedEditorInstance = 0;
-
 
         CameraTransform cameraTransform{};
         std::vector<CameraDebugInfo> cameraDebugList;

@@ -295,9 +295,10 @@ namespace aveng {
 			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
 			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
 
+			/* SSBOs uploaded once and forgotten about. No need to persistently map */
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList))
 			{
-				throw std::runtime_error("model buffer allocation size was incorrect");
+				throw std::runtime_error("mod`el buffer allocation size was incorrect");
 			};
 
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList))

@@ -70,15 +70,6 @@ namespace aveng {
 		}
 	}
 
-
-	// Note: Broken - Move this to Editor
-//void updateTriangleCount(unsigned int triangles) {
-//    // renderData.rdTriangleCount = 0;
-//    //for (const auto& instanceSlot : data_.miInstanceSlots) {
-//        renderData.rdTriangleCount += triangles;
-//    //}
-//}
-
 	Editor::~Editor() 
 	{
 		cleanup();
@@ -122,8 +113,8 @@ namespace aveng {
 			cameraManager.setActive(editor_camera_id);
 		}
 
-		setupSelectionHighlight(frameTime);
-		setSelectedInstance();
+		//setupSelectionHighlight(frameTime);
+		//setSelectedInstance();
 		updateStorageBuffers();
 	}
 
@@ -173,8 +164,8 @@ namespace aveng {
 			return;
 		}
 
-		// std::cout << "Reading Pixel Data" << std::endl;
-		/* wait for queue to be idle */
+		std::cout << "Reading Pixel Data" << std::endl;
+
 		vkQueueWaitIdle(engineDevice.graphicsQueue());
 
 		/* VALIDATION: Check coordinates are non-negative */
@@ -196,27 +187,26 @@ namespace aveng {
 			return;
 		}
 
-		float selectedInstanceId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos);
+		int pickId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos);
 		// std::cout << "End Selection: " << selectedInstanceId << std::endl;
-		if (selectedInstanceId >= 0.0f) {
-
-			// selectedInstanceId += 1.0f;
-			//std::cout << "True: >= 0.0f - SelectedID\t" << selectedInstanceId << std::endl;
-			/// TODO mModelInstanceData.miSelectedEditorInstance = static_cast<int>(selectedInstanceId);
-			editorData.eHasSelection = true;
+		if (pickId >= 0) {
+			///
+			// pickId += 1.0f;
+			///
+			std::cout << "True Selection: >= 0.0f\nSelectedID:\t" << pickId << std::endl;
+			renderData.selectedPickId = static_cast<int>(pickId);
+			editorData.eHasSelection = true; // Might be redundant now
+			editorData.primarySelection = renderer.getPickedHandle(pickId);
+			//std::cout << "Picked Handle Index: " << editorData.primarySelection.index;
 		}
 		else {
-			//std::cout << "False: SelectedID\t" << selectedInstanceId << std::endl;
-			// std::cout << "Deselecting instance " << mModelInstanceData.miSelectedEditorInstance << std::endl;
-			/// TODO mModelInstanceData.miSelectedEditorInstance = 0;
-			editorData.eHasSelection = false;
+			std::cout << "False Selection: SelectedID\t" << pickId << std::endl;
+			std::cout << "Deselecting instance:\t" << renderData.selectedPickId << std::endl;
+			renderData.selectedPickId = 0;
+			editorData.eHasSelection = false; // Might be redundant now
+			editorData.primarySelection = AnyInstanceHandle{};
 		}
 
-		//if (hasClicked()) {
-		//	std::cout << "--------[Begin Debug]-------------------------" << std::endl;
-		//	debug();
-		//	std::cout << "-------------------[FIN]---------------------" << std::endl;
-		//}
 		editorData.eMousePick = false;
 		
 	}
@@ -301,7 +291,7 @@ namespace aveng {
 	
 	bool Editor::createPipelineLayouts() {
 
-		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants) } };
+		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) } };
 
 		/* selection, non-animated */
 		std::vector<VkDescriptorSetLayout> selectionLayouts = {
@@ -363,159 +353,12 @@ namespace aveng {
 		return true;
 	}
 
-	/*
-	* Set the currently selected instance (for highlight)
-	*/
-	void Editor::setupSelectionHighlight(float dt) {
-
-		// Potential Improvement: Use a non-owning (weak) pointer or a reference to the shared_ptr in the container :
-		// E.g.
-		// AssimpInstance * currentSelectedInstance = nullptr;
-		// if (mRenderData.rdHighlightSelectedInstance) {
-		//     auto& sp = mModelInstData.miAssimpInstances[mModelInstData.miSelectedEditorInstance]; // reference, no refcount change
-		//     currentSelectedInstance = sp.get(); // raw, non-owning
-		// }
-		/*
-		* From ChatGuy:
-		* If you prefer to keep safety when selection changes, cache a weak_ptr
-		* once and lock only when you need it (ideally when selection changes, not per frame).
-		*/
-
-		// Selection Data - Q: Does this need to be cleared every frame as it is now?
-		editorData.eSelectedInstance.clear();
-		// Q: Why is eSelectedInstance the size of all instances? A: As we iterate over instances, the selected one is set at that same index
-		/// TODO editorData.eSelectedInstance.resize(mModelInstanceData.miAssimpInstances.size());
-
-		// The actual instance we're selecting
-		/// TODO editorData.eCurrentSelectedInstance = nullptr;
-		if (editorData.eHighlightSelectedInstance) {
-
-			/// TODO editorData.eCurrentSelectedInstance = &mModelInstanceData.miAssimpInstances[mModelInstanceData.miSelectedEditorInstance];
-			editorData.eSelectHighlightValue += dt * 4.0f;
-
-			if (editorData.eSelectHighlightValue > 2.0f) {
-				editorData.eSelectHighlightValue = 0.1f;
-			}
-		}
-	}
-
-	//void Editor::onModeSwitched(int frameIndex, AppMode& mode) {
-	//	currentFrameIndex = frameIndex;
-	//}
-
 	void Editor::handleMouseClick(const MouseButtonEvent& e) {
 		aveng_imgui.handleMouseButtonEvents(e.button, e.action, e.mods);
 	}
 
 	void Editor::handleMouseMove(const MouseMoveEvent& e) {
 		aveng_imgui.handleMousePositionEvents(e.x, e.y, e.rmbDown);
-	}
-
-	//template<class Tag>
-	//void Editor::updateSelectionForPool(
-	//	InstanceManager<Tag>& mgr,
-	//	const std::vector<InstanceHandle<Tag>>& drawOrder,
-	//	std::vector<glm::vec2>& out,
-	//	const AnyInstanceHandle& selectedAny,
-	//	bool highlight,
-	//	float blinkValue)
-	//{
-	//	ensureSize(out, drawOrder.size());
-
-	//	// default fill
-	//	for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
-	//		out[drawIdx].x = 1.0f;
-
-	//		if (auto* inst = mgr.get(drawOrder[drawIdx])) {
-	//			const auto s = inst->getInstanceSettings();
-	//			out[drawIdx].y = float(s.isInstanceIndexPosition);
-	//		}
-	//		else {
-	//			out[drawIdx].y = -1.0f;
-	//		}
-	//	}
-
-	//	if (!highlight) return;
-
-	//	// only highlight if the variant holds this pool's handle type
-	//	if (const auto* sel = std::get_if<InstanceHandle<Tag>>(&selectedAny)) {
-	//		// O(n) search in draw order (fine)
-	//		for (size_t drawIdx = 0; drawIdx < drawOrder.size(); ++drawIdx) {
-	//			if (drawOrder[drawIdx] == *sel) {
-	//				out[drawIdx].x = blinkValue;
-	//				break;
-	//			}
-	//		}
-	//	}
-	//}
-
-
-
-	/*
-	* Find the instance that was selected
-	* TODO - When we begin working with large numbers of instance, maybe just mix
-	* this into the renderer's draw() method which also loops over every instance
-	* 
-	*/
-	void Editor::setSelectedInstance()
-	{
-
-		size_t instanceToStore = 0;
-
-		if (editorData.eSelectedInstance.empty()) {
-			return;  // Nothing to do if vector is empty
-		}
-
-		// Loop through every model and its instances
-		/// TODO
-		//for (const auto& model : mModelInstanceData.miModelList) {
-		//	size_t numberOfInstances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()].size();
-
-		//	// If this model has geometry (it's not a "null" instance)
-		//	if (numberOfInstances > 0 && model->getTriangleCount() > 0) 
-		//	{
-
-		//		// std::vector<std::shared_ptr<AssimpInstance>> instances = mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()];
-		//		//if (numberOfInstances > 0) 
-		//		//{
-		//		// Iterate through its instances
-		//		int instIndex = 0;
-		//		// for (unsigned int i = 0; i < numberOfInstances; ++i) {
-		//		for (const auto& instance : mModelInstanceData.miAssimpInstancesPerModel[model->getModelFileName()]) {
-		//			
-		//			// Safety: Bounds check before access
-		//			size_t accessIndex = instanceToStore + instIndex;
-		//			if (accessIndex >= editorData.eSelectedInstance.size()) {
-		//				Logger::log(1, "%s warning: index %zu out of bounds (size: %zu), skipping\n",
-		//					__FUNCTION__, accessIndex, editorData.eSelectedInstance.size());
-		//				instIndex++;
-		//				continue;  // Skip this instance
-		//			}
-
-		//			// This is our currently selected instance
-		//			if (editorData.eCurrentSelectedInstance == instance) 
-		//			{
-		//				// []eSelectedInstance.x gets the blinking color value
-		//				editorData.eSelectedInstance.at(instanceToStore + instIndex).x = editorData.eSelectHighlightValue; // The blinking color
-		//			} else {
-		//				// []eSelectedInstance.x gets a standard value
-		//				editorData.eSelectedInstance.at(instanceToStore + instIndex).x = 1.0f; // color is unchanged
-		//			}
-
-		//			// Set the buffer's y - TODO - This probably can be uncommented(?)
-		//			//if (editorData.eMousePick || editorData.eHasSelection) 
-		//			//{
-		//				InstanceSettings instSettings = instance->getInstanceSettings();
-		//				// This isInstanceIndexPosition should match the shader's gl_InstanceIndex
-		//				editorData.eSelectedInstance.at(instanceToStore + instIndex).y = static_cast<float>(instSettings.isInstanceIndexPosition);
-		//			//}
-
-		//			instIndex++;
-		//		}
-		//		//}
-		//		instanceToStore += numberOfInstances;
-		//	}
-		//}
 	}
 
 	bool Editor::drawInstanceGizmo() {
@@ -646,6 +489,8 @@ namespace aveng {
 
 	void Editor::updateStorageBuffers()
 	{
+
+		renderer.updateBufferViews(); // TODO: Remove this once stable
 
 		// If one frame's buffer resized, resize ALL frames to keep them synchronized
 		if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), editorData.eSelectedInstance)) {

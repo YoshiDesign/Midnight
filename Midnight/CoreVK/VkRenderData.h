@@ -150,6 +150,8 @@ namespace aveng {
 		uint32_t pkModelStride;
 		uint32_t pkWorldPosOffset;
 		uint32_t pkSkinMatOffset;
+		uint32_t pkBasePickId;
+		uint32_t pkPickId;
 	};
 
 	struct VkComputePushConstants {
@@ -205,6 +207,8 @@ namespace aveng {
 
 		int rdWidth = 0;
 		int rdHeight = 0;
+
+		uint32_t selectedPickId = 0;
 
 		unsigned int rdTriangleCount = 0;
 		unsigned int rdMatricesSize = 0;

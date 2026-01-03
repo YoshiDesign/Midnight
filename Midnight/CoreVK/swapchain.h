@@ -50,7 +50,7 @@ namespace aveng {
         /*
         * Read the value of a pixel which contains the selected instance ID
         */
-        float getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t imageIndex);
+        int getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t imageIndex);
 
         //void createTextureImageViews();
         bool createSecondaryRenderpass(VkRenderPass& renderPass);

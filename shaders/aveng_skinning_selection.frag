@@ -4,11 +4,20 @@ layout (location = 1) in vec4 normal;
 layout (location = 2) in vec2 texCoord;
 layout (location = 3) flat in float selectInfo;
 layout (location = 4) in vec3 fragPosWorld;
+layout (location = 5) flat in uint vInstanceIndex;
 
 layout (location = 0) out vec4 FragColor;
-layout (location = 1) out float SelectedInstance;
+layout (location = 1) out uint SelectedInstance;
 
 layout (set = 0, binding = 0) uniform sampler2D tex;
+
+layout (push_constant) uniform Constants {
+  uint modelStride;
+  uint worldPosOffset;  // The index of each model's first instance
+  uint skinMatrixOffset;
+  uint basePickId;
+  uint pickId;
+};
 
 layout(set = 1, binding = 4) uniform LightsUbo {
     vec4 ambientLightColor;    // w component is intensity 
@@ -28,6 +37,8 @@ vec3 sRGB(vec3 c) {
 }
 
 void main() {
+
+    bool selected = (pickId == basePickId + vInstanceIndex);
 
     float ambientStrength = u_Lights.ambientLightColor.w;
     vec3 ambient = ambientStrength * u_Lights.ambientLightColor.rgb;
@@ -65,6 +76,11 @@ void main() {
     FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex, texCoord) * color;
     FragColor.rgb = sRGB(FragColor.rgb);
 
+    if(selected) {
+        vec3 highlight = vec3(0.25, 0.25, 0.25);
+        FragColor.rgb += highlight;
+    }
+
     /* fill the second color attachment with the ID of our model */
-    SelectedInstance = selectInfo;
+    SelectedInstance = basePickId + vInstanceIndex;
 }

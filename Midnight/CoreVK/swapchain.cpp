@@ -220,7 +220,7 @@ namespace aveng {
             1
         };
 
-        renderData.rdSelectionFormat = VK_FORMAT_R32_SFLOAT; // Update this to VK_FORMAT_R32_UINT for the new selection design 
+        renderData.rdSelectionFormat = VK_FORMAT_R32_UINT; // Update this to VK_FORMAT_R32_UINT for the new selection design 
                                                                 // - Fragment shader output must be uint 
                                                                 // - Attachment description must not have blending enabled 
                                                                 // - Your subpass attachment reference must match integer format rules
@@ -603,7 +603,7 @@ namespace aveng {
     
     }
 
-    float SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t imageIndex) {
+    int SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t imageIndex) {
         /* random default value to detect errors */
         float pixelColor = -444.0f;
 
@@ -642,7 +642,7 @@ namespace aveng {
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
-        imageInfo.format = VK_FORMAT_R32_SFLOAT;
+        imageInfo.format = VK_FORMAT_R32_UINT;
         imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;

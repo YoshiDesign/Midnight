@@ -44,9 +44,9 @@ namespace aveng {
 		uint32_t* pGetCurrentImageIndex() { return &currentImageIndex; }
 		VkImage& getImage(int index) { return aveng_swapchain->getImage(index); }
 		float getAspectRatio() const { return aveng_swapchain->extentAspectRatio(); }
-		float getPixelValueFromPos(unsigned int mMouseXPos, unsigned int mMouseYPos) { return aveng_swapchain->getPixelValueFromPos(mMouseXPos, mMouseYPos, currentImageIndex); };
+		int getPixelValueFromPos(unsigned int mMouseXPos, unsigned int mMouseYPos) { return aveng_swapchain->getPixelValueFromPos(mMouseXPos, mMouseYPos, currentImageIndex); };
 		uint32_t getImageCount() const { return aveng_swapchain->imageCount(); }
-
+		void updateBufferViews();
 		VkRenderPass getSwapChainRenderPass() const { return aveng_swapchain->getRenderPass(); }
 		VkRenderPass getSelectionRenderPass() const { return renderData.rdSelectionRenderpass; }
 		VkRenderPass getLineRenderPass() const { return renderData.rdLineRenderpass; }
@@ -65,6 +65,8 @@ namespace aveng {
 		bool createLightsUBO();
 
 		void updateLights();
+
+		AnyInstanceHandle getPickedHandle(int pickId);
 
 		// Just use the returned values directly if working in renderer.cpp. This is for clients
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 

@@ -9,7 +9,7 @@ namespace aveng {
 			if (c == '\\') c = '/';
 		}
 		// Optional: lowercase, strip "./", etc.
-		std::cout << "Renderer Normalized Asset Key: " << out << std::endl;
+		std::cout << "ModelLibrary: Normalized Asset Key: " << out << std::endl;
 		return out;
 	}
 
@@ -95,7 +95,7 @@ namespace aveng {
 				- Normalize the asset directory if loading from file source
 		*/
 
-		std::cout << "[Renderer::getOrLoadModel] Loading Model: " << assetKey << std::endl;
+		std::cout << "[ModelLibrary::getOrLoadModel] Loading Model: " << assetKey << std::endl;
 
 		// Already known?
 		if (auto it = registry_.idByKey.find(key); it != registry_.idByKey.end()) { // very "Go" semantic lol
@@ -103,7 +103,7 @@ namespace aveng {
 			const auto idxIt = registry_.indexById.find(id);
 			if (idxIt == registry_.indexById.end()) {
 				// Should never happen if maps are consistent - We had a key to no ID
-				std::cout << "[Renderer::getOrLoadModel] Anomaly alert [1]\n";
+				std::cout << "[ModelLibrary::getOrLoadModel] Anomaly alert [1]\n";
 				return {};
 			}
 
@@ -117,7 +117,7 @@ namespace aveng {
 
 			// We didn't find a model despite having found its index into the model list. Maybe it's in queue. If not, queue it
 			if (std::find(registry_.pendingLoads.begin(), registry_.pendingLoads.end(), key) == registry_.pendingLoads.end()) {
-				std::cout << "[Renderer::getOrLoadModel] Key found without a model - Anomaly alert [2]\n";
+				std::cout << "[ModelLibrary::getOrLoadModel] Key found without a model - Anomaly alert [2]\n";
 				registry_.pendingLoads.push_back(key);
 			}
 
@@ -267,6 +267,10 @@ namespace aveng {
 			// Commit to its registry entry
 			entry.model = std::move(model);
 			entry.isAnimated = entry.model->hasAnimations();
+			if (entry.isAnimated) {
+				entry.boneCount = entry.model->getBoneList().size();
+				std::cout << entry.key << " has " << entry.boneCount << " bones.\n";
+			}
 
 			anyLoaded = true;
 			lastLoadedId = entry.id;

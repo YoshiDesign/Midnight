@@ -8,13 +8,15 @@ layout (location = 4) in vec4 aBoneWeight; // ignored
 layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normal;
 layout (location = 2) out vec2 texCoord;
-layout (location = 3) out float selectInfo;
-layout (location = 4) out vec3 fragPosWorld;
+layout (location = 3) out vec3 fragPosWorld;
+layout (location = 4) flat out uint vInstanceIndex;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
   uint worldPosOffset;
   uint skinMatrixOffset;
+  uint basePickId;
+  uint pickId;
 };
 
 layout (std140, set = 1, binding = 0) uniform Matrices {
@@ -26,18 +28,16 @@ layout (std430, set = 1, binding = 1) readonly restrict buffer WorldPosMatrices 
   mat4 worldPosMat[];
 };
 
-layout (std430, set = 1, binding = 2) readonly restrict buffer InstanceSelected {
-  vec2 selected[];
-};
-
 void main() {
+  
+  bool selected = (pickId == basePickId + gl_InstanceIndex);
 
   mat4 modelMat = worldPosMat[gl_InstanceIndex + worldPosOffset];
   gl_Position = projection * view * modelMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 
-  color = aColor * selected[gl_InstanceIndex].x;
+  color = aColor;
   /* draw the instance always on top when highlighted, helps to find it better */
-  if (selected[gl_InstanceIndex].x != 1.0f) {
+  if (selected) {
     gl_Position.z -= 1.0f;
   }
 
@@ -46,7 +46,6 @@ void main() {
   normal = transpose(inverse(modelMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
   texCoord = vec2(aPos.w, aNormal.w);
   fragPosWorld = positionWorld.xyz;
+  vInstanceIndex = gl_InstanceIndex;
 
-  /* we need vertex id only (z -> y) */
-  selectInfo = selected[gl_InstanceIndex].y;
 }

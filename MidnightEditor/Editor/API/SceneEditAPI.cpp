@@ -10,6 +10,11 @@ namespace aveng {
 		return scene_.modelQuery().nModels();
 	}
 
+	bool SceneEditAPI::uiIsModelLoaded(ModelId id, ModelMeta& meta) {
+		if (id == NullModelId) return false;
+		scene_.modelQuery().isModelLoaded(id, meta);
+	}
+
 	ModelRef SceneEditAPI::uiGetOrLoadModel(const AssetKey& key) {
 		return scene_.getOrLoadModel(key);
 	}

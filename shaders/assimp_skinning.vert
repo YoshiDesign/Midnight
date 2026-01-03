@@ -14,6 +14,8 @@ layout (push_constant) uniform Constants {
   uint modelStride;
   uint worldPosOffset;
   uint skinMatrixOffset;
+  uint basePickId;
+  uint pickId;
 };
 
 layout (std140, set = 1, binding = 0) uniform Matrices {

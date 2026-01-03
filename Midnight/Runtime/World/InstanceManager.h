@@ -109,30 +109,30 @@ namespace aveng {
         explicit InstanceManager(const IModelQuery& mq)
             : modelQuery_(mq) {
         
-            // Note: Manually setting the modelId for the null-instance
-            Instance nullInstance = Instance();
-            nullInstance.setModelId(NullModelId);
+            //// Note: Manually setting the modelId for the null-instance
+            //Instance nullInstance = Instance();
+            //nullInstance.setModelId(NullModelId);
 
-            Slot slot = {
-                nullInstance, // instance
-                1, // generation
-                true // alive - arbitrary
-            };
+            //Slot slot = {
+            //    nullInstance, // instance
+            //    1, // generation
+            //    true // alive - arbitrary
+            //};
 
-            Handle handle = {
-                instanceData_.slots.size(), // index
-                1 // generation
-            };
+            //Handle handle = {
+            //    instanceData_.slots.size(), // index
+            //    1 // generation
+            //};
 
-            // Note: We probably won't need to keep null instance in instancesPerModel anymore - test later
-            instanceData_.instancesPerModel[NullModelId].emplace_back(handle);
-            instanceData_.slots.emplace_back(slot);
+            //// Note: We probably won't need to keep null instance in instancesPerModel anymore - test later
+            //instanceData_.instancesPerModel[NullModelId].emplace_back(handle);
+            //instanceData_.slots.emplace_back(slot);
 
-            ensureDirtyArrays(instanceData_);
+            //ensureDirtyArrays(instanceData_);
 
-            // Also Note: we're not adding the Null instance to instancesInOrder or active
-            // For this reason, never rely on a slot having the same index as a handle. 
-            // Stick to the conventions and we're groovy
+            //// Also Note: we're not adding the Null instance to instancesInOrder or active
+            //// For this reason, never rely on a slot having the same index as a handle. 
+            //// Stick to the conventions and we're groovy
         
         }
 
@@ -321,7 +321,7 @@ namespace aveng {
             }
 #endif
             std::cout << "Creating Instance Datas...\n";
-            uint32_t slotIndex = acquireSlotIndex(); // side-effects: Creates a slot if none are free
+            uint32_t slotIndex = acquireSlotIndex(); // [!!] Creates a slot or takes a free one
             markGpuDirty(slotIndex);
             // Via newly created index
             Slot& slot = instanceData_.slots[slotIndex];
@@ -332,7 +332,7 @@ namespace aveng {
 
             // Initialize instance's model constants
             if constexpr (InstanceTypeFor<Tag>::kAnimated) {
-                inst.init(mid, meta, settings.transform, settings.anim);
+                inst.init(mid, meta, settings.transform, settings.anim); /// Q: Should animClipSize be 0 here? it is...
             }
             else {
                 inst.init(mid, meta, settings);

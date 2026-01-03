@@ -13,6 +13,7 @@ namespace aveng {
         SceneEditAPI(SceneFacade& scene);
 
         const uint32_t nModels() const override;
+        bool uiIsModelLoaded(ModelId id, ModelMeta& meta) override;
 
         const std::vector<UiModelRow> uiListModels() const override;
         const std::vector<UiInstanceRow> uiListInstances() const override;

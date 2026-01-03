@@ -73,6 +73,8 @@ namespace aveng {
 
         // Guaranteed ordering: [0, staticInstanceCount) are static, [staticInstanceCount, total) are animated
         std::vector<AnyInstanceHandle> drawList;
+        std::vector<uint32_t> pickIds;
+        std::vector<AnyInstanceHandle> pickToHandle;
         // Guaranteed ordering: [0, staticBatchCount) are static batches, [staticBatchCount, total) are animated
         std::vector<DrawBatch> batches;
 
@@ -82,7 +84,7 @@ namespace aveng {
         uint32_t staticBatchCount = 0;
         uint32_t animatedBatchCount = 0;
 
-        // IN PREPARATION FOR FUTURE REFACTOR : Pre-extracted instance data (ready for GPU upload)
+        // Pre-extracted instance data (ready for GPU upload)
         std::vector<glm::mat4> worldMatrices;
         std::vector<NodeTransformData> nodeTransformData;  // Already padded to aligned counts
 
@@ -142,11 +144,13 @@ namespace aveng {
                 framePackets_.resize(frameIndex + 1);
             }
 
+            nextPickId = 0;
             FramePacket& pkt = framePackets_[frameIndex];
 
             // Clear previous frame data - we could alternatively clean this up after each frame is completed in a GC step
             pkt.drawList.clear();
-            pkt.batches.clear();
+            pkt.batches.clear();    /// TODO can we reserve this too?
+            pkt.worldMatrices.clear();
             pkt.frameIndex = frameIndex;
             pkt.frameNumber = frameNumber;
             pkt.staticInstanceCount = 0;
@@ -155,6 +159,11 @@ namespace aveng {
             pkt.animatedBatchCount = 0;
             pkt.dirtyStaticSlots = stat.dirtySlots;
             pkt.dirtyAnimatedSlots = anim.dirtySlots;
+
+            maxInstances = stat.slots->size() + anim.slots->size();
+            pkt.drawList.reserve(maxInstances);
+            pkt.pickIds.resize(maxInstances);
+            pkt.pickToHandle.resize(maxInstances); // +1 because pickId 0 is NullInstance
 
             // Defensive: required pointers
             if (!modelQ_ ||
@@ -167,6 +176,8 @@ namespace aveng {
 
             const auto& statSlots = *stat.slots;
             const auto& animSlots = *anim.slots;
+
+            /// TODO - if no instances, just return empty packets. but maybe think that through
 
             // Model validation helper
             auto modelIsDrawable = [&](ModelId mid) -> bool {
@@ -201,10 +212,14 @@ namespace aveng {
                         batch.modelId = mid;
                         batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                         batch.instanceCount = 0;
-                        batch.basePickId = 0;
+                        batch.basePickId = nextPickId;
                     }
 
                     pkt.drawList.emplace_back(h);
+                    pkt.pickIds.push_back(nextPickId);
+                    pkt.pickToHandle[nextPickId] = h;
+                    ++nextPickId;
+
                     pkt.worldMatrices.push_back(statSlots[h.index].instance->common.modelMatrix());
                     batch.instanceCount++;
                 }
@@ -215,18 +230,18 @@ namespace aveng {
             };
 
             auto processStaticFromPerModel = [&](const std::unordered_map<ModelId, std::vector<StaticHandle>>& perModelMap) {
-                std::vector<ModelId> keys;
+                std::vector<ModelId> model_ids;
                 if (opt.deterministicBatches) {
-                    keys = sortedModelKeys(perModelMap);
+                    model_ids = sortedModelKeys(perModelMap); // Numeric sorting on modelId
                 }
                 else {
-                    keys.reserve(perModelMap.size());
-                    for (const auto& kv : perModelMap) keys.push_back(kv.first);
+                    model_ids.reserve(perModelMap.size());
+                    for (const auto& kv : perModelMap) model_ids.push_back(kv.first);
                 }
 
-                for (ModelId mid : keys) {
+                for (ModelId mid : model_ids) {
                     auto it = perModelMap.find(mid);
-                    if (it == perModelMap.end()) continue;
+                    if (it == perModelMap.end()) continue; // insanity check - more useful when sorting deterministicBatches
                     if (!modelIsDrawable(mid)) continue;
 
                     const auto& vec = it->second;
@@ -237,11 +252,16 @@ namespace aveng {
                     batch.modelId = mid;
                     batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                     batch.instanceCount = 0;
-                    batch.basePickId = 0;
+                    batch.basePickId = nextPickId;
 
                     for (const StaticHandle& h : vec) {
                         if (!isHandleAlive(statSlots, h)) continue;
+
                         pkt.drawList.emplace_back(h);
+                        pkt.pickIds.push_back(nextPickId);
+                        pkt.pickToHandle[nextPickId] = h;
+                        ++nextPickId;
+
                         pkt.worldMatrices.push_back(statSlots[h.index].instance->common.modelMatrix());
                         batch.instanceCount++;
                     }
@@ -295,10 +315,14 @@ namespace aveng {
                         batch.modelId = mid;
                         batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                         batch.instanceCount = 0;
-                        batch.basePickId = 0;
+                        batch.basePickId = nextPickId;
                     }
 
                     pkt.drawList.emplace_back(h);
+                    pkt.pickIds.push_back(nextPickId);
+                    pkt.pickToHandle[nextPickId] = h;
+                    ++nextPickId;
+
                     pkt.worldMatrices.push_back(animSlots[h.index].instance->common.modelMatrix());
 
                     batch.instanceCount++;
@@ -332,11 +356,16 @@ namespace aveng {
                     batch.modelId = mid;
                     batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                     batch.instanceCount = 0;
-                    batch.basePickId = 0;
+                    batch.basePickId = nextPickId;
 
                     for (const AnimatedHandle& h : vec) {
                         if (!isHandleAlive(animSlots, h)) continue;
+
                         pkt.drawList.emplace_back(h);
+                        pkt.pickIds.push_back(nextPickId);
+                        pkt.pickToHandle[nextPickId] = h;
+                        ++nextPickId;
+
                         pkt.worldMatrices.push_back(animSlots[h.index].instance->common.modelMatrix());
                         batch.instanceCount++;
                     }
@@ -372,7 +401,7 @@ namespace aveng {
             for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
                 auto& b = pkt.batches[i];
                 ModelMeta meta{};
-                std::cout << "counting bone base...\n";
+                
                 if (modelQ_->isModelLoaded(b.modelId, meta) && meta.boneCount > 0) {
                     b.boneCount = meta.boneCount;
                     b.alignedInstanceCount = ((b.instanceCount + 31) / 32) * 32;
@@ -380,50 +409,59 @@ namespace aveng {
                     boneBase += b.boneCount * b.alignedInstanceCount;
                 }
 
-                // Resize and fill nodeTransformData (boneBase is the total size needed)
-                pkt.nodeTransformData.resize(boneBase);
+            }
 
-                // Copy node transforms for each animated batch
-                for (uint32_t batchIdx = pkt.staticBatchCount; batchIdx < pkt.batches.size(); ++batchIdx) {
-                    const DrawBatch& b = pkt.batches[batchIdx];
-                    if (b.boneCount == 0) continue;
+            // Resize and fill nodeTransformData (boneBase is the total size needed)
+            pkt.nodeTransformData.resize(boneBase);
 
-                    // Copy each instance's node transforms
-                    for (uint32_t i = 0; i < b.instanceCount; ++i) {
-                        const AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
-                        AnimatedHandle h = std::get<AnimatedHandle>(ah);
+            // Copy node transforms for each animated batch
+            for (uint32_t batchIdx = pkt.staticBatchCount; batchIdx < pkt.batches.size(); ++batchIdx) {
+                const DrawBatch& b = pkt.batches[batchIdx];
+                if (b.boneCount == 0) continue;
 
-                        auto boneSpan = animSlots[h.index].instance->getNodeTransformData();
-                        std::copy(
-                            boneSpan.begin(),
-                            boneSpan.end(),
-                            pkt.nodeTransformData.begin() + (b.boneBaseOffset + i * b.boneCount)
-                        );
+                // Copy each instance's node transforms
+                for (uint32_t i = 0; i < b.instanceCount; ++i) {
+                    const AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
+                    AnimatedHandle h = std::get<AnimatedHandle>(ah);
+
+                    auto boneSpan = animSlots[h.index].instance->getNodeTransformData();
+
+#ifdef M_DEBUG
+                    if (boneSpan.size() != b.boneCount) {
+                        std::cout << "[BONE MISMATCH] Instance has " << boneSpan.size()
+                            << " bones, expected " << b.boneCount << "\n";
                     }
+#endif
 
-                    // Pad remaining slots up to alignedInstanceCount
-                    const NodeTransformData identityTrs{
-                        glm::vec4(0.0f),
-                        glm::vec4(1.0f),
-                        glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
-                    };
+                    std::copy(
+                        boneSpan.begin(),
+                        boneSpan.end(),
+                        pkt.nodeTransformData.begin() + (b.boneBaseOffset + i * b.boneCount)
+                    );
+                }
 
-                    for (uint32_t i = b.instanceCount; i < b.alignedInstanceCount; ++i) {
-                        for (uint32_t bone = 0; bone < b.boneCount; ++bone) {
-                            pkt.nodeTransformData[b.boneBaseOffset + i * b.boneCount + bone] = identityTrs;
-                        }
+                // Pad remaining slots up to alignedInstanceCount
+                const NodeTransformData identityTrs{
+                    glm::vec4(0.0f),
+                    glm::vec4(1.0f),
+                    glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+                };
+
+                for (uint32_t i = b.instanceCount; i < b.alignedInstanceCount; ++i) {
+                    for (uint32_t bone = 0; bone < b.boneCount; ++bone) {
+                        pkt.nodeTransformData[b.boneBaseOffset + i * b.boneCount + bone] = identityTrs;
                     }
                 }
             }
 
-            // Assign pick IDs per batch if requested
-            if (opt.assignPickIds) {
+            // This now happens by default
+            /*if (opt.assignPickIds) {
                 uint32_t next = opt.pickIdStart;
                 for (auto& b : pkt.batches) {
                     b.basePickId = next;
                     next += b.instanceCount;
                 }
-            }
+            }*/
 
             return pkt;
         }
@@ -432,6 +470,8 @@ namespace aveng {
         std::vector<FramePacket> framePackets_{};
         const IModelQuery* modelQ_ = nullptr;
         BatchSortFn customBatchSort_{};
+        size_t maxInstances = 0;
+        uint32_t nextPickId = 1;
     };
 
 

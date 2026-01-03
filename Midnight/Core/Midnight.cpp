@@ -21,6 +21,7 @@ namespace aveng {
 		)
 		}
 		, editorInput_( std::make_unique<EditorInput>(editor_.get()) )
+		, gameInput_( std::make_unique<GameInput>() )
 		, inputRouter_( std::make_unique<EditorGameRouter>(game_data.currentAppMode, *editorInput_, *gameInput_) )
 		, inputSystem_( std::make_unique<InputSystem>(*inputRouter_, game_data))
 		, frame_(std::make_unique<AvengFrame>(

@@ -58,17 +58,15 @@ namespace aveng {
 		//void deleteInstance(AnimatedHandle h);
 		/// TODO
 
+		/* IRenderSceneView overrides - and pool views for frame packet builder */
 		const IModelQuery& modelQuery() const override;
-		/* FramePacketBuilder Pool Views */
 		FramePacketBuilder::PoolInputs<StaticTag, AvengInstance>
 			staticPoolInputs() const override { return staticMgr_.poolInputs(); }
 		FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance>
 			animatedPoolInputs() const override { return animatedMgr_.poolInputs(); }
 
-		/* IInstanceQuery - Just for the editor. Not a performance friendly way to go about things, but simple */
+		/* IInstanceQuery overrides - Just for the editor. Not a performance friendly way to go about things, but simple */
 		const IInstanceQuery& instanceQuery() const noexcept { return *this; }
-
-		/* IInstanceQuery overrides */
 		bool tryGetInstance(AnyInstanceHandle h, InstanceView& out) const override;
 		std::vector<AnyInstanceHandle> listAllInstances() const override;
 		std::vector<AnyInstanceHandle> listInstancesForModel(ModelId id) const override;

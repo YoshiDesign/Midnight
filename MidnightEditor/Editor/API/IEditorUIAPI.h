@@ -33,6 +33,7 @@ namespace aveng {
         virtual ~IEditorUIAPI() = default;
 
         virtual const uint32_t nModels() const = 0;
+        virtual bool uiIsModelLoaded(ModelId id, ModelMeta& meta) = 0;
 
         // Editor-Only Types
         virtual const std::vector<UiModelRow> uiListModels() const = 0;

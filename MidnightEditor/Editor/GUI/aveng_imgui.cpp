@@ -544,7 +544,6 @@ namespace aveng {
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("%d Models in memory", api_.nModels());
 
-
                 if (ImGui::Button("Import Model")) {
                     IGFD::FileDialogConfig config;
                     config.path = ".";
@@ -628,10 +627,8 @@ namespace aveng {
                     ImGui::EndCombo();
                 }
 
-                if (api_.nModels() == 1) {
-                    ImGui::BeginDisabled();
-                }
-
+                ImGui::BeginDisabled(api_.nModels() == 1);
+                
                 /// Destroy Models
                 if (ImGui::Button("Delete Model")) {
                     ImGui::OpenPopup("Delete Model?");
@@ -658,9 +655,9 @@ namespace aveng {
                     ImGui::EndPopup();
                 }
 
-                if (api_.nModels() == 1) {
-                    ImGui::EndDisabled();
-                }
+                
+                ImGui::EndDisabled();
+                
 
                 //ImGui::SameLine();
                 //if (ImGui::Button("Create Instance")) {
@@ -697,8 +694,35 @@ namespace aveng {
             }
 
             if (ImGui::CollapsingHeader("Instances")) {
+                                
+                ImGui::BeginDisabled(editorData.selectedModelId == NullModelId);
                 
 
+                ModelMeta modelMeta{};
+                bool model_ready = api_.uiIsModelLoaded(editorData.selectedModelId, modelMeta);
+
+                if (ImGui::Button("Create Instance")) {
+                    if (model_ready && editorData.selectedModelId != NullModelId) {
+                        if (modelMeta.animated) { /// Create Animated Instance
+                            api_.uiSpawn(
+                                api_.uiGetOrLoadModel(editorData.selectedModelKey),
+                                AnimatedCreateSettings{});
+                        }
+                        else {
+                            api_.uiSpawn( /// Create Static Instance
+                                api_.uiGetOrLoadModel(editorData.selectedModelKey), 
+                                TransformSettings{});
+                        }
+                    }
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Delete Instance")) {
+
+                }
+
+                ImGui::EndDisabled();
+                
                 const std::vector<UiInstanceRow> rows = api_.uiListInstances();
 
                 // Multi-select rules

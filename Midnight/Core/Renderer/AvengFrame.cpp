@@ -41,8 +41,6 @@ namespace aveng {
 		// Clear the vector of buffers we'll be submitting to the graphics queue
 		commandBuffers.clear();
 
-		/// Process Pending Models
-
 		// Wait for fences, vkAcquireNextImageKH
 		if (!renderer.beginFrame())
 		{

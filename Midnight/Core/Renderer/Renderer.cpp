@@ -766,7 +766,7 @@ namespace aveng {
 		std::vector<VkDescriptorSetLayout> layouts = {
 		  renderData.rdAvengTextureDescriptorLayout, renderData.rdAvengDescriptorLayout};
 
-		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants) } };
+		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) } };
 
 		if (!PipelineLayout::init(engineDevice, renderData.rdAvengPipelineLayout, layouts, pushConstants)) {
 			std::printf("%s error: could not init Assimp pipeline layout\n", __FUNCTION__);
@@ -984,6 +984,8 @@ namespace aveng {
 		const auto& stat_slots = *stat.slots;
 		const auto& anim_slots = *anim.slots;
 
+		animatedModelLoaded = anim_slots.size() > 0;
+
 		// Fetch the next frame packet and construct it
 		const FramePacket& pkt =
 			framePacketBuilder_.build<AvengInstance, AssimpInstance>(
@@ -1032,6 +1034,9 @@ namespace aveng {
 		}
 
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+
+		// Feels hacky
+		boneMatrixBufferSize = pkt.nodeTransformData.size();
 
 		/* resize SSBO if needed - Both of these are written by the compute shaders so we just make sure they're the right size (hence only using checkForResize) */
 		
@@ -1100,7 +1105,9 @@ namespace aveng {
 		UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
+
 		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
+			Logger::log(1, "[2] mShaderModelRootMatrixBuffers resized!!\n");
 			size_t newBufferSize = std::max(pkt.worldMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
 			buffer_trash.push_back(
@@ -1157,7 +1164,6 @@ namespace aveng {
 				const DrawBatch& b = pkt.batches[i];
 				if (b.boneCount == 0 || b.instanceCount == 0) continue;
 
-				// TODO: Replace with actual model registry lookup: modelRegistry_.get(b.modelId)
 				const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 				if (!model) continue;
 				
@@ -1245,6 +1251,11 @@ namespace aveng {
 		renderLights(pointLightSystem.getPipeline(), pointLightSystem.getPipelineLayout());
 	}
 
+	AnyInstanceHandle Renderer::getPickedHandle(int pickId) {
+		const auto& pkt = framePacketBuilder_.getFramePacket(currentFrameIndex);
+		return pkt.pickToHandle[pickId];
+	}
+
 	bool Renderer::drawModels(
 		const IModelLibrary& modelLib,
 		VkCommandBuffer commandBuffer,
@@ -1268,15 +1279,16 @@ namespace aveng {
 			const DrawBatch& b = pkt.batches[i];
 			if (b.instanceCount == 0) continue;
 
-			// TODO: Replace with actual model registry lookup: modelRegistry_.get(b.modelId)
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 			if (!model) continue;
 
 			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
-			mModelPushConst.pkModelStride = 0;
-			mModelPushConst.pkSkinMatOffset = 0;
+			mModelPushConst.pkModelStride = 0; // static - unused
+			mModelPushConst.pkSkinMatOffset = 0; // static - unused
+			mModelPushConst.pkBasePickId = b.basePickId; // if basePickId + gl_InstanceIndex == SelectedPickId, the instance is selected
+			mModelPushConst.pkPickId = renderData.selectedPickId;
 			vkCmdPushConstants(commandBuffer, basicLayout,
-				VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
 
 			model->drawInstancedV2(commandBuffer, basicLayout, b.instanceCount, frameIndex);
 		}
@@ -1291,15 +1303,16 @@ namespace aveng {
 			const DrawBatch& b = pkt.batches[i];
 			if (b.instanceCount == 0) continue;
 
-			// TODO: Replace with actual model registry lookup: modelRegistry_.get(b.modelId)
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 			if (!model) continue;
 
 			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
 			mModelPushConst.pkModelStride = b.boneCount;
 			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;
+			mModelPushConst.pkBasePickId = b.basePickId;
+			mModelPushConst.pkPickId = renderData.selectedPickId;
 			vkCmdPushConstants(commandBuffer, animationLayout,
-				VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
 
 			model->drawInstancedV2(commandBuffer, animationLayout, b.instanceCount, frameIndex);
 		}
@@ -1667,6 +1680,24 @@ namespace aveng {
 		};
 
 		return true;
+	}
+
+	void Renderer::updateBufferViews() {
+	
+		renderData.matrixBuffersView.modelRootSSBOs = {
+		mShaderModelRootMatrixBuffers.data(),
+		mShaderModelRootMatrixBuffers.size()
+		};
+
+		renderData.matrixBuffersView.boneMatSSBOs = {
+			mShaderBoneMatrixBuffers.data(),
+			mShaderBoneMatrixBuffers.size()
+		};
+
+		renderData.pointLightBufferView.viewPointLightUBOs = {
+			mPointLightUBOBuffers.data(),
+			mPointLightUBOBuffers.size()
+		};
 	}
 
 	/* Check the destruction queue for impending doom */

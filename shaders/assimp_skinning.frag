@@ -8,6 +8,14 @@ layout (location = 0) out vec4 FragColor;
 
 layout (set = 0, binding = 0) uniform sampler2D tex;
 
+layout (push_constant) uniform Constants {
+  uint modelStride;
+  uint worldPosOffset;  // The index of each model's first instance
+  uint skinMatrixOffset;
+  uint basePickId;
+  uint pickId;
+};
+
 layout(set = 1, binding = 3) uniform LightsUbo {
     vec4 ambientLightColor;
     vec4 lightPositions[100];  // w component is radius
