@@ -39,6 +39,7 @@ namespace aveng {
 		, inputSystem_(std::make_unique<InputSystem>(*gameInput_, game_data))
 		, frame_(std::make_unique<AvengFrame>(
 			renderer,
+			modelLib_,
 			sceneFacade_, /// Interface
 			modelLib_, /// Interface
 			renderData,

@@ -17,7 +17,8 @@ namespace aveng {
 #ifdef ENABLE_EDITOR
 		return std::make_unique<FilesystemModelSource>();
 #else
-		return std::make_unique<PackModelSource>("assets.pak");
+		return std::make_unique<FilesystemModelSource>();
+		//return std::make_unique<PackModelSource>("assets.pak");
 #endif
 	}
 
