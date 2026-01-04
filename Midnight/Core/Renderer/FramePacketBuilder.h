@@ -110,7 +110,7 @@ namespace aveng {
     public:
 
         void setModelQuery(const IModelQuery* q) { modelQ_ = q; }
-        void setAnimQuery(const IModelAnimQuery* aq) { animQ_ = aq; }
+        void setAnimQuery(IModelAnimQuery* aq) { animQ_ = aq; }
         void setFramesInFlight(int n) { framePackets_.resize(n); }
         const FramePacket& getFramePacket(int frameIndex) { return framePackets_[frameIndex]; }
 
@@ -122,7 +122,7 @@ namespace aveng {
 
             const std::vector<Handle>* instancesInOrder = nullptr;
             const std::unordered_map<ModelId, std::vector<Handle>>* instancesPerModel = nullptr;
-            const std::vector<Slot>* slots = nullptr;
+            std::vector<Slot>* slots = nullptr;
 
             std::span<const uint32_t> dirtySlots{};
         };
@@ -133,9 +133,9 @@ namespace aveng {
         void setCustomBatchSort(BatchSortFn fn) { customBatchSort_ = std::move(fn); }
 
         template<class StaticInstanceT, class AnimatedInstanceT>
-        const FramePacket& build(
+        FramePacket& build(
             const PoolInputs<StaticTag, StaticInstanceT>& stat,
-            const PoolInputs<AnimatedTag, AnimatedInstanceT>& anim,
+            PoolInputs<AnimatedTag, AnimatedInstanceT>& anim,
             uint32_t frameIndex,
             uint64_t frameNumber, // Could become useful for profiling
             float deltaTime,
@@ -176,8 +176,8 @@ namespace aveng {
                 return pkt;
             }
 
-            const auto& statSlots = *stat.slots;
-            const auto& animSlots = *anim.slots;
+            auto& statSlots = *stat.slots;
+            auto& animSlots = *anim.slots;
 
             /// TODO - if no instances, just return empty packets. but maybe think that through
 
@@ -423,15 +423,15 @@ namespace aveng {
 
             // Copy node transforms for each animated batch
             for (uint32_t batchIdx = pkt.staticBatchCount; batchIdx < pkt.batches.size(); ++batchIdx) {
-                const DrawBatch& b = pkt.batches[batchIdx];
+                DrawBatch& b = pkt.batches[batchIdx];
                 if (b.boneCount == 0) continue;
 
                 // Copy each instance's node transforms
                 for (uint32_t i = 0; i < b.instanceCount; ++i) {
-                    const AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
+                    AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
                     AnimatedHandle h = std::get<AnimatedHandle>(ah); /// Look up std::get semantics
-                    
-                    //animSlots[h.index].instance->updateAnimation(deltaTime, animQ_);
+
+                    animSlots[h.index].instance->updateAnimation(deltaTime, *animQ_);
                     std::vector<NodeTransformData> boneSpan = animSlots[h.index].instance->getNodeTransformData();
 
 #ifdef M_DEBUG
@@ -479,7 +479,7 @@ namespace aveng {
     private:
         std::vector<FramePacket> framePackets_{};
         const IModelQuery* modelQ_ = nullptr;
-        const IModelAnimQuery* animQ_ = nullptr;
+        IModelAnimQuery* animQ_ = nullptr;
         BatchSortFn customBatchSort_{};
         size_t maxInstances = 0;
         uint32_t nextPickId = 1;

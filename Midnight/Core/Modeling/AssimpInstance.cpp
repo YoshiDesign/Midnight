@@ -11,6 +11,7 @@ namespace aveng {
         t.rotEuler = ts.worldRotation;
         t.scale = ts.scale;
 
+        modelId_ = id;
         common.init(id, meta.root, t);
         anim = as;
 
@@ -24,7 +25,6 @@ namespace aveng {
 
         //std::fill(mNodeTransformData.begin(), mNodeTransformData.end(), identity);
         resizeNodeTransformData(meta.boneCount);
-
 
 #ifdef M_DEBUG
         // For sanity's sake

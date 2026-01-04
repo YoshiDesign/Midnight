@@ -50,7 +50,7 @@ namespace aveng {
             return registry_;
         }
 
-        const IModelAnimQuery& animQuery() const noexcept {
+        IModelAnimQuery& animQuery() noexcept {
             return registry_;
         }
 

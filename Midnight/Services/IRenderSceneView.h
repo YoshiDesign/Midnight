@@ -10,10 +10,10 @@ namespace aveng {
 		virtual const IModelQuery& modelQuery() const = 0;
 
 		virtual FramePacketBuilder::PoolInputs<StaticTag, AvengInstance>
-			staticPoolInputs() const = 0;
+			staticPoolInputs() = 0;
 
 		virtual FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance>
-			animatedPoolInputs() const = 0;
+			animatedPoolInputs() = 0;
 	};
 
 }

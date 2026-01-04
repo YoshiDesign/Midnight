@@ -74,12 +74,12 @@ namespace aveng {
 
         // This provides the FramePacketBuilder with the exact data it requires
         using PoolIn = FramePacketBuilder::PoolInputs<Tag, Instance>;
-        PoolIn poolInputs() const noexcept {
+        PoolIn poolInputs() noexcept {
             PoolIn in{};
             in.instancesInOrder = &instanceData_.instancesInOrder;
             in.instancesPerModel = &instanceData_.instancesPerModel;
             in.slots = &instanceData_.slots;
-            in.dirtySlots = std::span<const uint32_t>(instanceData_.dirtyGpuList);
+            in.dirtySlots = std::span<uint32_t>(instanceData_.dirtyGpuList);
             return in;
         }
 
@@ -420,7 +420,6 @@ namespace aveng {
             instanceData_.instancesPerModel[mid].push_back(h);
 
             // Mark GPU dirty for any new slots
- 
 
             return h;
         }

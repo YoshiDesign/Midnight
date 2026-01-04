@@ -10,7 +10,7 @@
 namespace aveng {
 
 	AvengFrame::AvengFrame(Renderer& renderer,
-		const IRenderSceneView& sceneView,
+		IRenderSceneView& sceneView,
 		const IModelLibrary& modelLib,
 		VkRenderData& renderData,
 		GameData& gameData,

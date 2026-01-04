@@ -61,9 +61,9 @@ namespace aveng {
 		/* IRenderSceneView overrides - and pool views for frame packet builder */
 		const IModelQuery& modelQuery() const override;
 		FramePacketBuilder::PoolInputs<StaticTag, AvengInstance>
-			staticPoolInputs() const override { return staticMgr_.poolInputs(); }
+			staticPoolInputs() override { return staticMgr_.poolInputs(); }
 		FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance>
-			animatedPoolInputs() const override { return animatedMgr_.poolInputs(); }
+			animatedPoolInputs() override { return animatedMgr_.poolInputs(); }
 
 		/* IInstanceQuery overrides - Just for the editor. Not a performance friendly way to go about things, but simple */
 		const IInstanceQuery& instanceQuery() const noexcept { return *this; }

@@ -16,7 +16,7 @@ namespace aveng {
 	public:
 		AvengFrame(
 			Renderer& renderer,
-			const IRenderSceneView& sceneView,
+			IRenderSceneView& sceneView,
 			const IModelLibrary& modelLib, // used to get Model pointers to the renderer, *for now*
 			VkRenderData& renderData,
 			GameData& gameData,
@@ -33,7 +33,7 @@ namespace aveng {
 
 	private:
 		const IModelLibrary& modelLib_;
-		const IRenderSceneView& sceneView_;
+		IRenderSceneView& sceneView_;
 
 		std::vector<VkCommandBuffer> commandBuffers;
 		bool drawGizmo = false;

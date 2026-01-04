@@ -29,7 +29,7 @@ namespace aveng {
 			VkRenderData& renderData, 
 			CameraManager& cameraManager,
 			const IModelQuery& mq,
-			const IModelAnimQuery& aq
+			IModelAnimQuery& aq
 		);
 		~Renderer() = default;
 
@@ -104,7 +104,7 @@ namespace aveng {
 		// IRenderSceneView as an arg allows us to use different scene sources.
 		// Alternatively you could store IRenderSceneView* but only if your engine guarantees it’s always valid and you prefer a slightly simpler callsite.
 		int draw(
-			const IRenderSceneView& sceneView,
+			IRenderSceneView& sceneView,
 			const IModelLibrary& modelLib_, // used to get Model pointers, *for now*
 			float deltaTime);
 
@@ -151,7 +151,7 @@ namespace aveng {
 		size_t calculateDynamicUBOStride() const;
 
 		const IModelQuery& modelQuery_;
-		const IModelAnimQuery& animQuery_;
+		IModelAnimQuery& animQuery_;
 
 		VkRenderData& renderData;
 

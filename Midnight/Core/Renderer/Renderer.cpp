@@ -29,7 +29,7 @@ namespace aveng {
 		VkRenderData& renderData, 
 		CameraManager& _cameraManager,
 		const IModelQuery& mq,
-		const IModelAnimQuery& aq)
+		IModelAnimQuery& aq)
 		:   engineDevice	{ engineDevice }, 
 			aveng_window	{ window }, 
 			renderData		{ renderData }, 
@@ -957,7 +957,7 @@ namespace aveng {
 	* - Primary Graphics Command buffer is reset and in a recording state.
 	* - Primary graphics renderpass has begun
 	*/
-	int Renderer::draw(const IRenderSceneView& sceneView, const IModelLibrary& modelLib, float deltaTime) {
+	int Renderer::draw(IRenderSceneView& sceneView, const IModelLibrary& modelLib, float deltaTime) {
 
 		/* no update on zero diff. This caused an issue */
 		if (deltaTime == 0.0f && !firstFrame) {
@@ -983,13 +983,13 @@ namespace aveng {
 
 		auto stat = sceneView.staticPoolInputs();
 		auto anim = sceneView.animatedPoolInputs();
-		const auto& stat_slots = *stat.slots;
-		const auto& anim_slots = *anim.slots;
+		auto& stat_slots = *stat.slots;
+		auto& anim_slots = *anim.slots;
 
 		animatedModelLoaded = anim_slots.size() > 0;
 
 		// Fetch the next frame packet and construct it
-		const FramePacket& pkt =
+		FramePacket& pkt =
 			framePacketBuilder_.build<AvengInstance, AssimpInstance>(
 				stat,
 				anim,

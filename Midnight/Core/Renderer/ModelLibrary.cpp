@@ -166,6 +166,7 @@ namespace aveng {
 
 			const size_t idx = idxIt->second;
 			ModelEntry& entry = registry_.models[idx];
+			std::cout << "Queued Model unloading: " << idx << std::endl;
 
 			// Sanity: entry.id should match id if you store it
 			// assert(entry.id == id);
@@ -243,13 +244,13 @@ namespace aveng {
 			}
 
 			ModelEntry& entry = registry_.models[idxIt->second];
+			std::cout << "Queued Model ENtry loading: " << entry.id << std::endl;
 
 			// Might have loaded already (if duplicate queue)
 			if (entry.model) {
+				std::cout << "Model already found: Abort\n ";
 				continue;
 			}
-
-			std::printf("[ModelLibrary] Processing queued model load: %s\n", key.c_str());
 
 			// 1) Read bytes (or ignore bytes if your builder loads from path)
 			std::vector<std::byte> bytes = modelSource_->readModelBytes(key);
@@ -265,6 +266,7 @@ namespace aveng {
 			}
 
 			// Commit to its registry entry
+			entry.rootTransform = model->getRootTranformationMatrix();
 			entry.model = std::move(model);
 			entry.isAnimated = entry.model->hasAnimations();
 			if (entry.isAnimated) {
@@ -275,9 +277,9 @@ namespace aveng {
 			anyLoaded = true;
 			lastLoadedId = entry.id;
 
-			std::printf("[ModelLibrary] Loaded model id=%u key=%s animated=%s\n",
-				entry.id, entry.key.c_str(), entry.isAnimated ? "true" : "false"
-			);
+			//std::printf("[ModelLibrary] Loaded model id=%u key=%s animated=%s\n",
+			//	entry.id, entry.key.c_str(), entry.isAnimated ? "true" : "false"
+			//);
 
 			// Optional: if you have GPU upload steps, do them HERE (still between frames)
 			// uploadModelToGpu(entry);
@@ -318,10 +320,6 @@ namespace aveng {
 		const std::string modelBaseDir = baseDirForAssetKey(key);                // e.g. "Assets/Models/House"
 		const std::string engineTextureDir = normalizeAssetKey(joinPath(contentRoot_, textureRoot_)); // e.g. "Assets/textures"
 		const std::string baseDir = baseDirForAssetKey(key);
-
-		std::cout << "baseDir:\t" << baseDir << "\n";
-		std::cout << "ModelBaseDir:\t" << modelBaseDir << "\n";
-		std::cout << "EngineTextureDir:\t" << engineTextureDir<< "\n";
 
 		// NOTE: AvengModel now does "import/build", not IO.
 		const bool ok = model->loadModelV2(
