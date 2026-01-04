@@ -2,6 +2,7 @@
 #ifdef ENABLE_EDITOR
 #include "Editor/Editor.h"
 #endif
+#include "Core/Renderer/ModelLibrary.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "Core/Renderer/Renderer.h"
 #include "Services/IRenderSceneView.h"
@@ -10,6 +11,7 @@
 namespace aveng {
 
 	AvengFrame::AvengFrame(Renderer& renderer,
+		ModelLibrary& modelLibrary,
 		IRenderSceneView& sceneView,
 		const IModelLibrary& modelLib,
 		VkRenderData& renderData,
@@ -23,6 +25,7 @@ namespace aveng {
 		, gameData { gameData }
 		, engineDevice{ engineDevice }
 		, pEditor{ editor }
+		, modelLib__{ modelLibrary }
 	{
 	}
 
@@ -62,6 +65,9 @@ namespace aveng {
 
 		// GC
 		renderer.destroyTrash();
+
+		modelLib__.processPendingUnloads();
+		modelLib__.processPendingModelLoads();
 
 		renderer.updateCamera();
 

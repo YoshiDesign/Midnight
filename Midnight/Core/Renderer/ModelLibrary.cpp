@@ -183,6 +183,9 @@ namespace aveng {
 			//    Only do this if you are sure no in-flight cmd buffers reference this model.
 			//    (Call this method only after the relevant frame fence(s) have completed.)
 			if (entry.model) {
+				/// IMPORTANT: If you ever want to load or unload models mid-game, this needs to change.
+				/// Do not idle the device. All you need to do is wait for 'n' frames to complete
+				vkDeviceWaitIdle(engineDevice_.device());
 				entry.model->cleanup(engineDevice_, renderData_);
 				entry.model.reset(); // drop the shared_ptr after cleanup
 			}

@@ -26,6 +26,7 @@ namespace aveng {
 		, inputSystem_( std::make_unique<InputSystem>(*inputRouter_, game_data))
 		, frame_(std::make_unique<AvengFrame>(
 			renderer,
+			modelLib_,
 			sceneFacade_, /// Interface
 			modelLib_, /// Interface
 			renderData,
@@ -55,9 +56,6 @@ namespace aveng {
 
 		// Load new models if any are pending. Side-Effect: Creates descriptor sets for this model
 #ifdef ENABLE_EDITOR
-
-		modelLib_.processPendingModelLoads();
-		modelLib_.processPendingUnloads();
 
 		// Give ImGUI the latest input state
 		updateGUI(inputState()); 

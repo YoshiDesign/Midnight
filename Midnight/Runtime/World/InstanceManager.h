@@ -245,7 +245,9 @@ namespace aveng {
                 auto& handles = it->second;
                 // Making use of the `InstanceHandle` overloaded operator==/!=. Uniqueness is (index, generation)
                 handles.erase(std::remove(handles.begin(), handles.end(), h), handles.end());
-                if (handles.empty()) instanceData_.instancesPerModel.erase(it); // optional cleanup
+
+                // Remove this element if its empty
+                if (handles.empty()) instanceData_.instancesPerModel.erase(it); 
             }
 
             // Remove from ordered instances
@@ -278,6 +280,7 @@ namespace aveng {
 #endif
             // Insert a free slot index
             instanceData_.free.push_back(h.index);
+            std::cout << "Instance Removed!!!!" << std::endl;
             return true;
         }
 
@@ -496,7 +499,7 @@ namespace aveng {
 
             // Copy first because deleteInstance() mutates instancesPerModel[mid]
             std::vector<Handle> toDelete = it->second;
-
+            std::cout << "Deleting....\n";
             deleteInstances(toDelete); // your existing span-based batch delete
             // deleteInstances will erase the map entry when it becomes empty (per your code)
         }

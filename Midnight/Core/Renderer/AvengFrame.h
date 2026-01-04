@@ -7,6 +7,7 @@ namespace aveng {
 	class Renderer;
 	class Editor;
 	class EngineDevice;
+	class ModelLibrary;
 	struct VkRenderData;
 	struct IRenderSceneView;
 	struct IModelLibrary;
@@ -16,6 +17,7 @@ namespace aveng {
 	public:
 		AvengFrame(
 			Renderer& renderer,
+			ModelLibrary& modelLibrary,
 			IRenderSceneView& sceneView,
 			const IModelLibrary& modelLib, // used to get Model pointers to the renderer, *for now*
 			VkRenderData& renderData,
@@ -33,6 +35,7 @@ namespace aveng {
 
 	private:
 		const IModelLibrary& modelLib_;
+		ModelLibrary& modelLib__;
 		IRenderSceneView& sceneView_;
 
 		std::vector<VkCommandBuffer> commandBuffers;

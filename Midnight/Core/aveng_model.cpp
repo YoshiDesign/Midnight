@@ -541,7 +541,7 @@ namespace aveng {
 	void AvengModel::cleanup(EngineDevice& engineDevice, VkRenderData& renderData) {
 
 		VkDescriptorPool pool = renderData.avengDescriptorPool;
-
+		
 		std::cout << "Model: self destruction sequence activated\n";
 		// This is identical to...
 		/*for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
@@ -549,16 +549,16 @@ namespace aveng {
 		}*/
 
 		// this... But just do
-		for (const auto& set : mMatrixMultPerModelDescriptorSets) {
-			vkFreeDescriptorSets(engineDevice.device(), pool, 1, &set);
-		}
+		//for (const auto& set : mMatrixMultPerModelDescriptorSets) {
+		//	vkFreeDescriptorSets(engineDevice.device(), pool, 1, &set);
+		//}
 		/// ...this:
-		//vkFreeDescriptorSets(
-		//	engineDevice.device(),
-		//	pool,
-		//	static_cast<uint32_t>(mMatrixMultPerModelDescriptorSets.size()),
-		//	mMatrixMultPerModelDescriptorSets.data()
-		//);
+		vkFreeDescriptorSets(
+			engineDevice.device(),
+			pool,
+			static_cast<uint32_t>(mMatrixMultPerModelDescriptorSets.size()),
+			mMatrixMultPerModelDescriptorSets.data()
+		);
 
 		for (auto buffer : mVertexBuffers) {
 			VertexBuffer::cleanup(engineDevice, buffer);

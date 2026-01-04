@@ -16,7 +16,7 @@ namespace aveng {
 
 	// IModelAnimQuery
 	bool ModelRegistryData::tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const {
-		std::cout << "Model ID Clipe Meta: " << id << std::endl;
+
 		const ModelEntry* e = get(id);
 		if (!e || e->id == NullModelId || e->model == nullptr || !e->isAnimated) return false;
 
