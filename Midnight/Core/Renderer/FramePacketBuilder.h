@@ -94,7 +94,7 @@ namespace aveng {
 
     struct FramePacketBuildOptions {
         bool requireModelLoaded = true;
-        bool deterministicBatches = true;
+        bool deterministicBatches = false;
 
         // Choose your "source of truth" for ordering:
         // - instancesInOrder keeps a global per-pool order
@@ -110,6 +110,7 @@ namespace aveng {
     public:
 
         void setModelQuery(const IModelQuery* q) { modelQ_ = q; }
+        void setAnimQuery(const IModelAnimQuery* aq) { animQ_ = aq; }
         void setFramesInFlight(int n) { framePackets_.resize(n); }
         const FramePacket& getFramePacket(int frameIndex) { return framePackets_[frameIndex]; }
 
@@ -137,6 +138,7 @@ namespace aveng {
             const PoolInputs<AnimatedTag, AnimatedInstanceT>& anim,
             uint32_t frameIndex,
             uint64_t frameNumber, // Could become useful for profiling
+            float deltaTime,
             const FramePacketBuildOptions& opt)
         {
             // Ensure we have storage for this frame index
@@ -144,12 +146,12 @@ namespace aveng {
                 framePackets_.resize(frameIndex + 1);
             }
 
-            nextPickId = 0;
+            nextPickId = 1;
             FramePacket& pkt = framePackets_[frameIndex];
 
             // Clear previous frame data - we could alternatively clean this up after each frame is completed in a GC step
             pkt.drawList.clear();
-            pkt.batches.clear();    /// TODO can we reserve this too?
+            pkt.batches.clear();    /// TODO can we reserve this too? Only if you can determine batches in advance
             pkt.worldMatrices.clear();
             pkt.frameIndex = frameIndex;
             pkt.frameNumber = frameNumber;
@@ -163,7 +165,7 @@ namespace aveng {
             maxInstances = stat.slots->size() + anim.slots->size();
             pkt.drawList.reserve(maxInstances);
             pkt.pickIds.resize(maxInstances);
-            pkt.pickToHandle.resize(maxInstances); // +1 because pickId 0 is NullInstance
+            pkt.pickToHandle.resize(maxInstances + 1); // +1 because pickId 0 is NullInstance
 
             // Defensive: required pointers
             if (!modelQ_ ||
@@ -395,6 +397,10 @@ namespace aveng {
             
 
             // ========== POST-PROCESSING ==========
+            /*
+                Data Layout:
+                batch[instance[nBones], instance[nBones], padding[nBones] ...32-1]
+            */
 
             // Add bone information for animated batches (starting at staticBatchCount)
             uint32_t boneBase = 0;
@@ -402,9 +408,10 @@ namespace aveng {
                 auto& b = pkt.batches[i];
                 ModelMeta meta{};
                 
+                // TODO - modelQ_ is a perf hit. Find a way to inline
                 if (modelQ_->isModelLoaded(b.modelId, meta) && meta.boneCount > 0) {
                     b.boneCount = meta.boneCount;
-                    b.alignedInstanceCount = ((b.instanceCount + 31) / 32) * 32;
+                    b.alignedInstanceCount = ((b.instanceCount + 31) / 32) * 32; // ensure ceiling
                     b.boneBaseOffset = boneBase;
                     boneBase += b.boneCount * b.alignedInstanceCount;
                 }
@@ -422,13 +429,14 @@ namespace aveng {
                 // Copy each instance's node transforms
                 for (uint32_t i = 0; i < b.instanceCount; ++i) {
                     const AnyInstanceHandle& ah = pkt.drawList[b.drawListOffset + i];
-                    AnimatedHandle h = std::get<AnimatedHandle>(ah);
-
-                    auto boneSpan = animSlots[h.index].instance->getNodeTransformData();
+                    AnimatedHandle h = std::get<AnimatedHandle>(ah); /// Look up std::get semantics
+                    
+                    //animSlots[h.index].instance->updateAnimation(deltaTime, animQ_);
+                    std::vector<NodeTransformData> boneSpan = animSlots[h.index].instance->getNodeTransformData();
 
 #ifdef M_DEBUG
                     if (boneSpan.size() != b.boneCount) {
-                        std::cout << "[BONE MISMATCH] Instance has " << boneSpan.size()
+                        std::cout << "[FPB: BONE MISMATCH] Instance has " << boneSpan.size()
                             << " bones, expected " << b.boneCount << "\n";
                     }
 #endif
@@ -436,6 +444,7 @@ namespace aveng {
                     std::copy(
                         boneSpan.begin(),
                         boneSpan.end(),
+                        // First bone of instance `i` for this batch of instances
                         pkt.nodeTransformData.begin() + (b.boneBaseOffset + i * b.boneCount)
                     );
                 }
@@ -447,6 +456,7 @@ namespace aveng {
                     glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
                 };
 
+                // Pad the remaining "slab"
                 for (uint32_t i = b.instanceCount; i < b.alignedInstanceCount; ++i) {
                     for (uint32_t bone = 0; bone < b.boneCount; ++bone) {
                         pkt.nodeTransformData[b.boneBaseOffset + i * b.boneCount + bone] = identityTrs;
@@ -469,6 +479,7 @@ namespace aveng {
     private:
         std::vector<FramePacket> framePackets_{};
         const IModelQuery* modelQ_ = nullptr;
+        const IModelAnimQuery* animQ_ = nullptr;
         BatchSortFn customBatchSort_{};
         size_t maxInstances = 0;
         uint32_t nextPickId = 1;

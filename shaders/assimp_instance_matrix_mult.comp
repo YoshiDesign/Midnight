@@ -9,16 +9,16 @@ layout (std430, set = 0, binding = 0) readonly restrict buffer TRSMatrix {
   mat4 trsMat[];
 };
 
+layout (std430, set = 0, binding = 1) writeonly restrict buffer NodeMatrices {
+  mat4 nodeMat[];
+};
+
 layout (std430, set = 1, binding = 0) readonly restrict buffer ParentMatrixIndices {
   int parentIndex[];
 };
 
 layout (std430, set = 1, binding = 1) readonly restrict buffer BoneOffsets {
   mat4 boneOff[];
-};
-
-layout (std430, set = 0, binding = 1) writeonly restrict buffer NodeMatrices {
-  mat4 nodeMat[];
 };
 
 void main() {
@@ -36,7 +36,7 @@ void main() {
   uint parent = 0;
 
   int parentNode = parentIndex[node];
-  while (parentNode >= 0) {
+  while (parentNode >= 0) { // Because all root nodes are explicitly -1
     parent = parentNode + numberOfBones * instance + modelOffset;
     nodeMatrix = trsMat[parent] * nodeMatrix;
     parentNode = parentIndex[parentNode];

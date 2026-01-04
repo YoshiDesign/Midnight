@@ -147,7 +147,7 @@ namespace aveng {
 	};
 
 	struct VkPushConstants {
-		uint32_t pkModelStride;
+		uint32_t pkModelBoneStride;
 		uint32_t pkWorldPosOffset;
 		uint32_t pkSkinMatOffset;
 		uint32_t pkBasePickId;

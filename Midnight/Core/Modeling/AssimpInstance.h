@@ -26,7 +26,7 @@ namespace aveng {
         ModelId modelId() const             { return modelId_; }
         void setAnimClipNr(uint32_t clipNr) { anim.clipNr = clipNr; }
         void setModelId(ModelId id)         { modelId_ = id; };
-        void resizeNodeTransformData(unsigned int boneCount) { mNodeTransformData.resize(boneCount); };
+        void resizeNodeTransformData(unsigned int boneCount);
 
         void setTranslation(glm::vec3 position);
         void setRotation(glm::vec3 rotation);

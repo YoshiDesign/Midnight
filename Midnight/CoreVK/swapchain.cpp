@@ -605,7 +605,7 @@ namespace aveng {
 
     int SwapChain::getPixelValueFromPos(unsigned int xPos, unsigned int yPos, uint32_t imageIndex) {
         /* random default value to detect errors */
-        float pixelColor = -444.0f;
+        int pixelColor = -444;
 
         // This would be true while the swapchain is being recreated.
         if (renderData.rdSelectionImages.empty() ||
@@ -747,7 +747,7 @@ namespace aveng {
         vkGetImageSubresourceLayout(device.device(), readbackImage, &subResource, &subResourceLayout);
 
         /* map and read data */
-        const float* data;
+        const unsigned int* data;
         result = vmaMapMemory(device.allocator(), readbackImageAlloc, (void**)&data);
         if (result != VK_SUCCESS) {
             vmaDestroyImage(device.allocator(), readbackImage, readbackImageAlloc);
@@ -755,7 +755,7 @@ namespace aveng {
             return pixelColor;
         }
 
-        data += yPos * subResourceLayout.rowPitch / sizeof(float) + xPos;
+        data += yPos * subResourceLayout.rowPitch / sizeof(unsigned int) + xPos;
         pixelColor = *data;
 
         vmaUnmapMemory(device.allocator(), readbackImageAlloc);

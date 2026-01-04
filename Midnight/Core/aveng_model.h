@@ -82,6 +82,8 @@ namespace aveng {
 	
 		std::string path; 
 
+		const VkShaderStorageBufferData& getMatOffBuffer(int findex) const { return mShaderBoneMatrixOffsetBuffers[findex]; }
+
 	private:
 
 		EngineDevice& engineDevice;

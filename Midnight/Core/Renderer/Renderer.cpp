@@ -28,12 +28,14 @@ namespace aveng {
 		AvengWindow& window,
 		VkRenderData& renderData, 
 		CameraManager& _cameraManager,
-		const IModelQuery& mq)
+		const IModelQuery& mq,
+		const IModelAnimQuery& aq)
 		:   engineDevice	{ engineDevice }, 
 			aveng_window	{ window }, 
 			renderData		{ renderData }, 
 			cameraManager	{ _cameraManager },
-			modelQuery_		{ mq }
+			modelQuery_		{ mq },
+			animQuery_		{ aq }
 	{
 
 		buffer_trash.clear();
@@ -43,7 +45,7 @@ namespace aveng {
 		// Define buffer vec's that are managed by the Renderer
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mPointLightUBOBuffers			 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mShaderModelRootMatrixBuffers	 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mModelMatrixBuffers	 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mNodeTransformBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderTrsMatrixBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderBoneMatrixBuffers		 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
@@ -118,6 +120,7 @@ namespace aveng {
 
 		/* framePacketBuilder_ dependencies */
 		framePacketBuilder_.setModelQuery(&modelQuery_);
+		framePacketBuilder_.setAnimQuery(&animQuery_);
 		framePacketBuilder_.setFramesInFlight(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		addLight(
@@ -535,7 +538,7 @@ namespace aveng {
 		{
 			/* compute transformation shader */
 			VkDescriptorSetLayoutBinding assimpTransformSsboBind{};
-			assimpTransformSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			assimpTransformSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // NodeTransformBuffers
 			assimpTransformSsboBind.binding = 0;
 			assimpTransformSsboBind.descriptorCount = 1;
 			assimpTransformSsboBind.pImmutableSamplers = nullptr;
@@ -877,10 +880,9 @@ namespace aveng {
 		return 0;
 	}
 
-	void Renderer::runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset) {
-		uint32_t numberOfBones = static_cast<uint32_t>(model->getBoneList().size());
+	void Renderer::runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t numberOfBones) {
 		// VkCommandBuffer computeCommandBuffer = getCurrentCommandBufferCompute();
-
+		uint32_t groupsY = (numInstances + 31) / 32;
 		/* node transformation */
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipeline);
@@ -895,7 +897,7 @@ namespace aveng {
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		vkCmdDispatch(renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
+		vkCmdDispatch(renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, groupsY, 1);
 
 		/* memory barrier between the compute shaders
 		 * wait for TRS buffer to be written  */
@@ -928,7 +930,7 @@ namespace aveng {
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-		vkCmdDispatch (renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, static_cast<uint32_t>(std::ceil(numInstances / 32.0f)), 1);
+		vkCmdDispatch (renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, groupsY, 1);
 
 		/* memory barrier after compute shader
 		 * wait for bone matrix buffer to be written  */
@@ -993,6 +995,7 @@ namespace aveng {
 				anim,
 				currentFrameIndex,
 				0, // tmp/unused frame number
+				deltaTime,
 				FramePacketBuildOptions{} // opts
 			);
 
@@ -1005,6 +1008,13 @@ namespace aveng {
 		*/
 
 		bool bufferResized = false;
+		//for (size_t i = 0; i < std::min(pkt.nodeTransformData.size(), (size_t)5); ++i) {
+		//	auto& n = pkt.nodeTransformData[i];
+		//	std::printf("[NodeTRS %zu] T=(%.2f,%.2f,%.2f) S=(%.2f,%.2f,%.2f) R=(%.2f,%.2f,%.2f,%.2f)\n",
+		//		i, n.translation.x, n.translation.y, n.translation.z,
+		//		n.scale.x, n.scale.y, n.scale.z,
+		//		n.rotation.x, n.rotation.y, n.rotation.z, n.rotation.w);
+		//}
 		// TODO - This upload only needs to occur if there are Animated Models!
 		bufferResized = ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), pkt.nodeTransformData);
 		// Upload every instance's current transform data (translation, scale, rotation)
@@ -1101,32 +1111,32 @@ namespace aveng {
 		/* we need to update descriptors after the upload if buffer size changed */
 		mUploadToUBOTimer.start();
 
-		UniformBuffer::uploadPersistentData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices);
+		UniformBuffer::uploadPersistentData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices); // View/Proj Matrices
 		UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
-
-		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
-			Logger::log(1, "[2] mShaderModelRootMatrixBuffers resized!!\n");
-			size_t newBufferSize = std::max(pkt.worldMatrices.size() * sizeof glm::mat4, mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
+		// Upload the model mat's
+		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) { 
+			Logger::log(1, "[2] mModelMatrixBuffers resized!!\n");
+			size_t newBufferSize = std::max(pkt.worldMatrices.size() * sizeof glm::mat4, mModelMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
 			buffer_trash.push_back(
 				PendingBufferDestroy{
-					mShaderModelRootMatrixBuffers.at(currentFrameIndex).buffer,
-					mShaderModelRootMatrixBuffers.at(currentFrameIndex).bufferAlloc,
+					mModelMatrixBuffers.at(currentFrameIndex).buffer,
+					mModelMatrixBuffers.at(currentFrameIndex).bufferAlloc,
 				}
 			);
 
 			// Reinitialize TrsMat buffers
 			ShaderStorageBuffer::init(
 				engineDevice,
-				mShaderModelRootMatrixBuffers.at(currentFrameIndex),
+				mModelMatrixBuffers.at(currentFrameIndex),
 				MapMode::Persistent,
 				ResidentMode::CPU,
 				newBufferSize // New buffer size
 			);
 
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderModelRootMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
 				std::printf("[2] Failed to accommodate resized buffer.\n");
 				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
 			}
@@ -1164,10 +1174,11 @@ namespace aveng {
 				const DrawBatch& b = pkt.batches[i];
 				if (b.boneCount == 0 || b.instanceCount == 0) continue;
 
-				const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
+				const AvengModel* model = modelLib.pModel(b.modelId); /* TODO - Another vtable ref... */
 				if (!model) continue;
-				
-				runComputeShaders(model, b.alignedInstanceCount, b.boneBaseOffset);
+				//std::vector<glm::mat4> debugBoneMat(model->getMatOffBuffer(currentFrameIndex).bufferSize, glm::mat4(1.0f));
+				//ShaderStorageBuffer::uploadSsboData(engineDevice, model->getMatOffBuffer(currentFrameIndex), debugBoneMat);
+				runComputeShaders(model, b.alignedInstanceCount, b.boneBaseOffset, b.boneCount);
 			}
 
 			// End command recording for Compute Queue
@@ -1283,7 +1294,7 @@ namespace aveng {
 			if (!model) continue;
 
 			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
-			mModelPushConst.pkModelStride = 0; // static - unused
+			mModelPushConst.pkModelBoneStride = 0; // static - unused
 			mModelPushConst.pkSkinMatOffset = 0; // static - unused
 			mModelPushConst.pkBasePickId = b.basePickId; // if basePickId + gl_InstanceIndex == SelectedPickId, the instance is selected
 			mModelPushConst.pkPickId = renderData.selectedPickId;
@@ -1306,9 +1317,9 @@ namespace aveng {
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 			if (!model) continue;
 
-			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
-			mModelPushConst.pkModelStride = b.boneCount;
-			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;
+			mModelPushConst.pkWorldPosOffset = b.drawListOffset; // instance offset
+			mModelPushConst.pkModelBoneStride = b.boneCount;	// stride per model
+			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;	// 
 			mModelPushConst.pkBasePickId = b.basePickId;
 			mModelPushConst.pkPickId = renderData.selectedPickId;
 			vkCmdPushConstants(commandBuffer, animationLayout,
@@ -1332,7 +1343,7 @@ namespace aveng {
 			matrixInfo.range = VK_WHOLE_SIZE;
 
 			VkDescriptorBufferInfo worldPosInfo{};
-			worldPosInfo.buffer = mShaderModelRootMatrixBuffers[frameIndex].buffer;
+			worldPosInfo.buffer = mModelMatrixBuffers[frameIndex].buffer;
 			worldPosInfo.offset = 0;
 			worldPosInfo.range = VK_WHOLE_SIZE;
 
@@ -1385,7 +1396,7 @@ namespace aveng {
 			boneMatrixInfo.range = VK_WHOLE_SIZE;
 
 			VkDescriptorBufferInfo worldPosInfo{};
-			worldPosInfo.buffer = mShaderModelRootMatrixBuffers[frameIndex].buffer;
+			worldPosInfo.buffer = mModelMatrixBuffers[frameIndex].buffer;
 			worldPosInfo.offset = 0;
 			worldPosInfo.range = VK_WHOLE_SIZE;
 
@@ -1583,7 +1594,7 @@ namespace aveng {
 			UniformBuffer::cleanup(engineDevice, mPointLightUBOBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderTrsMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
-			ShaderStorageBuffer::cleanup(engineDevice, mShaderModelRootMatrixBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, mModelMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
 		
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
@@ -1657,7 +1668,7 @@ namespace aveng {
 				return false;
 			}
 
-			if (!ShaderStorageBuffer::init(engineDevice, mShaderModelRootMatrixBuffers[i], MapMode::Persistent)) { // CPU Resident
+			if (!ShaderStorageBuffer::init(engineDevice, mModelMatrixBuffers[i], MapMode::Persistent)) { // CPU Resident
 				Logger::log(1, "%s error: could not create nodel root position SSBO\n", __FUNCTION__);
 				return false;
 			}
@@ -1671,8 +1682,8 @@ namespace aveng {
 
 		// Populate the shared view for the editor - for when it needs to update its descriptor sets
 		renderData.matrixBuffersView.modelRootSSBOs = {
-			mShaderModelRootMatrixBuffers.data(),
-			mShaderModelRootMatrixBuffers.size()
+			mModelMatrixBuffers.data(),
+			mModelMatrixBuffers.size()
 		};
 		renderData.matrixBuffersView.boneMatSSBOs = {
 			mShaderBoneMatrixBuffers.data(),
@@ -1685,8 +1696,8 @@ namespace aveng {
 	void Renderer::updateBufferViews() {
 	
 		renderData.matrixBuffersView.modelRootSSBOs = {
-		mShaderModelRootMatrixBuffers.data(),
-		mShaderModelRootMatrixBuffers.size()
+		mModelMatrixBuffers.data(),
+		mModelMatrixBuffers.size()
 		};
 
 		renderData.matrixBuffersView.boneMatSSBOs = {

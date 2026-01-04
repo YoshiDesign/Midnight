@@ -14,7 +14,18 @@ namespace aveng {
         common.init(id, meta.root, t);
         anim = as;
 
+        //mNodeTransformData.resize(meta.boneCount);
+
+        //const NodeTransformData identity{
+        //    glm::vec4(0,0,0,0),
+        //    glm::vec4(1,1,1,0),
+        //    glm::vec4(0,0,0,1),
+        //};
+
+        //std::fill(mNodeTransformData.begin(), mNodeTransformData.end(), identity);
         resizeNodeTransformData(meta.boneCount);
+
+
 #ifdef M_DEBUG
         // For sanity's sake
         ensurePoseStorage(meta.boneCount);
@@ -50,6 +61,20 @@ namespace aveng {
             std::cout << "Resizing NodeTransformData\n";
             resizeNodeTransformData(boneCount);
         }
+    }
+
+    void AssimpInstance::resizeNodeTransformData(unsigned int boneCount) {
+
+        mNodeTransformData.resize(boneCount);
+
+        const NodeTransformData identity{
+            glm::vec4(0,0,0,0),
+            glm::vec4(1,1,1,0),
+            glm::vec4(0,0,0,1),
+        };
+
+        std::fill(mNodeTransformData.begin(), mNodeTransformData.end(), identity);
+    
     }
 
     void AssimpInstance::updateAnimation(float deltaTime, const IModelAnimQuery& animQ) {
@@ -112,7 +137,11 @@ namespace aveng {
          */
         std::fill(mNodeTransformData.begin(),
             mNodeTransformData.end(),
-            NodeTransformData{});
+            NodeTransformData{
+                //glm::vec4(0.0f),
+                //glm::vec4(1.0f),
+                //glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)
+            });
     }
 
     std::vector<NodeTransformData> AssimpInstance::getNodeTransformData() {

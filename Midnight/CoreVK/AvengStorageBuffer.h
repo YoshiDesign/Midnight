@@ -41,6 +41,33 @@ namespace aveng {
 
             return false;
         }
+
+        template <typename T>
+        static bool uploadSsboData(EngineDevice& engineDevice, const VkShaderStorageBufferData& SSBOData, std::vector<T> bufferData) {
+            if (bufferData.empty()) {
+                return false;
+            }
+
+            if ((bufferData.size() * sizeof(T)) > SSBOData.bufferSize) {
+                Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(T)));
+                return true;
+            }
+
+            void* data;
+            VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
+            if (result != VK_SUCCESS) {
+                Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+                return false;
+            }
+            std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(T)));
+            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+
+            if (!SSBOData.isHostCoherent) {
+                vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+            }
+
+            return false;
+        }
         template <typename T>
         static bool uploadPersistentSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::vector<T> bufferData) {
 

@@ -7,7 +7,7 @@ namespace aveng {
 
     bool AssimpMesh::processMesh(const VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, /*std::string assetDirectory*/const std::string modelBaseDir, const std::string contentRoot, std::unordered_map<std::string, VkTextureData>& textures) {
         mMeshName = mesh->mName.C_Str();
-
+        std::cout << "--------------- Processign Mesh " << mMeshName << std::endl;
         mTriangleCount = mesh->mNumFaces;
         mVertexCount = mesh->mNumVertices;
 
@@ -200,6 +200,17 @@ namespace aveng {
                 // Use the sandwich (B * M * inv(B)), not just B * M.
                 glm::mat4 offset_engine = B * offset_gltf * glm::inverse(B);
 
+                //auto printScale = [](const char* tag, const glm::mat4& m) {
+                //    glm::vec3 sx = glm::vec3(m[0]);
+                //    glm::vec3 sy = glm::vec3(m[1]);
+                //    glm::vec3 sz = glm::vec3(m[2]);
+                //    printf("%s scale=(%.3f,%.3f,%.3f) det=%.3f\n",
+                //        tag, glm::length(sx), glm::length(sy), glm::length(sz), glm::determinant(m));
+                //};
+
+                //printScale("offset_gltf ", offset_gltf);
+                //printScale("offset_engine", offset_engine);
+
                 std::shared_ptr<AssimpBone> newBone = std::make_shared<AssimpBone>(boneId, boneName, offset_engine);
 
                 mBoneList.push_back(newBone);
@@ -225,8 +236,12 @@ namespace aveng {
                     mMesh.vertices.at(vertexId).boneWeight = currentWeights;
 
                 }
+
+
             }
         }
+
+
 
         return true;
     }

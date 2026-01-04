@@ -37,6 +37,39 @@ namespace std {
 	};
 }
 
+namespace {
+
+	glm::mat4 AiToGlm(const aiMatrix4x4& a) {
+		return glm::mat4(
+			a.a1, a.b1, a.c1, a.d1,
+			a.a2, a.b2, a.c2, a.d2,
+			a.a3, a.b3, a.c3, a.d3,
+			a.a4, a.b4, a.c4, a.d4
+		);
+	}
+
+	glm::mat4 ComputeGlobalAssimp(const aiNode* node) {
+		glm::mat4 global(1.0f);
+		// Build chain then multiply top-down to avoid order mistakes
+		std::vector<const aiNode*> chain;
+		for (auto* n = node; n != nullptr; n = n->mParent)
+			chain.push_back(n);
+
+		for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+			global = global * AiToGlm((*it)->mTransformation);
+		}
+		return global;
+	}
+
+	glm::vec3 ExtractScale(const glm::mat4& m) {
+		glm::vec3 sx = glm::vec3(m[0]);
+		glm::vec3 sy = glm::vec3(m[1]);
+		glm::vec3 sz = glm::vec3(m[2]);
+		return glm::vec3(glm::length(sx), glm::length(sy), glm::length(sz));
+	}
+
+}
+
 namespace aveng {
 
 	struct Model {
@@ -65,7 +98,7 @@ namespace aveng {
 			* @Note
 			* For glTF imports, Assimp often maps glTF baseColorTexture -> aiTextureType_DIFFUSE 
 			* for compatibility with older code paths. Later, Assimp added a dedicated texture 
-			* type aiTextureType_BASE_COLOR specifically to represent glTF’s baseColor without pretending it’s "diffuse"
+			* type aiTextureType_BASE_COLOR specifically to represent glTFâ€™s baseColor without pretending itâ€™s "diffuse"
 			*/
 
 			// find diffuse texture by name
@@ -194,7 +227,7 @@ namespace aveng {
 			std::cout << "Model has an embedded texture!!" << std::endl;
 
 			for (int i = 0; i < scene->mNumTextures; ++i) {
-				std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
+				std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but donâ€™t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
 
 				int height = scene->mTextures[i]->mHeight;
 				int width = scene->mTextures[i]->mWidth;
@@ -236,24 +269,24 @@ namespace aveng {
 		std::printf("%s: root node name: '%s'\n", __FUNCTION__, rootNodeName.c_str());
 
 		processNode(renderData, mRootNode, rootNode, scene, modelBaseDir, contentRoot);
-
+		
 		/**
 		  * Check your work
 		  */
-		for (const auto& entry : mNodeList) {
-			std::vector<std::shared_ptr<AssimpNode>> childNodes = entry->getChilds();
+		//for (const auto& entry : mNodeList) {
+		//	std::vector<std::shared_ptr<AssimpNode>> childNodes = entry->getChilds();
 
-			std::string parentName = entry->getParentNodeName();
-			// std::printf("%s: --- found node %s in node list, it has %i children, parent is %s\n", __FUNCTION__, entry->getNodeName().c_str(), childNodes.size(), parentName.c_str());
+		//	std::string parentName = entry->getParentNodeName();
+		//	std::printf("[NODE] \"%s\" in node list, it has %i children, parent is \"%s\"\n", entry->getNodeName().c_str(), childNodes.size(), parentName.c_str());
 
-			for (const auto& node : childNodes) {
-				// std::printf("%s: ---- child: %s\n", __FUNCTION__, node->getNodeName().c_str());
-			}
-		}
+		//	for (const auto& node : childNodes) {
+		//		std::printf("[NODE -> CHILD] child: \"%s\"\n", node->getNodeName().c_str());
+		//	}
+		//}
 
 		std::vector<glm::mat4> boneOffsetMatricesList{};
 		std::vector<int32_t> boneParentIndexList{};
-
+		std::cout << "Model Loading: " << key << "\n";
 		for (const auto& bone : mBoneList) {
 			boneOffsetMatricesList.emplace_back(bone->getOffsetMatrix());
 
@@ -267,12 +300,15 @@ namespace aveng {
 			}
 		}
 
-		// std::printf("%s: -- bone parents --\n", __FUNCTION__);
-		// for (unsigned int i = 0; i < mBoneList.size(); ++i) {
-			// std::printf("%s: bone %i (%s) has parent %i (%s)\n", __FUNCTION__, i, mBoneList.at(i)->getBoneName().c_str(), boneParentIndexList.at(i),
-				// boneParentIndexList.at(i) < 0 ? "invalid" : mBoneList.at(boneParentIndexList.at(i))->getBoneName().c_str());
-		// }
-		// std::printf("%s: -- bone parents --\n", __FUNCTION__);
+		 //std::printf("[THEM BONE PARENTS] bone parents --\n");
+		 //for (unsigned int i = 0; i < mBoneList.size(); ++i) {
+			// std::printf("-- bone %i (%s) has parent %i (%s)\n", i, mBoneList.at(i)->getBoneName().c_str(), boneParentIndexList.at(i),
+			//	 boneParentIndexList.at(i) < 0 ? "invalid" : mBoneList.at(boneParentIndexList.at(i))->getBoneName().c_str());
+			// if (boneParentIndexList.at(i) == -1) {
+			//	 std::printf("NEG 1\n");
+			// }
+		 //}
+		 //std::printf("[END BONE PARENTS] bone parents --\n");
 
 		/* create vertex buffers for the meshes */
 		for (const auto& mesh : mModelMeshes) {
@@ -298,7 +334,7 @@ namespace aveng {
 			/* SSBOs uploaded once and forgotten about. No need to persistently map */
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList))
 			{
-				throw std::runtime_error("mod`el buffer allocation size was incorrect");
+				throw std::runtime_error("model buffer allocation size was incorrect");
 			};
 
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList))

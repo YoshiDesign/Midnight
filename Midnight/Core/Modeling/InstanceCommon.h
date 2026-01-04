@@ -32,7 +32,7 @@ namespace aveng {
 
         const glm::mat4& modelMatrix() const {
             if (!dirty) return cachedModelMatrix;
-
+            std::cout << "computing model matrix" << std::endl;
             // your current math, but only when needed:
             glm::mat4 T = glm::translate(glm::mat4(1.f), xf.pos);
 

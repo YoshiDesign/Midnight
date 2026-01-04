@@ -13,7 +13,7 @@ layout (location = 4) out vec3 fragPosWorld;
 layout (location = 5) flat out uint vInstanceIndex;
 
 layout (push_constant) uniform Constants {
-  uint modelStride;
+  uint modelBoneStride;
   uint worldPosOffset;  // The index of each model's first instance
   uint skinMatrixOffset;
   uint basePickId;
@@ -37,12 +37,12 @@ void main() {
 
   bool selected = (pickId == basePickId + gl_InstanceIndex);
 
-  uint skinMatOffset = gl_InstanceIndex * modelStride + skinMatrixOffset;
-  mat4 skinMat = mat4(1.0);
-  //aBoneWeight.x * boneMat[aBoneNum.x + skinMatOffset] +
-  //aBoneWeight.y * boneMat[aBoneNum.y + skinMatOffset] +
-  //aBoneWeight.z * boneMat[aBoneNum.z + skinMatOffset] +
-  //aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
+  uint skinMatOffset = gl_InstanceIndex * modelBoneStride + skinMatrixOffset;
+  mat4 skinMat = 
+    aBoneWeight.x * boneMat[aBoneNum.x + skinMatOffset] +
+    aBoneWeight.y * boneMat[aBoneNum.y + skinMatOffset] +
+    aBoneWeight.z * boneMat[aBoneNum.z + skinMatOffset] +
+    aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
 
   mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + worldPosOffset] * skinMat;
   vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0f);

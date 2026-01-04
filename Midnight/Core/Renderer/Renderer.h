@@ -28,7 +28,8 @@ namespace aveng {
 			AvengWindow& window, 
 			VkRenderData& renderData, 
 			CameraManager& cameraManager,
-			const IModelQuery& mq
+			const IModelQuery& mq,
+			const IModelAnimQuery& aq
 		);
 		~Renderer() = default;
 
@@ -126,7 +127,7 @@ namespace aveng {
 		// New methods for descriptor/buffer management
 		void updateCamera();
 
-		void runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset);
+		void runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t numberOfBones);
 		
 		void initializePointLights();
 		void renderLights(const VkPipeline& pipeline, const VkPipelineLayout& layout);
@@ -150,6 +151,8 @@ namespace aveng {
 		size_t calculateDynamicUBOStride() const;
 
 		const IModelQuery& modelQuery_;
+		const IModelAnimQuery& animQuery_;
+
 		VkRenderData& renderData;
 
 		bool firstFrame = true;
@@ -184,7 +187,7 @@ namespace aveng {
 		// Descriptors and Buffers
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
 		std::vector<VkUniformBufferData> mPointLightUBOBuffers;
-		std::vector<VkShaderStorageBufferData> mShaderModelRootMatrixBuffers;
+		std::vector<VkShaderStorageBufferData> mModelMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderTrsMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
