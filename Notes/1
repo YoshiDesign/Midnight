@@ -1,46 +1,5 @@
 
-## Materials and Lighting
-[] app_object normalMatrix for new model instances. Needed for lighting calculations I think
-[] Don't rely on Assimp. Bring material inspection into your engine.
-[] Maybe create another pipeline with shader modules that support mat's
 
-## Extras
-[] Reduce LoC in Renderer.cpp by re-introducing the GfxPipeline class
-
-
-## Things that might f*ck you up (and some questions):
-- Call order of buffer writes. see AvengStorageBuffer map -> write -> unmap -> flush
-- SSBO resizing!
-- There's a buffer for each MAX_FRAMES_IN_FLIGHT, or there's only 1 in certain cases. What are those certain cases?
-- Utilization of the GfxPipeline class vs. the new approach.
-- Missing member variable init/usage due to my not using the lower lvl details and engine setup.
-
-
-## Immediate TODO
-[x] Re-implement command buffer command submission (you're freeing them too frequently instead of taking a more common approach)
-
-[x] V2 Vertex / Index buffers
-[x] V2 Pipeline(s)
-
-[x] Accommodate the v2 shaders:
-	[x] New Vertex and Index Buffers
-	[x] Descriptor Set Types
-	[x] Descriptor Layouts
-	[x] Storage Buffers
-	[x] Compute Shaders
-	[x] New Push Constant
-		- VkPushConstants
-		- VkComputePushConstants
-	[x] New Layout Attributes
-	[x] Check yo' pipeline layout's layouts
-	
-
-## OVERALL
-[x] Make gltf (prefer glb) the primary model loader
-
-## Side-Quests
-[] Move mix() and slerp() from AssimpAnimChannel to the GPU
-[](0) Other gameData things. Might help you wrap your head around what needs to go where
 
 # Checkin' out the Tut
 - Update Location 1: SSBO - VkRenderer.cpp - mNodeTransFormData
@@ -50,19 +9,7 @@
  - Vertex attributes are in the pipeline creation
  - Instances populate the NodeTransform
 
-# Architecture Quirks
- - Command pools are created by the EngineDevice, stored in VkRenderData. Commands are created by the CommandBuffer class.
- - Assume std::string is ALWAYS UTF-8 for max portability. Don't bother with UTF-16 (or WChars?)
+
 
 # Timeline
-11/01/25 - 
-	1. Learned how vertex/index buffers are mapped once per model, used per instance
-	2. Learned how single-shot command buffers work and that my architecture sucks.
-	3. Found out that the screen stuttering might be caused by using vkFreeCommandBuffers too frequently instead of reusing them OR because I'm using vkQueueWaitIdle during command recording (Update: Unlikely, because this is only being performed during single-shot commands. Be sure to use fences during the main loop, and avoid single shots)
-		see: https://chatgpt.com/g/g-p-67fd00e1b6748191913d770a83c124e5/c/69069bbb-bc4c-8330-8ba1-3f188f940760
-10/30/25 - 
-	1. Added Compute Shader Pipeline
-	2. Added Another Command Pool for Compute Commands
-	3. Added Command Buffer Creation for Compute
-10/28/25 - Learned about how descriptors are attributed and bound. <aveng_model>
-10/29/25 - Studying. Drafted v2 shaders. Added ModelManager.
+

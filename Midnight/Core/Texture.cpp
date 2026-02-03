@@ -71,7 +71,7 @@ namespace aveng {
             return false;
         }
 
-        std::printf("%s: texture '%s' loaded (%dx%d, %d channels)\n", __FUNCTION__, textureFilename.c_str(), texWidth, texHeight, numberOfChannels);
+        // std::printf("%s: texture '%s' loaded (%dx%d, %d channels)\n", __FUNCTION__, textureFilename.c_str(), texWidth, texHeight, numberOfChannels);
         return true;
     }
 
@@ -153,7 +153,7 @@ namespace aveng {
             return false;
         }
 
-        std::printf("%s: texture '%s' loaded (%dx%d, %d channels)\n", __FUNCTION__, textureName.c_str(), texWidth, texHeight, numberOfChannels);
+        //std::printf("%s: texture '%s' loaded (%dx%d, %d channels)\n", __FUNCTION__, textureName.c_str(), texWidth, texHeight, numberOfChannels);
         return true;
     }
 
@@ -307,7 +307,7 @@ namespace aveng {
                     mipHeight /= 2;
                 }
 
-                std::printf("%s: created level %i with width %i and height %i\n", __FUNCTION__, i, mipWidth, mipHeight);
+                // std::printf("%s: created level %i with width %i and height %i\n", __FUNCTION__, i, mipWidth, mipHeight);
             }
 
             VkImageMemoryBarrier lastBarrier{};
@@ -352,13 +352,13 @@ namespace aveng {
 
         VkPhysicalDeviceFeatures supportedFeatures{};
         vkGetPhysicalDeviceFeatures(engineDevice.physicalDevice(), &supportedFeatures);
-        std::printf("%s: anisotropy supported: %s\n", __FUNCTION__, supportedFeatures.samplerAnisotropy ? "yes" : "no");
+        //std::printf("%s: anisotropy supported: %s\n", __FUNCTION__, supportedFeatures.samplerAnisotropy ? "yes" : "no");
         const VkBool32 anisotropyAvailable = supportedFeatures.samplerAnisotropy;
 
         VkPhysicalDeviceProperties physProperties{};
         vkGetPhysicalDeviceProperties(engineDevice.physicalDevice(), &physProperties);
         const float maxAnisotropy = physProperties.limits.maxSamplerAnisotropy;
-        std::printf("%s: device supports max anisotropy of %f\n", __FUNCTION__, maxAnisotropy);
+        //std::printf("%s: device supports max anisotropy of %f\n", __FUNCTION__, maxAnisotropy);
 
         VkSamplerCreateInfo texSamplerInfo{};
         texSamplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

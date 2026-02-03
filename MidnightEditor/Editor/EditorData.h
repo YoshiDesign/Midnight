@@ -19,6 +19,7 @@ namespace aveng {
         ModelId selectedModelId = 0;          // authoritative
         AssetKey selectedModelKey{};
         int selectedModelIndex = 0;           // For UI lists, to enable highlighted rows and whatnot.
+        bool implicitSelection = false;
 
         // --- instance selection ---
         AnyInstanceHandle primarySelection{}; // last clicked / active

@@ -9,7 +9,7 @@ namespace aveng {
 			if (c == '\\') c = '/';
 		}
 		// Optional: lowercase, strip "./", etc.
-		std::cout << "ModelLibrary: Normalized Asset Key: " << out << std::endl;
+		std::cout << "[ModelLibrary] Normalized Asset Key: " << out << std::endl;
 		return out;
 	}
 

@@ -542,7 +542,7 @@ namespace aveng {
             if (ImGui::CollapsingHeader("Models", ImGuiTreeNodeFlags_DefaultOpen)) {
 
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("%d Models in memory", api_.nModels());
+                ImGui::Text("%d Models in memory", api_.nModels() - 1);
 
                 if (ImGui::Button("Import Model")) {
                     IGFD::FileDialogConfig config;
@@ -568,14 +568,19 @@ namespace aveng {
                         /* Windows does understand forward slashes, but std::filesystem preferres backslashes... */
                         std::replace(filePathName.begin(), filePathName.end(), '\\', '/');
 
+                        ModelRef ref = api_.uiGetOrLoadModel(filePathName);
+
                         /* This is now the "AssetKey" */
-                        if (!api_.uiGetOrLoadModel(filePathName)) {
+                        if (!ref) {
                             std::printf("%s error: unable to load model file '%s', unknown error \n", __FUNCTION__, filePathName.c_str());
                         }
                         else {
                             /* Model is queued but not loaded yet - selection will be updated after processing */
                             std::printf("Model queued for loading: %s\n", filePathName.c_str());
-
+                            std::printf("Model ID: %d\n", ref.id);
+                            editorData.selectedModelId = ref.id;
+                            editorData.selectedModelKey = filePathName;
+                            editorData.implicitSelection = true;
                         }
                     }
                     ImGuiFileDialog::Instance()->Close();
@@ -593,7 +598,7 @@ namespace aveng {
                         selectedLabel = std::string(it->key.c_str());
                         selectedLabel += it->animated ? " [Animated]" : " [Static]";
                     }
-                    else {
+                    else if (!editorData.implicitSelection){
                         // Selected model no longer exists
                         editorData.selectedModelId = NullModelId;
                         editorData.selectedModelKey = "[No Selection]";
@@ -645,6 +650,7 @@ namespace aveng {
 
                         editorData.selectedModelKey = "";
                         editorData.selectedModelId = NullModelId;
+                        editorData.implicitSelection = false;
      
                         ImGui::CloseCurrentPopup();
                     }

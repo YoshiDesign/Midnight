@@ -188,12 +188,9 @@ namespace aveng {
 		}
 
 		int pickId = renderer.getPixelValueFromPos(editorData.eMouseXPos, editorData.eMouseYPos);
-		// std::cout << "End Selection: " << selectedInstanceId << std::endl;
+
 		if (pickId >= 0) {
-			///
-			// pickId += 1.0f;
-			///
-			std::cout << "True Selection: >= 0.0f\nSelectedID:\t" << pickId << std::endl;
+
 			renderData.selectedPickId = static_cast<int>(pickId);
 			editorData.eHasSelection = true; // Might be redundant now
 			editorData.primarySelection = renderer.getPickedHandle(pickId);

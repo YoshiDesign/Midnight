@@ -159,9 +159,9 @@ namespace aveng {
 		const std::string& contentRoot      // Texture root. for engine-owned defaults
 	) {
 
-		std::cout 
-			<< "LoadModelV2V2\nContent Root: " << contentRoot 
-			<< "\nModel Base Dir: " << modelBaseDir << std::endl;
+		//std::cout 
+		//	<< "LoadModelV2V2\nContent Root: " << contentRoot 
+		//	<< "\nModel Base Dir: " << modelBaseDir << std::endl;
 
 		Assimp::Importer importer;
 
@@ -204,7 +204,7 @@ namespace aveng {
 		// - etc.
 
 		unsigned int numMeshes = scene->mNumMeshes;
-		std::printf("Loaded AssimpModel: Found %d mesh%s.\n", numMeshes, numMeshes == 1 ? "" : "es");
+		// std::printf("Loaded AssimpModel: Found %d mesh%s.\n", numMeshes, numMeshes == 1 ? "" : "es");
 
 		// Count vertices and faces
 		for (unsigned int i = 0; i < numMeshes; ++i) {
@@ -243,7 +243,7 @@ namespace aveng {
 				mTextures.insert({ internalTexName, newTex });
 			}
 
-			std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
+			// std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
 		}
 
 		/* add a white texture in case there is no diffuse tex but colors */
@@ -399,9 +399,9 @@ namespace aveng {
 				return false;
 			}
 
-			std::cout << "Index:\t"  << i << "\n" <<
-				"[Creating Model (mShaderBoneMatrixOffsetBuffers) Buffers] Size:\t" <<
-				mShaderBoneMatrixOffsetBuffers[i].bufferSize << std::endl;
+			//std::cout << "Index:\t"  << i << "\n" <<
+			//	"[Creating Model (mShaderBoneMatrixOffsetBuffers) Buffers] Size:\t" <<
+			//	mShaderBoneMatrixOffsetBuffers[i].bufferSize << std::endl;
 
 			VkDescriptorBufferInfo parentNodeInfo{};
 			parentNodeInfo.buffer = mBoneParentMatrixBuffers[i].buffer;	// ...attaching this data buffer
