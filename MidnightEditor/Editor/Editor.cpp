@@ -1,5 +1,6 @@
 
 #include "Editor.h"
+#include "Editor/Utils/selection_utils.h"
 #include "Utils/Logger.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/swapchain.h"
@@ -192,16 +193,22 @@ namespace aveng {
 		if (pickId >= 0) {
 
 			renderData.selectedPickId = static_cast<int>(pickId);
-			editorData.eHasSelection = true; // Might be redundant now
+
 			editorData.primarySelection = renderer.getPickedHandle(pickId);
+			editorData.selectedMany.clear();
+			editorData.eShowTRSPanel = true; // Not necessary here, just being explicit
+			addUnique(editorData.selectedMany, editorData.primarySelection);
+
 			//std::cout << "Picked Handle Index: " << editorData.primarySelection.index;
 		}
 		else {
 			std::cout << "False Selection: SelectedID\t" << pickId << std::endl;
 			std::cout << "Deselecting instance:\t" << renderData.selectedPickId << std::endl;
 			renderData.selectedPickId = 0;
-			editorData.eHasSelection = false; // Might be redundant now
+
 			editorData.primarySelection = AnyInstanceHandle{};
+			editorData.selectedMany.clear();
+			editorData.eShowTRSPanel = false;
 		}
 
 		editorData.eMousePick = false;

@@ -26,7 +26,6 @@ namespace aveng {
         std::vector<AnyInstanceHandle> selectedMany; // multi-select set (unique)
         AnyInstanceHandle noSelect{};
 
-        bool eHasSelection = false;
         ModelRef curModelSelect{};
 
         bool eHighlightSelectedInstance = false;
@@ -58,6 +57,7 @@ namespace aveng {
 
         bool eMousePick = false;
         bool eMouseLock = false;
+        bool eShowTRSPanel = false;
         int eMouseXPos = 0;
         int eMouseYPos = 0;
         int eMouseLastClickX = 0;

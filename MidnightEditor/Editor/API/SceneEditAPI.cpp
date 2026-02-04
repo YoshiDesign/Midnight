@@ -133,10 +133,16 @@ namespace aveng {
 	}
 
 	void SceneEditAPI::uiSetInstanceTransform(AnyInstanceHandle h, const InstanceTransform& t) {
-		return;
+		std::span<const AnyInstanceHandle> hs{ &h, 1 };
+		std::span<const InstanceTransform> ts{ &t, 1 };
+		scene_.setTransforms(hs, ts);
 	}
-	bool SceneEditAPI::uiTryGetInstanceTransform(AnyInstanceHandle h, InstanceTransform& out) const {
-		return false;
+
+	bool SceneEditAPI::uiGetInstanceTransform(AnyInstanceHandle h, InstanceTransform& out) const {
+		InstanceView view;
+		scene_.tryGetInstance(h, view);
+		out = view.xf;
+		return true;
 	}
 
 

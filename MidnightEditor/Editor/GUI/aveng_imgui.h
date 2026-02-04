@@ -60,6 +60,7 @@ namespace aveng {
 
 		bool show_input_panel = false;
         bool show_all_cameras = false;
+        bool show_trs_panel = false;
 
 	private:
 		// EngineDevice& device;
@@ -109,6 +110,11 @@ namespace aveng {
         int mMatrixUploadOffset = 0;
         int mUiGenOffset = 0;
         int mUiDrawOffset = 0;
+
+        // Selected instance data
+        InstanceTransform curInstXform;
+        InstanceTransform newInstXform;
+        AnyInstanceHandle curInstHandle;
 
 	};
 } 

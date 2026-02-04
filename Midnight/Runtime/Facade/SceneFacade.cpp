@@ -529,6 +529,7 @@ namespace aveng {
         }
     }
 
+    // Set transforms for handles, begin from TransformSettings before converting to InstanceTransform
     void SceneFacade::setTransforms(
         std::span<const AnyInstanceHandle> handles,
         std::span<const TransformSettings> transforms)

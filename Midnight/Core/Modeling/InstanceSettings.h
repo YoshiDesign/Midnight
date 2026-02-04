@@ -13,6 +13,13 @@ namespace aveng {
         glm::vec3 rotEuler{ 0.f };   // keep for now; later consider quat
         float     scale{ 1.f };
     };
+    // write an overload to be able to compare two InstanceTransform structs
+    inline bool operator==(const InstanceTransform& a, const InstanceTransform& b) {
+        return a.pos == b.pos && a.rotEuler == b.rotEuler && a.scale == b.scale;
+    }
+    inline bool operator!=(const InstanceTransform& a, const InstanceTransform& b) noexcept {
+        return !(a == b);
+    }
 
     struct AnimSettings {
         size_t animClipSize = 0;

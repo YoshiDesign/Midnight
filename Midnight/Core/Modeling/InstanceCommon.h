@@ -32,11 +32,11 @@ namespace aveng {
 
         const glm::mat4& modelMatrix() const {
             if (!dirty) return cachedModelMatrix;
-            std::cout << "computing model matrix" << std::endl;
-            // your current math, but only when needed:
+            
+            // Compute the model matrix if it isn't cached.
             glm::mat4 T = glm::translate(glm::mat4(1.f), xf.pos);
 
-            // keep your convention; later: store quat and avoid euler->quat per call
+            // TODO: store quat and avoid euler->quat per call (new convention)
             glm::quat q = glm::quat(glm::radians(xf.rotEuler));
             glm::mat4 R = glm::mat4_cast(q);
 

@@ -470,7 +470,7 @@ namespace aveng {
             std::span<const Handle> handles,
             std::span<const InstanceTransform> transforms)
         {
-            std::cout << "[InstanceManager] Setting transforms!\n";
+            //std::cout << "[InstanceManager] Setting transforms!\n";
             if (handles.size() != transforms.size()) {
                 std::cout << "[InstanceManager] Transform/Handle spans were not the same size!\n";
                 return;

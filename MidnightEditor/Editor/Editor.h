@@ -69,7 +69,7 @@ namespace aveng {
 
 		// void onModeSwitched(int frameIndex, AppMode& mode);
 
-		bool hasSelection() { return editorData.eHasSelection; }
+		bool hasSelection() { return editorData.selectedMany.size() > 0; }
 		bool hasClicked() { return editorData.eMousePick; }
 		void debug() {
 			/* Open to suggestions */

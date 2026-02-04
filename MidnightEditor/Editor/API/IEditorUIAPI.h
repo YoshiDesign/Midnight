@@ -57,7 +57,7 @@ namespace aveng {
         virtual std::vector<AnyInstanceHandle> uiCloneMany(std::span<const AnyInstanceHandle> src) = 0;
         virtual void uiDestroy(AnyInstanceHandle h) = 0;
         virtual void uiDestroyMany(std::span<const AnyInstanceHandle> handles) = 0;
-        virtual bool uiTryGetInstanceTransform(AnyInstanceHandle h, InstanceTransform& out) const = 0;
+        virtual bool uiGetInstanceTransform(AnyInstanceHandle h, InstanceTransform& out) const = 0;
         virtual void uiSetInstanceTransform(AnyInstanceHandle h, const InstanceTransform& t) = 0;
 
         virtual const std::unordered_map<AssetKey, ModelMeta> uiMapModels() const = 0;

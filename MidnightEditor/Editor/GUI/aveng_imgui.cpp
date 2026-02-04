@@ -8,6 +8,7 @@
 #include "CoreVK/VertexBuffer.h"
 #include "Editor/API/IEditorUIAPI.h"
 
+
 namespace aveng {
 
     /*
@@ -21,6 +22,226 @@ namespace aveng {
             return *data_;
         }
     */
+
+    static constexpr float kDegToRad = 0.01745329251994329577f; // pi/180
+
+    inline float WrapRadiansPi(float a)
+    {
+        // Wrap to [-pi, pi)
+        constexpr float twoPi = 6.2831853071795864769f;
+        constexpr float pi = 3.14159265358979323846f;
+        a = std::fmod(a + pi, twoPi);
+        if (a < 0.0f) a += twoPi;
+        return a - pi;
+    }
+
+    struct FloatRowOpts
+    {
+        float labelWidth = 90.0f;
+
+        float dragSpeed = 0.05f;
+        const char* dragFormat = "%.3f";
+        const char* inputFormat = "%.6f";
+
+        bool clampMin = false;
+        float minValue = 0.0f;   // useful for scale
+    };
+
+    static void DrawFloatInspectorRow(
+        const char* tableId,
+        const char* label,
+        const char* valueId,
+        float& v,
+        float stepSmall,
+        float stepLarge,
+        bool shiftHeld,
+        bool& exactInputMode,
+        const FloatRowOpts& opts
+    )
+    {
+        const float step = shiftHeld ? stepSmall : stepLarge;
+
+        if (ImGui::BeginTable(tableId, 2,
+            ImGuiTableFlags_SizingStretchProp |
+            ImGuiTableFlags_NoSavedSettings |
+            ImGuiTableFlags_PadOuterX))
+        {
+            ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, opts.labelWidth);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextRow();
+
+            // Label
+            ImGui::TableSetColumnIndex(0);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(label);
+
+            // Value
+            ImGui::TableSetColumnIndex(1);
+
+            float availW = ImGui::GetContentRegionAvail().x;
+            ImGui::SetNextItemWidth(availW * 0.33f);
+
+            ImGui::PushID(valueId);
+            if (!exactInputMode)
+            {
+                // Unbounded drag unless clampMin is enabled
+                float min = opts.clampMin ? opts.minValue : 0.0f;
+                float max = opts.clampMin ? FLT_MAX : 0.0f;
+
+                ImGui::DragFloat("##drag", &v, opts.dragSpeed, min, max, opts.dragFormat);
+            }
+            else
+            {
+                ImGui::InputFloat("##input", &v, 0.0f, 0.0f, opts.inputFormat);
+            }
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(availW * 0.27f);
+            if (ImGui::Button(exactInputMode ? "Input" : "Drag")) {
+                exactInputMode = !exactInputMode;
+            }
+
+            // +/- buttons under the main control
+            float cellW = ImGui::GetContentRegionAvail().x;
+            ImGui::SetNextItemWidth(cellW* 0.15f);
+            ImGui::SameLine();
+            if (ImGui::Button("-##dec")) {
+                v -= step;
+            }
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(availW * 0.15f);
+            if (ImGui::Button("+##inc")) {
+                v += step;
+            }
+
+            // Enforce clamp after change if requested
+            if (opts.clampMin && v < opts.minValue)
+                v = opts.minValue;
+
+            ImGui::PopID();
+            ImGui::EndTable();
+        }
+    }
+
+
+    struct Vec3RowOpts
+    {
+        float labelWidth = 90.0f;
+
+        // Drag behavior
+        float dragSpeed = 0.1f;         // in "display units"
+        const char* dragFormat = "%.3f";
+        const char* inputFormat = "%.6f";
+
+        // Per-axis sign: lets you invert Y (or any axis) for button stepping.
+        // (+ button adds sign[i]*step)
+        float axisSign[3] = { +1.0f, +1.0f, +1.0f };
+
+        // Optional post-step fixup (wrap angles, clamp, etc.)
+        bool wrapRadians = false;
+    };
+
+    static void DrawVec3InspectorRow(
+        const char* tableId,
+        const char* label,
+        const char* valueId,      // unique ID stem for ImGui items (e.g. "EntityPos" or "EntityRot")
+        float v[3],               // pointer to x/y/z contiguous floats
+        float stepSmall,
+        float stepLarge,
+        bool shiftHeld,
+        bool& exactInputMode,
+        const Vec3RowOpts& opts
+    )
+    {
+        const float step = shiftHeld ? stepSmall : stepLarge;
+
+        if (ImGui::BeginTable(tableId, 2,
+            ImGuiTableFlags_SizingStretchProp |
+            ImGuiTableFlags_NoSavedSettings |
+            ImGuiTableFlags_PadOuterX))
+        {
+            ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, opts.labelWidth);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextRow();
+
+            // Label column
+            ImGui::TableSetColumnIndex(0);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(label);
+
+            // Value column
+            ImGui::TableSetColumnIndex(1);
+
+            float availW = ImGui::GetContentRegionAvail().x;
+            ImGui::SetNextItemWidth(availW * 0.75f);
+
+            ImGui::PushID(valueId);
+
+            if (!exactInputMode)
+            {
+                // Unbounded drag: min/max = 0,0 => no clamp
+                ImGui::DragFloat3("##drag", v, opts.dragSpeed, 0.0f, 0.0f, opts.dragFormat);
+            }
+            else
+            {
+                ImGui::InputFloat3("##input", v, opts.inputFormat);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button(exactInputMode ? "Input" : "Drag"))
+                exactInputMode = !exactInputMode;
+
+            // +/- row
+            //if (ImGui::BeginTable("##buttons", 3,
+            //    ImGuiTableFlags_SizingStretchSame |
+            //    ImGuiTableFlags_NoSavedSettings))
+            //{
+            //    auto axis = [&](const char* axisLabel, int i)
+            //    {
+            //        ImGui::TableNextColumn();
+            //        ImGui::PushID(i);
+
+            //        ImGui::AlignTextToFramePadding();
+            //        ImGui::TextUnformatted(axisLabel);
+            //        ImGui::SameLine();
+
+            //        float cellW = ImGui::GetContentRegionAvail().x;
+            //        float w = (cellW - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+
+            //        if (ImGui::Button("-", ImVec2(w, 0)))
+            //            v[i] -= opts.axisSign[i] * step;
+
+            //        ImGui::SameLine();
+
+            //        if (ImGui::Button("+", ImVec2(w, 0)))
+            //            v[i] += opts.axisSign[i] * step;
+
+            //        ImGui::PopID();
+            //    };
+
+            //    axis("X", 0);
+            //    axis("Y", 1);
+            //    axis("Z", 2);
+
+            //    ImGui::EndTable();
+            //}
+
+            // Optional fixup (useful for Euler radians)
+            if (opts.wrapRadians)
+            {
+                v[0] = WrapRadiansPi(v[0]);
+                v[1] = WrapRadiansPi(v[1]);
+                v[2] = WrapRadiansPi(v[2]);
+            }
+
+            ImGui::PopID();
+            ImGui::EndTable();
+        }
+    }
+
 
     static void sanitizeSelection(EditorData& ed, const IEditorUIAPI& api) {
         auto alive = [&](AnyInstanceHandle h) {
@@ -142,7 +363,7 @@ namespace aveng {
         style.GrabMinSize = 12.0f;
 
         // --------------------------------------------------
-        // Rounding (soft but not ìmobile UIî)
+        // Rounding (soft but not ÔøΩmobile UIÔøΩ)
         // --------------------------------------------------
         style.WindowRounding = 6.0f;
         style.ChildRounding = 5.0f;
@@ -162,7 +383,7 @@ namespace aveng {
         style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
 
         // --------------------------------------------------
-        // Colors ó Midnight Palette
+        // Colors ÔøΩ Midnight Palette
         // --------------------------------------------------
         ImVec4* colors = style.Colors;
 
@@ -258,6 +479,9 @@ namespace aveng {
         static bool hasChanged = false;
         static int counter = 0;
 
+        const bool ctrl = ImGui::GetIO().KeyCtrl;
+        const bool shift = ImGui::GetIO().KeyShift;
+
         {
             ImGui::Begin("Engine Info");
             ImGui::Text("Video Device:\t %s", engineDevice.properties.deviceName);
@@ -311,6 +535,98 @@ namespace aveng {
             ImGui::Text("A: \t%d", inputState.keyDown[GLFW_KEY_A]);
             ImGui::Text("S: \t%d", inputState.keyDown[GLFW_KEY_S]);
             ImGui::Text("D: \t%d", inputState.keyDown[GLFW_KEY_D]);
+            ImGui::End();
+        }
+
+        if (editorData.eShowTRSPanel) {
+
+            api_.uiGetInstanceTransform(editorData.primarySelection, curInstXform);
+
+            // Local copy of the selected instance transform data
+            newInstXform = curInstXform;
+
+            ImGui::Begin("Modify Instance");
+            if (ImGui::TreeNode("Transform##entity"))
+            {
+                static bool exactPos = false;
+
+                Vec3RowOpts posOpts;
+                posOpts.dragSpeed = 0.1f;
+                posOpts.dragFormat = "%.3f";
+                posOpts.inputFormat = "%.6f";
+                // Buttons should follow your coordinate convention: +Y button moves ‚Äúdown‚Äù in world if -Y is up
+                posOpts.axisSign[0] = +1.0f;
+                posOpts.axisSign[1] = -1.0f; // inverted Y (intentional)
+                posOpts.axisSign[2] = +1.0f;
+
+                DrawVec3InspectorRow(
+                    "##EntityPosRow",
+                    "Position",
+                    "EntityPos",
+                    &newInstXform.pos.x,
+                    /*stepSmall=*/0.1f,
+                    /*stepLarge=*/1.0f,
+                    shift,
+                    exactPos,
+                    posOpts
+                );
+
+                ImGui::Separator();
+
+                static bool exactRot = false;
+
+                Vec3RowOpts rotOpts;
+                rotOpts.dragSpeed = 0.5f; // * kDegToRad; // drag in ~0.5¬∞ increments (tweak)
+                rotOpts.dragFormat = "%.3f";          // shown as radians unless you convert display (see note below)
+                rotOpts.inputFormat = "%.6f";
+                rotOpts.wrapRadians = false;          // Wrap on pi
+                rotOpts.axisSign[0] = +1.0f;
+                rotOpts.axisSign[1] = -1.0f;          // -Y-up 
+                rotOpts.axisSign[2] = +1.0f;
+
+                DrawVec3InspectorRow(
+                    "##EntityRotRow",
+                    "Rotation",
+                    "EntityRot",
+                    &newInstXform.rotEuler.x,
+                    /*stepSmall=*/0.1f,
+                    /*stepLarge=*/1.0f,
+                    shift,
+                    exactRot,
+                    rotOpts
+                );
+
+                ImGui::Separator();
+
+                static bool exactScale = false;
+
+                FloatRowOpts scaleOpts;
+                scaleOpts.dragSpeed = 0.05f;
+                scaleOpts.dragFormat = "%.3f";
+                scaleOpts.inputFormat = "%.6f";
+                scaleOpts.clampMin = true;
+                scaleOpts.minValue = 0.001f; // prevent collapse / inversion
+
+                DrawFloatInspectorRow(
+                    "##EntityScaleRow",
+                    "Scale",
+                    "EntityScale",
+                    newInstXform.scale,
+                    /*stepSmall=*/0.01f,
+                    /*stepLarge=*/0.1f,
+                    shift,
+                    exactScale,
+                    scaleOpts
+                );
+
+                ImGui::TreePop();
+            }
+
+            if (newInstXform != curInstXform) {
+                curInstXform = newInstXform;
+                api_.uiSetInstanceTransform(editorData.primarySelection, newInstXform);
+            }
+
             ImGui::End();
         }
 
@@ -660,7 +976,6 @@ namespace aveng {
                     }
                     ImGui::EndPopup();
                 }
-
                 
                 ImGui::EndDisabled();
                 
@@ -700,10 +1015,9 @@ namespace aveng {
             }
 
             if (ImGui::CollapsingHeader("Instances")) {
-                                
+       
                 ImGui::BeginDisabled(editorData.selectedModelId == NullModelId);
                 
-
                 ModelMeta modelMeta{};
                 bool model_ready = api_.uiIsModelLoaded(editorData.selectedModelId, modelMeta);
 
@@ -730,10 +1044,6 @@ namespace aveng {
                 ImGui::EndDisabled();
                 
                 const std::vector<UiInstanceRow> rows = api_.uiListInstances();
-
-                // Multi-select rules
-                const bool ctrl = ImGui::GetIO().KeyCtrl;
-                const bool shift = ImGui::GetIO().KeyShift; // (range selection later)
 
                 // Optional: filter to selected model
                 static bool filterToSelectedModel = false;
@@ -770,7 +1080,7 @@ namespace aveng {
                         + std::to_string(r.position.z) + ")";
 
                     // Make ID unique using the handle (index/generation)
-                    // We canít easily stringify variant cleanly without a helper, so we use a stable-ish suffix:
+                    // We canÔøΩt easily stringify variant cleanly without a helper, so we use a stable-ish suffix:
                     // You can replace uiHandleDebugId(...) with your own helper later.
                     display += "##";
                     display += std::to_string(visibleIndex++);
@@ -836,6 +1146,9 @@ namespace aveng {
                         }
                         ImGui::EndPopup();
                     }
+                    if (editorData.selectedMany.size() > 0) {
+                        editorData.eShowTRSPanel = true;
+                    }
                 }
 
                 ImGui::EndChild();
@@ -850,7 +1163,8 @@ namespace aveng {
                 if (ImGui::Button("Destroy Selected"))
                 {
                     api_.uiDestroyMany(editorData.selectedMany);
-                    // sanitizeSelection(editorData, api_);
+                    sanitizeSelection(editorData, api_);
+                    editorData.eShowTRSPanel = false;
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Clear Selection"))
