@@ -253,6 +253,9 @@ namespace aveng {
 		std::vector<VkSemaphore> rdComputeSemaphore;
 		std::vector<VkFence> rdRenderFence;
 		std::vector<VkFence> rdComputeFence;
+		std::vector<VkFence> rdRuntimeGraphicsFence;
+		std::vector<VkFence> rdRuntimeComputeFence;
+		std::vector<VkFence> rdImagesInFlight; // Tracks which frame's fence is using each swapchain image
 
 		/*
 		* Descriptors
@@ -284,6 +287,8 @@ namespace aveng {
 		/*
 		* Pipeline
 		*/
+		VkPipelineLayout rdDebugPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdDebugAnimatedPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengSelectionPipelineLayout = VK_NULL_HANDLE;
@@ -292,6 +297,8 @@ namespace aveng {
 		VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
 
+		VkPipeline rdDebugPipeline = VK_NULL_HANDLE;
+		VkPipeline rdDebugAnimatedPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengAnimationPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengSelectionPipeline = VK_NULL_HANDLE;

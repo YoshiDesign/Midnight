@@ -41,7 +41,7 @@ namespace aveng {
 	bool AvengFrame::render(float deltaTime)
 	{
 
-		// Clear the vector of buffers we'll be submitting to the graphics queue
+		// Clear the Frame's vector of command buffer handles that we'll be submitting to the graphics queue
 		commandBuffers.clear();
 
 		// Wait for fences, vkAcquireNextImageKH
@@ -57,11 +57,11 @@ namespace aveng {
   		int currentFrameIndex = renderer.getFrameIndex();
 
 		/* start graphics rendering */
-		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence.at(currentFrameIndex));
-		if (result != VK_SUCCESS) {
-			std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
-			throw std::runtime_error("Frame Failure 0");
-		}
+		// result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence.at(currentFrameIndex));
+		// if (result != VK_SUCCESS) {
+		// 	std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
+		// 	throw std::runtime_error("Frame Failure 0");
+		// }
 
 		// GC
 		renderer.destroyTrash();
@@ -75,7 +75,24 @@ namespace aveng {
 		* Update Model Buffer Data - Does not record commands
 		* Side-effects: Buffers resizes cause descriptor sets to update
 		*/
-		renderer.draw(sceneView_, modelLib_, deltaTime);
+		int drawResult = renderer.draw(sceneView_, modelLib_, deltaTime);
+		
+		// If draw() returned early (e.g., deltaTime == 0 or frame not started),
+		// the compute semaphore was never signaled. We must skip this frame entirely
+		// to avoid graphics queue waiting on an unsignaled semaphore.
+		// NOTE: We check this BEFORE resetting the render fence to avoid deadlock.
+		if (drawResult == 0 || !renderer.isFrameInProgress()) {
+			std::printf("%s: draw() skipped frame, aborting render\n", __FUNCTION__);
+			renderer.endFrame();
+			return false;
+		}
+
+		/* start graphics rendering - reset fence only after we're committed to submitting */
+		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence.at(currentFrameIndex));
+		if (result != VK_SUCCESS) {
+			std::printf("%s error:  fence reset failed (error: %i)\n", __FUNCTION__, result);
+			throw std::runtime_error("Frame Failure 0");
+		}
 
 #ifdef ENABLE_EDITOR
 		if (gameData.currentAppMode == AppMode::Editor) {
@@ -210,16 +227,31 @@ namespace aveng {
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		std::vector<VkSemaphore> waitSemaphores = { renderData.rdComputeSemaphore.at(currentFrameIndex), renderData.rdPresentSemaphore.at(currentFrameIndex) };
-		std::vector<VkPipelineStageFlags> waitStages = { VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		// When graphics and compute use the same queue, skip compute semaphore sync
+		// Submission order on the same queue already guarantees compute finishes before graphics uses its output
+		std::vector<VkSemaphore> waitSemaphores;
+		std::vector<VkPipelineStageFlags> waitStages;
+		
+		if (!engineDevice.sameGraphicsComputeQueue()) {
+			// Different queues: wait for compute semaphore
+			waitSemaphores.push_back(renderData.rdComputeSemaphore.at(currentFrameIndex));
+			waitStages.push_back(VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+		}
+		// Always wait for present semaphore (swapchain image acquisition)
+		waitSemaphores.push_back(renderData.rdPresentSemaphore.at(currentFrameIndex));
+		waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-		/* compute shader: contine if in vertex input ready
-		 * vertex shader: wait for color attachment output ready */
 		submitInfo.pWaitDstStageMask = waitStages.data();
 		submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
 		submitInfo.pWaitSemaphores = waitSemaphores.data();
 
-		std::vector<VkSemaphore> signalSemaphores = { renderData.rdRenderSemaphore.at(currentFrameIndex), renderData.rdGraphicSemaphore.at(currentFrameIndex) };
+		// Signal semaphores: always signal render semaphore for present
+		// Only signal graphics semaphore if using separate queues (for compute to wait on)
+		std::vector<VkSemaphore> signalSemaphores;
+		signalSemaphores.push_back(renderData.rdRenderSemaphore.at(currentFrameIndex));
+		if (!engineDevice.sameGraphicsComputeQueue()) {
+			signalSemaphores.push_back(renderData.rdGraphicSemaphore.at(currentFrameIndex));
+		}
 
 		submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
 		submitInfo.pSignalSemaphores = signalSemaphores.data();
@@ -263,6 +295,8 @@ namespace aveng {
 			std::printf("%s error: failed to present swapchain image\n", __FUNCTION__);
 			throw std::runtime_error("Frame Failure 2");
 		}
+		vkDeviceWaitIdle(engineDevice.device()); // TEMPORARY - removes all parallelism
+
 		
 		renderer.endFrame();
 

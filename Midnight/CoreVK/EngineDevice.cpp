@@ -155,14 +155,15 @@ namespace aveng {
         if (enableValidationLayers) {
             // [Validators] Create this instance's Debug Validation Layer
             
-            // Setup validation features for GPU-assisted validation
+            // Setup validation features for GPU-assisted validation AND synchronization validation
             VkValidationFeatureEnableEXT enabledValidationFeatures[] = {
-                VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT
+                VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+                VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
             };
             
             VkValidationFeaturesEXT validationFeatures = {};
             validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-            validationFeatures.enabledValidationFeatureCount = 1;
+            validationFeatures.enabledValidationFeatureCount = 2;
             validationFeatures.pEnabledValidationFeatures = enabledValidationFeatures;
             
             // Setup debug messenger
@@ -174,7 +175,7 @@ namespace aveng {
 
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
-            createInfo.pNext = &validationFeatures;
+            createInfo.pNext = nullptr; // &validationFeatures;
 
         } 
         else {
@@ -328,6 +329,14 @@ namespace aveng {
         vkGetDeviceQueue(_device, indices.graphicsFamily, 0, &_graphicsQueue);
         vkGetDeviceQueue(_device, indices.presentFamily, 0, &_presentQueue);
         vkGetDeviceQueue(_device, indices.computeFamily, 0, &_computeQueue);
+
+        // Diagnostic: Log queue family assignments to detect aliasing
+        std::cout << "[EngineDevice] Queue Families - Graphics: " << indices.graphicsFamily 
+                  << ", Compute: " << indices.computeFamily 
+                  << ", Present: " << indices.presentFamily << std::endl;
+        if (indices.graphicsFamily == indices.computeFamily) {
+            std::cout << "[EngineDevice] WARNING: Graphics and Compute use same queue family - semaphore sync may cause stalls!" << std::endl;
+        }
     }
 
     void EngineDevice::createCommandPools() {
@@ -358,6 +367,30 @@ namespace aveng {
         {
             throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
         }
+
+        //// Runtime Graphics Pool
+        //VkCommandPoolCreateInfo runtime_poolInfo = {};
+        //runtime_poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        //runtime_poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+        //runtime_poolInfo.flags =
+        //    VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        //if (vkCreateCommandPool(_device, &runtime_poolInfo, nullptr, &_commandPoolRuntimeGraphics) != VK_SUCCESS)
+        //{
+        //    throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
+        //}
+
+        //// Runtime Compute Pool
+        //VkCommandPoolCreateInfo runtime_compute_poolInfo = {};
+        //runtime_compute_poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        //runtime_compute_poolInfo.queueFamilyIndex = queueFamilyIndices.computeFamilyHasValue ? queueFamilyIndices.computeFamily : queueFamilyIndices.graphicsFamily;
+        //runtime_compute_poolInfo.flags =
+        //    VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        //if (vkCreateCommandPool(_device, &runtime_compute_poolInfo, nullptr, &_commandPoolRuntimeCompute) != VK_SUCCESS)
+        //{
+        //    throw std::runtime_error("[EngineDevice] Failed to create a command pool!");
+        //}
 
     }
 
@@ -853,22 +886,9 @@ namespace aveng {
         return commandBuffer;
     }
 
-    void EngineDevice::endSingleTimeCommands(VkCommandBuffer& commandBuffer) 
-    {
-        vkEndCommandBuffer(commandBuffer);
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
-
-        vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(_graphicsQueue);
-
-        vkFreeCommandBuffers(_device, _commandPoolGraphics, 1, &commandBuffer);
-
-        // ^^ Old
-
+    // For reference
+    // void EngineDevice::endSingleTimeCommands(VkCommandBuffer& commandBuffer) 
+    // {
         //VkFence fence{};
         //VkFenceCreateInfo fi{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         //vkCreateFence(_device, &fi, nullptr, &fence);
@@ -888,7 +908,7 @@ namespace aveng {
 
         //vkDestroyFence(_device, fence, nullptr);
 
-    }
+    // }
 
     bool EngineDevice::initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers, const char* type)
     {
@@ -949,6 +969,7 @@ namespace aveng {
             return false;
         }
 
+        // TODO : Can this actually be removed?
         if (vkResetFences(_device, 1, &bufferFence) != VK_SUCCESS) {
             std::printf("%s error: buffer fence reset failed (error)\n", __FUNCTION__);
             return false;
@@ -969,6 +990,10 @@ namespace aveng {
 
         //std::printf("%s: single shot command buffer successfully submitted\n", __FUNCTION__);
         return true;
+    }
+
+    bool EngineDevice::submitRuntimeCmdBuffer(VkCommandBuffer commandBuffer) {
+        return false;
     }
 
     bool EngineDevice::resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags)
@@ -1004,87 +1029,6 @@ namespace aveng {
     void EngineDevice::cleanupCommandBuffer(VkCommandPool& pool, VkCommandBuffer& commandBuffer)
     {
         vkFreeCommandBuffers(device(), pool, 1, &commandBuffer);
-    }
-
-    void EngineDevice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) 
-    {
-        VkCommandBuffer commandBuffer = createSingleShotBuffer();
-
-        VkBufferCopy copyRegion{};
-        //copyRegion.srcOffset = 0;  // Optional
-        //copyRegion.dstOffset = 0;  // Optional
-        copyRegion.size = size;
-        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-        endSingleTimeCommands(commandBuffer);
-    }
-
-    void EngineDevice::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount) 
-    {
-        VkCommandBuffer commandBuffer = createSingleShotBuffer();
-
-        VkBufferImageCopy region{};
-        region.bufferOffset = 0;        // Offset at which the pixels start
-        region.bufferRowLength = 0;     // Data -
-        region.bufferImageHeight = 0;   // - dimensionality. 0 means there is no padding. Tightly packed
-
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.mipLevel = 0;
-        region.imageSubresource.baseArrayLayer = 0;
-        region.imageSubresource.layerCount = layerCount;    // Typically 1 for now
-
-        region.imageOffset = {0, 0, 0};        // These next 2 properties tell vulkan which part of the image we want to copy
-        region.imageExtent = {width, height, 1};            
-
-        vkCmdCopyBufferToImage(
-            commandBuffer,
-            buffer,
-            image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // Which layout the image is currently using
-            1,
-            &region);
-
-        /*
-            Right now we're only copying one chunk of pixels to the whole image, but it's possible 
-            it's possible to specify an array of VkBufferImageCopy to perform many different 
-            copies from this buffer to the image in one operation.
-        */
-
-        endSingleTimeCommands(commandBuffer);
-    }
-
-    /*
-    * DEPRECATED
-    * Reserve memory based on provided property(ies)
-    */
-    void EngineDevice::createImageWithInfo(
-        const VkImageCreateInfo &imageInfo,
-        VkMemoryPropertyFlags properties,
-        VkImage &image,
-        VkDeviceMemory &imageMemory
-    ) {
-        if (vkCreateImage(_device, &imageInfo, nullptr, &image) != VK_SUCCESS) 
-        {
-            throw std::runtime_error("failed to create image!");
-        }
-
-        VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(_device, image, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-        if (vkAllocateMemory(_device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) 
-        {
-            throw std::runtime_error("failed to allocate image memory!");
-        }
-
-        if (vkBindImageMemory(_device, image, imageMemory, 0) != VK_SUCCESS) 
-        {
-            throw std::runtime_error("failed to bind image memory!");
-        }
     }
 
     /*

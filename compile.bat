@@ -12,5 +12,9 @@ C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\aveng_skinning_selection.frag -o sh
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\aveng_skinning_selection.vert -o shaders\aveng_skinning_selection.vert.spv
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\point_light.vert -o shaders\point_light.vert.spv
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\point_light.frag -o shaders\point_light.frag.spv
+C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug.vert -o shaders\debug.vert.spv
+C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug.frag -o shaders\debug.frag.spv
+C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug_skinning.vert -o shaders\debug_skinning.vert.spv
+C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug_skinning.frag -o shaders\debug_skinning.frag.spv
 
 pause

@@ -143,7 +143,7 @@ namespace aveng {
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE;
 
-        createInfo.oldSwapchain == nullptr ? VK_NULL_HANDLE : oldSwapChain->swapChain;
+        createInfo.oldSwapchain = (oldSwapChain == nullptr) ? VK_NULL_HANDLE : oldSwapChain->swapChain;
 
         if (vkCreateSwapchainKHR(device.device(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
             throw std::runtime_error("failed to create swap chain!");
@@ -156,6 +156,12 @@ namespace aveng {
         vkGetSwapchainImagesKHR(device.device(), swapChain, &imageCount, nullptr);
         swapChainImages.resize(imageCount);
         vkGetSwapchainImagesKHR(device.device(), swapChain, &imageCount, swapChainImages.data());
+
+        std::cout << "[SwapChain] Actual image count: " << imageCount 
+                  << " (MAX_FRAMES_IN_FLIGHT: " << MAX_FRAMES_IN_FLIGHT << ")" << std::endl;
+        if (imageCount < static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)) {
+            std::cout << "[SwapChain] WARNING: Swapchain has fewer images than frames-in-flight!" << std::endl;
+        }
 
         swapChainImageFormat = surfaceFormat.format;
         swapChainExtent = extent;
@@ -659,6 +665,7 @@ namespace aveng {
             return pixelColor;
         }
 
+        // TODO: This could probably be a runtime buffer! Research plz
         VkCommandBuffer readbackCommandBuffer = device.createSingleShotBuffer();
 
         VkImageSubresourceRange layoutTransferRange{};
@@ -821,24 +828,26 @@ namespace aveng {
         for (const auto& availableFormat : availableFormats) 
         {
             if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB 
+            // if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB
                 && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) 
             {
                 return availableFormat;
             }
         }
 
+        // Fallback
         return availableFormats[0];
     }
 
     VkPresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) 
     {
         // Pro-Tip: VK_PRESENT_MODE_MAILBOX_KHR is probably the most efficient, but more energy intensive so it might not be well suited for mobile applications.
-        for (const auto& availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                std::cout << "Present mode: Mailbox" << std::endl;
-                return availablePresentMode;
-            }
-        }
+        //for (const auto& availablePresentMode : availablePresentModes) {
+        //    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        //        std::cout << "Present mode: Mailbox" << std::endl;
+        //        return availablePresentMode;
+        //    }
+        //}
 
          // Pro-Tip: Immediate mode will not work on most mobile devices
          //for (const auto &availablePresentMode : availablePresentModes) {

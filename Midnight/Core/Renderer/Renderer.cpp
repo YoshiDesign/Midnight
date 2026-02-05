@@ -97,17 +97,21 @@ namespace aveng {
 		//mModelInstanceCallbacks.miInstanceCenterCallbackFunction = [this](const InstanceHandle& handle) { centerInstance(handle); };
 
 		/* signal graphics semaphores before doing anything else to be able to run compute submit */
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			VkSubmitInfo submitInfo{};
-			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submitInfo.signalSemaphoreCount = 1;
-			submitInfo.pSignalSemaphores = &renderData.rdGraphicSemaphore[i];
+		/* Only needed when using separate graphics and compute queues */
+		if (!engineDevice.sameGraphicsComputeQueue()) {
+			for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+				VkSubmitInfo submitInfo{};
+				submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submitInfo.signalSemaphoreCount = 1;
+				submitInfo.pSignalSemaphores = &renderData.rdGraphicSemaphore[i];
 
-			VkResult result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-			if (result != VK_SUCCESS) {
-				std::printf("%s error: failed to submit initial semaphore for frame %i (%i)\n", __FUNCTION__, i, result);
+				VkResult result = vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+				if (result != VK_SUCCESS) {
+					std::printf("%s error: failed to submit initial semaphore for frame %i (%i)\n", __FUNCTION__, i, result);
+				}
 			}
-
+		} else {
+			std::cout << "[Renderer] Same queue detected - skipping graphics/compute semaphore sync" << std::endl;
 		}
 
 		mFrameTimer.start();
@@ -219,6 +223,10 @@ namespace aveng {
 
 		}
 
+		// Reset per-image fence tracking after swapchain recreation
+		renderData.rdImagesInFlight.clear();
+		renderData.rdImagesInFlight.resize(aveng_swapchain->imageCount(), VK_NULL_HANDLE);
+
 		recreatingSwapchain = false;
 
 	}
@@ -263,7 +271,8 @@ namespace aveng {
 		isFrameStarted = true;
 
 		// Wait for both fences to be signaled before getting the new framebuffer image
-		std::vector<VkFence> waitFences = { renderData.rdComputeFence.at(currentFrameIndex), renderData.rdRenderFence.at(currentFrameIndex) };
+		// Re-enabled compute fence to ensure compute command buffer is safe to reuse
+		std::vector<VkFence> waitFences = { renderData.rdComputeFence.at(currentFrameIndex), renderData.rdRenderFence.at(currentFrameIndex)};
 		VkResult result = vkWaitForFences(
 			engineDevice.device(),
 			static_cast<uint32_t>(waitFences.size()),
@@ -299,6 +308,24 @@ namespace aveng {
 		{
 			throw std::runtime_error("Failed to acquire swap chain image.");
 		}
+
+		// Wait for any previous frame that was using this swapchain image to complete
+		// This handles the case where frame-in-flight index != swapchain image index
+		if (renderData.rdImagesInFlight[currentImageIndex] != VK_NULL_HANDLE) {
+			result = vkWaitForFences(
+				engineDevice.device(),
+				1,
+				&renderData.rdImagesInFlight[currentImageIndex],
+				VK_TRUE,
+				UINT64_MAX
+			);
+			if (result != VK_SUCCESS) {
+				std::printf("%s error: waiting for image fence failed (error: %i)\n", __FUNCTION__, result);
+				throw std::runtime_error("waiting for image fence failed");
+			}
+		}
+		// Mark that this swapchain image is now being used by the current frame's fence
+		renderData.rdImagesInFlight[currentImageIndex] = renderData.rdRenderFence.at(currentFrameIndex);
 
 		// This is the first point during a new frame where the command buffer is first captured.
 		assert(renderData.rdCommandBuffersGraphics.at(currentFrameIndex) == getCurrentCommandBufferGraphics()
@@ -829,22 +856,6 @@ namespace aveng {
 			return false;
 		}
 
-		//vertexShaderFile = "shader/aveng_selection.vert.spv";
-		//fragmentShaderFile = "shader/aveng_selection.frag.spv";
-		//if (!SkinningPipeline::init(engineDevice, renderPass, renderData.rdAvengSelectionPipelineLayout,
-		//	renderData.rdAvengSelectionPipeline, vertexShaderFile, fragmentShaderFile)) {
-		//	Logger::log(1, "%s error: could not init Aveng Selection shader pipeline\n", __FUNCTION__);
-		//	return false;
-		//}
-
-		//vertexShaderFile = "shader/aveng_skinning_selection.vert.spv";
-		//fragmentShaderFile = "shader/aveng_skinning_selection.frag.spv";
-		//if (!SkinningPipeline::init(engineDevice, renderPass, renderData.rdAvengSkinningSelectionPipelineLayout,
-		//	renderData.rdAvengSkinningSelectionPipeline, vertexShaderFile, fragmentShaderFile)) {
-		//	Logger::log(1, "%s error: could not init Assimp Skinning Selection shader pipeline\n", __FUNCTION__);
-		//	return false;
-		//}
-
 		// Compute Pipeline - Calculates bone transformations throughout animation (writes the updated TRS matrix)
 		std::string computeShaderFile = "shaders/assimp_instance_transform.comp.spv";
 		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout,
@@ -1169,7 +1180,7 @@ namespace aveng {
 				return WTF_BOOM;
 			}
 
-			// Dispatch compute shaders for all animated batches in the FramePacket
+			// Dispatch compute shaders for all animated batches in the FramePacket - begin at the end of static batch offset
 			for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
 				const DrawBatch& b = pkt.batches[i];
 				if (b.boneCount == 0 || b.instanceCount == 0) continue;
@@ -1194,11 +1205,16 @@ namespace aveng {
 			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			computeSubmitInfo.commandBufferCount = 1;
 			computeSubmitInfo.pCommandBuffers = &renderData.rdCommandBuffersCompute[currentFrameIndex];
-			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
-			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
-			computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+			// When graphics and compute use the same queue, skip semaphore sync
+			// Submission order on the same queue guarantees execution order
+			if (!engineDevice.sameGraphicsComputeQueue()) {
+				computeSubmitInfo.signalSemaphoreCount = 1;
+				computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
+				computeSubmitInfo.waitSemaphoreCount = 1;
+				computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
+				computeSubmitInfo.pWaitDstStageMask = &waitStage;
+			}
 
 			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
 			if (result != VK_SUCCESS) {
@@ -1208,16 +1224,20 @@ namespace aveng {
 
 		}
 		else {
-			/* do an empty submit if we don't have animated models to satisfy fence and semaphor */
+			/* do an empty submit if we don't have animated models to satisfy fence and semaphore */
 			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
 			VkSubmitInfo computeSubmitInfo{};
 			computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			computeSubmitInfo.signalSemaphoreCount = 1;
-			computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
-			computeSubmitInfo.waitSemaphoreCount = 1;
-			computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
-			computeSubmitInfo.pWaitDstStageMask = &waitStage;
+
+			// When graphics and compute use the same queue, skip semaphore sync
+			if (!engineDevice.sameGraphicsComputeQueue()) {
+				computeSubmitInfo.signalSemaphoreCount = 1;
+				computeSubmitInfo.pSignalSemaphores = &renderData.rdComputeSemaphore[currentFrameIndex];
+				computeSubmitInfo.waitSemaphoreCount = 1;
+				computeSubmitInfo.pWaitSemaphores = &renderData.rdGraphicSemaphore[currentFrameIndex];
+				computeSubmitInfo.pWaitDstStageMask = &waitStage;
+			}
 
 			// Compute submission and fence signaling
 			result = vkQueueSubmit(engineDevice.computeQueue(), 1, &computeSubmitInfo, renderData.rdComputeFence[currentFrameIndex]);
@@ -1290,6 +1310,7 @@ namespace aveng {
 			const DrawBatch& b = pkt.batches[i];
 			if (b.instanceCount == 0) continue;
 
+			// Pointer here? Really?
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 			if (!model) continue;
 
@@ -1554,6 +1575,9 @@ namespace aveng {
 		renderData.rdRenderFence.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdComputeFence.resize(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
+		// Initialize per-image fence tracking (one per swapchain image, not per frame-in-flight)
+		renderData.rdImagesInFlight.resize(aveng_swapchain->imageCount(), VK_NULL_HANDLE);
+
 		if (!SyncObjects::init(engineDevice, renderData, SwapChain::MAX_FRAMES_IN_FLIGHT)) {
 			std::printf("%s error: could not create sync objects\n", __FUNCTION__);
 			return false;
@@ -1696,8 +1720,8 @@ namespace aveng {
 	void Renderer::updateBufferViews() {
 	
 		renderData.matrixBuffersView.modelRootSSBOs = {
-		mModelMatrixBuffers.data(),
-		mModelMatrixBuffers.size()
+			mModelMatrixBuffers.data(),
+			mModelMatrixBuffers.size()
 		};
 
 		renderData.matrixBuffersView.boneMatSSBOs = {

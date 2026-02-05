@@ -34,6 +34,8 @@ namespace aveng {
         VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
         VkCommandPool   _commandPoolGraphics;
         VkCommandPool   _commandPoolCompute;
+        VkCommandPool   _commandPoolRuntimeGraphics;
+        VkCommandPool   _commandPoolRuntimeCompute;
         VkDevice        _device;
         VkSurfaceKHR    _surface;
         VkQueue         _graphicsQueue;
@@ -65,12 +67,15 @@ namespace aveng {
         VkPhysicalDevice physicalDevice()       { return _physicalDevice; }
         VkCommandPool commandPoolGraphics()     { return _commandPoolGraphics; }
         VkCommandPool commandPoolCompute()      { return _commandPoolCompute; }
+        VkCommandPool commandPoolRuntimeGraphics()     { return _commandPoolRuntimeGraphics; }
+        VkCommandPool commandPoolRuntimeCompute()      { return _commandPoolRuntimeCompute; }
 
         VkDevice device()                       { return _device; }
         VkSurfaceKHR surface()                  { return _surface; }
         VkQueue graphicsQueue()                 { return _graphicsQueue; }
         VkQueue computeQueue()                  { return _computeQueue; }
         VkQueue presentQueue()                  { return _presentQueue; }
+        bool sameGraphicsComputeQueue() const   { return _graphicsQueue == _computeQueue; }
         VmaAllocator allocator()                { return _allocator; }
         void checkBufferCoherence(VmaAllocation& allocation);
 
@@ -105,27 +110,10 @@ namespace aveng {
         bool beginSingleShotCommand(VkCommandBuffer& commandBuffer); // Reuses a reset command buffer (faster)
         bool beginCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferBeginInfo& beginInfo);
         bool submitSingleShotBuffer(VkCommandBuffer commandBuffer); // Note: Uses the graphics queue
+        bool submitRuntimeCmdBuffer(VkCommandBuffer commandBuffer);
         bool resetCommandBuffer(VkCommandBuffer& commandBuffer, VkCommandBufferResetFlags flags = 0);
         bool endCommandBuffer(VkCommandBuffer& commandBuffer);
-        void endSingleTimeCommands(VkCommandBuffer& commandBuffer);
         void cleanupCommandBuffer(VkCommandPool& pool, VkCommandBuffer& commandBuffer);
-
-        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-        void copyBufferToImage(
-            VkBuffer buffer, 
-            VkImage image, 
-            uint32_t width, 
-            uint32_t height, 
-            uint32_t layerCount
-        );
-
-        // DEPRECATED
-        void createImageWithInfo(
-            const VkImageCreateInfo &imageInfo,
-            VkMemoryPropertyFlags properties,
-            VkImage &image,
-            VkDeviceMemory &imageMemory
-        );
 
         // VMA-based image creation
         void createImageWithVMA(

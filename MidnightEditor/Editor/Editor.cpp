@@ -101,13 +101,12 @@ namespace aveng {
 
 		editorData.cameraTransform = cameraManager.active().transform;
 
+		// Update our camera data
 		editorData.cameraDebugList.clear();
 		editorData.cameraDebugList.reserve(cameraManager.cameraCount());
-
 		cameraManager.forEachCamera([&](const auto& cam) {
 			editorData.cameraDebugList.push_back({ cam.name, cam.transform, cam.active });
 		});
-
 
 		if (cameraManager.activeId() != editor_camera_id) {
 			std::cout << "Setting Editor as Active Camera..." << std::endl;
@@ -167,7 +166,7 @@ namespace aveng {
 
 		std::cout << "Reading Pixel Data" << std::endl;
 
-		vkQueueWaitIdle(engineDevice.graphicsQueue());
+		// vkQueueWaitIdle(engineDevice.graphicsQueue());
 
 		/* VALIDATION: Check coordinates are non-negative */
 		if (editorData.eMouseXPos < 0 || editorData.eMouseYPos < 0) {
@@ -252,8 +251,26 @@ namespace aveng {
 		swapchain->createEditorSelectionFramebuffers();
 		createPipelineLayouts();
 
-		std::string vertexShaderFile = "shaders/line.vert.spv";
-		std::string fragmentShaderFile = "shaders/line.frag.spv";
+		// Debug - Static
+		std::string vertexShaderFile = "shaders/debug.vert.spv";
+		std::string fragmentShaderFile = "shaders/debug.frag.spv";
+		if (!SkinningPipeline::init(engineDevice, renderData.rdDebugPipelineLayout,
+			renderData.rdDebugPipeline, renderData.rdSelectionRenderpass, 2, vertexShaderFile, fragmentShaderFile)) {
+			std::printf("%s error: could not init Assimp shader pipeline\n", __FUNCTION__);
+			throw std::runtime_error("editor fail 0");
+		}
+
+		// Debug - Animated
+		vertexShaderFile = "shaders/debug_skinning.vert.spv";
+		fragmentShaderFile = "shaders/debug_skinning.frag.spv";
+		if (!SkinningPipeline::init(engineDevice, renderData.rdDebugAnimatedPipelineLayout,
+			renderData.rdDebugAnimatedPipeline, renderData.rdSelectionRenderpass, 2, vertexShaderFile, fragmentShaderFile)) {
+			std::printf("%s error: could not init Assimp shader pipeline\n", __FUNCTION__);
+			throw std::runtime_error("editor fail 0");
+		}
+
+		vertexShaderFile = "shaders/line.vert.spv";
+		fragmentShaderFile = "shaders/line.frag.spv";
 		if (!LinePipeline::init(engineDevice, renderData.rdLineRenderpass, renderData.rdLinePipelineLayout,
 			renderData.rdLinePipeline, vertexShaderFile, fragmentShaderFile)) {
 			Logger::log(1, "%s error: could not init Assimp line drawing shader pipeline\n", __FUNCTION__);
@@ -306,6 +323,11 @@ namespace aveng {
 			Logger::log(1, "%s error: could not init Assimp selection pipeline layout\n", __FUNCTION__);
 			return false;
 		}
+		/* Static debug */
+		if (!PipelineLayout::init(engineDevice, renderData.rdDebugPipelineLayout, selectionLayouts, pushConstants)) {
+			Logger::log(1, "%s error: could not init Assimp selection pipeline layout\n", __FUNCTION__);
+			return false;
+		}
 
 		/* selection, animated */
 		std::vector<VkDescriptorSetLayout> skinningSelectionLayouts = {
@@ -313,6 +335,12 @@ namespace aveng {
 		  renderData.rdAvengAnimationSelectionDescriptorLayout };
 
 		if (!PipelineLayout::init(engineDevice, renderData.rdAvengAnimationSelectionPipelineLayout, skinningSelectionLayouts, pushConstants)) {
+			Logger::log(1, "%s error: could not init Assimp skinning selection pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+		
+		/* Animated debug */
+		if (!PipelineLayout::init(engineDevice, renderData.rdDebugAnimatedPipelineLayout, skinningSelectionLayouts, pushConstants)) {
 			Logger::log(1, "%s error: could not init Assimp skinning selection pipeline layout\n", __FUNCTION__);
 			return false;
 		}
@@ -479,13 +507,24 @@ namespace aveng {
 	void Editor::drawModels(const IModelLibrary& modelLib, int frameIndex)
 	{
 		//
+		//renderer.drawModels(
+		//	modelLib,
+		//	renderData.rdCommandBuffersGraphics[frameIndex],
+		//	renderData.rdAvengSelectionPipeline,
+		//	renderData.rdAvengAnimationSelectionPipeline,
+		//	renderData.rdAvengSelectionPipelineLayout,
+		//	renderData.rdAvengAnimationSelectionPipelineLayout,
+		//	renderData.rdAvengSelectionDescriptorSets[frameIndex],
+		//	renderData.rdAvengAnimationSelectionDescriptorSets[frameIndex],
+		//	frameIndex);
+		//
 		renderer.drawModels(
 			modelLib,
 			renderData.rdCommandBuffersGraphics[frameIndex],
-			renderData.rdAvengSelectionPipeline,
-			renderData.rdAvengAnimationSelectionPipeline,
-			renderData.rdAvengSelectionPipelineLayout,
-			renderData.rdAvengAnimationSelectionPipelineLayout,
+			renderData.rdDebugPipeline,
+			renderData.rdDebugAnimatedPipeline,
+			renderData.rdDebugPipelineLayout,
+			renderData.rdDebugAnimatedPipelineLayout,
 			renderData.rdAvengSelectionDescriptorSets[frameIndex],
 			renderData.rdAvengAnimationSelectionDescriptorSets[frameIndex],
 			frameIndex);
@@ -931,10 +970,14 @@ namespace aveng {
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdLineDescriptorLayout, nullptr);
 
+		vkDestroyPipeline(engineDevice.device(), renderData.rdDebugPipeline, nullptr);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdDebugAnimatedPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
 
+		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugPipelineLayout, nullptr);
+		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugAnimatedPipelineLayout, nullptr);
 		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengSelectionPipelineLayout, nullptr);
 		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionPipelineLayout, nullptr);
 		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdLinePipelineLayout, nullptr);
