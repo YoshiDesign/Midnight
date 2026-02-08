@@ -1,0 +1,28 @@
+layout(local_size_x = 256) in;
+
+// Input: already-computed face normals from CPU
+layout(std430, binding = 0) readonly buffer FaceNormals {
+    vec3 faceNormals[];  // one per triangle
+};
+
+layout(std430, binding = 1) readonly buffer Adjacency {
+    VertexAdjacency adjacency[];  // which triangles touch each vertex
+};
+
+// Output
+layout(std430, binding = 2) writeonly buffer VertexNormals {
+    vec3 vertexNormals[];
+};
+
+void main() {
+    uint vertexId = gl_GlobalInvocationID.x;
+    vec3 normalSum = vec3(0.0);
+    
+    VertexAdjacency adj = adjacency[vertexId];
+    for (uint i = 0; i < adj.count; i++) {
+        uint triId = adj.triangleIndices[i];
+        normalSum += faceNormals[triId];  // just read, don't compute
+    }
+    
+    vertexNormals[vertexId] = normalize(normalSum);
+}
