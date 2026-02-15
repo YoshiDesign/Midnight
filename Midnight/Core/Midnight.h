@@ -1,11 +1,12 @@
 #pragma once
+#include <thread>
 #include "Core/Input/InputSystem.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
 #include "Core/Renderer/ModelLibrary.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
-#include "Runtime/World/InstanceManager.h"
+#include "Runtime/Threading/ITaskSystem.h"
 #include "Runtime/Facade/SceneFacade.h"
 
 #include "Game/data.h"
@@ -96,6 +97,8 @@ namespace aveng {
 
 		std::unique_ptr<InputSystem> inputSystem_;
 		std::unique_ptr<AvengFrame>  frame_;
+
+		ThreadPoolTaskSystem taskSystem_{ std::thread::hardware_concurrency() };
 
 		/*
 		* Note to self:

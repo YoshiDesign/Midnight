@@ -83,6 +83,11 @@
     "xtr1common": "cpp",
     "xtree": "cpp",
     "xutility": "cpp",
-    "random": "cpp"
+    "random": "cpp",
+    "deque": "cpp",
+    "coroutine": "cpp",
+    "resumable": "cpp",
+    "future": "cpp",
+    "memory_resource": "cpp"
   }
 }

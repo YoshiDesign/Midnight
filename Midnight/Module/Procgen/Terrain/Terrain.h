@@ -6,31 +6,12 @@
 #include "Module/Procgen/SpatialGrid.h"
 #include "Core/Math/Math.h"
 
+
 namespace aveng {
 
-    struct TerrainChunk {
-
-		ChunkCoord coord;
-		ChunkConfig cfg;
-		int64_t seed;
-		float minX, minZ;
-		float maxX, maxZ;
-		DelaunayMesh *delaunayMesh;
-		std::vector<float> Heights;
-
-		SpatialGrid *spatialGrid;
-		std::vector<SiteIndex> coreSiteIndices;
-		std::vector<float> erosionHeightDeltas;
-
-	};
-
-    class ChunkManager {
-    public:
-        ChunkManager();
-    private:
-    };
-
 	// Factory function for SpatialGrid
+	// We perform 2 passes over all of the triangles in order to
+	// store information 
 	inline std::unique_ptr<SpatialGrid> BuildSpatialGrid(
 		const DelaunayMesh* mesh,
 		const std::vector<float>& heights,

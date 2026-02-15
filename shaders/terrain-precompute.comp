@@ -3,6 +3,7 @@ layout(local_size_x = 256) in;
 
 /*
     Pre-compute v1 for terrain generator
+    Supports shared/global SSBOs via baseVertex/baseTriangle offsets.
 */
 
 // -------------------------
@@ -10,56 +11,37 @@ layout(local_size_x = 256) in;
 // -------------------------
 layout(std140, binding = 0) uniform SettingsUBO
 {
-    // Normal calculation mode:
-    // 0 = area-weighted (uses face normal * area)
-    // 1 = angle-weighted (uses corner angle at vertex)
-    uint normalMode;
-
-    // Weight output mode:
-    // 0 = per-vertex SSBO only
-    // 1 = weightmap texture only
-    // 2 = both
-    uint weightOutputMode;
-
-    // Number of layers written into RGBA (typically 3 used, 4th optional)
-    // For now this shader writes 3 layers: grass/rock/snow into RGB, A unused (0).
+    uint normalMode;        // 0 = area-weighted, 1 = angle-weighted
+    uint weightOutputMode;  // 0 = SSBO, 1 = image, 2 = both
     uint numLayers;
-
-    // Weightmap layout if using image output: texel index = vertexId
-    // x = vertexId % weightmapWidth
-    // y = vertexId / weightmapWidth
     uint weightmapWidth;
 
-    // World "up" direction (set this to vec3(0,-1,0) if you're -Y up)
-    vec4 upDir; // xyz used
+    vec4 upDir;
 
-    // Height-based blending params (example defaults are up to you)
-    // snowStart < snowEnd; values in same units as your vertex height (y)
     float snowStart;
     float snowEnd;
 
-    // Steepness-based blending params:
-    // steepness in [0..1], where 0 = flat, 1 = vertical
     float rockStart;
     float rockEnd;
 
-    // Optional: hard clamp epsilon to avoid division by 0 / NaNs
     float eps;
 } ubo;
 
-// Push constants for per-dispatch counts
+// Push constants for per-dispatch counts + offsets into shared buffers
 layout(push_constant) uniform PC
 {
-    uint numVertices;
-    uint numTriangles; // for defensive checks
+    uint baseVertex;    // global vertex base for this chunk in shared buffers
+    uint baseTriangle;  // global triangle base for this chunk in shared buffers
+    uint numVertices;   // vertices in this chunk
+    uint numTriangles;  // triangles in this chunk (defensive checks)
 } pc;
 
 // -------------------------
 // Inputs (SSBOs)
 // -------------------------
 
-// faceN_area[tri].xyz = normalized face normal (in whatever space you want)
-// faceN_area[tri].w   = triangle area (or any scalar weight)
+// faceN_area[globalTri].xyz = normalized face normal
+// faceN_area[globalTri].w   = triangle area (or weight)
 layout(std430, binding = 1) readonly buffer FaceNormals
 {
     vec4 faceN_area[];
@@ -67,9 +49,11 @@ layout(std430, binding = 1) readonly buffer FaceNormals
 
 const uint MAX_ADJACENT_TRIS = 12;
 
-// For each vertex, which triangles share it
 struct VertexAdjacency
 {
+    // IMPORTANT ASSUMPTION:
+    // triangleIndices[] are CHUNK-LOCAL triangle IDs in [0..numTriangles).
+    // We'll add pc.baseTriangle when indexing shared triangle/face arrays.
     uint triangleIndices[MAX_ADJACENT_TRIS];
     uint count;
     uint _pad0;
@@ -82,41 +66,38 @@ layout(std430, binding = 2) readonly buffer Adjacency
     VertexAdjacency adjacency[];
 };
 
-// Triangle indices needed for angle-weighted normals
-// tris[triId] = uvec3(i0, i1, i2)
+// tris[] stores chunk-local vertex indices, not global ones. 
+// pc.baseTriangle is the first triangle for the current chunk
 layout(std430, binding = 3) readonly buffer Triangles
 {
     uvec3 tris[];
 };
 
-// Vertex positions. Convention here:
-// positions[v].xyz = position (world or chunk-local)
-// positions[v].y   = height (used for snow threshold)
-// positions[v].w   = optional (unused)
+// positions[globalV].xyz = position; positions[globalV].y used as height
 layout(std430, binding = 4) readonly buffer Positions
 {
     vec4 positions[];
 };
 
 // -------------------------
-// Outputs
+// Outputs (shared SSBOs)
 // -------------------------
 layout(std430, binding = 5) writeonly buffer VertexNormals
 {
-    vec4 vertexNormals[]; // xyz = normal, w unused
+    vec4 vertexNormals[];
 };
 
+// ONLY FOR DEBUG (at the moment) - This is very useful data
 layout(std430, binding = 6) writeonly buffer VertexSteepness
 {
-    float steepnessOut[]; // optional but useful for debugging / future logic
+    float steepnessOut[];
 };
 
 layout(std430, binding = 7) writeonly buffer VertexWeights
 {
-    vec4 weightsOut[]; // RGB used: grass/rock/snow, A unused (0)
+    vec4 weightsOut[];
 };
 
-// Optional weightmap image output (not in your material texture array)
 layout(binding = 8, rgba16f) uniform writeonly image2D weightmapImage;
 
 // -------------------------
@@ -127,7 +108,6 @@ float saturate(float x) { return clamp(x, 0.0, 1.0); }
 
 float smooth01(float e0, float e1, float x)
 {
-    // like smoothstep but handles degenerate ranges safely
     float d = max(e1 - e0, ubo.eps);
     float t = saturate((x - e0) / d);
     return t * t * (3.0 - 2.0 * t);
@@ -140,8 +120,7 @@ vec3 safeNormalize(vec3 v, vec3 fallback)
     return v * inversesqrt(len2);
 }
 
-// Corner angle at vertex p0 formed by edges to p1 and p2.
-// Robust and faster than acos: angle = atan(|cross|, dot)
+// Robust corner angle: atan(|cross|, dot)
 float cornerAngle(vec3 p0, vec3 p1, vec3 p2)
 {
     vec3 e1 = p1 - p0;
@@ -153,41 +132,41 @@ float cornerAngle(vec3 p0, vec3 p1, vec3 p2)
 
     float d = dot(e1, e2);
     vec3 c = cross(e1, e2);
-    float s = length(c); // |e1||e2|sin(theta)
+    float s = length(c);
 
-    // atan(y, x) gives angle in [0, pi]
-    return atan(s, d);
+    return atan(s, d); // [0..pi]
 }
 
-// Returns the corner angle in triangle triId at vertex v, and the face normal for that tri.
-bool getTriCornerAngleAndNormal(uint triId, uint v, out float angle, out vec3 faceN)
+// triLocal is in [0..pc.numTriangles). vLocal in [0..pc.numVertices).
+// Returns corner angle at vLocal and face normal (from shared face buffer).
+bool getTriCornerAngleAndNormal(uint triLocal, uint vLocal, out float angle, out vec3 faceN)
 {
-    if (triId >= pc.numTriangles) { angle = 0.0; faceN = vec3(0); return false; }
+    if (triLocal >= pc.numTriangles) { angle = 0.0; faceN = vec3(0); return false; }
 
-    uvec3 t = tris[triId];
+    uint triGlobal = pc.baseTriangle + triLocal;
+    uvec3 t = tris[triGlobal]; // chunk-local vertex indices
 
-    // Identify which corner corresponds to v
-    // If v is not in this tri (corrupt adjacency), return false.
-    if (t.x == v)
+    // Ensure vLocal is in this tri
+    if (t.x == vLocal)
     {
-        vec3 p0 = positions[t.x].xyz;
-        vec3 p1 = positions[t.y].xyz;
-        vec3 p2 = positions[t.z].xyz;
-        angle = cornerAngle(p0, p1, p2);
+        uint g0 = pc.baseVertex + t.x;
+        uint g1 = pc.baseVertex + t.y;
+        uint g2 = pc.baseVertex + t.z;
+        angle = cornerAngle(positions[g0].xyz, positions[g1].xyz, positions[g2].xyz);
     }
-    else if (t.y == v)
+    else if (t.y == vLocal)
     {
-        vec3 p0 = positions[t.y].xyz;
-        vec3 p1 = positions[t.z].xyz;
-        vec3 p2 = positions[t.x].xyz;
-        angle = cornerAngle(p0, p1, p2);
+        uint g0 = pc.baseVertex + t.y;
+        uint g1 = pc.baseVertex + t.z;
+        uint g2 = pc.baseVertex + t.x;
+        angle = cornerAngle(positions[g0].xyz, positions[g1].xyz, positions[g2].xyz);
     }
-    else if (t.z == v)
+    else if (t.z == vLocal)
     {
-        vec3 p0 = positions[t.z].xyz;
-        vec3 p1 = positions[t.x].xyz;
-        vec3 p2 = positions[t.y].xyz;
-        angle = cornerAngle(p0, p1, p2);
+        uint g0 = pc.baseVertex + t.z;
+        uint g1 = pc.baseVertex + t.x;
+        uint g2 = pc.baseVertex + t.y;
+        angle = cornerAngle(positions[g0].xyz, positions[g1].xyz, positions[g2].xyz);
     }
     else
     {
@@ -196,8 +175,7 @@ bool getTriCornerAngleAndNormal(uint triId, uint v, out float angle, out vec3 fa
         return false;
     }
 
-    // Face normal comes from your precomputed buffer (normalized)
-    faceN = faceN_area[triId].xyz;
+    faceN = faceN_area[triGlobal].xyz;
     return true;
 }
 
@@ -206,18 +184,18 @@ bool getTriCornerAngleAndNormal(uint triId, uint v, out float angle, out vec3 fa
 // -------------------------
 void main()
 {
-    uint v = gl_GlobalInvocationID.x;
-    if (v >= pc.numVertices) return;
+    uint vLocal = gl_GlobalInvocationID.x;
+    if (vLocal >= pc.numVertices) return;
 
-    VertexAdjacency adj = adjacency[v];
+    uint vGlobal = pc.baseVertex + vLocal;
+
+    VertexAdjacency adj = adjacency[vGlobal];
     uint c = min(adj.count, MAX_ADJACENT_TRIS);
 
     // -------------------------
     // 1) Vertex normal
     // -------------------------
     vec3 sum = vec3(0.0);
-
-    // Fallback normal: use upDir (normalized)
     vec3 up = safeNormalize(ubo.upDir.xyz, vec3(0.0, 1.0, 0.0));
 
     if (ubo.normalMode == 0u)
@@ -225,10 +203,11 @@ void main()
         // Area-weighted: sum += faceNormal * area
         for (uint i = 0; i < c; ++i)
         {
-            uint triId = adj.triangleIndices[i];
-            if (triId >= pc.numTriangles) continue;
+            uint triLocal = adj.triangleIndices[i];
+            if (triLocal >= pc.numTriangles) continue;
 
-            vec4 nA = faceN_area[triId];
+            uint triGlobal = pc.baseTriangle + triLocal;
+            vec4 nA = faceN_area[triGlobal];
             sum += nA.xyz * nA.w;
         }
     }
@@ -237,11 +216,11 @@ void main()
         // Angle-weighted: sum += faceNormal * cornerAngle
         for (uint i = 0; i < c; ++i)
         {
-            uint triId = adj.triangleIndices[i];
+            uint triLocal = adj.triangleIndices[i];
 
             float ang;
             vec3 faceN;
-            if (!getTriCornerAngleAndNormal(triId, v, ang, faceN))
+            if (!getTriCornerAngleAndNormal(triLocal, vLocal, ang, faceN))
                 continue;
 
             sum += faceN * ang;
@@ -249,56 +228,49 @@ void main()
     }
 
     vec3 N = safeNormalize(sum, up);
-    vertexNormals[v] = vec4(N, 0.0);
+    vertexNormals[vGlobal] = vec4(N, 0.0);
 
     // -------------------------
-    // 2) Steepness from normal
+    // 2) Steepness from normal | Slope
     // -------------------------
-    // steepness = 0 on flat (aligned with up), 1 on vertical
-    // If your up vector is (0,-1,0), dot will still work correctly.
-    float alignment = abs(dot(N, up));        // 1=flat, 0=vertical
+    float alignment = abs(dot(N, up));  // 1=flat, 0=vertical
     float steepness = 1.0 - saturate(alignment);
-    steepnessOut[v] = steepness;
+    steepnessOut[vGlobal] = steepness;
 
     // -------------------------
-    // 3) Material weights (rudimentary v1: grass/rock/snow)
+    // 3) Material weights (grass/rock/snow)
     // -------------------------
-    float h = positions[v].y;
+    float h = positions[vGlobal].y;
 
-    // Rock appears on steep slopes
     float rockW = smooth01(ubo.rockStart, ubo.rockEnd, steepness);
 
-    // Snow appears at high elevation (optionally reduce snow on very steep slopes)
     float snowW = smooth01(ubo.snowStart, ubo.snowEnd, h);
-    // optional: keep snow off cliffs a bit (comment out if undesired)
-    snowW *= (1.0 - rockW);
+    snowW *= (1.0 - rockW); // keep snow off cliffs (optional)
 
-    // Grass is "whatever is left"
     float grassW = max(0.0, 1.0 - max(rockW, snowW));
 
-    // Normalize so weights sum to 1 (avoid division by 0)
     float s = grassW + rockW + snowW;
-    if (s < ubo.eps) {
-        // default to grass if everything degenerate
+    if (s < ubo.eps)
+    {
         grassW = 1.0; rockW = 0.0; snowW = 0.0;
         s = 1.0;
     }
+
     float invS = 1.0 / s;
     vec4 w = vec4(grassW * invS, rockW * invS, snowW * invS, 0.0);
 
-    // Output mode: SSBO / image / both
     if (ubo.weightOutputMode == 0u || ubo.weightOutputMode == 2u)
     {
-        weightsOut[v] = w;
+        weightsOut[vGlobal] = w;
     }
 
     if (ubo.weightOutputMode == 1u || ubo.weightOutputMode == 2u)
     {
-        // Pack vertices linearly into a 2D image
-        // Ensure image dimensions are set to cover numVertices:
-        // height >= ceil(numVertices / weightmapWidth)
-        uint x = (ubo.weightmapWidth > 0u) ? (v % ubo.weightmapWidth) : v;
-        uint y = (ubo.weightmapWidth > 0u) ? (v / ubo.weightmapWidth) : 0u;
+        // NOTE: We pack by GLOBAL vertexId so every vertex has a unique texel.
+        uint id = vGlobal;
+
+        uint x = (ubo.weightmapWidth > 0u) ? (id % ubo.weightmapWidth) : id;
+        uint y = (ubo.weightmapWidth > 0u) ? (id / ubo.weightmapWidth) : 0u;
         imageStore(weightmapImage, ivec2(int(x), int(y)), w);
     }
 }

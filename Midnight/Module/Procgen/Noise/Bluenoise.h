@@ -1,8 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <random>
-#include <glm/glm.hpp>
+#include <memory_resource>
 
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types.h"
@@ -32,21 +31,20 @@ namespace aveng {
 	int32_t UniformInt(Rng& rng, int32_t minVal, int32_t maxVal);
 	
 	// Core APIs (Go parity)
-	std::vector<Vec2> GenerateBlueNoise(
+	std::pmr::vector<Vec2> GenerateBlueNoise(
 		Rng& rng,
 		float minX, float minZ,
 		float maxX, float maxZ,
-		BlueNoiseConfig cfg
+		BlueNoiseConfig cfg,
+		std::pmr::memory_resource* mr
 	);
 	
-	std::vector<Vec2> GenerateBlueNoiseSeeded(
+	std::pmr::vector<Vec2> GenerateBlueNoiseSeeded(
 		int64_t seed,
 		float minX, float minZ,
 		float maxX, float maxZ,
-		BlueNoiseConfig cfg
+		BlueNoiseConfig cfg,
+		std::pmr::memory_resource* mr
 	);
 	
-	// Deterministic chunk seed (FNV-1a 64-bit), Go parity
-	int64_t ChunkSeed(int64_t worldSeed, ChunkCoord coord);
 }
-
