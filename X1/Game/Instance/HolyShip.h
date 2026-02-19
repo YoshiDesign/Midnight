@@ -1,8 +1,7 @@
 #pragma once
-
+#include "Runtime/Play/GameContext.h"
 #include "Runtime/Play/IGameInstance.h"
 #include "Runtime/Play/PlayManager.h"
-#include "avpch.h"
 
 namespace xone {
 
@@ -12,15 +11,13 @@ namespace xone {
 
         std::string name() const override { return "HolyShip"; }
 
-        void onEnter() override {
-            std::cout << "[HolyShip] Enter\n";
-        }
+        void onEnter() override;
 
         void onExit() override {
             std::cout << "[HolyShip] Exit\n";
         }
 
-        void update(const TickContext& ctx) override;
+        void update(const TickContext& ctx, const aveng::GameServices& services) override;
 
         void render(const RenderContext&) override {
             // draw game
@@ -32,4 +29,4 @@ namespace xone {
         bool started_{ false };
     };
 
-} // namespace xone
+} 

@@ -1,8 +1,5 @@
 #include "ChunkManager.h"
-#include <memory>
-#include <unordered_set>
-#include <functional>
-#include <array>
+#include "avpch.h"
 
 #include "Module/Procgen/Noise/Bluenoise.h"
 
@@ -153,6 +150,7 @@ namespace aveng {
     */
     ChunkRecord* ChunkManager::getOrCreateRecord(ChunkCoord coord)
     {
+        std::printf("%s\n", __FUNCTION__);
         const size_t hash = ChunkCoordHash{}(coord); // turns (x,z) into a size_t
         // Note: This only looks at the lowest 6 bits of the final hash. We use the MurmurHash3 algorithm for this.
         // const size_t stripeIdx = hash % STRIPES; // Determine which bucket's map the record ends up in - index will always be [0, STRIPES)
@@ -205,6 +203,7 @@ namespace aveng {
     // AllPoints (depends on 9 point sets)
     std::shared_future<AllPoints const*> ChunkManager::requestAllPoints(ChunkCoord c, uint64_t frameIndex)
     {
+        std::printf("%s\n", __FUNCTION__);
         ChunkRecord* rec = getOrCreateRecord(c);
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
@@ -227,6 +226,7 @@ namespace aveng {
                 // Ensure neighbors' points exist
                 std::array<std::shared_future<Points const*>, 9> pf;
                 for (int i = 0; i < 9; ++i) {
+                    std::printf("Requesting points for neighbor: %d\n", i);
                     pf[i] = requestPoints(neighbors[i], frameIndex); // This is safe bc requestPoints uses call_once with that stage's once-flag
                 }
 
@@ -311,24 +311,30 @@ namespace aveng {
     //    return rec->meshF;
     //}
 
-    // FInal mesh (alloc in `final`) + drop scratch
-    std::shared_future<FinalMeshCPU const*> ChunkManager::requestFinalMesh(ChunkCoord c) {
-        auto rec = getOrCreateRecord(c);
+    // Final mesh (alloc in `final`) + drop scratch
+    //std::shared_future<FinalMeshCPU const*> ChunkManager::requestFinalMesh(ChunkCoord c) {
+    //    auto rec = getOrCreateRecord(c);
 
-        std::call_once(rec->meshOnce, [&] {
-            rec->meshF = tasks_.submit([this, rec, c]() -> FinalMeshCPU const* {
-                auto ef = requestErosion(c);      // or requestTriangulation() if you prefer first
-                (void)tasks_.wait(ef);
+    //    std::call_once(rec->meshOnce, [&] {
+    //        rec->meshF = tasks_.submit([this, rec, c]() -> FinalMeshCPU const* {
+    //            auto ef = requestErosion(c);      // or requestTriangulation() if you prefer first
+    //            (void)tasks_.wait(ef);
 
-                auto* mesh = buildFinalMesh(*rec);
+    //            auto* mesh = buildFinalMesh(*rec);
 
-                // You can drop scratch now (optional: keep for debug/editor)
-                rec->discardScratchIntermediates();
-                return mesh;
-            });
-        });
+    //            // You can drop scratch now (optional: keep for debug/editor)
+    //            rec->discardScratchIntermediates();
+    //            return mesh;
+    //        });
+    //    });
 
-        return rec->meshF;
+    //    return rec->meshF;
+    //}
+
+    void ChunkManager::test(ChunkCoord c, uint64_t frameIndex)
+    {
+        std::printf("[%d] Begin Test: Requesting All Points for (%s, %s)\n", frameIndex, c.x, c.z);
+        auto pf = requestAllPoints(c, frameIndex);
     }
 
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)

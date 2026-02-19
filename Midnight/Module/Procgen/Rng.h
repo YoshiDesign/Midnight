@@ -134,7 +134,7 @@ namespace aveng {
             const uint64_t x = NextU64(r);
             const Uns v = static_cast<Uns>(x); // truncation is okay for rejection
             // Rejection threshold to avoid modulo bias for huge spans:
-            const Uns threshold = static_cast<Uns>(-span) % span;
+            const Uns threshold = (Uns(0) - span) % span;
             if (v >= threshold) {
                 return static_cast<IntT>(static_cast<Uns>(minVal) + (v % span));
             }

@@ -1,9 +1,11 @@
 #include "ITaskSystem.h"
+#include <iostream>
 namespace aveng {
 
 	thread_local bool ThreadPoolTaskSystem::workerFlag_ = false;
 
     ThreadPoolTaskSystem::ThreadPoolTaskSystem(uint32_t threadCount) {
+        std::cout << __FUNCTION__ << "Starting ThreadPoolTaskSystem with " << threadCount << " threads." << std::endl;
         start(threadCount);
     }
 

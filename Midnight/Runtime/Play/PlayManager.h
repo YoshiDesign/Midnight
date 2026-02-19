@@ -1,9 +1,9 @@
 #pragma once
-#include "avpch.h"
-
+#include <cstdio>
 #include "GameRegistry.h"
 #include "Runtime/Facade/SceneFacade.h"
-
+#include "Runtime/Play/GameContext.h"
+#include "Runtime/Play/Controller/TerrainController.h"
 namespace xone {
 
     class PlayManager {
@@ -24,17 +24,20 @@ namespace xone {
 
         // Apply game/sim transitions + update current game
         // TickContext includes input state
-        void update(const TickContext& ctx) {
+        void update(const TickContext& ctx, const aveng::GameServices& services) {
 
-            // Apply pending transitions
+            // Apply pending playable transitions
             if (!pendingId_.empty() && pendingId_ != activeId_) {
                 switchTo(pendingId_);
                 pendingId_.clear();
             }
 
             if (active_) {
+                
+                // TODO - This might be tmp placement
+                services.terrain.setFrameIndex(ctx.frameIndex);
 
-                active_->update(ctx);
+                active_->update(ctx, services);
             }
 
         }
@@ -51,7 +54,9 @@ namespace xone {
         void switchTo(std::string id) {
             // Tear down old
             if (active_) {
+                // Hook
                 active_->onExit();
+                // Destroy the current game/scene ptr
                 active_.reset();
             }
 

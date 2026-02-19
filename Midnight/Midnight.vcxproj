@@ -219,6 +219,9 @@
     <ClCompile Include="Module\Procgen\Terrain\Erosion.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Terrain.cpp" />
     <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
+    <ClCompile Include="Runtime\Play\Controller\DebugController.cpp" />
+    <ClCompile Include="Runtime\Play\Controller\TerrainController.cpp" />
+    <ClCompile Include="Runtime\Play\WorldManager.cpp" />
     <ClCompile Include="Runtime\Threading\ITaskSystem.cpp" />
     <ClCompile Include="Utils\AssetResolution.cpp" />
     <ClCompile Include="Utils\Logger.cpp" />
@@ -290,10 +293,15 @@
     <ClInclude Include="Module\Procgen\Terrain\Erosion.h" />
     <ClInclude Include="Module\Procgen\Terrain\Terrain.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
+    <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
     <ClInclude Include="Runtime\Facade\SceneFacade.h" />
+    <ClInclude Include="Runtime\Play\Controller\DebugController.h" />
+    <ClInclude Include="Runtime\Play\Controller\TerrainController.h" />
+    <ClInclude Include="Runtime\Play\GameContext.h" />
     <ClInclude Include="Runtime\Play\GameRegistry.h" />
     <ClInclude Include="Runtime\Play\IGameInstance.h" />
     <ClInclude Include="Runtime\Play\PlayManager.h" />
+    <ClInclude Include="Runtime\Play\WorldManager.h" />
     <ClInclude Include="Runtime\Threading\ITaskSystem.h" />
     <ClInclude Include="Runtime\Threading\Types.h" />
     <ClInclude Include="Runtime\World\InstanceManager.h" />

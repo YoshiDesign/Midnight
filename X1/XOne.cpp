@@ -1,11 +1,13 @@
 #include "avpch.h"
 #include "XOne.h"
-#include "Game/Math/aveng_math.h"
+#include "Runtime/Play/PlayManager.h"
 #include "Game/Instance/HolyShip.h"
 #include "Game/Instance/Starfield.h"
 #ifdef ENABLE_EDITOR
 #include "Editor/EditorData.h"
 #endif
+#include <Runtime/Play/GameRegistry.h>
+#include <Runtime/Play/IGameInstance.h>
 
 namespace xone {
 
@@ -34,7 +36,7 @@ namespace xone {
 		auto player_camera = std::make_unique<aveng::PlayerCamera>();
 		player_camera_id = midnight.registerCamera("player_camera", std::move(player_camera));
 
-		// Note: Editor will take precedence when it's enabled
+		// Note: Editor's camera will take over if it's initialized
 		midnight.setActiveCamera(player_camera_id);
 
 		// "Yo, Tank..."
@@ -50,9 +52,13 @@ namespace xone {
 
 			// Clear all input states, calculate mouse & scroll deltas, reset key edges, etc.
 			midnight.beginFrameInput();
-			TickContext tick{ frameTime, midnight.inputState() };
+			TickContext tick{ 
+				frameTime, 
+				0, // midnight.frameIndex(), 
+				midnight.inputState() 
+			};
 
-			play.update(tick);
+			play.update(tick, midnight.gameServices());
 
 #ifdef ENABLE_EDITOR
 			/* There currently exist no methods for switching cameras within the context of AppMode::Game

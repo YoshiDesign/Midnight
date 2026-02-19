@@ -1,11 +1,13 @@
 #pragma once
+#include <string>
+#include "Runtime/Play/GameContext.h"
 #include "Core/Input/InputState.h"
-#include "avpch.h"
 
 namespace xone {
 
     struct TickContext {
         float dt{};
+        size_t frameIndex;
         const aveng::InputState& input;
 
     };
@@ -23,7 +25,7 @@ namespace xone {
         virtual void onExit() {}
 
         // Per-frame - state mutation
-        virtual void update(const TickContext& ctx) = 0;
+        virtual void update(const TickContext& ctx, const aveng::GameServices& services) = 0;
 
         /**
         * render()

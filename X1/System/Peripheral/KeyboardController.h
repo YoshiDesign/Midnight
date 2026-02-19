@@ -5,6 +5,9 @@
 #include "Game/Player/Action.h"
 #include "Game/data.h"
 
+/**
+ * DEPRECATED
+ */
 
 namespace aveng {
 	class KeyboardController {

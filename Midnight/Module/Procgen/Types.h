@@ -377,7 +377,7 @@ namespace aveng {
 	};
 
 	struct TerrainConfig {
-		uint64_t worldSeed = 0;
+		uint64_t worldSeed = 42;
 		float chunkSize = 256.f;
 		float minPointDist = 8.f;
 		float halo = 32.f;   // consider 4x minPointDist as a starting point

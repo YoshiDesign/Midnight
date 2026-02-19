@@ -1,14 +1,21 @@
 #include "Midnight.h"
+#include "avpch.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
+
 namespace aveng {
 
 	Midnight::Midnight(GameData& gd)
 		// Just remember that initialization order is the member declaration order, not your initializer list order
-		: game_data(gd)
+		: taskSystem_{ std::thread::hardware_concurrency() }
+		, chunkManager_(taskSystem_)
+		, terrain_(chunkManager_)
+		, debug_{}
+		, gs_{terrain_, debug_}
+		, game_data(gd)
 		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
 		, engineDevice(aveng_window)
 		, modelLib_(engineDevice, renderData)
-		, sceneFacade_(modelLib_, modelLib_.query()) // intentionally injecting registry via getter
+		, sceneFacade_(modelLib_, modelLib_.query()) // intentionally injecting registry as a separate interface (query())
 		, renderer(engineDevice, aveng_window, renderData, cameraManager, modelLib_.query(), modelLib_.animQuery())
 #ifdef ENABLE_EDITOR
 		, editor_{ std::make_unique<Editor>(renderData,
@@ -65,7 +72,7 @@ namespace aveng {
 			game_data.currentAppMode = game_data.requestedMode;
 			game_data.modeSwitchRequested = false;
 
-			// Good to know - In case anything needs dealing with
+			// Just a helpful hook if ever needed
 			// editor.onModeSwitched(frame.currentFrameIndex(), game_data.currentAppMode);
 		}
 #endif
@@ -78,8 +85,6 @@ namespace aveng {
 		// Fetched all the way from downtown (the swapchain)
 		aspect = renderer.getAspectRatio();
 
-		// Track key press to transform viewer object
-		// keyboardController.moveCameraXZ(window.getGLFWwindow(), frameTime);
 		cameraManager.update(frameTime, inputState());
 
 		// Apply new viewer obj values to the camera

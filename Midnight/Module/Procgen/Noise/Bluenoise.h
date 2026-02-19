@@ -5,6 +5,7 @@
 
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types.h"
+#include "Module/Procgen/Rng.h"
 
 /**
  * Performance Improvements:
@@ -25,10 +26,10 @@ namespace aveng {
 	
 	// Forward declare your RNG type + seeding + helpers.
 	// (Include your Rng.h here if you prefer.)
-	struct Rng;
-	void SeedRng(Rng& rng, uint64_t seed);
-	float Uniform01d(Rng& rng);
-	int32_t UniformInt(Rng& rng, int32_t minVal, int32_t maxVal);
+	//struct Rng;
+	//void SeedRng(Rng& rng, uint64_t seed);
+	//float Uniform01d(Rng& rng);
+	//int32_t UniformInt(Rng& rng, int32_t minVal, int32_t maxVal);
 	
 	// Core APIs (Go parity)
 	std::pmr::vector<Vec2> GenerateBlueNoise(

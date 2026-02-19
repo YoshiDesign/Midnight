@@ -3,6 +3,7 @@
 #include "Runtime/Play/IGameInstance.h"
 #include "Runtime/Play/PlayManager.h"
 #include <iostream>
+#include <Runtime/Play/GameContext.h>
 
 namespace xone {
 
@@ -20,7 +21,7 @@ namespace xone {
             std::cout << "[Starfield] Exit\n";
         }
 
-        void update(const TickContext& ctx) override {
+        void update(const TickContext& ctx, const aveng::GameServices& services) override {
             // Pretend the user pressed "Start"
             elapsed_ += ctx.dt;
             if (elapsed_ > 1.0f && !started_) {

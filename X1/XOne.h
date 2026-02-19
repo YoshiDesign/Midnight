@@ -1,13 +1,8 @@
 #pragma once
-#include <vector>
+
 #include "Game/data.h"
 #include "Core/Midnight.h"
-#include "Core/app_object.h"
-#include "Core/aveng_window.h"
-#include "CoreVK/EngineDevice.h"
-#include "CoreVk/aveng_buffer.h"
-#include "System/Peripheral/KeyboardController.h"
-#include "Runtime/Play/PlayManager.h"
+
 #ifdef ENABLE_EDITOR
 #include "Editor/Editor.h"
 #endif
@@ -42,8 +37,8 @@ namespace xone {
 
 		float frameTime;
 		int player_camera_id;
-		aveng::GameData gameData; // This is a big design flaw at the moment. Don't rely on it
-		aveng::Midnight midnight{ gameData };
+		::aveng::GameData gameData; // This is a big design flaw at the moment. Don't rely on it
+		::aveng::Midnight midnight{ gameData };
 
 	};
 

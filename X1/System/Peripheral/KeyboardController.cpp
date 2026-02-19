@@ -3,6 +3,10 @@
 #include "Game/Math/aveng_math.h"
 #include "avpch.h"
 
+/**
+ * DEPRECATED
+ */
+
 namespace aveng{
 
 	/**

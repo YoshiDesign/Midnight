@@ -1,5 +1,5 @@
 #pragma once
-#include <thread>
+
 #include "Core/Input/InputSystem.h"
 #include "Core/aveng_window.h"
 #include "CoreVK/EngineDevice.h"
@@ -8,12 +8,15 @@
 #include "Core/Renderer/AvengFrame.h"
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Runtime/Facade/SceneFacade.h"
+#include "Runtime/Play/Controller/TerrainController.h"
+#include "Runtime/Play/Controller/DebugController.h"
+#include "Runtime/Play/GameContext.h"
+#include "Module/Procgen/Terrain/ChunkManager.h"
 
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
 #include "Editor/Editor.h"
 #endif
-#include "avpch.h"
 
 namespace aveng {
 
@@ -26,12 +29,15 @@ namespace aveng {
 		Midnight(GameData& _gamedata);
 		~Midnight() = default;
 
+		const GameServices& gameServices() const noexcept { return gs_; };
+
 		void initialize();
 		void initializeDependencies();
 
 		void beginFrameInput() { inputSystem_->beginFrame(); }
 
 		const InputState& inputState() { return inputSystem_->inputState(); }
+
 
 		// Editor Only
 		const AppMode mode() { return game_data.currentAppMode; }
@@ -49,6 +55,7 @@ namespace aveng {
 
 		// Resource State
 		bool frameInProgress() { return renderer.isFrameInProgress(); }
+		int frameIndex() { return renderer.getFrameIndex(); }
 		bool shouldClose() { return aveng_window.shouldClose(); }
 		float getAspectRatio() { return renderer.getAspectRatio(); }
 
@@ -65,6 +72,11 @@ namespace aveng {
 	private:
 		// ---- External state
 		GameData& game_data;
+
+		// ---- Internal APIs
+		TerrainController terrain_;
+		DebugController debug_;
+		GameServices gs_; // GameContext.h
 
 		// ---- Core state (order matters!)
 		float aspect = 0.0f;
@@ -98,7 +110,9 @@ namespace aveng {
 		std::unique_ptr<InputSystem> inputSystem_;
 		std::unique_ptr<AvengFrame>  frame_;
 
-		ThreadPoolTaskSystem taskSystem_{ std::thread::hardware_concurrency() };
+		// Threadpool
+		ThreadPoolTaskSystem taskSystem_;
+		ChunkManager chunkManager_;
 
 		/*
 		* Note to self:

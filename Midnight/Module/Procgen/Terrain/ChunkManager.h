@@ -25,8 +25,29 @@ namespace aveng {
 
     class ChunkManager {
     public:
-        explicit ChunkManager(ITaskSystem& tasks, TerrainConfig cfg)
-            : tasks_(tasks), cfg_(cfg) {
+        explicit ChunkManager(ITaskSystem& tasks)
+            : tasks_(tasks) {
+            cfg_ = defaultTerrainConfig();
+        }
+
+        TerrainConfig defaultTerrainConfig() {
+            return {
+                42,     // worldSeed
+                256.f,  // chunkSize
+                8.f,    // minPointDist
+                32.f,   // halo
+                defaultNoiseParams()
+            };
+        }
+
+        NoiseParams defaultNoiseParams() {
+            return {
+                7,      // octaves
+                0.01f,  // frequency
+                1.0f,   // amplitude
+                0.5f,   // persistence
+                2.0f    // lacunarity
+            };
         }
 
         // Very dangerous Public API (extend as needed, but work in tandem with pin/unpin)
@@ -35,8 +56,8 @@ namespace aveng {
         std::shared_future<AllPoints const*>     requestAllPoints(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<Heights const*>       requestHeights(ChunkCoord c);
         std::shared_future<Triangulation const*> requestTriangulation(ChunkCoord c);
-        std::shared_future<ErosionField const*>  requestErosion(ChunkCoord c);
-        std::shared_future<FinalMeshCPU const*>  requestFinalMesh(ChunkCoord c);
+        //std::shared_future<ErosionField const*>  requestErosion(ChunkCoord c);
+        //std::shared_future<FinalMeshCPU const*>  requestFinalMesh(ChunkCoord c);
 
         // Streaming helpers
         ChunkRecord* pin(ChunkCoord c, uint64_t frameIndex); // 
@@ -49,6 +70,8 @@ namespace aveng {
             return ChunkCoordHash{}(c) & (STRIPES - 1); // STRIPES must be power-of-two
             // or: % STRIPES if not power-of-two
         }
+
+        void test(ChunkCoord c, uint64_t frameIndex); // test function to schedule the whole pipeline for a chunk
 
     private:
         using RecPtr = ChunkRecord*; // changed from shared_ptr. RIP evenings
@@ -70,8 +93,8 @@ namespace aveng {
         AllPoints const* buildAllPoints(ChunkRecord& r);     // alloc in scratch
         Heights const* buildHeights(ChunkRecord& r);       // alloc in scratch
         Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
-        ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
-        FinalMeshCPU const* buildFinalMesh(ChunkRecord& r);     // alloc in final
+        //ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
+        //FinalMeshCPU const* buildFinalMesh(ChunkRecord& r);     // alloc in final
 
     private:
         ITaskSystem& tasks_;
