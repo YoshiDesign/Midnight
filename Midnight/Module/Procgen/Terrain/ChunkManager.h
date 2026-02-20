@@ -1,8 +1,8 @@
 #pragma once
 #include <array>
 #include <stdint.h>
-#include "Module/Procgen/Types.h"
 #include "Runtime/Threading/ITaskSystem.h"
+#include "Module/Procgen/Types.h"
 #include "Runtime/Threading/Types.h"
 
 namespace aveng {

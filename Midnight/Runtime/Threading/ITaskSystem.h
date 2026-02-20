@@ -8,7 +8,6 @@
 #include <atomic>
 #include <vector>
 #include <chrono>
-#include <type_traits>
 
 /*
 * Currently, this implementation offers a lot of extensibility.
@@ -64,28 +63,32 @@ namespace aveng {
         // Note: If the destructor is not virtual, ~ThreadPoolTaskSystem() won't run correctly when deleting via ITaskSystem*
         virtual ~ITaskSystem() = default;
 
-        // Schedules work. Returns a shared_future so multiple stages can depend on it.
-        //template<class Fn>
-        //auto submit(Fn&& fn) -> std::shared_future<std::invoke_result_t<Fn>> {
-        //    using R = std::invoke_result_t<Fn>;
-        //    
-        //    // A packaged_task wraps our function and gives us a future, then...
-        //    auto task = std::make_shared<std::packaged_task<R()>>(std::forward<Fn>(fn));
-        //    // ... .share() makes the future a shared_future
-        //    std::shared_future<R> fut = task->get_future().share();
-
-        //    enqueue([task]() { (*task)(); });
-        //    return fut;
-        //}
-
         template<class Fn>
         auto submit(Fn&& fn) -> std::shared_future<decltype(std::declval<Fn>()())> {
             using R = decltype(std::declval<Fn>()());
+            // using R = std::invoke_result_t<Fn&>; -- If we need a more general pattern with std::invoke(fn)
+
+            // shared_ptr is a convenience tradeoff: simpler queue + lifetime, but some heap allocation / refcounting
+            /*
+            * You can remove it if your queue can store move-only jobs 
+            * (e.g., a custom move-only function wrapper instead of std::function). 
+            * Then you can move the packaged_task into the job and avoid shared_ptr overhead.
+            */
             auto task = std::make_shared<std::packaged_task<R()>>(std::forward<Fn>(fn));
             std::shared_future<R> fut = task->get_future().share();
             enqueue([task]() { (*task)(); });
             return fut;
         }
+
+        // A more "modern" approach to `submit`
+        //template<class Fn>
+        //auto submit(Fn&& fn) -> std::shared_future<std::invoke_result_t<Fn&>> {
+        //    using R = std::invoke_result_t<Fn&>;
+        //    auto task = std::make_shared<std::packaged_task<R()>>(std::forward<Fn>(fn));
+        //    auto fut = task->get_future().share();
+        //    enqueue([task] { (*task)(); });
+        //    return fut;
+        //}
 
         // Helping wait: avoids deadlocks when workers wait on other tasks.
         template<class T>

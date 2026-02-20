@@ -1,6 +1,6 @@
 #include "ChunkManager.h"
 #include "avpch.h"
-
+#include "Runtime/Threading/Scratch.h"
 #include "Module/Procgen/Noise/Bluenoise.h"
 
 namespace aveng {
@@ -70,6 +70,7 @@ namespace aveng {
         RecordPin(ChunkManager& m, ChunkRecord* r, uint64_t frameIndex)
             : mgr(&m), rec(r)
         {
+            std::printf("Pinning chunk record for ChunkCoord(%d, %d)\n", r->coord.x, r->coord.z);
             mgr->pin(rec, frameIndex); // increments + touches
         }
 
@@ -134,9 +135,6 @@ namespace aveng {
     *       would be responsible for generating points in its expanded bounds, which you explicitly said you don’t want.
     */
 
-    // Thread local scratch arena - Tier 1 of our 3-tier arena strategy
-    thread_local ChunkArena tlsScratch;
-
     /*
     * Returning ChunkRecord* is safe as long as eviction respects pins (lifetime safety!).
     *
@@ -150,19 +148,20 @@ namespace aveng {
     */
     ChunkRecord* ChunkManager::getOrCreateRecord(ChunkCoord coord)
     {
-        std::printf("%s\n", __FUNCTION__);
+        std::printf("%s [%d, %d]\n", __FUNCTION__, coord.x, coord.z);
         const size_t hash = ChunkCoordHash{}(coord); // turns (x,z) into a size_t
         // Note: This only looks at the lowest 6 bits of the final hash. We use the MurmurHash3 algorithm for this.
         // const size_t stripeIdx = hash % STRIPES; // Determine which bucket's map the record ends up in - index will always be [0, STRIPES)
-        const size_t stripeIdx = hash & (STRIPES - 1); // Use bitwise AND to get the lowest 6 bits - faster than % but only works if STRIPES is a power of two
+        const size_t stripeIdx = hash & (STRIPES - 1); // Use bitwise AND to get the lowest 6 bits - faster than % but only works if STRIPES is a power of two (it is)
         auto& bucket = records_[stripeIdx];
 
-        // RAII lock_guard
+        // Nifty RAII lock_guard
         std::lock_guard<std::mutex> lock(bucket.mut);
 
         // Insert the key if it's missing, with a null unique_ptr placeholder.
         auto [it, inserted] = bucket.map.try_emplace(coord, nullptr);
         if (!inserted) {
+            std::printf("%s Record Already Created for (%d, %d)...\n", __FUNCTION__, coord.x, coord.z);
             return it->second.get();
         }
 
@@ -179,6 +178,7 @@ namespace aveng {
 
         // Only reserve FINAL here. Scratch is thread-local now. 2MB though...
         rec->final.reserve(2 * 1024 * 1024);
+		rec->scratch.reserve(2 * 1024 * 1024);
 
         ChunkRecord* out = rec.get();
         it->second = std::move(rec); // "overwrite" the nullptr with the new record
@@ -203,7 +203,7 @@ namespace aveng {
     // AllPoints (depends on 9 point sets)
     std::shared_future<AllPoints const*> ChunkManager::requestAllPoints(ChunkCoord c, uint64_t frameIndex)
     {
-        std::printf("%s\n", __FUNCTION__);
+        std::printf("[%s] ChunkCoord{%d,%d} \n", __FUNCTION__, c.x, c.z);
         ChunkRecord* rec = getOrCreateRecord(c);
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
@@ -333,14 +333,19 @@ namespace aveng {
 
     void ChunkManager::test(ChunkCoord c, uint64_t frameIndex)
     {
-        std::printf("[%d] Begin Test: Requesting All Points for (%s, %s)\n", frameIndex, c.x, c.z);
+        std::printf("[%d] Begin Test: Requesting All Points for (%d, %d)\n", frameIndex, c.x, c.z);
         auto pf = requestAllPoints(c, frameIndex);
     }
 
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)
     {
+
+
         // 1) Reset thread-local scratch for this job
-        tlsScratch.reset();
+        tlsScratchArena().reset();
+
+        auto* mr = tlsScratchArena().mr();
+        assert(mr && "tlsScratch.mr() is null");
 
         // 2) Generate deterministic seed for this chunk
         uint64_t seed = chunkSeed(cfg_.worldSeed, rec.coord);
@@ -357,7 +362,7 @@ namespace aveng {
             rec.coreBounds.maxX,
             rec.coreBounds.maxZ,
             bnCfg,
-            tlsScratch.mr()  // Use thread-local scratch
+            tlsScratchArena().mr()  // Use thread-local scratch
         );
 
         // 4) Allocate the published product in FINAL memory.
@@ -380,7 +385,7 @@ namespace aveng {
 
     AllPoints const* ChunkManager::buildAllPoints(ChunkRecord& rec) {
         // 1) Reset thread-local scratch for this job
-        tlsScratch.reset();
+        tlsScratchArena().reset();
         
         // 2) Allocate AllPoints in chunk scratch (persists across stages)
         if (!rec.allPoints) {
@@ -393,7 +398,7 @@ namespace aveng {
         const Bounds2 haloBounds = expandBounds(rec.coreBounds, rec.halo);
         
         // 4) Temporary collection using thread-local scratch
-        std::pmr::vector<Vec2> collected(tlsScratch.mr());
+        std::pmr::vector<Vec2> collected(tlsScratchArena().mr());
         collected.reserve(10000); // heuristic: ~1000 points/chunk × 9 neighbors
         
         // 5) Iterate through 9 neighbors and collect points within halo
@@ -418,11 +423,11 @@ namespace aveng {
         constexpr float DEDUPE_EPS = 1e-4f; // smaller than minPointDist
         // std::pmr::unordered_set<QKey, QKeyHash> seen(tlsScratch.mr());
         std::pmr::unordered_set<QKey, QKeyHash> seen(
-            0, QKeyHash{}, std::equal_to<QKey>{}, tlsScratch.mr()
+            0, QKeyHash{}, std::equal_to<QKey>{}, tlsScratchArena().mr()
         );
         seen.reserve(collected.size());
         
-        std::pmr::vector<Vec2> unique(tlsScratch.mr());
+        std::pmr::vector<Vec2> unique(tlsScratchArena().mr());
         unique.reserve(collected.size());
         
         for (const auto& pt : collected) {

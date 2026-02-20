@@ -7,7 +7,7 @@ namespace aveng {
     // Blue noise (Bridson's Algorithm)
     //
     // TODO: If indices are never conceptually negative in the grid which this
-    // algorithm produces, then we
+    // algorithm produces, then we don't need all of these static casts, perhaps.
     // ---------------------------
     std::pmr::vector<Vec2> GenerateBlueNoise(
         Rng& rng,

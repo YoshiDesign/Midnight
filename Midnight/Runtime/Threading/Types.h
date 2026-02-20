@@ -1,7 +1,7 @@
 #pragma once
+#include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <array>
 #include "Module/Procgen/Types.h"
 
 namespace aveng
@@ -40,5 +40,5 @@ namespace aveng
         std::mutex mut;
         std::unordered_map<ChunkCoord, std::unique_ptr<ChunkRecord>, ChunkCoordHash> map;
     };
-
+    
 }

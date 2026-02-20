@@ -34,19 +34,23 @@ namespace aveng {
             return;
         }
 
-        lastRequested_.clear();
-        lastRequested_.reserve(static_cast<size_t>(cols) * static_cast<size_t>(rows));
+        std::printf("[%s] ChunkCoord{%d, %d}", __FUNCTION__, start_coord.x, start_coord.z);
+        chunks_->test(start_coord, frameIndex_);
+        return;
+        
+        //lastRequested_.clear();
+        //lastRequested_.reserve(static_cast<size_t>(cols) * static_cast<size_t>(rows));
 
-        // Convention: cols increases +x, rows increases +z (adjust if your grid differs).
-        for (int r = 0; r < rows; ++r) {
-            for (int c = 0; c < cols; ++c) {
-                const ChunkCoord coord = offsetCoord(start_coord, c, r);
+        //// Convention: cols increases +x, rows increases +z (adjust if your grid differs).
+        //for (int r = 0; r < rows; ++r) {
+        //    for (int c = 0; c < cols; ++c) {
+        //        const ChunkCoord coord = offsetCoord(start_coord, c, r);
 
-                // This schedules the whole pipeline via call_once inside ChunkManager::requestMesh.
-                // It should be non-blocking unless requestMesh itself blocks (it shouldn't).
-                // lastRequested_.push_back(chunks_->test(coord, frameIndex_));
-                chunks_->test(start_coord, frameIndex_);
-            }
-        }
+        //        // This schedules the whole pipeline via call_once inside ChunkManager::requestMesh.
+        //        // It should be non-blocking unless requestMesh itself blocks (it shouldn't).
+        //        // lastRequested_.push_back(chunks_->test(coord, frameIndex_));
+        //        chunks_->test(coord, frameIndex_);
+        //    }
+        //}
     }
 }

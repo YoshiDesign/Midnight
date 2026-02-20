@@ -219,10 +219,12 @@
     <ClCompile Include="Module\Procgen\Terrain\Erosion.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Terrain.cpp" />
     <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
+    <ClCompile Include="Runtime\Memory\ChunkArena.h" />
     <ClCompile Include="Runtime\Play\Controller\DebugController.cpp" />
     <ClCompile Include="Runtime\Play\Controller\TerrainController.cpp" />
     <ClCompile Include="Runtime\Play\WorldManager.cpp" />
     <ClCompile Include="Runtime\Threading\ITaskSystem.cpp" />
+    <ClCompile Include="Runtime\Threading\Scratch.cpp" />
     <ClCompile Include="Utils\AssetResolution.cpp" />
     <ClCompile Include="Utils\Logger.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />
@@ -303,6 +305,7 @@
     <ClInclude Include="Runtime\Play\PlayManager.h" />
     <ClInclude Include="Runtime\Play\WorldManager.h" />
     <ClInclude Include="Runtime\Threading\ITaskSystem.h" />
+    <ClInclude Include="Runtime\Threading\Scratch.h" />
     <ClInclude Include="Runtime\Threading\Types.h" />
     <ClInclude Include="Runtime\World\InstanceManager.h" />
     <ClInclude Include="Services\InstanceServices.h" />

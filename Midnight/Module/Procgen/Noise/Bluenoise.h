@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <memory_resource>
-
+#include <cstdint>
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/Rng.h"

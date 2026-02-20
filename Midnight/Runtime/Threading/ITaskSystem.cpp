@@ -1,4 +1,6 @@
 #include "ITaskSystem.h"
+#include "Runtime/Threading/Scratch.h"
+#include "Runtime/Memory/ChunkArena.h"
 #include <iostream>
 namespace aveng {
 
@@ -13,6 +15,7 @@ namespace aveng {
         stop();
     }
 
+    // The worker loop
     void ThreadPoolTaskSystem::start(uint32_t threadCount){
         stopping_.store(false, std::memory_order_release);
         workers_.reserve(threadCount);
@@ -21,6 +24,10 @@ namespace aveng {
         for (uint32_t i = 0; i < threadCount; ++i) {
             workers_.emplace_back([this] {
                 workerFlag_ = true;
+
+                // Prepare a scratch memory resource for every 
+                tlsScratchArena().reserve(8 * 1024 * 1024); // 8MB per thread
+
                 for (;;) {
                     std::function<void()> job;
                     {
