@@ -1,6 +1,28 @@
 #include "Bluenoise.h"
+#include "Runtime/Debug.h"
 #include "Module/Procgen/Rng.h"
+#ifdef M_DEBUG
+#include <iostream>
+#include <filesystem>
+#endif
 namespace aveng {
+
+#ifdef M_DEBUG
+
+    void dumpChunkData(ChunkCoord coord, std::pmr::vector<Vec2> data)
+    {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}.txt", name);
+
+        Debug::writeBlueNoiseDataToFile(fullPath, data);
+    }
+#endif
 
 
     // ---------------------------
@@ -15,6 +37,9 @@ namespace aveng {
         float maxX, float maxZ,
         BlueNoiseConfig cfg,
         std::pmr::memory_resource* mr
+#ifdef M_DEBUG
+        , ChunkCoord coord
+#endif
     ) {
         if (cfg.MinDist <= 0.0) {
             return {};
@@ -146,6 +171,10 @@ namespace aveng {
             }
         }
 
+#ifdef M_DEBUG
+        std::cout << "writing chunk data..." << std::endl;
+        dumpChunkData(coord, points);
+#endif
         return points;
     }
 
@@ -155,10 +184,17 @@ namespace aveng {
         float maxX, float maxZ,
         BlueNoiseConfig cfg,
         std::pmr::memory_resource* mr
+#ifdef M_DEBUG
+        , ChunkCoord coord
+#endif
     ) {
         Rng rng{};
         SeedRng(rng, static_cast<uint64_t>(seed));
-        return GenerateBlueNoise(rng, minX, minZ, maxX, maxZ, cfg, mr);
+        return GenerateBlueNoise(rng, minX, minZ, maxX, maxZ, cfg, mr
+#ifdef M_DEBUG
+        , coord
+#endif
+        );
     }
 
 }

@@ -200,7 +200,7 @@ namespace aveng {
 		std::once_flag triangOnce;
 		std::shared_future<Triangulation const*> triangF;
 
-		std::once_flag erosionOnce;
+		std::once_flag erosionOnce_Hydro;
 		std::shared_future<ErosionField const*> erosionF;
 
 		std::once_flag meshOnce;
@@ -273,15 +273,15 @@ namespace aveng {
 		int Prev;
 	};
 
-	struct ChunkConfig {
-		uint64_t worldSeed = 0;
-		float chunkSize = 256.f;
-		float minPointDist = 8.f;
-		float halo = 32.f;   // consider 4x minPointDist as a starting point
-		NoiseParams noise{};
-		int chunksX;
-		int chunksZ;
-	};
+	//struct ChunkConfig {
+	//	uint64_t worldSeed = 0;
+	//	float chunkSize = 256.f;
+	//	float minPointDist = 8.f;
+	//	float halo = 32.f;   // consider 4x minPointDist as a starting point
+	//	NoiseParams noise{};
+	//	int chunksX;
+	//	int chunksZ;
+	//};
 
 	struct VoronoiCell {
 		SiteIndex site;

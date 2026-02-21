@@ -296,6 +296,7 @@
     <ClInclude Include="Module\Procgen\Terrain\Terrain.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
     <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
+    <ClInclude Include="Runtime\Debug.h" />
     <ClInclude Include="Runtime\Facade\SceneFacade.h" />
     <ClInclude Include="Runtime\Play\Controller\DebugController.h" />
     <ClInclude Include="Runtime\Play\Controller\TerrainController.h" />

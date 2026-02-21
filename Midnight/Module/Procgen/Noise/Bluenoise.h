@@ -38,6 +38,9 @@ namespace aveng {
 		float maxX, float maxZ,
 		BlueNoiseConfig cfg,
 		std::pmr::memory_resource* mr
+#ifdef M_DEBUG
+		, ChunkCoord coord
+#endif
 	);
 	
 	std::pmr::vector<Vec2> GenerateBlueNoiseSeeded(
@@ -46,6 +49,9 @@ namespace aveng {
 		float maxX, float maxZ,
 		BlueNoiseConfig cfg,
 		std::pmr::memory_resource* mr
+#ifdef M_DEBUG
+		, ChunkCoord coord
+#endif
 	);
 	
 }

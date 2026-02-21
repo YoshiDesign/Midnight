@@ -3,7 +3,38 @@
 #include "Runtime/Threading/Scratch.h"
 #include "Module/Procgen/Noise/Bluenoise.h"
 
+#ifdef M_DEBUG
+#include <fstream>
+#include <string>
+#include <cstdint>
+#include <format>
+#endif
+
 namespace aveng {
+
+#ifdef M_DEBUG
+#include <filesystem>
+
+    void dumpChunk(ChunkCoord coord)
+    {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        fs::create_directories(exeDir);
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}.txt", name);
+
+        std::ofstream file(fullPath);
+
+        if (!file) {
+            throw std::runtime_error("Failed to create file");
+        }
+    }
+#endif
 
     // Get 3x3 neighborhood coordinates (including self at center)
     inline void get3x3Neighbors(ChunkCoord center, ChunkCoord out[9]) noexcept {
@@ -203,7 +234,7 @@ namespace aveng {
     // AllPoints (depends on 9 point sets)
     std::shared_future<AllPoints const*> ChunkManager::requestAllPoints(ChunkCoord c, uint64_t frameIndex)
     {
-        std::printf("[%s] ChunkCoord{%d,%d} \n", __FUNCTION__, c.x, c.z);
+        // std::printf("[%s] ChunkCoord{%d,%d} \n", __FUNCTION__, c.x, c.z);
         ChunkRecord* rec = getOrCreateRecord(c);
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
@@ -226,7 +257,7 @@ namespace aveng {
                 // Ensure neighbors' points exist
                 std::array<std::shared_future<Points const*>, 9> pf;
                 for (int i = 0; i < 9; ++i) {
-                    std::printf("Requesting points for neighbor: %d\n", i);
+                    // std::printf("Requesting points for neighbor: %d\n", i);
                     pf[i] = requestPoints(neighbors[i], frameIndex); // This is safe bc requestPoints uses call_once with that stage's once-flag
                 }
 
@@ -244,19 +275,19 @@ namespace aveng {
 
     // Heights - We do not need the halo-region in order to compute heights
     // The height function will remain deterministic across world-space.
-    //std::shared_future<Heights const*> ChunkManager::requestHeights(ChunkCoord c) {
-    //    auto rec = getOrCreateRecord(c);
+    std::shared_future<Heights const*> ChunkManager::requestHeights(ChunkCoord c) {
+        auto rec = getOrCreateRecord(c);
 
-    //    std::call_once(rec->heightsOnce, [&] {
-    //        rec->heightsF = tasks_.submit([this, rec, c]() -> Heights const* {
-    //            //auto af = requestAllPoints(c);
-    //            //(void)tasks_.wait(af);
-    //            //return buildHeights(*rec);
-    //        });
-    //    });
+        std::call_once(rec->heightsOnce, [&] {
+            rec->heightsF = tasks_.submit([this, rec, c]() -> Heights const* {
+                auto af = requestAllPoints(c);
+                (void)tasks_.wait(af);
+                return buildHeights(*rec);
+            });
+        });
 
-    //    return rec->heightsF;
-    //}
+        return rec->heightsF;
+    }
 
     // Triangulation
     //std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c) {
@@ -289,27 +320,27 @@ namespace aveng {
     //}
 
     // Consider this implementation now that we've reasoned about pinning/unpinning, 
-    //std::shared_future<FinalMeshCPU const*> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
-    //{
-    //    ChunkRecord* rec = getOrCreateRecord(c);
-    //    rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
+    std::shared_future<FinalMeshCPU const*> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
+    {
+        ChunkRecord* rec = getOrCreateRecord(c);
+        rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
-    //    std::call_once(rec->meshOnce, [this, rec] {
-    //        rec->meshF = tasks_.submit([this, rec]() -> FinalMeshCPU const* {
-    //            RecordPin pipelineHold(*this, rec); // holds across all stages
+        std::call_once(rec->meshOnce, [this, rec] {
+            rec->meshF = tasks_.submit([this, rec]() -> FinalMeshCPU const* {
+                RecordPin pipelineHold(*this, rec); // holds across all stages
 
-    //            // These can schedule/use other stages without extra pinning
-    //            auto pts = requestPoints(rec->coord, /*frameIndex*/0).get();
-    //            auto h = requestHeights(rec->coord, 0).get();
-    //            auto er = requestErosion(rec->coord, 0).get();
-    //            auto mesh = buildMesh(*rec);
+                // These can schedule/use other stages without extra pinning
+                auto pts = requestPoints(rec->coord, /*frameIndex*/0).get();
+                auto h = requestHeights(rec->coord, 0).get();
+                auto er = requestErosion(rec->coord, 0).get();
+                auto mesh = buildMesh(*rec);
 
-    //            return mesh;
-    //        });
-    //    });
+                return mesh;
+            });
+        });
 
-    //    return rec->meshF;
-    //}
+        return rec->meshF;
+    }
 
     // Final mesh (alloc in `final`) + drop scratch
     //std::shared_future<FinalMeshCPU const*> ChunkManager::requestFinalMesh(ChunkCoord c) {
@@ -340,7 +371,6 @@ namespace aveng {
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)
     {
 
-
         // 1) Reset thread-local scratch for this job
         tlsScratchArena().reset();
 
@@ -349,10 +379,12 @@ namespace aveng {
 
         // 2) Generate deterministic seed for this chunk
         uint64_t seed = chunkSeed(cfg_.worldSeed, rec.coord);
-
+#ifdef M_DEBUG
+        dumpChunk(rec.coord);
+#endif
         // 3) Generate blue noise points using thread-local scratch
         BlueNoiseConfig bnCfg{};
-        bnCfg.MinDist = cfg_.minPointDist;
+        bnCfg.MinDist = cfg_.minPointDist; 
         bnCfg.MaxTries = 30;
 
         auto candidates = GenerateBlueNoiseSeeded(
@@ -363,6 +395,9 @@ namespace aveng {
             rec.coreBounds.maxZ,
             bnCfg,
             tlsScratchArena().mr()  // Use thread-local scratch
+#ifdef M_DEBUG
+            , rec.coord
+#endif
         );
 
         // 4) Allocate the published product in FINAL memory.
@@ -455,6 +490,11 @@ namespace aveng {
         
         // 8) Done
         return rec.allPoints;
+    }
+
+    Heights const* ChunkManager::buildHeights(ChunkRecord& r)
+    {
+        return nullptr;
     }
 
     // Pin based on chunk coord - this can end up creating a chunk record

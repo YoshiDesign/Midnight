@@ -25,19 +25,10 @@ namespace aveng {
 
     class ChunkManager {
     public:
+
         explicit ChunkManager(ITaskSystem& tasks)
             : tasks_(tasks) {
             cfg_ = defaultTerrainConfig();
-        }
-
-        TerrainConfig defaultTerrainConfig() {
-            return {
-                42,     // worldSeed
-                256.f,  // chunkSize
-                8.f,    // minPointDist
-                32.f,   // halo
-                defaultNoiseParams()
-            };
         }
 
         NoiseParams defaultNoiseParams() {
@@ -47,6 +38,16 @@ namespace aveng {
                 1.0f,   // amplitude
                 0.5f,   // persistence
                 2.0f    // lacunarity
+            };
+        }
+
+        TerrainConfig defaultTerrainConfig() {
+            return {
+                42,     // worldSeed
+                256.f,  // chunkSize
+                8.f,    // minPointDist
+                32.f,   // halo
+                defaultNoiseParams()
             };
         }
 
@@ -98,7 +99,7 @@ namespace aveng {
 
     private:
         ITaskSystem& tasks_;
-        TerrainConfig cfg_;
+        TerrainConfig cfg_; // Note that this differs from our prototype, where each Chunk owned its own config
 
         static constexpr size_t STRIPES = 64;
         std::array<StripeBucket, STRIPES> records_;

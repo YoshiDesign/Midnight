@@ -11,6 +11,8 @@ namespace aveng{
 	
 		Vec2 operator-(const Vec2& rhs) const { return Vec2{x - rhs.x, y - rhs.y}; }
 		float len2() const { return x * x + y * y; }
+		// This equals the signed area scale used by many barycentric/tri tests.
+		float cross2(Vec2 a, Vec2 b) { return a.x * b.y - a.y * b.x; }
 	};
 
 	struct Vec3 {
