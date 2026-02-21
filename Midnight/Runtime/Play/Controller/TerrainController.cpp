@@ -35,7 +35,7 @@ namespace aveng {
         }
 
         std::printf("[%s] ChunkCoord{%d, %d}", __FUNCTION__, start_coord.x, start_coord.z);
-        chunks_->test(start_coord, frameIndex_);
+        chunks_->requestMesh(start_coord, frameIndex_);
         return;
         
         //lastRequested_.clear();

@@ -100,6 +100,8 @@ namespace aveng {
                     std::this_thread::yield();
                 }
             }
+            // The fact that this returns a call to .get() has
+			// a lot of useful implications. It's also tied to the fact that we're using shared_future.
             return fut.get();
         }
 

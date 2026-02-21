@@ -26,7 +26,7 @@ namespace aveng::noise {
 
     // If you want float everywhere (faster), flip to float.
     // Using double keeps parity with your Go prototype.
-    using Real = double;
+    using Real = float;
 
     // --- Constants (2D skew/unskew)
     // F2 = 0.5 * (sqrt(3) - 1)
@@ -158,17 +158,18 @@ namespace aveng::noise {
     // Fractal noise: sum octave(Simplex2D(x*freq, z*freq) * amp), then update amp/freq
     [[nodiscard]] inline Real FractalNoiseV2(
         Real x, Real z,
-        int octaves,
-        Real frequency,
-        Real amplitude,
-        Real persistence,
-        Real lacunarity
+        NoiseParams np
+        // int octaves,
+        // Real frequency,
+        // Real amplitude,
+        // Real persistence,
+        //Real lacunarity
     ) noexcept {
         Real sum = Real(0);
-        for (int i = 0; i < octaves; ++i) {
-            sum += Simplex2D(x * frequency, z * frequency) * amplitude;
-            amplitude *= persistence;
-            frequency *= lacunarity;
+        for (int i = 0; i < np.octaves; ++i) {
+            sum += Simplex2D(x * np.frequency, z * np.frequency) * np.amplitude;
+            np.amplitude *= np.persistence;
+            np.frequency *= np.lacunarity;
         }
         return sum;
     }

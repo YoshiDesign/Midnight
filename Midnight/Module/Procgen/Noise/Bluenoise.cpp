@@ -35,7 +35,7 @@ namespace aveng {
         Rng& rng,
         float minX, float minZ,
         float maxX, float maxZ,
-        BlueNoiseConfig cfg,
+        noise::BlueNoiseConfig cfg,
         std::pmr::memory_resource* mr
 #ifdef M_DEBUG
         , ChunkCoord coord
@@ -81,7 +81,7 @@ namespace aveng {
         std::pmr::vector<int> active(mr);
         active.reserve(128);
 
-        // This could just live inside of `toGrid` - Compiler might inline it anyway
+        // This could just live inside of `toGrid` - Compiler will hopefully inline it until then
         auto clampi = [](int v, int lo, int hi) -> int {
             return (v < lo) ? lo : (v > hi) ? hi : v;
         };
@@ -182,7 +182,7 @@ namespace aveng {
         int64_t seed,
         float minX, float minZ,
         float maxX, float maxZ,
-        BlueNoiseConfig cfg,
+        noise::BlueNoiseConfig cfg,
         std::pmr::memory_resource* mr
 #ifdef M_DEBUG
         , ChunkCoord coord

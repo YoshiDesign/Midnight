@@ -131,21 +131,21 @@ namespace aveng {
 		explicit AllPoints(std::pmr::memory_resource* mr) : pts(mr), coreIdx(mr) {}
 	};
 
-	struct Heights {
-		std::pmr::vector<float> h; // same length as AllPoints::pts
-		explicit Heights(std::pmr::memory_resource* mr) : h(mr) {}
+	struct HeightField {
+		std::pmr::vector<float> heights; // same length as AllPoints::pts
+		explicit HeightField(std::pmr::memory_resource* mr) : heights(mr) {}
 	};
 
 	struct Triangulation {
-		std::pmr::vector<glm::uvec3> tris;        // indices into AllPoints::pts
-		std::pmr::vector<glm::vec2>  circumcenters; // optional
+		std::pmr::vector<Triangle> tris;        // indices into AllPoints::pts
+		std::pmr::vector<Vec2>  circumcenters; // optional
 		explicit Triangulation(std::pmr::memory_resource* mr) : tris(mr), circumcenters(mr) {}
 	};
 
 	// Placeholder (not designing hydrology now)
 	struct ErosionField {
-		std::pmr::vector<float> hPost; // heights after erosion, same indexing as AllPoints
-		explicit ErosionField(std::pmr::memory_resource* mr) : hPost(mr) {}
+		std::pmr::vector<float> hDelta; // heights after erosion, same indexing as AllPoints
+		explicit ErosionField(std::pmr::memory_resource* mr) : hDelta(mr) {}
 	};
 
 	// Final durable product example (you’ll extend)
@@ -182,7 +182,7 @@ namespace aveng {
 		// We store raw pointers because arenas own the memory; record lifetime owns arenas.
 		Points* points = nullptr;
 		AllPoints* allPoints = nullptr;
-		Heights* heights = nullptr;
+		HeightField* heightField = nullptr;
 		Triangulation* triangulation = nullptr;
 		ErosionField* erosion = nullptr;
 		FinalMeshCPU* finalMesh = nullptr;
@@ -195,12 +195,12 @@ namespace aveng {
 		std::shared_future<AllPoints const*> allPointsF;
 
 		std::once_flag heightsOnce;
-		std::shared_future<Heights const*> heightsF;
+		std::shared_future<HeightField const*> heightsF;
 
 		std::once_flag triangOnce;
 		std::shared_future<Triangulation const*> triangF;
 
-		std::once_flag erosionOnce_Hydro;
+		std::once_flag erosionOnce;
 		std::shared_future<ErosionField const*> erosionF;
 
 		std::once_flag meshOnce;
@@ -209,6 +209,11 @@ namespace aveng {
 		// Streaming / residency
 		std::atomic<int32_t> pinCount{ 0 };
 		std::atomic<uint64_t> lastTouchedFrame{ 0 };
+
+		std::vector<Site> Sites;
+		std::vector<Triangle> Tris;
+		std::vector<HalfEdge> HalfEdges;
+		std::vector<Vec3> FaceNormals;
 
 		/*
 		* Hard Invariants:
@@ -241,7 +246,7 @@ namespace aveng {
 			scratch.reset();
 			points = nullptr;
 			allPoints = nullptr;
-			heights = nullptr;
+			heightField = nullptr;
 			triangulation = nullptr;
 			erosion = nullptr;
 		}
@@ -252,7 +257,7 @@ namespace aveng {
 		float chunkSize = 256.f;
 		float minPointDist = 8.f;
 		float halo = 32.f;   // consider 4x minPointDist as a starting point
-		NoiseParams noise{};
+		noise::NoiseParams noise{};
 	};
 
 	struct Site {

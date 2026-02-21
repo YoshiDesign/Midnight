@@ -4,6 +4,7 @@
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Module/Procgen/Types.h"
 #include "Runtime/Threading/Types.h"
+#include "Module/Procgen/Noise/Config.h"
 
 namespace aveng {
 
@@ -31,7 +32,7 @@ namespace aveng {
             cfg_ = defaultTerrainConfig();
         }
 
-        NoiseParams defaultNoiseParams() {
+        noise::NoiseParams defaultNoiseParams() {
             return {
                 7,      // octaves
                 0.01f,  // frequency
@@ -55,10 +56,10 @@ namespace aveng {
         // Lifetime safety is paramount.
         std::shared_future<Points const*>        requestPoints(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<AllPoints const*>     requestAllPoints(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<Heights const*>       requestHeights(ChunkCoord c);
-        std::shared_future<Triangulation const*> requestTriangulation(ChunkCoord c);
-        //std::shared_future<ErosionField const*>  requestErosion(ChunkCoord c);
-        //std::shared_future<FinalMeshCPU const*>  requestFinalMesh(ChunkCoord c);
+        std::shared_future<HeightField const*>       requestHeights(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<Triangulation const*>      requestTriangulation(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<ErosionField const*>  requestErosion(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<FinalMeshCPU const*>  requestMesh(ChunkCoord c, uint64_t frameIndex);
 
         // Streaming helpers
         ChunkRecord* pin(ChunkCoord c, uint64_t frameIndex); // 
@@ -71,8 +72,6 @@ namespace aveng {
             return ChunkCoordHash{}(c) & (STRIPES - 1); // STRIPES must be power-of-two
             // or: % STRIPES if not power-of-two
         }
-
-        void test(ChunkCoord c, uint64_t frameIndex); // test function to schedule the whole pipeline for a chunk
 
     private:
         using RecPtr = ChunkRecord*; // changed from shared_ptr. RIP evenings
@@ -92,10 +91,10 @@ namespace aveng {
         // Builders (run in worker threads)
         Points const* buildPoints(ChunkRecord& r);        // alloc in final arena
         AllPoints const* buildAllPoints(ChunkRecord& r);     // alloc in scratch
-        Heights const* buildHeights(ChunkRecord& r);       // alloc in scratch
+        HeightField const* buildHeights(ChunkRecord& r);       // alloc in scratch
         Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
-        //ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
-        //FinalMeshCPU const* buildFinalMesh(ChunkRecord& r);     // alloc in final
+        ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
+        FinalMeshCPU const* buildMesh(ChunkRecord& r);     // alloc in final
 
     private:
         ITaskSystem& tasks_;

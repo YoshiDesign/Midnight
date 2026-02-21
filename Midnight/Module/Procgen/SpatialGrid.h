@@ -14,7 +14,8 @@ namespace aveng {
     class SpatialGrid {
     public:
 
-        const DelaunayMesh* delaunayMesh;
+        const DelaunayMeshView* delaunayMesh;
+        std::pmr::vector<Triangle> tris;
         std::span<const float> heights; // Lifetime requirement: whatever backs the span must outlive the SpatialGrid
         float minx = 0.f, minz = 0.f, maxx = 0.f, maxz = 0.f;
         int gridw = 0, gridh = 0;
@@ -40,7 +41,6 @@ namespace aveng {
 
         SpatialGrid() = default;
         ~SpatialGrid();
-
 
         // Just an alias
         std::pair<float, bool> Raycast(float x, float z) const {

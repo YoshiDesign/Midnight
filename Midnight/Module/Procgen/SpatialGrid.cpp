@@ -1,5 +1,4 @@
 #include "SpatialGrid.h"
-#include "avpch.h"
 
 namespace aveng {
 
@@ -57,7 +56,7 @@ namespace aveng {
             return { 0.f, false };
         }
 
-        const Triangle& t = delaunayMesh->Tris[ti];
+        const Triangle& t = delaunayMesh->tris[ti];
 
         // Discrete samples at triangle vertices
         // (Using span gives you .size() + bounds-friendly semantics in debug)
@@ -93,7 +92,7 @@ namespace aveng {
     ) {
         if (!delaunayMesh) return {};
 
-        scratch.ensure(delaunayMesh->Tris.size());
+        scratch.ensure(delaunayMesh->tris.size());
 
         int cellMinX = static_cast<int>((minX - minx) / cellSize);
         int cellMaxX = static_cast<int>((maxX - minx) / cellSize);

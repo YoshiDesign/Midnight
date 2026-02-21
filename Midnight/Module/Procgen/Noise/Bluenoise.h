@@ -6,6 +6,7 @@
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/Rng.h"
+#include "Module/Procgen/Noise/Config.h"
 
 /**
  * Performance Improvements:
@@ -18,11 +19,7 @@
  */
 
 namespace aveng {
-	
-	struct BlueNoiseConfig {
-		float MinDist = 0.0;
-		int MaxTries = 30; // default matches your Go behavior
-	};
+
 	
 	// Forward declare your RNG type + seeding + helpers.
 	// (Include your Rng.h here if you prefer.)
@@ -36,7 +33,7 @@ namespace aveng {
 		Rng& rng,
 		float minX, float minZ,
 		float maxX, float maxZ,
-		BlueNoiseConfig cfg,
+		noise::BlueNoiseConfig cfg,
 		std::pmr::memory_resource* mr
 #ifdef M_DEBUG
 		, ChunkCoord coord
@@ -47,7 +44,7 @@ namespace aveng {
 		int64_t seed,
 		float minX, float minZ,
 		float maxX, float maxZ,
-		BlueNoiseConfig cfg,
+		noise::BlueNoiseConfig cfg,
 		std::pmr::memory_resource* mr
 #ifdef M_DEBUG
 		, ChunkCoord coord
