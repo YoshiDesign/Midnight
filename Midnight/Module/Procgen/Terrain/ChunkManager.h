@@ -58,6 +58,7 @@ namespace aveng {
         std::shared_future<AllPoints const*>     requestAllPoints(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<HeightField const*>       requestHeights(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<Triangulation const*>      requestTriangulation(ChunkCoord c, uint64_t frameIndex);
+        // 
         std::shared_future<ErosionField const*>  requestErosion(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<FinalMeshCPU const*>  requestMesh(ChunkCoord c, uint64_t frameIndex);
 
@@ -92,8 +93,8 @@ namespace aveng {
         Points const* buildPoints(ChunkRecord& r);        // alloc in final arena
         AllPoints const* buildAllPoints(ChunkRecord& r);     // alloc in scratch
         HeightField const* buildHeights(ChunkRecord& r);       // alloc in scratch
-        Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
-        ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
+        //Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
+        //ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
         FinalMeshCPU const* buildMesh(ChunkRecord& r);     // alloc in final
 
     private:

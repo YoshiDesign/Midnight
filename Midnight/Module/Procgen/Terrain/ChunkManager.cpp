@@ -295,33 +295,33 @@ namespace aveng {
     }
 
     // Triangulation
-    std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c, uint64_t frameIndex) {
-        auto rec = getOrCreateRecord(c);
-        rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
+    //std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c, uint64_t frameIndex) {
+    //    auto rec = getOrCreateRecord(c);
+    //    rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
-        std::call_once(rec->triangOnce, [&] {
-            rec->triangF = tasks_.submit([this, rec, c, frameIndex]() -> Triangulation const* {
-                RecordPin taskHold(*this, rec);   // pin/unpin
-                return buildTriangulation(*rec);
-            });
-        });
+    //    std::call_once(rec->triangOnce, [&] {
+    //        rec->triangF = tasks_.submit([this, rec, c, frameIndex]() -> Triangulation const* {
+    //            RecordPin taskHold(*this, rec);   // pin/unpin
+    //            return buildTriangulation(*rec);
+    //        });
+    //    });
 
-        return rec->triangF;
-    }
+    //    return rec->triangF;
+    //}
 
-    // Erosion (placeholder)
-    std::shared_future<ErosionField const*> ChunkManager::requestErosion(ChunkCoord c, uint64_t frameIndex) {
-        auto rec = getOrCreateRecord(c);
+    //// Erosion (placeholder)
+    //std::shared_future<ErosionField const*> ChunkManager::requestErosion(ChunkCoord c, uint64_t frameIndex) {
+    //    auto rec = getOrCreateRecord(c);
 
-        std::call_once(rec->erosionOnce, [&] {
-            rec->erosionF = tasks_.submit([this, rec, c]() -> ErosionField const* {
-                RecordPin taskHold(*this, rec);
-                return buildErosion(*rec);
-            });
-        });
+    //    std::call_once(rec->erosionOnce, [&] {
+    //        rec->erosionF = tasks_.submit([this, rec, c]() -> ErosionField const* {
+    //            RecordPin taskHold(*this, rec);
+    //            return buildErosion(*rec);
+    //        });
+    //    });
 
-        return rec->erosionF;
-    }
+    //    return rec->erosionF;
+    //}
 
     // Consider this implementation now that we've reasoned about pinning/unpinning, 
     std::shared_future<FinalMeshCPU const*> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
@@ -337,12 +337,13 @@ namespace aveng {
 				// [!] We use the helping wait on worker threads to keep them productive while waiting for prerequisites. No pool starvation :D
                 auto pts = tasks_.wait(requestAllPoints(rec->coord, frameIndex));
                 auto h = tasks_.wait(requestHeights(rec->coord, frameIndex));
-                auto tri = tasks_.wait(requestTriangulation(rec->coord, frameIndex));
-                auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
+                //auto tri = tasks_.wait(requestTriangulation(rec->coord, frameIndex));
+                //auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
 
-                auto mesh = buildMesh(*rec);
+                //auto mesh = buildMesh(*rec);
 
-                return mesh;
+                //return mesh;
+                return nullptr;
             });
         });
 
@@ -487,10 +488,11 @@ namespace aveng {
         noise::NoiseParams np = defaultNoiseParams();
 
         std::vector<float> heightsOut;
-        heightsOut.reserve(rec.allPoints->coreIdx.size());
-
+        heightsOut.resize(rec.allPoints->coreIdx.size());
+        std::printf("Heights Iteration\n");
         for (size_t i = 0; i < rec.allPoints->coreIdx.size(); i++) {
             auto idx = rec.allPoints->coreIdx[i];
+            std::printf("i: %d\tidx: %d\n", i, idx);
             heightsOut[i] = FractalNoiseV2(
                 rec.allPoints->pts[idx].x,
                 rec.allPoints->pts[idx].y, // Z - in engine terms, don't confuse this during translation!

@@ -236,12 +236,8 @@ namespace aveng {
                     mMesh.vertices.at(vertexId).boneWeight = currentWeights;
 
                 }
-
-
             }
         }
-
-
 
         return true;
     }

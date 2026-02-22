@@ -14,12 +14,47 @@ namespace aveng {
 	using GridIndex = int32_t;	// Spatial Grid Index
 	using TriangleIndex = int32_t; //
 
+	struct Triangle {
+		SiteIndex A, B, C;
+	};
+
 	const enum Border {
 		Border_None = 0,
 		Border_North = 1,
 		Border_South = 2,
 		Border_East = 3,
 		Border_West = 4,
+	};
+
+	struct Site {
+		Vec2 Pos;
+		float Height;
+	};
+
+	struct HalfEdge {
+		SiteIndex Origin;
+		SiteIndex EdgeDest;
+		int Tri;
+		int Next;
+		int Twin;
+		int Prev;
+	};
+
+	//struct ChunkConfig {
+	//	uint64_t worldSeed = 0;
+	//	float chunkSize = 256.f;
+	//	float minPointDist = 8.f;
+	//	float halo = 32.f;   // consider 4x minPointDist as a starting point
+	//	NoiseParams noise{};
+	//	int chunksX;
+	//	int chunksZ;
+	//};
+
+	struct VoronoiCell {
+		SiteIndex site;
+		std::vector<Triangle> triangles;
+		std::vector<Vec2> vertices;
+		bool closed;
 	};
 
 	// -------------------------
@@ -260,39 +295,6 @@ namespace aveng {
 		noise::NoiseParams noise{};
 	};
 
-	struct Site {
-		Vec2 Pos;
-		float Height;
-	};
 
-	struct Triangle {
-		SiteIndex A, B, C;
-	};
-
-	struct HalfEdge {
-		SiteIndex Origin;
-		SiteIndex EdgeDest;
-		int Tri;
-		int Next;
-		int Twin;
-		int Prev;
-	};
-
-	//struct ChunkConfig {
-	//	uint64_t worldSeed = 0;
-	//	float chunkSize = 256.f;
-	//	float minPointDist = 8.f;
-	//	float halo = 32.f;   // consider 4x minPointDist as a starting point
-	//	NoiseParams noise{};
-	//	int chunksX;
-	//	int chunksZ;
-	//};
-
-	struct VoronoiCell {
-		SiteIndex site;
-		std::vector<Triangle> triangles;
-		std::vector<Vec2> vertices;
-		bool closed;
-	};
 
 }
