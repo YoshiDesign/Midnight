@@ -23,6 +23,16 @@
  *        Improve build stability
  *
  *    This is professional C++ hygiene.
+ * 
+ * * * When you see:
+ *      - forward-declared type
+ *      - unique_ptr<T> inside a 
+ *      - struct defined in a header
+ *
+ *     Immediately ask
+ *      - Where is the destructor instantiated"
+ * 
+ *     If the answer is "implicitly everywhere" -> move it out-of-line.
  */
 
 namespace aveng {
@@ -397,6 +407,290 @@ namespace aveng {
                 file << "(Note) The robust vertex-rotation used above is twin(prev(e)) for FROM-vertex fan traversal.\n";
             }
 
+        }
+
+        static void writeSgridDataToFile(const fs::path& path, const SpatialGrid* sg)
+        {
+            // Ensure parent directory exists
+            if (!path.parent_path().empty())
+            {
+                fs::create_directories(path.parent_path());
+            }
+
+            std::ofstream file(path);
+
+            if (!file)
+            {
+                throw std::runtime_error(
+                    std::format("Failed to open debug file: {}", path.string()));
+            }
+
+            file << "--- Spatial Grid Validation ---\n";
+
+            auto ok = [&](bool cond, const char* msg)
+            {
+                file << (cond ? "[OK] " : "[!!] ") << msg << "\n";
+                return cond;
+            };
+
+            auto num = [&](double v) {
+                file << v;
+            };
+
+            // ---- Basic existence / wiring ----
+            ok(sg != nullptr, "SpatialGrid pointer is non-null");
+            if (!sg) return;
+
+            ok(sg->tri != nullptr, "sg->tri is wired (Triangulation*)");
+            ok(sg->pts != nullptr, "sg->pts is wired (AllPoints*)");
+            ok(sg->hf != nullptr, "sg->hf  is wired (HeightField*)");
+
+            // ---- Header summary ----
+            file << "\n--- Summary ---\n";
+            file << "Bounds(minX,minZ,maxX,maxZ): ";
+            num(sg->minx); file << ","; num(sg->minz); file << ","; num(sg->maxx); file << ","; num(sg->maxz); file << "\n";
+            file << "cellSize: "; num(sg->cellSize); file << "\n";
+            file << "grid (w,h): " << sg->gridw << "," << sg->gridh << "\n";
+
+            // Spans
+            const size_t triCount = sg->tris.size();
+            const size_t vertCount = sg->vertexPos.size();
+            const size_t heightCount = sg->heights.size();
+
+            file << "tris.size: " << triCount << "\n";
+            file << "vertexPos.size: " << vertCount << "\n";
+            file << "heights.size: " << heightCount << "\n";
+            file << "vertexCount field: " << sg->vertexCount << "\n";
+
+            ok(sg->cellSize > 0.0f, "cellSize > 0");
+            ok(sg->maxx > sg->minx && sg->maxz > sg->minz, "bounds are non-degenerate (max > min)");
+            ok(sg->gridw > 0 && sg->gridh > 0, "grid dimensions > 0");
+
+            ok(vertCount == heightCount, "vertexPos.size == heights.size");
+            ok(sg->vertexCount == heightCount, "sg->vertexCount matches heights.size");
+            ok(triCount > 0, "triangle count > 0");
+
+            // ---- Consistency with record-owned vectors (if present) ----
+            if (sg->tri) {
+                ok(sg->tri->tris.size() == triCount, "triangulation->tris.size matches sg->tris.size");
+            }
+            if (sg->pts) {
+                ok(sg->pts->pts.size() == vertCount, "allPoints->pts.size matches sg->vertexPos.size");
+            }
+            if (sg->hf) {
+                ok(sg->hf->heights.size() == heightCount, "heightField->heights.size matches sg->heights.size");
+            }
+
+            // ---- Triangle index validation ----
+            file << "\n--- Triangle Index Validation ---\n";
+            size_t badTri = 0;
+            size_t degTri = 0;
+
+            const auto inRange = [&](uint32_t i) { return static_cast<size_t>(i) < vertCount; };
+
+            // sample-limited reporting (avoid huge output)
+            constexpr size_t kMaxReport = 20;
+            size_t reported = 0;
+
+            for (size_t ti = 0; ti < triCount; ++ti)
+            {
+                const Triangle& t = sg->tris[ti];
+
+                const bool ra = inRange(t.A);
+                const bool rb = inRange(t.B);
+                const bool rc = inRange(t.C);
+                if (!(ra && rb && rc))
+                {
+                    ++badTri;
+                    if (reported++ < kMaxReport)
+                    {
+                        file << "[!!] tri " << ti << " has out-of-range index: ("
+                            << t.A << "," << t.B << "," << t.C << ")\n";
+                    }
+                    continue;
+                }
+
+                if (t.A == t.B || t.B == t.C || t.A == t.C)
+                {
+                    ++degTri;
+                    if (reported++ < kMaxReport)
+                    {
+                        file << "[!!] tri " << ti << " is degenerate (repeated index): ("
+                            << t.A << "," << t.B << "," << t.C << ")\n";
+                    }
+                }
+            }
+
+            ok(badTri == 0, "all triangle indices are in-range");
+            ok(degTri == 0, "no degenerate triangles (repeated indices)");
+            file << "badTri: " << badTri << "\n";
+            file << "degTri: " << degTri << "\n";
+
+            // ---- Cell coverage validation ----
+            //
+            // We don't assume internal storage details (cells array type / layout),
+            // but we can still validate that the bounds -> grid mapping is sane by
+            // re-deriving cell coords for some vertices and checking they're in-range.
+            //
+            file << "\n--- Cell Mapping Sanity ---\n";
+
+            const float invCell = (sg->cellSize > 0.0f) ? (1.0f / sg->cellSize) : 0.0f;
+
+            auto clampi = [](int v, int lo, int hi) {
+                if (v < lo) return lo;
+                if (v > hi) return hi;
+                return v;
+            };
+
+            auto cellOf = [&](const Vec2& p, int& cx, int& cz)
+            {
+                // match the build-side convention: int((x - min)/cellSize)
+                // then clamp into [0, w-1], [0, h-1]
+                const float fx = (p.x - sg->minx) * invCell;
+                const float fz = (p.y - sg->minz) * invCell;
+
+                cx = static_cast<int>(fx);
+                cz = static_cast<int>(fz);
+
+                cx = clampi(cx, 0, static_cast<int>(sg->gridw) - 1);
+                cz = clampi(cz, 0, static_cast<int>(sg->gridh) - 1);
+            };
+
+            // sample some vertices deterministically (no RNG dependency)
+            auto pickIndex = [&](size_t k) -> size_t {
+                if (vertCount == 0) return 0;
+                // a cheap LCG-ish stride pattern
+                return (k * 2654435761u) % vertCount;
+            };
+
+            constexpr size_t kSamples = 64;
+            size_t outOfBoundsPts = 0;
+
+            for (size_t s = 0; s < kSamples && s < vertCount; ++s)
+            {
+                const size_t vi = pickIndex(s);
+                const Vec2 p = sg->vertexPos[vi];
+
+                // raw (unclamped) for reporting
+                const float fx = (p.x - sg->minx) * invCell;
+                const float fz = (p.y - sg->minz) * invCell;
+                const int rawX = static_cast<int>(fx);
+                const int rawZ = static_cast<int>(fz);
+
+                const bool inGrid =
+                    (rawX >= 0 && rawX < static_cast<int>(sg->gridw) &&
+                        rawZ >= 0 && rawZ < static_cast<int>(sg->gridh));
+
+                if (!inGrid)
+                {
+                    ++outOfBoundsPts;
+                    if (outOfBoundsPts <= kMaxReport)
+                    {
+                        file << "[!!] vertex " << vi << " maps outside grid before clamp: raw("
+                            << rawX << "," << rawZ << ")  pos("
+                            << p.x << "," << p.y << ")\n";
+                    }
+                }
+            }
+
+            // This one is *not necessarily an error* if some points are outside the min/max,
+            // but given your builder uses min/max expanded by halo, we expect 0 in practice.
+            ok(outOfBoundsPts == 0, "sampled vertices map inside grid without clamping");
+            file << "sampled out-of-grid vertices: " << outOfBoundsPts << " / " << (std::min)(kSamples, vertCount) << "\n";
+
+            // ---- Backing data pointer/span validation (must match ChunkRecord-owned products) ----
+            file << "\n--- Backing Data & Span Wiring ---\n";
+
+            // 1) Pointers exist (you already check these above, but keep it local/specific)
+            ok(sg->tri != nullptr, "sg->tri (Triangulation*) non-null");
+            ok(sg->pts != nullptr, "sg->pts (AllPoints*) non-null");
+            ok(sg->hf != nullptr, "sg->hf  (HeightField*) non-null");
+
+            // If any are missing, don't dereference further.
+            if (!(sg->tri && sg->pts && sg->hf)) {
+                file << "[!!] Skipping backing-data wiring checks due to missing pointers.\n";
+            }
+            else {
+                // 2) Span sizes match their source vectors
+                ok(sg->tris.size() == sg->tri->tris.size(), "sg->tris.size == tri->tris.size");
+                ok(sg->vertexPos.size() == sg->pts->pts.size(), "sg->vertexPos.size == pts->pts.size");
+                ok(sg->heights.size() == sg->hf->heights.size(), "sg->heights.size == hf->heights.size");
+
+                // 3) Span data pointers match the source vector data pointers
+                // Note: std::span::data() returns nullptr when size==0; so compare pointers
+                // only if non-empty to avoid false negatives for empty products.
+                if (!sg->tri->tris.empty() && !sg->tris.empty()) {
+                    ok(sg->tris.data() == sg->tri->tris.data(), "sg->tris.data matches tri->tris.data");
+                }
+                else {
+                    ok(sg->tri->tris.empty() && sg->tris.empty(), "tri->tris and sg->tris are both empty");
+                }
+
+                if (!sg->pts->pts.empty() && !sg->vertexPos.empty()) {
+                    ok(sg->vertexPos.data() == sg->pts->pts.data(), "sg->vertexPos.data matches pts->pts.data");
+                }
+                else {
+                    ok(sg->pts->pts.empty() && sg->vertexPos.empty(), "pts->pts and sg->vertexPos are both empty");
+                }
+
+                if (!sg->hf->heights.empty() && !sg->heights.empty()) {
+                    ok(sg->heights.data() == sg->hf->heights.data(), "sg->heights.data matches hf->heights.data");
+                }
+                else {
+                    ok(sg->hf->heights.empty() && sg->heights.empty(), "hf->heights and sg->heights are both empty");
+                }
+
+                // 4) Cross-field consistency expectations
+                ok(sg->pts->pts.size() == sg->hf->heights.size(),
+                    "pts->pts.size == hf->heights.size (positions align with heights)");
+
+                // Triangulation accelerators typically have these invariants:
+                // - triEdge0 size == tris size
+                // - siteEdge size == vertex count (all points count)
+                // (If you ever choose to not build them, you can relax these to warnings.)
+                ok(sg->tri->triEdge0.size() == sg->tri->tris.size(),
+                    "tri->triEdge0.size == tri->tris.size");
+
+                ok(sg->tri->siteEdge.size() == sg->pts->pts.size(),
+                    "tri->siteEdge.size == pts->pts.size (siteEdge per vertex)");
+
+                // 5) Optional: spot-check that a few triangle vertex indices refer into the *same* vertexPos span.
+                // This catches cases where spans were accidentally derived from a different buffer.
+                file << "\n--- Spot Checks (triangle -> vertexPos) ---\n";
+                if (!sg->tris.empty() && !sg->vertexPos.empty()) {
+                    auto inRange = [&](uint32_t i) { return static_cast<size_t>(i) < sg->vertexPos.size(); };
+
+                    constexpr size_t kSpot = 8;
+                    size_t bad = 0;
+                    for (size_t k = 0; k < kSpot && k < sg->tris.size(); ++k) {
+                        const size_t ti = (k * 1315423911u) % sg->tris.size();
+                        const Triangle& t = sg->tris[ti];
+
+                        const bool ra = inRange(t.A);
+                        const bool rb = inRange(t.B);
+                        const bool rc = inRange(t.C);
+
+                        if (!(ra && rb && rc)) {
+                            ++bad;
+                            file << "[!!] tri " << ti << " has out-of-range indices for vertexPos: ("
+                                << t.A << "," << t.B << "," << t.C << ")\n";
+                        }
+                        else {
+                            // Touch the data (forces debugger/ASAN-ish issues to show up)
+                            const Vec2 a = sg->vertexPos[static_cast<size_t>(t.A)];
+                            const Vec2 b = sg->vertexPos[static_cast<size_t>(t.B)];
+                            const Vec2 c = sg->vertexPos[static_cast<size_t>(t.C)];
+                            (void)a; (void)b; (void)c;
+                        }
+                    }
+                    ok(bad == 0, "spot-checked triangles reference valid vertexPos indices");
+                }
+                else {
+                    file << "[!!] Skipping spot checks (no tris or no vertexPos).\n";
+                }
+            }
+
+            file << "\n--- Done ---\n";
         }
 
 	private:

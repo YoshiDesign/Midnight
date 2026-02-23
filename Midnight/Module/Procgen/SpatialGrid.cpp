@@ -31,14 +31,14 @@ namespace aveng {
             return nullptr;
         }
 
-        const float width = maxX - minX;
-        const float height = maxZ - minZ;
+        const float width = maxX - minX; // This should be the same for every chunk, just saying.
+        const float height = maxZ - minZ; // same
         if (width <= 0.0f || height <= 0.0f || cellSize <= 0.0f) {
             return nullptr;
         }
 
-        int gridW = static_cast<int>(std::ceil(width / cellSize));
-        int gridH = static_cast<int>(std::ceil(height / cellSize));
+        int gridW = std::ceil(width / cellSize);
+        int gridH = std::ceil(height / cellSize);
         if (gridW <= 0) gridW = 1;
         if (gridH <= 0) gridH = 1;
 
@@ -51,7 +51,7 @@ namespace aveng {
         sg->pts = allPoints;
         sg->hf = heightField;
 
-        // DIRECT ACCESS TO CHUNK DATA
+        // "Convenience Spans"
         sg->tris = std::span<const Triangle>(triVec.data(), triVec.size());
         sg->vertexPos = std::span<const Vec2>(posVec.data(), posVec.size());
         sg->heights = std::span<const float>(hVec.data(), hVec.size());

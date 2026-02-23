@@ -185,6 +185,7 @@ namespace aveng {
 
 		// Note - The SpatialGrid is best being ephemeral
 		std::optional<SpatialGrid> spatial; // Not trivially destructible!
+											// This must also remain moveable due to its usage in the StripeBucket. 
 
 		// Streaming / residency
 		std::atomic<int32_t> pinCount{ 0 };

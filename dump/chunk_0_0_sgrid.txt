@@ -1,0 +1,52 @@
+--- Spatial Grid Validation ---
+[OK] SpatialGrid pointer is non-null
+[OK] sg->tri is wired (Triangulation*)
+[OK] sg->pts is wired (AllPoints*)
+[OK] sg->hf  is wired (HeightField*)
+
+--- Summary ---
+Bounds(minX,minZ,maxX,maxZ): -32,-32,288,288
+cellSize: 8
+grid (w,h): 40,40
+tris.size: 2101
+vertexPos.size: 1061
+heights.size: 1061
+vertexCount field: 1061
+[OK] cellSize > 0
+[OK] bounds are non-degenerate (max > min)
+[OK] grid dimensions > 0
+[OK] vertexPos.size == heights.size
+[OK] sg->vertexCount matches heights.size
+[OK] triangle count > 0
+[OK] triangulation->tris.size matches sg->tris.size
+[OK] allPoints->pts.size matches sg->vertexPos.size
+[OK] heightField->heights.size matches sg->heights.size
+
+--- Triangle Index Validation ---
+[OK] all triangle indices are in-range
+[OK] no degenerate triangles (repeated indices)
+badTri: 0
+degTri: 0
+
+--- Cell Mapping Sanity ---
+[OK] sampled vertices map inside grid without clamping
+sampled out-of-grid vertices: 0 / 64
+
+--- Backing Data & Span Wiring ---
+[OK] sg->tri (Triangulation*) non-null
+[OK] sg->pts (AllPoints*) non-null
+[OK] sg->hf  (HeightField*) non-null
+[OK] sg->tris.size == tri->tris.size
+[OK] sg->vertexPos.size == pts->pts.size
+[OK] sg->heights.size == hf->heights.size
+[OK] sg->tris.data matches tri->tris.data
+[OK] sg->vertexPos.data matches pts->pts.data
+[OK] sg->heights.data matches hf->heights.data
+[OK] pts->pts.size == hf->heights.size (positions align with heights)
+[OK] tri->triEdge0.size == tri->tris.size
+[OK] tri->siteEdge.size == pts->pts.size (siteEdge per vertex)
+
+--- Spot Checks (triangle -> vertexPos) ---
+[OK] spot-checked triangles reference valid vertexPos indices
+
+--- Done ---

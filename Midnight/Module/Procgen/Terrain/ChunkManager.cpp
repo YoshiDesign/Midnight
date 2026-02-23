@@ -7,6 +7,7 @@
 // #include "Module/Procgen/Terrain/ChunkRecord.h"
 
 #ifdef M_DEBUG
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <cstdint>
@@ -17,37 +18,20 @@
 namespace aveng {
 
 #ifdef M_DEBUG
-#include <filesystem>
 
-    // Creates all of the files for chunk generation debugging
-    // Each file is later written from a different location.
-    void createDebugFileForChunk(ChunkCoord coord)
-    {
+
+    void dumpSpatialGridData(ChunkCoord coord, const SpatialGrid* grid) {
         namespace fs = std::filesystem;
 
         fs::path exeDir = fs::current_path() / "dump";
 
-        fs::create_directories(exeDir);
-
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
-        // Blue Noise
         fs::path fullPath = exeDir /
-            std::format("chunk_{}.txt", name);
+            std::format("chunk_{}_sgrid.txt", name);
 
-        // Height field
-        fs::path heightPath = exeDir /
-			std::format("chunk_{}_heights.txt", name);
+        Debug::writeSgridDataToFile(fullPath, grid);
 
-		// Triangulation
-        fs::path trisPath = exeDir /
-            std::format("chunk_{}_tris.txt", name);
-
-        std::ofstream file(fullPath);
-
-        if (!file) {
-            throw std::runtime_error("Failed to create file");
-        }
     }
 
 	// Height data writer for debugging
@@ -287,6 +271,8 @@ namespace aveng {
                 auto pts = tasks_.wait(requestAllPoints(rec->coord, frameIndex));
                 auto h = tasks_.wait(requestHeights(rec->coord, frameIndex));
                 auto tri = tasks_.wait(requestTriangulation(rec->coord, frameIndex));
+                auto spa = tasks_.wait(requestSpatialGrid(rec->coord, frameIndex));
+                
                 //auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
 
                 //auto mesh = buildMesh(*rec);
@@ -400,10 +386,6 @@ namespace aveng {
         std::call_once(rec->spatialOnce, [this, rec, frameIndex] {
             rec->spatialF = tasks_.submit([this, rec, frameIndex]() -> SpatialGrid const* {
                 RecordPin pin(*this, rec);
-
-                auto tri = requestTriangulation(rec->coord, frameIndex).get();
-                (void)tri;
-
                 return buildSpatialGrid(*rec); // publishes pointer into rec->spatial
             });
         });
@@ -436,9 +418,12 @@ namespace aveng {
 
         // 2) Generate deterministic seed for this chunk
         uint64_t seed = chunkSeed(cfg_.worldSeed, rec.coord);
-#ifdef M_DEBUG
-        createDebugFileForChunk(rec.coord);
-#endif
+
+        /* [IMPORTANT]
+         *   Are heights deterministic across chunks?
+         *   They should be, if you compute heights as a pure function of world position and global params:
+         */
+
         // 3) Generate blue noise points using thread-local scratch
         noise::BlueNoiseConfig bnCfg{};
         bnCfg.MinDist = cfg_.minPointDist; 
@@ -561,17 +546,16 @@ namespace aveng {
         assert(mr && "tlsScratch.mr() is null");
 
         std::pmr::vector<float> heightsOut(mr);
-        heightsOut.resize(rec.allPoints->coreIdx.size());
+        heightsOut.resize(rec.allPoints->pts.size());
 
         // Bring the (default) noise
         noise::NoiseParams np = defaultNoiseParams();
 
-        for (size_t i = 0; i < rec.allPoints->coreIdx.size(); i++) {
-            auto idx = rec.allPoints->coreIdx[i];
-            std::printf("i: %d\tidx: %d\n", i, idx);
+        for (size_t i = 0; i < rec.allPoints->pts.size(); i++) {
+            // Heights in parallel with points (Sites)
             heightsOut[i] = FractalNoiseV2(
-                rec.allPoints->pts[idx].x,
-                rec.allPoints->pts[idx].y, // Z - in engine terms, don't confuse this during translation!
+                rec.allPoints->pts[i].x,
+                rec.allPoints->pts[i].y, // Z - in engine terms
                 np);
         }
 
@@ -658,6 +642,94 @@ namespace aveng {
         return rec.triangulation;
     }
 
+    SpatialGrid const* ChunkManager::buildSpatialGrid(ChunkRecord& rec)
+    {
+#ifdef M_DEBUG
+        assert(rec.triangulation && "[buildSpatialGrid] Missing triangulation prerequisite");
+        assert(rec.allPoints && "[buildSpatialGrid] Missing allPoints prerequisite");
+        assert(rec.heightField && "[buildSpatialGrid] Missing heightField prerequisite");
+#endif
+
+        // If we ever get called redundantly (shouldn't happen with call_once),
+        // just return the already-published product.
+        if (rec.spatial.has_value()) {
+            std::printf("SpatialGrid Already has value?\n");
+            return &(*rec.spatial);
+        }
+
+        // Expand core bounds by halo for spatial queries that need neighbor continuity.
+        const float minX = rec.coreBounds.minX - rec.halo;
+        const float minZ = rec.coreBounds.minZ - rec.halo;
+        const float maxX = rec.coreBounds.maxX + rec.halo;
+        const float maxZ = rec.coreBounds.maxZ + rec.halo;
+
+        // Cell size: prototype used ~MinPointDist for good performance.
+        const float cellSize = cfg_.minPointDist;
+
+
+#ifdef M_DEBUG
+        {
+            std::printf("[SpatialGrid] prereqs: tri=%p pts=%p hf=%p\n",
+                (void*)rec.triangulation, (void*)rec.allPoints, (void*)rec.heightField);
+
+            if (rec.triangulation) {
+                std::printf("[SpatialGrid] tri: tris=%zu halfEdges=%zu triEdge0=%zu siteEdge=%zu\n",
+                    rec.triangulation->tris.size(),
+                    rec.triangulation->halfEdges.size(),
+                    rec.triangulation->triEdge0.size(),
+                    rec.triangulation->siteEdge.size());
+            }
+            if (rec.allPoints) {
+                std::printf("[SpatialGrid] pts: pts=%zu coreIdx=%zu\n",
+                    rec.allPoints->pts.size(),
+                    rec.allPoints->coreIdx.size());
+            }
+            if (rec.heightField) {
+                std::printf("[SpatialGrid] hf: heights=%zu\n",
+                    rec.heightField->heights.size());
+            }
+
+            std::printf("[SpatialGrid] cellSize=%f bounds(minx,minz,maxx,maxz)=(%f,%f,%f,%f) halo=%f\n",
+                cellSize, minX, minZ, maxX, maxZ, rec.halo);
+
+            if (!(cellSize > 0.0f)) std::printf("[SpatialGrid][!!] cellSize is not > 0\n");
+            if (!(maxX > minX && maxZ > minZ)) std::printf("[SpatialGrid][!!] bounds are degenerate/inverted\n");
+        }
+#endif
+
+
+        // Build via free function (returns owning pointer)
+        std::unique_ptr<SpatialGrid> sg = BuildSpatialGrid(
+            rec.triangulation,
+            rec.allPoints,
+            rec.heightField,
+            cellSize,
+            minX, minZ,
+            maxX, maxZ
+        );
+
+#ifdef M_DEBUG
+
+        if (!sg) {
+            std::printf("[SpatialGrid][!!] BuildSpatialGrid returned nullptr\n");
+            // If you want to hard-fail but still see the message:
+            assert(false && "BuildSpatialGrid returned null (see console prereq dump above)");
+        }
+
+        assert(sg && "[buildSpatialGrid] BuildSpatialGrid returned null");
+        std::printf("Completed SpatialGrid\n");
+#endif
+
+        // Publish into the record. This makes the lifetime tied to ChunkRecord,
+        // but still easy to drop/clear on eviction.
+        rec.spatial.emplace(std::move(*sg));
+        dumpSpatialGridData(rec.coord, &(*rec.spatial));
+        // Return stable pointer into the optional.
+        return &(*rec.spatial);
+    }
+
+    /* Lifetime saftey features below */
+
     // Pin based on chunk coord - this can end up creating a chunk record
     ChunkRecord* ChunkManager::pin(ChunkCoord c, uint64_t frameIndex) {
         ChunkRecord* rec = getOrCreateRecord(c);
@@ -680,7 +752,7 @@ namespace aveng {
         rec->pinCount.fetch_sub(1, std::memory_order_relaxed);
     }
 
-    // See https://chatgpt.com/share/698e7ab7-08a4-800a-86e1-291e1041e496
+    // See https://chatgpt.com/share/698e7ab7-08a4-800a-86e1-291e1041e496 for more info
     void ChunkManager::evictUnpinnedOlderThan(uint64_t frameIndex, uint64_t ageFrames) {
         for (size_t s = 0; s < STRIPES; ++s) {
             std::vector<std::unique_ptr<ChunkRecord>> toFree;

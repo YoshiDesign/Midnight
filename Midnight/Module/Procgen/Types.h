@@ -10,19 +10,6 @@ namespace aveng {
 	static constexpr EdgeIndex kInvalidEdge = -1;
 	static constexpr TriIndex  kInvalidTri = -1;
 
-	struct Triangle {
-		SiteIndex A, B, C;
-	};
-
-	// ---------- Temporary adjacency triangle (scratch) ----------
-	struct AdjTri {
-		SiteIndex a, b, c;      // vertex indices into allPts
-		TriIndex  n0, n1, n2;   // neighbors across edges (b-c), (c-a), (a-b)
-		bool      alive;
-	};
-
-	struct TriEdgeRef { TriIndex triIdx; int edgeSlot; }; // edgeSlot 0..2
-
 	const enum Border {
 		Border_None = 0,
 		Border_North = 1,
@@ -31,11 +18,9 @@ namespace aveng {
 		Border_West = 4,
 	};
 
-	// Deprecated
-	/*struct Site {
-		Vec2 Pos;
-		float Height;
-	};*/
+	struct Triangle {
+		SiteIndex A, B, C;
+	};
 
 	// AoS is perfectly suitable for this struct.
 	// If we needed to perform linear operations over
@@ -46,6 +31,13 @@ namespace aveng {
 		int tri;    // face index
 		int next;
 		int twin;
+	};
+
+	// ---------- Temporary adjacency triangle (scratch) ----------
+	struct AdjTri {
+		SiteIndex a, b, c;      // vertex indices into allPts
+		TriIndex  n0, n1, n2;   // neighbors across edges (b-c), (c-a), (a-b)
+		bool      alive;
 	};
 
 	// Used to speed up barycentric computations by caching invariant values per triangle.
@@ -63,6 +55,13 @@ namespace aveng {
 		int slot; // 0..2
 	};
 
+	struct TriEdgeRef { TriIndex triIdx; int edgeSlot; }; // edgeSlot 0..2
+
+	// Deprecated
+	/*struct Site {
+		Vec2 Pos;
+		float Height;
+	};*/
 	// -------------------------
 	// ChunkCoord + Hash
 	// -------------------------

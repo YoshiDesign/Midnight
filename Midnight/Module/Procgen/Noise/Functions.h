@@ -159,11 +159,6 @@ namespace aveng::noise {
     [[nodiscard]] inline Real FractalNoiseV2(
         Real x, Real z,
         NoiseParams np
-        // int octaves,
-        // Real frequency,
-        // Real amplitude,
-        // Real persistence,
-        //Real lacunarity
     ) noexcept {
         Real sum = Real(0);
         for (int i = 0; i < np.octaves; ++i) {
