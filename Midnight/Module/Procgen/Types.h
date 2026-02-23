@@ -69,10 +69,14 @@ namespace aveng {
 	};
 
 	struct VoronoiCell {
-		SiteIndex site;
-		std::vector<Triangle> triangles;
-		std::vector<Vec2> vertices;
-		bool closed;
+		SiteIndex site = -1;
+		bool closed = false;
+		std::pmr::vector<TriIndex> tris;
+		std::pmr::vector<Vec2> vertices;
+
+		explicit VoronoiCell(std::pmr::memory_resource* mr)
+			: tris(mr), vertices(mr) {
+		}
 	};
 
 	// -------------------------
