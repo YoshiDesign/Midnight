@@ -13,8 +13,8 @@ namespace xone {
         // Pretend the user pressed "Start"
         elapsed_ += ctx.dt;
         if (elapsed_ > 1.0f && !started_) {
-            started_ = true;
             play_.requestPlay("holyship");
+            started_ = true;
             services.terrain.generateChunks(aveng::ChunkCoord{ 0,0 }, 2, 2);
         }
         

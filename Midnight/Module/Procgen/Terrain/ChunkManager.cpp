@@ -3,12 +3,14 @@
 #include "Runtime/Threading/Scratch.h"
 #include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Noise/Functions.h"
+#include "Module/Procgen/Delaunay.h"
 
 #ifdef M_DEBUG
 #include <fstream>
 #include <string>
 #include <cstdint>
 #include <format>
+#include "Runtime/Debug.h"
 #endif
 
 namespace aveng {
@@ -16,6 +18,8 @@ namespace aveng {
 #ifdef M_DEBUG
 #include <filesystem>
 
+    // Creates all of the files for chunk generation debugging
+    // Each file is later written from a different location.
     void createDebugFileForChunk(ChunkCoord coord)
     {
         namespace fs = std::filesystem;
@@ -26,14 +30,52 @@ namespace aveng {
 
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
+        // Blue Noise
         fs::path fullPath = exeDir /
             std::format("chunk_{}.txt", name);
+
+        // Height field
+        fs::path heightPath = exeDir /
+			std::format("chunk_{}_heights.txt", name);
+
+		// Triangulation
+        fs::path trisPath = exeDir /
+            std::format("chunk_{}_tris.txt", name);
 
         std::ofstream file(fullPath);
 
         if (!file) {
             throw std::runtime_error("Failed to create file");
         }
+    }
+
+	// Height data writer for debugging
+    void dumpChunkHeightData(ChunkCoord coord, std::span<float> data)
+    {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}_heights.txt", name);
+
+        Debug::writeHeightDataToFile(fullPath, data);
+    }
+
+    void dumpTriangulationDatas(ChunkCoord coord, Triangulation* tri_data) {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}_triangulation.txt", name);
+
+		Debug::writeTriangulationDataToFile(fullPath, tri_data);
+
     }
 #endif
 
@@ -43,7 +85,7 @@ namespace aveng {
         out[1] = {center.x,     center.z - 1};
         out[2] = {center.x + 1, center.z - 1};
         out[3] = {center.x - 1, center.z};
-        out[4] = {center.x,     center.z};  // The current chunk
+        out[4] = {center.x,     center.z};
         out[5] = {center.x + 1, center.z};
         out[6] = {center.x - 1, center.z + 1};
         out[7] = {center.x,     center.z + 1};
@@ -217,6 +259,46 @@ namespace aveng {
         return out;
     }
 
+    // Consider this implementation now that we've reasoned about pinning/unpinning, 
+    std::shared_future<FinalMeshCPU const*> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
+    {
+        ChunkRecord* rec = getOrCreateRecord(c);
+        rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
+
+        std::call_once(rec->meshOnce, [this, rec, frameIndex] {
+            rec->meshF = tasks_.submit([this, rec, frameIndex]() -> FinalMeshCPU const* {
+
+                RecordPin pipelineHold(*this, rec); // holds across all stages
+
+                // [IMPORTANT]
+                // `wait` calls .get() internally while ensuring no pool starves. Typical helping-wait design.
+                // 
+                // Note that these local future values arent "used", they're mostly just for signaling completion.
+                // But, they keep the pipeline honest in case a consumer ever needs to rely on the restulting
+                // data without first referencing the chunk record and hoping it's all there.
+                // This also forces some obvious invariance: "future is ready so the product exists"
+                //
+                // You are the dependency manager here. Invariants are implicit to the weary observer.
+                // There's nothing preventing us from requesting heights without having generated points first.
+                // We sequentially list stages in order here, instead of wiring stages together explicitly.
+
+                // TODO - Add asserts to each stage to validate prerequisites if we decide to keep this approach
+                auto pts = tasks_.wait(requestAllPoints(rec->coord, frameIndex));
+                auto h = tasks_.wait(requestHeights(rec->coord, frameIndex));
+                auto tri = tasks_.wait(requestTriangulation(rec->coord, frameIndex));
+                //auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
+
+                //auto mesh = buildMesh(*rec);
+
+                //return mesh;
+                return nullptr;
+            });
+        });
+
+        // [!] On the main thread we would use .get() on this future, which blocks.
+        return rec->meshF;
+    }
+
     std::shared_future<Points const*> ChunkManager::requestPoints(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
@@ -295,19 +377,19 @@ namespace aveng {
     }
 
     // Triangulation
-    //std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c, uint64_t frameIndex) {
-    //    auto rec = getOrCreateRecord(c);
-    //    rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
+    std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c, uint64_t frameIndex) {
+        auto rec = getOrCreateRecord(c);
+        rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
-    //    std::call_once(rec->triangOnce, [&] {
-    //        rec->triangF = tasks_.submit([this, rec, c, frameIndex]() -> Triangulation const* {
-    //            RecordPin taskHold(*this, rec);   // pin/unpin
-    //            return buildTriangulation(*rec);
-    //        });
-    //    });
+        std::call_once(rec->triangOnce, [&] {
+            rec->triangF = tasks_.submit([this, rec, c, frameIndex]() -> Triangulation const* {
+                RecordPin taskHold(*this, rec);   // pin/unpin
+                return buildTriangulation(*rec);
+            });
+        });
 
-    //    return rec->triangF;
-    //}
+        return rec->triangF;
+    }
 
     //// Erosion (placeholder)
     //std::shared_future<ErosionField const*> ChunkManager::requestErosion(ChunkCoord c, uint64_t frameIndex) {
@@ -322,34 +404,6 @@ namespace aveng {
 
     //    return rec->erosionF;
     //}
-
-    // Consider this implementation now that we've reasoned about pinning/unpinning, 
-    std::shared_future<FinalMeshCPU const*> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
-    {
-        ChunkRecord* rec = getOrCreateRecord(c);
-        rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
-
-        std::call_once(rec->meshOnce, [this, rec, frameIndex] {
-            rec->meshF = tasks_.submit([this, rec, frameIndex]() -> FinalMeshCPU const* {
-
-                RecordPin pipelineHold(*this, rec); // holds across all stages
-
-				// [!] We use the helping wait on worker threads to keep them productive while waiting for prerequisites. No pool starvation :D
-                auto pts = tasks_.wait(requestAllPoints(rec->coord, frameIndex));
-                auto h = tasks_.wait(requestHeights(rec->coord, frameIndex));
-                //auto tri = tasks_.wait(requestTriangulation(rec->coord, frameIndex));
-                //auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
-
-                //auto mesh = buildMesh(*rec);
-
-                //return mesh;
-                return nullptr;
-            });
-        });
-
-        // [!] On the main thread we would use .get() on this future, which blocks.
-        return rec->meshF;
-    }
 
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)
     {
@@ -482,14 +536,16 @@ namespace aveng {
         // 1) Reset thread-local scratch for this job
         tlsScratchArena().reset();
 
+        // Scratch setup
         auto* mr = tlsScratchArena().mr();
         assert(mr && "tlsScratch.mr() is null");
 
+        std::pmr::vector<float> heightsOut(mr);
+        heightsOut.resize(rec.allPoints->coreIdx.size());
+
+        // Bring the (default) noise
         noise::NoiseParams np = defaultNoiseParams();
 
-        std::vector<float> heightsOut;
-        heightsOut.resize(rec.allPoints->coreIdx.size());
-        std::printf("Heights Iteration\n");
         for (size_t i = 0; i < rec.allPoints->coreIdx.size(); i++) {
             auto idx = rec.allPoints->coreIdx[i];
             std::printf("i: %d\tidx: %d\n", i, idx);
@@ -498,6 +554,10 @@ namespace aveng {
                 rec.allPoints->pts[idx].y, // Z - in engine terms, don't confuse this during translation!
                 np);
         }
+
+#ifdef M_DEBUG
+		dumpChunkHeightData(rec.coord, heightsOut);
+#endif
 
         // 4) Allocate the published product in FINAL memory.
         //    This is the pointer that the future will return, so it must outlive scratch.
@@ -516,6 +576,66 @@ namespace aveng {
         // 6) Done. Scratch can be reused immediately by this worker for the next job.
         return rec.heightField;
 
+    }
+
+    Triangulation const* ChunkManager::buildTriangulation(ChunkRecord& rec)
+    {
+
+        // Note, I haven't designed any configurations for Triangulation. Potential options:
+        // - omit the circumcenter calculations. They're only needed if we'd like a voronoi layer, but enabled by default.
+        // - add different triangulation algorithms for better quality meshes, but maybe a perf tradeoff.
+
+        // Prereq: allPoints must exist (caller discipline or assert/hard dependency)
+        assert(rec.allPoints && "Triangulation requires AllPoints");
+
+        // 1) Reset thread-local scratch for this job
+        tlsScratchArena().reset();
+        auto* scratchMr = tlsScratchArena().mr();
+        assert(scratchMr && "tlsScratch.mr() is null");
+
+        auto* finalMr = rec.final.mr();
+        assert(finalMr && "rec.final.mr() is null");
+
+        std::printf("Building Triangulation\n");
+
+        // 2) Vertex positions: typically triangulate ALL points (core + halo) for continuity.
+        // If rec.allPoints->pts is already Vec2, great.
+        std::span<const Vec2> vertexPos = rec.allPoints->pts;
+        const SiteIndex vertexCount = static_cast<SiteIndex>(vertexPos.size());
+
+        // 3) Bowyer–Watson: allocates Triangulation in FINAL arena and fills only `tris`
+        Triangulation* tri = TriangulateBowyerWatson(vertexPos, scratchMr, finalMr);
+
+        // 4) Publish/adopt as the chunk product
+        rec.triangulation = tri;
+
+        // Ensure non-tris outputs start clean (defensive, cheap, but 
+        // also necessary when we eventually allow re-triangulation for mesh updates)
+        tri->halfEdges.clear();
+        tri->cache.clear();
+        tri->circumcenters.clear();
+        tri->triEdge0.clear();
+        tri->siteEdge.clear();
+
+        // Build half-edge mesh and accelerators into `tri`
+        BuildHalfEdgeMesh(
+            vertexPos,
+            *tri,   // output parameter
+            vertexCount,
+            scratchMr
+        );
+
+#ifdef M_DEBUG
+        // Optional: sanity invariants (adapt to your exact half-edge layout)
+        assert(tri->triEdge0.size() == tri->tris.size());
+        assert(tri->siteEdge.size() == static_cast<size_t>(vertexCount));
+        // If you do 3 half-edges per triangle:
+        // assert(tri->halfEdges.size() == tri->tris.size() * 3);
+
+        dumpTriangulationDatas(rec.coord, rec.triangulation);
+#endif
+        std::printf("Triangulation Complete\n");
+        return rec.triangulation;
     }
 
     // Pin based on chunk coord - this can end up creating a chunk record

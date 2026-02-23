@@ -44,6 +44,8 @@ namespace aveng {
         return wa >= eps && wb >= eps && wc >= eps;
     }
 
+	// You could also use DelaunayMeshView::SampleScalar here, but that requires locating the triangle first anyway; that's the SpatialGrid's job.
+	// We have the heights local to the SpatialGrid, so no need drill into the DelaunayMeshView for this.
     std::pair<float, bool> SpatialGrid::SampleHeight(float x, float z) const {
         const auto [tiInt, ok] = LocateTriangle(x, z);
         if (!ok) return { 0.f, false };
@@ -120,5 +122,4 @@ namespace aveng {
         }
         return result;
     }
-
 }

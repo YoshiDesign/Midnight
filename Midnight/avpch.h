@@ -35,6 +35,8 @@
 #include <unordered_set>
 #include <vector>
 #include <variant>
+#include <memory_resource>
+#include <deque>
 
 // #include "Utils/aveng_utils.h"
 

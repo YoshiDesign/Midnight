@@ -1,5 +1,5 @@
 #include "Scratch.h"
-#include "Module/Procgen/Types.h"   // where ChunkArena is fully defined
+#include "Module/Procgen/Types.h" // For ChunkArena
 
 namespace aveng {
     thread_local ChunkArena tlsScratch;

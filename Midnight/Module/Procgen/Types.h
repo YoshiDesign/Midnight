@@ -3,20 +3,30 @@
 #include <future>
 #include <memory_resource>
 #include "Utils/glm_includes.h"
-#include "Module/Procgen/Noise/Config.h"
 #include "Core/Math/Vector.h"
 #include "Runtime/Memory/ChunkArena.h"
+#include "Module/Procgen/Noise/Config.h"
 
 namespace aveng {
 
-	using SiteIndex = int32_t;
-	using BorderIndex = int32_t;
-	using GridIndex = int32_t;	// Spatial Grid Index
-	using TriangleIndex = int32_t; //
+	using EdgeIndex = int32_t;
+	using TriIndex = int32_t;
+	using SiteIndex = uint32_t;
+	static constexpr EdgeIndex kInvalidEdge = -1;
+	static constexpr TriIndex  kInvalidTri = -1;
 
 	struct Triangle {
 		SiteIndex A, B, C;
 	};
+
+	// ---------- Temporary adjacency triangle (scratch) ----------
+	struct AdjTri {
+		SiteIndex a, b, c;      // vertex indices into allPts
+		TriIndex  n0, n1, n2;   // neighbors across edges (b-c), (c-a), (a-b)
+		bool      alive;
+	};
+
+	struct TriEdgeRef { TriIndex triIdx; int edgeSlot; }; // edgeSlot 0..2
 
 	const enum Border {
 		Border_None = 0,
@@ -26,29 +36,37 @@ namespace aveng {
 		Border_West = 4,
 	};
 
-	struct Site {
+	// Deprecated
+	/*struct Site {
 		Vec2 Pos;
 		float Height;
-	};
+	};*/
 
+	// AoS is perfectly suitable for this struct.
+	// If we needed to perform linear operations over
+	// thousands of half-edges, then we might consider SoA for better perf.
+	// Note that we don't have a `prev` member. We just use delaunay traversal based on next/twin to do that
 	struct HalfEdge {
-		SiteIndex Origin;
-		SiteIndex EdgeDest;
-		int Tri;
-		int Next;
-		int Twin;
-		int Prev;
+		SiteIndex origin;
+		int tri;    // face index
+		int next;
+		int twin;
 	};
 
-	//struct ChunkConfig {
-	//	uint64_t worldSeed = 0;
-	//	float chunkSize = 256.f;
-	//	float minPointDist = 8.f;
-	//	float halo = 32.f;   // consider 4x minPointDist as a starting point
-	//	NoiseParams noise{};
-	//	int chunksX;
-	//	int chunksZ;
-	//};
+	// Used to speed up barycentric computations by caching invariant values per triangle.
+	// Member of the Triangulation ChunkRecord product.
+	// AoS also feels suitable here for now.
+	struct TriangleCache {
+		Vec2 ab;
+		Vec2 ac;
+		float invDenom;
+	};
+
+	// Used to validate, identify and store triangle edges during post-triangulation phase
+	struct TriEdgeDesc {
+		uint64_t key;
+		int slot; // 0..2
+	};
 
 	struct VoronoiCell {
 		SiteIndex site;
@@ -143,7 +161,7 @@ namespace aveng {
 	*/
 
 	// -------------------------
-	// Products (pmr containers)
+	// Products (pmr containers) - Construct with arena memory resource
 	// These are each effectively:
 	//	pointer
 	//	size
@@ -172,9 +190,18 @@ namespace aveng {
 	};
 
 	struct Triangulation {
-		std::pmr::vector<Triangle> tris;        // indices into AllPoints::pts
-		std::pmr::vector<Vec2>  circumcenters; // optional
-		explicit Triangulation(std::pmr::memory_resource* mr) : tris(mr), circumcenters(mr) {}
+		std::pmr::vector<Triangle>      tris;
+		std::pmr::vector<HalfEdge>      halfEdges;
+		std::pmr::vector<TriangleCache> cache;
+		std::pmr::vector<Vec2>          circumcenters;
+
+		// Extra accelerators - Used by nature sim's quite a lot.
+		std::pmr::vector<EdgeIndex>     triEdge0;  // size = tris.size()
+		std::pmr::vector<EdgeIndex>     siteEdge;  // size = vertexCount (allPoints count)
+
+		explicit Triangulation(std::pmr::memory_resource* mr)
+			: tris(mr), halfEdges(mr), cache(mr), circumcenters(mr), triEdge0(mr), siteEdge(mr) {
+		}
 	};
 
 	// Placeholder (not designing hydrology now)
@@ -193,6 +220,7 @@ namespace aveng {
 		}
 	};
 
+	// A registry of stage products + futures + residency
 	struct ChunkRecord {
 
 		/*
@@ -207,14 +235,13 @@ namespace aveng {
 		float halo = 0.f;
 
 		// Arena strategy:
-		// - scratch: intermediates, reset when you no longer need them
-		// - final: durable outputs (mesh + gameplay outputs)
-		ChunkArena scratch; // Tier 2 of our 3-tier arena strategy - For intermediate results that other stages may depend on
-		ChunkArena final; // Tier 3 of our 3-tier arena strategy - For final results that are used by the simulation runtime
-		// Tier 1 is thread-local allocation
+		// - (T2) scratch: intermediates, reset when you no longer need them
+		// - (T3) final: durable outputs (mesh + gameplay outputs)
+		ChunkArena final;	// Tier 3
+		ChunkArena scratch; // Tier 2
+							// Tier 1 is thread-local scratch allocation
 
-		// Products live inside arenas (allocated with pmr containers).
-		// We store raw pointers because arenas own the memory; record lifetime owns arenas.
+		// Arenas own the memory; record lifetime owns arenas.
 		Points* points = nullptr;
 		AllPoints* allPoints = nullptr;
 		HeightField* heightField = nullptr;
@@ -244,11 +271,6 @@ namespace aveng {
 		// Streaming / residency
 		std::atomic<int32_t> pinCount{ 0 };
 		std::atomic<uint64_t> lastTouchedFrame{ 0 };
-
-		std::vector<Site> Sites;
-		std::vector<Triangle> Tris;
-		std::vector<HalfEdge> HalfEdges;
-		std::vector<Vec3> FaceNormals;
 
 		/*
 		* Hard Invariants:

@@ -7,20 +7,28 @@
 
 namespace aveng {
 
+	void BuildHalfEdgeMesh(
+		std::span<const Vec2> vertexPos,
+		Triangulation& out,
+		SiteIndex vertexCount,
+		std::pmr::memory_resource* scratchMr // for temporary edge map
+	);
+
+	Triangulation* TriangulateBowyerWatson(
+		std::span<const Vec2> points,
+		std::pmr::memory_resource* scratchMr,
+		std::pmr::memory_resource* finalMr
+	);
+
+	// SoA centric struct!
 	struct DelaunayMeshView {
 
-		using SitePos = Vec2;
-
-		std::span<const SitePos>  sitePos;     // or span<const Site> if Site is only pos
+		std::span<const Vec2>  vertexPos;
 		std::span<const Triangle> tris;
 		std::span<const HalfEdge> halfEdges;
+		std::span<const TriangleCache> cache;
 
-		// Optional cached invariants spans:
-		std::span<const float> baryDenom;
-		std::span<const Vec2>  ab;
-		std::span<const Vec2>  ac;
-
-		std::pmr::vector<Triangle> Triangulate(std::span<const Vec2> points);
+		// std::pmr::vector<Triangle> Triangulate(std::span<const Vec2> points);
 
 		// Barycentric returns barycentric weights (wa, wb, wc) for point p in triangle triID.
 		// Triangle vertices are the *sites* (A,B,C). The weights satisfy:
@@ -28,7 +36,7 @@ namespace aveng {
 		//   p = wa*A + wb*B + wc*C
 		//   wa + wb + wc = 1
 		//
-		// ok=false if the triangle is degenerate (area ~ 0).
+		// Early exit if the triangle is degenerate (area ~ 0).
 		// If you want "inside triangle" test: wa>=0 && wb>=0 && wc>=0 (with epsilon).
 		bool Barycentric(uint32_t ti, const Vec2& p, float& wa, float& wb, float& wc) const;
 
@@ -36,7 +44,7 @@ namespace aveng {
 		// across a triangle using barycentric weights.
 		//
 		// valuesAtSites must have length >= len(m.Sites).
-		// Returns (value, ok). ok=false if degenerate tri or invalid indexing.
+		// Early exit if degenerate tri or invalid indexing.
 		float SampleScalar(int triID,Vec2 p, std::span<const float> valuesAtSites) const;
 
 		// TriangleGradient returns the constant (positive) gradient of a linearly interpolated scalar field
@@ -48,12 +56,12 @@ namespace aveng {
 		//
 		// This is extremely useful for slope computation because the gradient is constant per triangle.
 		//
-		// Returns (dhdx, dhdy), TODO - flag/bool return param if degenerate triangle or bad inputs.
+		// Returns (dhdx, dhdy), early exit if degenerate triangle or bad inputs.
 		Vec2 TriangleGradient(int triID, std::span<const float> valuesAtSites) const; // returns Vec2{dhdx, dhdy}
 
 		// TriangleNormal computes the face normal for a triangle given heights at each site.
 		// The normal is computed using the cross product of two edges in 3D space.
-		// Returns (normal, ok) where ok=false if the triangle is degenerate.
+		// Returns normal, or early exit if the triangle is degenerate.
 		//
 		// For terrain: X = east, Y = up (height), Z = north.
 		// CCW winding produces an upward-facing normal.
@@ -69,7 +77,7 @@ namespace aveng {
 		Vec3 TriangleNormalFromGradient(float dhdx, float dhdz);
 
 		// AllFaceNormals computes face normals for all triangles in the mesh.
-		// Returns a slice parallel to m.Tris containing the normalized face normal for each triangle.
+		// Returns a vector, parallel to m.tris, containing the normalized face normal for each triangle.
 		std::vector<Vec3> AllFaceNormals(std::span<const float> heights);
 
 		// SlopeAngle returns the slope angle in radians for a triangle.

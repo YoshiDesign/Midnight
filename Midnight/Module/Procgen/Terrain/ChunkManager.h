@@ -36,7 +36,7 @@ namespace aveng {
             return {
                 7,      // octaves
                 0.01f,  // frequency
-                1.0f,   // amplitude
+                5.0f,   // amplitude
                 0.5f,   // persistence
                 2.0f    // lacunarity
             };
@@ -93,7 +93,7 @@ namespace aveng {
         Points const* buildPoints(ChunkRecord& r);        // alloc in final arena
         AllPoints const* buildAllPoints(ChunkRecord& r);     // alloc in scratch
         HeightField const* buildHeights(ChunkRecord& r);       // alloc in scratch
-        //Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
+        Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
         //ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
         FinalMeshCPU const* buildMesh(ChunkRecord& r);     // alloc in final
 

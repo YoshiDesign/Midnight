@@ -14,9 +14,11 @@ namespace aveng {
     class SpatialGrid {
     public:
 
-        const DelaunayMeshView* delaunayMesh;
-        std::pmr::vector<Triangle> tris;
-        std::span<const float> heights; // Lifetime requirement: whatever backs the span must outlive the SpatialGrid
+        const DelaunayMeshView* delaunayMesh; // Used as a "view" into the data that represents delaunay mesh.
+                                              // Prefer this over using resources of the ChunkRecord directly.
+        std::span<const float> heights;       // Provided by the ChunkRecord.
+
+        // Config
         float minx = 0.f, minz = 0.f, maxx = 0.f, maxz = 0.f;
         int gridw = 0, gridh = 0;
         float cellSize = 0.f;
@@ -52,7 +54,6 @@ namespace aveng {
         // This is how we manage a 2D grid of triangles while remaining cache-friendly.
         std::vector<uint32_t> cellOffsets;   // size = numCells + 1
         std::vector<uint32_t> cellTriangles; // flat triangle indices
-
 
         std::pair<int, bool> LocateTriangle(float x, float z) const;
 
