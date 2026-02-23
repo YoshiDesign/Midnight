@@ -14,7 +14,7 @@ namespace aveng::noise {
 
     struct BlueNoiseConfig {
         float MinDist = 0.0;
-        int MaxTries = 30; // default matches your Go behavior
+        int MaxTries = 30;
     };
 
 }

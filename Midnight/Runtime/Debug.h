@@ -6,6 +6,7 @@
 #include <span>
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types.h"
+#include "Module/Procgen/Terrain/ChunkRecord.h"
 namespace aveng {
 
 	namespace fs = std::filesystem;

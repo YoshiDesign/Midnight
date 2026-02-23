@@ -1,6 +1,7 @@
 #include "Delaunay.h"
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types.h"
+#include "Module/Procgen/Terrain/ChunkRecord.h"
 #include "avpch.h"
 
 

@@ -1,5 +1,5 @@
 #pragma once
-
+#include <cmath>
 namespace aveng{
     
     struct Vec2 {

@@ -159,9 +159,6 @@
     <ClCompile Include="Module\Procgen\SpatialGrid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Module\Procgen\Terrain\Terrain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Module\Procgen\Terrain\Erosion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1382,9 +1379,6 @@
     <ClInclude Include="Module\Procgen\SpatialGrid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Module\Procgen\Terrain\Terrain.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Module\Procgen\Terrain\Erosion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1443,6 +1437,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Module\Procgen\Noise\Functions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\ChunkRecord.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

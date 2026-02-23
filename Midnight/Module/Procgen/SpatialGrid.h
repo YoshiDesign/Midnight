@@ -11,8 +11,6 @@
 
 namespace aveng {
 
-    // Forward decls (adjust include strategy to match your codebase)
-    struct Triangle;
     struct Triangulation;
     struct AllPoints;
     struct HeightField;
@@ -90,16 +88,8 @@ namespace aveng {
             TrianglesInBoundsScratch& scratch
         ) const;
 
-        bool valid() const
-        {
-            return tri && pts && hf &&
-                !tris.empty() &&
-                vertexPos.size() >= 3 &&
-                heights.size() == vertexPos.size() &&
-                gridw > 0 && gridh > 0 &&
-                cellSize > 0.f &&
-                cellOffsets.size() == static_cast<size_t>(gridw * gridh + 1);
-        }
+        bool valid() const;
+
     };
 
     // Build function: uses ChunkRecord-owned stage data directly.

@@ -6,7 +6,29 @@
 #include "Runtime/Threading/Types.h"
 #include "Module/Procgen/Noise/Config.h"
 
+/*
+ * TODO: Review scratch vs. final
+ *
+ * Notes - Organize these later.
+ * Points location: rec.final (persistent, needed by neighbors later)
+ * AllPoints location: rec.scratch (intermediate, only needed until triangulation)
+ *     Why rec.scratch not tlsScratch?
+ *      Heights stage needs to read rec.allPoints->pts
+ *      Triangulation stage needs to read rec.allPoints->pts
+ *      Can't use tlsScratch (resets after this job)
+ *      Can't use rec.final (not a published artifact, discarded after mesh)
+ */
+
 namespace aveng {
+
+    struct Points;
+    struct AllPoints;
+    struct HeightField;
+    struct Triangulation;
+    struct ErosionField;
+    struct FinalMeshCPU;
+	struct ChunkRecord; // forward declaration for chunk record
+	class SpatialGrid; // forward declaration for spatial grid product
 
     // Utility: chunk seed
     inline uint64_t chunkSeed(uint64_t worldSeed, ChunkCoord c) {
@@ -54,13 +76,13 @@ namespace aveng {
 
         // Very dangerous Public API (extend as needed, but work in tandem with pin/unpin)
         // Lifetime safety is paramount.
-        std::shared_future<Points const*>        requestPoints(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<AllPoints const*>     requestAllPoints(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<HeightField const*>       requestHeights(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<Triangulation const*>      requestTriangulation(ChunkCoord c, uint64_t frameIndex);
-        // 
-        std::shared_future<ErosionField const*>  requestErosion(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<FinalMeshCPU const*>  requestMesh(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<Points const*>           requestPoints(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<AllPoints const*>        requestAllPoints(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<HeightField const*>      requestHeights(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<Triangulation const*>    requestTriangulation(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<SpatialGrid const*>      requestSpatialGrid(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<ErosionField const*>     requestErosion(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future<FinalMeshCPU const*>     requestMesh(ChunkCoord c, uint64_t frameIndex);
 
         // Streaming helpers
         ChunkRecord* pin(ChunkCoord c, uint64_t frameIndex); // 
@@ -71,37 +93,25 @@ namespace aveng {
 
         size_t stripeIndexFor(ChunkCoord c) const {
             return ChunkCoordHash{}(c) & (STRIPES - 1); // STRIPES must be power-of-two
-            // or: % STRIPES if not power-of-two
+                                                        // or: % STRIPES if not power-of-two
         }
 
     private:
-        using RecPtr = ChunkRecord*; // changed from shared_ptr. RIP evenings
-        RecPtr getOrCreateRecord(ChunkCoord c);
-
-        /**
-         * Notes - Organize these later.
-         * Points location: rec.final (persistent, needed by neighbors later)
-         * AllPoints location: rec.scratch (intermediate, only needed until triangulation)
-         *     Why rec.scratch not tlsScratch?
-         *      Heights stage needs to read rec.allPoints->pts
-         *      Triangulation stage needs to read rec.allPoints->pts
-         *      Can't use tlsScratch (resets after this job)
-         *      Can't use rec.final (not a published artifact, discarded after mesh)
-         */
+        ChunkRecord* getOrCreateRecord(ChunkCoord c);
 
         // Builders (run in worker threads)
-        Points const* buildPoints(ChunkRecord& r);        // alloc in final arena
-        AllPoints const* buildAllPoints(ChunkRecord& r);     // alloc in scratch
-        HeightField const* buildHeights(ChunkRecord& r);       // alloc in scratch
+        Points const*       buildPoints(ChunkRecord& r);        // alloc in final arena
+        AllPoints const*    buildAllPoints(ChunkRecord& r);     // alloc in scratch
+        HeightField const*  buildHeights(ChunkRecord& r);       // alloc in scratch
         Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
-        //ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
-        FinalMeshCPU const* buildMesh(ChunkRecord& r);     // alloc in final
+		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
+        ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
+        FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
 
-    private:
         ITaskSystem& tasks_;
         TerrainConfig cfg_; // Note that this differs from our prototype, where each Chunk owned its own config
 
-        static constexpr size_t STRIPES = 64;
+		static constexpr size_t STRIPES = 64; // This should be a power of two for the bitwise bucket calculation to work correctly
         std::array<StripeBucket, STRIPES> records_;
     };
 

@@ -18,6 +18,10 @@
 
 namespace aveng {
 
+	struct AllPoints;
+	struct Triangulation;
+	struct VoronoiCell;
+
 	/* Triangulation Essentials */
 	
 	// Primary function of the Triangulation phase

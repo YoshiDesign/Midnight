@@ -217,7 +217,6 @@
     <ClCompile Include="Module\Procgen\SpatialGrid.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\ChunkManager.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion.cpp" />
-    <ClCompile Include="Module\Procgen\Terrain\Terrain.cpp" />
     <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
     <ClCompile Include="Runtime\Memory\ChunkArena.h" />
     <ClCompile Include="Runtime\Play\Controller\DebugController.cpp" />
@@ -293,8 +292,8 @@
     <ClInclude Include="Module\Procgen\Rng.h" />
     <ClInclude Include="Module\Procgen\SpatialGrid.h" />
     <ClInclude Include="Module\Procgen\Terrain\ChunkManager.h" />
+    <ClInclude Include="Module\Procgen\Terrain\ChunkRecord.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion.h" />
-    <ClInclude Include="Module\Procgen\Terrain\Terrain.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
     <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
     <ClInclude Include="Runtime\Debug.h" />

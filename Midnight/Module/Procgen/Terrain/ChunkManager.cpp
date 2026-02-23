@@ -4,6 +4,7 @@
 #include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Noise/Functions.h"
 #include "Module/Procgen/Delaunay.h"
+#include "Module/Procgen/Terrain/ChunkRecord.h"
 
 #ifdef M_DEBUG
 #include <fstream>
@@ -389,6 +390,25 @@ namespace aveng {
         });
 
         return rec->triangF;
+    }
+
+    std::shared_future<SpatialGrid const*> ChunkManager::requestSpatialGrid(ChunkCoord c, uint64_t frameIndex)
+    {
+        ChunkRecord* rec = getOrCreateRecord(c);
+        rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
+
+        std::call_once(rec->spatialOnce, [this, rec, frameIndex] {
+            rec->spatialF = tasks_.submit([this, rec, frameIndex]() -> SpatialGrid const* {
+                RecordPin pin(*this, rec);
+
+                auto tri = requestTriangulation(rec->coord, frameIndex).get();
+                (void)tri;
+
+                return buildSpatialGrid(*rec); // publishes pointer into rec->spatial
+            });
+        });
+
+        return rec->spatialF;
     }
 
     //// Erosion (placeholder)

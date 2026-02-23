@@ -1,6 +1,7 @@
 #include "SpatialGrid.h"
 #include "Core/Math/Math.h"
 #include "Module/Procgen/Delaunay.h"
+#include "Module/Procgen/Terrain/ChunkRecord.h"
 
 namespace aveng {
     // -----------------------------
@@ -148,6 +149,16 @@ namespace aveng {
         }
 
         return sg;
+    }
+
+    bool SpatialGrid::valid() const {
+        return tri && pts && hf &&
+            !tris.empty() &&
+            vertexPos.size() >= 3 &&
+            heights.size() == vertexPos.size() &&
+            gridw > 0 && gridh > 0 &&
+            cellSize > 0.f &&
+            cellOffsets.size() == static_cast<size_t>(gridw * gridh + 1);
     }
 
     // -----------------------------
