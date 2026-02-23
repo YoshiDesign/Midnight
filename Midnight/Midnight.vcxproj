@@ -224,6 +224,7 @@
     <ClCompile Include="Runtime\Play\WorldManager.cpp" />
     <ClCompile Include="Runtime\Threading\ITaskSystem.cpp" />
     <ClCompile Include="Runtime\Threading\Scratch.cpp" />
+    <ClCompile Include="Runtime\Threading\Types.cpp" />
     <ClCompile Include="Utils\AssetResolution.cpp" />
     <ClCompile Include="Utils\Logger.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />

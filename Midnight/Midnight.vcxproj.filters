@@ -189,6 +189,9 @@
     <ClCompile Include="Runtime\Memory\ChunkArena.h">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Runtime\Threading\Types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">

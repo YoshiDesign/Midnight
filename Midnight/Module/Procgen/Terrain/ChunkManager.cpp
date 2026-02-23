@@ -4,7 +4,7 @@
 #include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Noise/Functions.h"
 #include "Module/Procgen/Delaunay.h"
-#include "Module/Procgen/Terrain/ChunkRecord.h"
+// #include "Module/Procgen/Terrain/ChunkRecord.h"
 
 #ifdef M_DEBUG
 #include <fstream>

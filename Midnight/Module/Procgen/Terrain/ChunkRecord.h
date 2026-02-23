@@ -184,7 +184,7 @@ namespace aveng {
 		std::shared_future<SpatialGrid const*> spatialF;
 
 		// Note - The SpatialGrid is best being ephemeral
-		std::optional<SpatialGrid> spatial; // Value owned, stable address, destructible/rebuildable
+		std::optional<SpatialGrid> spatial; // Not trivially destructible!
 
 		// Streaming / residency
 		std::atomic<int32_t> pinCount{ 0 };

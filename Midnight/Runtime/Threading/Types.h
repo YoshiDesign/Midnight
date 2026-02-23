@@ -36,9 +36,21 @@ namespace aveng
      * - stage futures
      * - RecordPin to keep the record from being evicted out from under tasks/users
     */
+
+    struct ChunkRecord; // forward declare is fine here
+    // HOWEVER - Since ChunkRecords are not trivially destructible,
+	// we require the full definition of ChunkRecord in order to destroy them when we evict them from the map.
+	// Hence, our .cpp implementation of StripeBucket defines the destructor out-of-line, where we can include 
+    // the full definition of ChunkRecord without blowing anything to smithereens.
+
     struct StripeBucket {
         std::mutex mut;
         std::unordered_map<ChunkCoord, std::unique_ptr<ChunkRecord>, ChunkCoordHash> map;
+
+        StripeBucket();
+        ~StripeBucket();                // <- key: out-of-line
+        StripeBucket(const StripeBucket&) = delete;
+        StripeBucket& operator=(const StripeBucket&) = delete;
     };
-    
-}
+
+} // namespace aveng

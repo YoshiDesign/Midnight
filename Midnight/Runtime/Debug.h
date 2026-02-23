@@ -7,6 +7,24 @@
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/Terrain/ChunkRecord.h"
+
+/*
+ *	While you're here, weary traveler, please consider the following advice from a robot:
+ *
+ *    Headers should not:
+ *        Implicitly generate heavy destructors
+ *        Force complete-type requirements in widely included files
+ *        Leak large template instantiations everywhere
+ *
+ *    Out-of-line special members:
+ *        Localize template instantiation
+ *        Reduce compile times
+ *        Prevent incomplete-type traps
+ *        Improve build stability
+ *
+ *    This is professional C++ hygiene.
+ */
+
 namespace aveng {
 
 	namespace fs = std::filesystem;
