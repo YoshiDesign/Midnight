@@ -10,6 +10,10 @@
  *  - fwd declarations and less header noise.
  *  - We ended up going the route of independent functions instead composing a DelaunayMeshView.
  *    Unsure of what the prognosis looks like. I think this is only a maintainability concern.
+ * 
+ * [IMPORTANT]
+ * These functions should be completely unaware of the SpatialGrid.
+ * The spatial grid is used to access up the triangles that these functions operate on.
  */
 
 namespace aveng {

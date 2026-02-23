@@ -1,30 +1,176 @@
 #include "SpatialGrid.h"
+#include "Core/Math/Math.h"
+#include "Module/Procgen/Delaunay.h"
 
 namespace aveng {
+    // -----------------------------
+      // BuildSpatialGrid
+      // -----------------------------
+    std::unique_ptr<SpatialGrid> BuildSpatialGrid(
+        const Triangulation* triangulation,
+        const AllPoints* allPoints,
+        const HeightField* heightField,
+        float cellSize,
+        float minX, float minZ,
+        float maxX, float maxZ
+    ) {
+        if (!triangulation || !allPoints || !heightField) {
+            return nullptr;
+        }
+        if (triangulation->tris.empty()) {
+            return nullptr;
+        }
 
-    // Access: [cell][i]
-    std::span<const uint32_t> SpatialGrid::trianglesForCell(uint32_t cell) const {
-        uint32_t begin = cellOffsets[cell];
-        uint32_t end   = cellOffsets[cell + 1];
-        return { cellTriangles.data() + begin, end - begin };
+        const auto& triVec = triangulation->tris;
+        const auto& posVec = allPoints->pts;
+        const auto& hVec = heightField->heights;
+
+        // We assume triangulation indices refer into allPoints->pts and heightField->heights
+        if (posVec.empty() || hVec.empty() || posVec.size() != hVec.size()) {
+            return nullptr;
+        }
+
+        const float width = maxX - minX;
+        const float height = maxZ - minZ;
+        if (width <= 0.0f || height <= 0.0f || cellSize <= 0.0f) {
+            return nullptr;
+        }
+
+        int gridW = static_cast<int>(std::ceil(width / cellSize));
+        int gridH = static_cast<int>(std::ceil(height / cellSize));
+        if (gridW <= 0) gridW = 1;
+        if (gridH <= 0) gridH = 1;
+
+        const int numCells = gridW * gridH;
+
+        auto sg = std::make_unique<SpatialGrid>();
+
+        // Wire pointers/spans to ChunkRecord-owned data
+        sg->tri = triangulation;
+        sg->pts = allPoints;
+        sg->hf = heightField;
+
+        // DIRECT ACCESS TO CHUNK DATA
+        sg->tris = std::span<const Triangle>(triVec.data(), triVec.size());
+        sg->vertexPos = std::span<const Vec2>(posVec.data(), posVec.size());
+        sg->heights = std::span<const float>(hVec.data(), hVec.size());
+        sg->vertexCount = sg->heights.size();
+
+        sg->cellSize = cellSize;
+        sg->minx = minX;
+        sg->minz = minZ;
+        sg->maxx = maxX;
+        sg->maxz = maxZ;
+        sg->gridw = gridW;
+        sg->gridh = gridH;
+
+        // Pass 1: count triangle references per cell
+        std::vector<uint32_t> counts(numCells, 0);
+
+        for (uint32_t ti = 0; ti < sg->tris.size(); ++ti) {
+            const Triangle& t = sg->tris[ti];
+
+            const Vec2 a = sg->vertexPos[t.A]; // [IMPORTANT] SiteIndex is a 32-bit type. Keep in mind if we decide to go crazy on resolution.
+            const Vec2 b = sg->vertexPos[t.B]; // [IMPORTANT] SiteIndex is a 32-bit type. Keep in mind if we decide to go crazy on resolution.
+            const Vec2 c = sg->vertexPos[t.C]; // [IMPORTANT] SiteIndex is a 32-bit type. Keep in mind if we decide to go crazy on resolution.
+
+            const float triMinX = std::min({ a.x, b.x, c.x });
+            const float triMaxX = std::max({ a.x, b.x, c.x });
+            const float triMinZ = std::min({ a.y, b.y, c.y });
+            const float triMaxZ = std::max({ a.y, b.y, c.y });
+
+            int cellMinX = /* static_cast<int> ( */(triMinX - minX) / cellSize /* )*/; // Warning - Implicit conversion
+            int cellMaxX = /* static_cast<int> ( */(triMaxX - minX) / cellSize /* )*/; // Warning - Implicit conversion
+            int cellMinZ = /* static_cast<int> ( */(triMinZ - minZ) / cellSize /* )*/; // Warning - Implicit conversion
+            int cellMaxZ = /* static_cast<int> ( */(triMaxZ - minZ) / cellSize /* )*/; // Warning - Implicit conversion
+
+            // If gridW/H are ever negative you need to unscrew yourself.
+            cellMinX = clampInt(cellMinX, 0, gridW - 1);
+            cellMaxX = clampInt(cellMaxX, 0, gridW - 1);
+            cellMinZ = clampInt(cellMinZ, 0, gridH - 1);
+            cellMaxZ = clampInt(cellMaxZ, 0, gridH - 1);
+
+            for (int cz = cellMinZ; cz <= cellMaxZ; ++cz) {
+                for (int cx = cellMinX; cx <= cellMaxX; ++cx) {
+                    const int cellIdx = cz * gridW + cx;
+                    counts[cellIdx]++;
+                }
+            }
+        }
+
+        // Prefix sum -> offsets
+        sg->cellOffsets.assign(numCells + 1, 0);
+        for (size_t i = 0; i < numCells; ++i) {
+            sg->cellOffsets[i + 1] =
+                sg->cellOffsets[i] + counts[i];
+        }
+
+        const size_t totalRefs = sg->cellOffsets.back();
+        sg->cellTriangles.resize(totalRefs);
+
+        // Pass 2: fill using per-cell cursors (reuse counts)
+        std::fill(counts.begin(), counts.end(), 0);
+
+        for (uint32_t ti = 0; ti < static_cast<uint32_t>(sg->tris.size()); ++ti) {
+            const Triangle& t = sg->tris[ti];
+
+            const Vec2 a = sg->vertexPos[t.A];
+            const Vec2 b = sg->vertexPos[t.B];
+            const Vec2 c = sg->vertexPos[t.C];
+
+            const float triMinX = std::min({ a.x, b.x, c.x });
+            const float triMaxX = std::max({ a.x, b.x, c.x });
+            const float triMinZ = std::min({ a.y, b.y, c.y });
+            const float triMaxZ = std::max({ a.y, b.y, c.y });
+
+            int cellMinX = (triMinX - minX) / cellSize;
+            int cellMaxX = (triMaxX - minX) / cellSize;
+            int cellMinZ = (triMinZ - minZ) / cellSize;
+            int cellMaxZ = (triMaxZ - minZ) / cellSize;
+
+            // If gridW/H are ever negative you need to unscrew yourself.
+            cellMinX = clampInt(cellMinX, 0, gridW - 1);
+            cellMaxX = clampInt(cellMaxX, 0, gridW - 1);
+            cellMinZ = clampInt(cellMinZ, 0, gridH - 1);
+            cellMaxZ = clampInt(cellMaxZ, 0, gridH - 1);
+
+            for (int cz = cellMinZ; cz <= cellMaxZ; ++cz) {
+                for (int cx = cellMinX; cx <= cellMaxX; ++cx) {
+
+                    const size_t cellIdx = cz * gridW + cx;
+                    const size_t writeBase = sg->cellOffsets[cellIdx];
+                    const size_t writeAt = writeBase + counts[cellIdx];
+
+                    sg->cellTriangles[writeAt] = ti;
+                    counts[cellIdx]++;
+                }
+            }
+        }
+
+        return sg;
     }
 
-    std::pair<int, bool> SpatialGrid::LocateTriangle(float x, float z) const {
-        if (!delaunayMesh) return { -1, false };
+    // -----------------------------
+    // SpatialGrid methods
+    // -----------------------------
 
-        // Find the cell (Go's int() truncates toward zero; for non-negative coords this matches floor)
-        const int cx = static_cast<int>((x - minx) / cellSize);
-        const int cz = static_cast<int>((z - minz) / cellSize);
+    std::pair<TriIndex, bool> SpatialGrid::LocateTriangle(float x, float z) const
+    {
+        if (!tri || !pts || tris.empty()) {
+            return { -1, false };
+        }
+
+        const int cx = (x - minx) / cellSize; // Implicit truncation toward 0
+        const int cz = (z - minz) / cellSize; // Implicit truncation toward 0
 
         if (cx < 0 || cx >= gridw || cz < 0 || cz >= gridh) {
             return { -1, false };
         }
 
-        const uint32_t cellIdx = static_cast<uint32_t>(cz * gridw + cx);
+        const uint32_t cellIdx = cz * gridw + cx; // God help you if this exceeds 2,147,483,647
         const Vec2 p{ x, z };
 
-        // Candidate tris for this cell
-        for (uint32_t ti : trianglesForCell(cellIdx)) {
+        for (TriIndex ti : trianglesForCell(cellIdx)) {
             if (pointInTriangle(ti, p)) {
                 return { static_cast<int>(ti), true };
             }
@@ -33,86 +179,87 @@ namespace aveng {
         return { -1, false };
     }
 
-    bool SpatialGrid::pointInTriangle(uint32_t ti, const Vec2& p) const {
-        float wa, wb, wc;
-        if (!delaunayMesh->Barycentric(ti, p, wa, wb, wc)) {
+    bool SpatialGrid::pointInTriangle(TriIndex ti, const Vec2& p) const
+    {
+        if (!pts || !tri) return false;
+
+        BaryWeights w{};
+        constexpr float denomEps = 1e-8f; // for degenerate tri rejection
+
+        if (!Barycentric(*pts, *tri, ti, p, w, denomEps)) {
             return false;
         }
 
-        // Point is inside if all weights are non-negative (with small epsilon for edge cases)
-        constexpr float eps = -1e-6f; // you used -1e-9 in float64; loosen slightly for float
-        return wa >= eps && wb >= eps && wc >= eps;
+        // Inside test epsilon (edge tolerance)
+        constexpr float insideEps = -1e-6f;
+        return (w.wa >= insideEps) && (w.wb >= insideEps) && (w.wc >= insideEps);
     }
 
-	// You could also use DelaunayMeshView::SampleScalar here, but that requires locating the triangle first anyway; that's the SpatialGrid's job.
-	// We have the heights local to the SpatialGrid, so no need drill into the DelaunayMeshView for this.
-    std::pair<float, bool> SpatialGrid::SampleHeight(float x, float z) const {
-        const auto [tiInt, ok] = LocateTriangle(x, z);
-        if (!ok) return { 0.f, false };
+    std::pair<float, bool> SpatialGrid::SampleHeight(float x, float z) const
+    {
+        const auto [ti, ok] = LocateTriangle(x, z);
+        if (!ok) return { 0.f, false }; // Some Go flavor
 
-        const uint32_t ti = static_cast<uint32_t>(tiInt);
+        if (!pts || !tri) return { 0.f, false };
+
         const Vec2 p{ x, z };
 
-        float wa, wb, wc;
-        if (!delaunayMesh->Barycentric(ti, p, wa, wb, wc)) {
+        BaryWeights w{};
+        constexpr float denomEps = 1e-8f;
+
+        if (!Barycentric(*pts, *tri, ti, p, w, denomEps)) {
             return { 0.f, false };
         }
 
-        const Triangle& t = delaunayMesh->tris[ti];
+        const Triangle& t = tri->tris[ti];
 
-        // Discrete samples at triangle vertices
-        // (Using span gives you .size() + bounds-friendly semantics in debug)
-        if (static_cast<size_t>(t.A) >= heights.size() ||
-            static_cast<size_t>(t.B) >= heights.size() ||
-            static_cast<size_t>(t.C) >= heights.size()) {
+        if (t.A >= heights.size() || t.B >= heights.size() || t.C >= heights.size()) {
             return { 0.f, false };
         }
 
-        const float ha = heights[static_cast<size_t>(t.A)];
-        const float hb = heights[static_cast<size_t>(t.B)];
-        const float hc = heights[static_cast<size_t>(t.C)];
+        const float ha = heights[t.A];
+        const float hb = heights[t.B];
+        const float hc = heights[t.C];
 
-        return { wa * ha + wb * hb + wc * hc, true };
+        return { w.wa * ha + w.wb * hb + w.wc * hc, true };
     }
 
-    std::pair<Vec3, bool> SpatialGrid::GetTriangleNormal(float x, float z, std::span<const Vec3> normals) const {
-        const auto [tiInt, ok] = LocateTriangle(x, z);
+    std::pair<Vec3, bool> SpatialGrid::GetTriangleNormal(float x, float z, std::span<const Vec3> normals) const
+    {
+        const auto [ti, ok] = LocateTriangle(x, z);
         if (!ok) return { Vec3{}, false };
 
-        const uint32_t ti = static_cast<uint32_t>(tiInt);
         if (ti >= normals.size()) {
             return { Vec3{}, false };
         }
-
         return { normals[ti], true };
     }
 
-    std::vector<uint32_t> SpatialGrid::TrianglesInBounds(
-        const SpatialGrid& sg,
-        float minX, float minZ, float maxX, float maxZ,
+    std::vector<TriIndex> SpatialGrid::TrianglesInBounds(
+        float qMinX, float qMinZ, float qMaxX, float qMaxZ,
         TrianglesInBoundsScratch& scratch
-    ) {
-        if (!delaunayMesh) return {};
+    ) const {
+        if (!tri || tris.empty()) return {};
 
-        scratch.ensure(delaunayMesh->tris.size());
+        scratch.ensure(tris.size());
 
-        int cellMinX = static_cast<int>((minX - minx) / cellSize);
-        int cellMaxX = static_cast<int>((maxX - minx) / cellSize);
-        int cellMinZ = static_cast<int>((minZ - minz) / cellSize);
-        int cellMaxZ = static_cast<int>((maxZ - minz) / cellSize);
+        int cellMinX = (qMinX - minx) / cellSize; // More implicit conversion for -Wall heart attacks
+        int cellMaxX = (qMaxX - minx) / cellSize;
+        int cellMinZ = (qMinZ - minz) / cellSize;
+        int cellMaxZ = (qMaxZ - minz) / cellSize;
 
         cellMinX = std::max(0, cellMinX);
         cellMinZ = std::max(0, cellMinZ);
-        cellMaxX = std::min(sg.gridw - 1, cellMaxX);
-        cellMaxZ = std::min(sg.gridh - 1, cellMaxZ);
+        cellMaxX = std::min(gridw - 1, cellMaxX);
+        cellMaxZ = std::min(gridh - 1, cellMaxZ);
 
-        std::vector<uint32_t> result;
-        result.reserve(64); // perf hint
+        std::vector<TriIndex> result;
+        result.reserve(64);
 
         for (int cz = cellMinZ; cz <= cellMaxZ; ++cz) {
             for (int cx = cellMinX; cx <= cellMaxX; ++cx) {
-                const uint32_t cellIdx = static_cast<uint32_t>(cz * gridw + cx);
-                for (uint32_t ti : trianglesForCell(cellIdx)) {
+                const uint32_t cellIdx = cz * gridw + cx; 
+                for (TriIndex ti : trianglesForCell(cellIdx)) {
                     if (scratch.stamp[ti] != scratch.epoch) {
                         scratch.stamp[ti] = scratch.epoch;
                         result.push_back(ti);
@@ -120,6 +267,8 @@ namespace aveng {
                 }
             }
         }
+
         return result;
     }
+
 }
