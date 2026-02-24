@@ -60,18 +60,19 @@ namespace aveng {
 	* >	}
 	*/
 
+	// The structs below represent the final products of each stage.
 	// -------------------------
 	// Products (pmr containers) - Construct with arena memory resource
 	// These are each effectively:
 	//	pointer
 	//	size
 	//  capacity
-	// No different than a typical container, but we construct them with a memory resource that belongs to an arena.
 	// 
 	// Be aware, with a monotonic_buffer_resource: 
 	//  When vector grows, it allocates new memory 
-	//  Old memory is NOT freed.
-	// So repeated resize() or reserve() growth patterns may accumulate memory inside the arena
+	//  Old memory is not freed.
+	// So repeated resize() or reserve() growth patterns may accumulate memory inside the arena.
+	// For this reason we always compute our resources in a scratch pmr, resize, and set the final product once.
 	// -------------------------
 	struct Points {
 		std::pmr::vector<Vec2> core; // core points only
@@ -85,7 +86,7 @@ namespace aveng {
 	};
 
 	struct HeightField {
-		std::pmr::vector<float> heights; // same length as AllPoints::pts
+		std::pmr::vector<float> heights; // parallel with AllPoints::pts
 		explicit HeightField(std::pmr::memory_resource* mr) : heights(mr) {}
 	};
 
@@ -95,19 +96,19 @@ namespace aveng {
 		std::pmr::vector<TriangleCache> cache;
 		std::pmr::vector<Vec2>          circumcenters;
 
-		// Extra accelerators - Used by nature sim's quite a lot.
+		// Accelerators - Used by nature sim's quite a lot.
 		std::pmr::vector<EdgeIndex>     triEdge0;  // size = tris.size()
-		std::pmr::vector<EdgeIndex>     siteEdge;  // size = vertexCount (allPoints count)
+		std::pmr::vector<EdgeIndex>     siteEdge;  // size = vertexCount (allPoints count. core + halo)
 
 		explicit Triangulation(std::pmr::memory_resource* mr)
 			: tris(mr), halfEdges(mr), cache(mr), circumcenters(mr), triEdge0(mr), siteEdge(mr) {
 		}
 	};
 
-	// Placeholder (not designing hydrology now)
+	// Example...
 	struct ErosionField {
-		std::pmr::vector<float> hDelta; // heights after erosion, same indexing as AllPoints
-		explicit ErosionField(std::pmr::memory_resource* mr) : hDelta(mr) {}
+		std::pmr::vector<float> eHeights; // parallel with AllPoints::pts
+		explicit ErosionField(std::pmr::memory_resource* mr) : eHeights(mr) {}
 	};
 
 	// Final durable product example (you’ll extend)

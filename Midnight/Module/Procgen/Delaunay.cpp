@@ -387,9 +387,14 @@ namespace aveng {
     }
 
     /* Shameless AI guidance
-    * Because TriangulateBowyerWatson allocates a new `struct Triangulation` every time it runs, if you ever allow recomputation(invalidate / rebuild triangulation for the same chunk), you'll be "leaking" inside the chunk's monotonic arena.
-    * - `Triangulation* result = new (out) Triangulation(finalMr);`
-    * That might be totally fine(common in arena designs) if chunk records aren't recomputed often and the arena is reset when the chunk is evicted / destroyed.
+    * 
+    * Because TriangulateBowyerWatson allocates a new `struct Triangulation` every time it runs, 
+    * if you ever allow recomputation (i.e invalidate / rebuild triangulation for the same chunk), 
+    * you'll be "leaking" inside the chunk's monotonic arena.
+    * 
+    * That might be totally fine(common in arena designs) if chunk records aren't recomputed often 
+    * and the arena is reset when the chunk is evicted / destroyed.
+    * 
     * If you do want to support rebuild - without - growth later, you'll eventually want to refactor BW to fill into an existing Triangulation& out rather than allocate.
     * But for your current "compute once per chunk lifetime" strategy : this is exactly right.
     */

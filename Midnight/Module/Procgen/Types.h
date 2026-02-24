@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Noise/Config.h"
 
@@ -42,7 +43,7 @@ namespace aveng {
 
 	// Used to speed up barycentric computations by caching invariant values per triangle.
 	// Member of the Triangulation ChunkRecord product.
-	// AoS also feels suitable here for now.
+	// AoS feels suitable here for now.
 	struct TriangleCache {
 		Vec2 ab;
 		Vec2 ac;
@@ -62,6 +63,7 @@ namespace aveng {
 		Vec2 Pos;
 		float Height;
 	};*/
+
 	// -------------------------
 	// ChunkCoord + Hash
 	// -------------------------
@@ -96,14 +98,61 @@ namespace aveng {
 		}
 	};
 
+	/* Global Terrain Config */
 	struct TerrainConfig {
 		uint64_t worldSeed = 42;
 		float chunkSize = 256.f;
 		float minPointDist = 8.f;
 		float halo = 32.f;   // consider 4x minPointDist as a starting point
+		bool hydraulicErosionEnabled = true;
+		bool thermalErosionEnabled = true;
+		bool ridgeEnhancementEnabled = true;
+		bool hardnessMapEnabled = true;
 		noise::NoiseParams noise{};
 	};
 
+	/* Stage Params */
+	struct HydraulicErosionParams{
+		float pInertia;	    // 0-1, higher means droplets are more influenced by their current velocity, less by terrain slope
+		float pCapacity;    // Higher means droplets can carry more sediment, leading to more erosion and deposition
+		float pDeposition;  // 0-1, higher means sediment is more likely to be deposited, lower means it’s more likely to be carried further
+		float pErosion;
+		float pEvaporation;
+		float pMinSlope;
+		float gravity;
+		float numDroplets;
+		float numSteps;
+	};
 
+	struct ThermalErosionParams {
+		float TalusThreshold;	// degrees angle of repose
+		float TransferRate;		// Transfer % of excess per iteration
+		size_t Iterations;
+	};
 
+	struct HardnessParams {
+		float elevationWeight; // How much elevation affects hardness (0-1)
+		float NoiseWeight;	   // How much noise variation to add (0-1)
+		float NoiseFrequency;  // Frequency of hardness noise (lower = larger features)
+		float BaseHardness;	   // Minimum hardness for all sites (0-1)
+		float ElevationPower;  // Exponent for elevation curve (1=linear, 2=quadratic)
+	};
+
+	struct RidgeParams {
+		float Threshold;     // Minimum ridgeness score to enhance (0-1)
+		float BoostAmount;   // Maximum height boost in world units
+		float NoiseAmount;   // Jaggedness noise amplitude
+		float NoiseFreq;     // Jaggedness noise frequency
+		int Iterations;		 // Number of enhancement passes
+		float MinHeight;     // Minimum elevation for ridge enhancement (world units)
+		std::string MinHeightMode; // "absolute" = world height, "normalized" = 0-1 within chunk
+	};
+
+	/* Stage Settings */
+	struct ErosionSettings {
+		HydraulicErosionParams erosion{};
+		ThermalErosionParams thermal{};
+		HardnessParams hardness{};
+		RidgeParams ridges{};
+	};
 }
