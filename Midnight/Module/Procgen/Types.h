@@ -104,11 +104,11 @@ namespace aveng {
 		float chunkSize = 256.f;
 		float minPointDist = 8.f;
 		float halo = 32.f;   // consider 4x minPointDist as a starting point
+		noise::NoiseParams noise{};
 		bool hydraulicErosionEnabled = true;
 		bool thermalErosionEnabled = true;
 		bool ridgeEnhancementEnabled = true;
 		bool hardnessMapEnabled = true;
-		noise::NoiseParams noise{};
 	};
 
 	/* Stage Params */
@@ -131,11 +131,12 @@ namespace aveng {
 	};
 
 	struct HardnessParams {
-		float elevationWeight; // How much elevation affects hardness (0-1)
+		float ElevationWeight; // How much elevation affects hardness (0-1)
 		float NoiseWeight;	   // How much noise variation to add (0-1)
 		float NoiseFrequency;  // Frequency of hardness noise (lower = larger features)
 		float BaseHardness;	   // Minimum hardness for all sites (0-1)
 		float ElevationPower;  // Exponent for elevation curve (1=linear, 2=quadratic)
+		bool Enabled;		   // Master toggle for hardness map generation
 	};
 
 	struct RidgeParams {

@@ -24,17 +24,17 @@ namespace std {
 
 	// This function allows us to take a vertex struct instance and hash it, for use by an unordered map key
 	// This allows us to create vertex buffers which only contain unique vertices
-	template<>
-	struct hash<aveng::VkVertex> {
-		size_t operator()(aveng::VkVertex const& vertex) const {
-	
-			// for final hash value
-			size_t seed = 0;
-			aveng::hashCombine(seed, vertex.position, vertex.color, vertex.normal, vertex.boneNumber, vertex.boneWeight);
-			return seed;
-	
-		}
-	};
+	//template<>
+	//struct hash<aveng::VkVertex> {
+	//	size_t operator()(aveng::VkVertex const& vertex) const {
+	//
+	//		// for final hash value
+	//		size_t seed = 0;
+	//		aveng::hashCombine(seed, vertex.position, vertex.color, vertex.normal, vertex.boneNumber, vertex.boneWeight);
+	//		return seed;
+	//
+	//	}
+	//};
 }
 
 namespace {
@@ -142,26 +142,20 @@ namespace aveng {
 		return mModelFilenamePath;
 	}
 
-	/*V2 of V2
-	
-		Big TODO: Clean this sh*t up.
-		const VkRenderData& renderData (if possible) not VkRenderData& renderData!
-		renderData has been factored out of many of the places it propagates through.
-		It will receive an overhaul sooner than later
-	
-	*/
+	/*
+	 *  V2
+	 *	Big TODO: Clean this sh*t up.
+	 *	renderData has been factored out of many of the places it propagates through.
+	 *	It will receive an overhaul sooner than later
+	 */
 	bool AvengModel::loadModelV2(
 		const VkRenderData& renderData,
-		const AssetKey& key,                        // keep for debug + extension hint
-		std::span<const std::byte> bytes,           // data from IModelSource
-		unsigned int extraImportFlags,
-		const std::string& modelBaseDir,     // for model-owned refs
+		const AssetKey& key,                // keep for debug + extension hint
+		std::span<const std::byte> bytes,   // data from IModelSource
+		unsigned int extraImportFlags,		// Assimp flags
+		const std::string& modelBaseDir,    // for model-owned refs
 		const std::string& contentRoot      // Texture root. for engine-owned defaults
 	) {
-
-		//std::cout 
-		//	<< "LoadModelV2V2\nContent Root: " << contentRoot 
-		//	<< "\nModel Base Dir: " << modelBaseDir << std::endl;
 
 		Assimp::Importer importer;
 

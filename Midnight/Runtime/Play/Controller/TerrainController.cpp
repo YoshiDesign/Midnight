@@ -8,6 +8,7 @@ namespace aveng {
 	TerrainController::TerrainController(ChunkManager& chunks) noexcept 
 		: chunks_(&chunks) 
 	{
+        chunks_->setErosionManager(&erosionMgr_);
 		std::printf("[%s] Constructing TerrainController\n", __FUNCTION__);
 	}
 
@@ -35,6 +36,7 @@ namespace aveng {
         }
 
         std::printf("[%s] ChunkCoord{%d, %d}", __FUNCTION__, start_coord.x, start_coord.z);
+        // Note that we're only calling requestMesh from outside of a loop, since we're still just doing test runs.
         chunks_->requestMesh(start_coord, frameIndex_);
         return;
         

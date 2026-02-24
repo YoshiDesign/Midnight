@@ -146,6 +146,7 @@ namespace aveng {
 		ChunkCoord coord{};
 		Bounds2 coreBounds{};
 		float halo = 0.f;
+		uint64_t chunkSeed = 0;
 
 		// Arena strategy:
 		// - (T2) scratch: intermediates, reset when you no longer need them

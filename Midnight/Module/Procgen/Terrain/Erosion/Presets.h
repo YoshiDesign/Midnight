@@ -28,6 +28,7 @@ namespace procgen {
 			0.01,
 			0.1,
 			2.0,
+			true // enabled
 		};
 
 		aveng::RidgeParams ridges {

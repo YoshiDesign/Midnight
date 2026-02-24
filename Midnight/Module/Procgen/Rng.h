@@ -3,6 +3,15 @@
 #include <limits>
 #include <type_traits>
 
+namespace SeedTag {
+    // Arbitrary, but keep these stable or the world will never be the same.
+    static constexpr uint64_t Hardness = 0xA1B2C3D4E5F60718ull;
+    static constexpr uint64_t Hydraulic = 0xBADC0FFEE0DDF00Dull;
+    static constexpr uint64_t Thermal = 0x123456789ABCDEF0ull;
+    static constexpr uint64_t Ridge = 0x0F1E2D3C4B5A6978ull;
+    static constexpr uint64_t Smooth = 0xC001D00DC0FFEE11ull;
+}
+
 namespace aveng {
 
     // ------------------------------------------------------------
@@ -20,6 +29,15 @@ namespace aveng {
             return z ^ (z >> 31);
         }
     };
+
+    // Mix baseSeed + tag into a new 64-bit seed.
+    // Deterministic, cheap, good avalanche. The opposite of rng, 
+    // but that's a correlation at the end of the day so it can live here.
+    static inline uint64_t stageSeed(uint64_t baseSeed, uint64_t tag) {
+        // SplitMix64 is commonly used exactly for this purpose.
+        SplitMix64 sm(baseSeed ^ tag);
+        return sm.next();
+    }
     
     // ------------------------------------------------------------
     // xoroshiro256**

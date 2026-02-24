@@ -17,9 +17,18 @@
  *      Triangulation stage needs to read rec.allPoints->pts
  *      Can't use tlsScratch (resets after this job)
  *      Can't use rec.final (not a published artifact, discarded after mesh)
+ * 
+ * [IMPORTANT] DO NOT SET SETTINGS ON OTHER MANAGERS FROM THE CHUNKMANAGER.
+ * TODO: Create a thinner interface rather than passing manager ref's into ChunkManager.
  */
 
+// I still suck at organizing namespaces. This project is very long-lived, we'll get there.
+namespace procgen {
+    struct ErosionManager;
+}
+
 namespace aveng {
+
 
     struct Points;
     struct AllPoints;
@@ -51,7 +60,8 @@ namespace aveng {
 
         explicit ChunkManager(ITaskSystem& tasks)
             : tasks_(tasks) {
-            cfg_ = defaultTerrainConfig();
+            cfg_ = defaultTerrainConfig(); // Global Config
+			cSeed_ = chunkSeed(cfg_.worldSeed, { 0, 0 }); // Example of using chunkSeed utility
         }
 
         noise::NoiseParams defaultNoiseParams() {
@@ -70,9 +80,15 @@ namespace aveng {
                 256.f,  // chunkSize
                 8.f,    // minPointDist
                 32.f,   // halo
-                defaultNoiseParams()
+				defaultNoiseParams(),
+                true,
+                true,
+                true,
+                true
             };
         }
+
+        void setErosionManager(procgen::ErosionManager* er);
 
         // Very dangerous Public API (extend as needed, but work in tandem with pin/unpin)
         // Lifetime safety is paramount.
@@ -99,13 +115,15 @@ namespace aveng {
     private:
         ChunkRecord* getOrCreateRecord(ChunkCoord c);
 
+        procgen::ErosionManager* erosionMgr_ = nullptr;
+
         // Builders (run in worker threads)
         Points const*       buildPoints(ChunkRecord& r);        // alloc in final arena
         AllPoints const*    buildAllPoints(ChunkRecord& r);     // alloc in scratch
         HeightField const*  buildHeights(ChunkRecord& r);       // alloc in scratch
         Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
 		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
-        ErosionField const* buildErosion(ChunkRecord& r);       // alloc in scratch
+        ErosionField const* buildErosion(ChunkRecord& r, const ErosionSettings& settings);       // alloc in scratch
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
 
         ITaskSystem& tasks_;

@@ -2,7 +2,8 @@
 #include <cstdint>
 #include <vector>
 #include <future>
-#include "Runtime/Commands/TerrainCMD.h"
+#include "Runtime/Commands/TerrainCMD.h" // TODO
+#include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Types.h"
 
 namespace aveng {
@@ -27,7 +28,7 @@ namespace aveng {
          * v1 behavior: request the final CPU mesh for each chunk (schedules work via ChunkManager).
          *
          * Notes:
-         * - This does NOT block; ChunkManager returns shared_futures.
+         * - This does not block/is async. ChunkManager hands you a shared_future.
          * - We keep the futures in an internal list for debugging / inspection.
          */
         void generateChunks(ChunkCoord start_coord, int cols, int rows);
@@ -38,7 +39,9 @@ namespace aveng {
     private:
         static ChunkCoord offsetCoord(ChunkCoord base, int dx, int dz) noexcept;
 
-        ChunkManager* chunks_ = nullptr; // non-owning
+        ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
+        procgen::ErosionManager erosionMgr_;
+
         uint64_t frameIndex_ = 0;
 
         // v1: store futures so you can introspect progress in debug UI if you want

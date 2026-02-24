@@ -22,15 +22,15 @@ namespace procgen {
 		ErosionManager() = default;
 		~ErosionManager() = default;
 
-		aveng::ErosionSettings getAllSettings() const { return activeSettings; }
-		aveng::ErosionSettings setAllSettings(size_t set) { activeSettings = settings[set]; return activeSettings; }
+		aveng::ErosionSettings getActiveSettings() const { return activeSettings; }
+		aveng::ErosionSettings setActiveSettings(size_t setIdx) { activeSettings = settings[setIdx]; return activeSettings; }
 
-		void setHydraulicErosionParams(aveng::HydraulicErosionParams p) {}
-		void setThermalErosionParams(aveng::ThermalErosionParams p) {}
-		void setHardnessParams(aveng::HardnessParams p) {}
-		void setRidgeParams(aveng::RidgeParams p) {}
+		void setHydraulicErosionParams(aveng::HydraulicErosionParams p) {} // TODO
+		void setThermalErosionParams(aveng::ThermalErosionParams p) {} // TODO
+		void setHardnessParams(aveng::HardnessParams p) {} // TODO
+		void setRidgeParams(aveng::RidgeParams p) {} // TODO
 
-		aveng::ErosionSettings createNewSettings(
+		aveng::ErosionSettings addCustomSettings( // TODO
 			aveng::HydraulicErosionParams hp,
 			aveng::ThermalErosionParams tp,
 			aveng::HardnessParams hrp,

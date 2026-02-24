@@ -4,7 +4,9 @@
 #include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Noise/Functions.h"
 #include "Module/Procgen/Delaunay.h"
-// #include "Module/Procgen/Terrain/ChunkRecord.h"
+#include "Module/Procgen/Terrain/Erosion/Data.h"
+#include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
+#include "Module/Procgen/Terrain/Erosion/Initialization.h"
 
 #ifdef M_DEBUG
 #include <filesystem>
@@ -159,6 +161,11 @@ namespace aveng {
             return *this;
         }
     };
+
+    void ChunkManager::setErosionManager(procgen::ErosionManager* er)
+    {
+        erosionMgr_ = er;
+    }
     
     /*
     * Policy 
@@ -286,6 +293,7 @@ namespace aveng {
         return rec->meshF;
     }
 
+
     std::shared_future<Points const*> ChunkManager::requestPoints(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
@@ -393,19 +401,20 @@ namespace aveng {
         return rec->spatialF;
     }
 
-    //// Erosion (placeholder)
-    //std::shared_future<ErosionField const*> ChunkManager::requestErosion(ChunkCoord c, uint64_t frameIndex) {
-    //    auto rec = getOrCreateRecord(c);
+    // Erosion
+    std::shared_future<ErosionField const*> ChunkManager::requestErosion(ChunkCoord c, uint64_t frameIndex) {
+        auto rec = getOrCreateRecord(c);
 
-    //    std::call_once(rec->erosionOnce, [&] {
-    //        rec->erosionF = tasks_.submit([this, rec, c]() -> ErosionField const* {
-    //            RecordPin taskHold(*this, rec);
-    //            return buildErosion(*rec);
-    //        });
-    //    });
+        std::call_once(rec->erosionOnce, [this, rec, frameIndex] {
+            const ErosionSettings s = erosionMgr_ ? erosionMgr_->getActiveSettings() : ErosionSettings{};
+            rec->erosionF = tasks_.submit([this, rec, s, frameIndex]() -> ErosionField const* {
+                RecordPin taskHold(*this, rec);
+                return buildErosion(*rec, s);
+            });
+        });
 
-    //    return rec->erosionF;
-    //}
+        return rec->erosionF;
+    }
 
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)
     {
@@ -416,8 +425,9 @@ namespace aveng {
         auto* mr = tlsScratchArena().mr();
         assert(mr && "tlsScratch.mr() is null");
 
-        // 2) Generate deterministic seed for this chunk
-        uint64_t seed = chunkSeed(cfg_.worldSeed, rec.coord);
+        // 2) Generate the chunk seed - It's used across stages 
+        // (and mixed for stochastic determinism. Cool, right?)
+        rec.chunkSeed = chunkSeed(cfg_.worldSeed, rec.coord);
 
         /* [IMPORTANT]
          *   Are heights deterministic across chunks?
@@ -430,7 +440,7 @@ namespace aveng {
         bnCfg.MaxTries = 30;
 
         auto candidates = GenerateBlueNoiseSeeded(
-            static_cast<int64_t>(seed),
+            static_cast<int64_t>(rec.chunkSeed),
             rec.coreBounds.minX,
             rec.coreBounds.minZ,
             rec.coreBounds.maxX,
@@ -726,6 +736,98 @@ namespace aveng {
         dumpSpatialGridData(rec.coord, &(*rec.spatial));
         // Return stable pointer into the optional.
         return &(*rec.spatial);
+    }
+
+    ErosionField const* ChunkManager::buildErosion(ChunkRecord& rec, const ErosionSettings& settings)
+    {
+        // Erosion is call_once'd => safe to reuse rec.scratch for the whole stage
+        rec.scratch.reset(); // whatever your API is
+
+        auto* scratchMr = rec.scratch.mr();
+        auto* finalMr = rec.final.mr();
+
+        // 1) Construct working buffers in scratch
+        procgen::ErosionWorkingSet ws(scratchMr);
+
+		// Seeds for any stochastic components in each stage
+        // ensures deterministic output per chunk, but different patterns across stages.
+        // TODO: move them elsewhere so they're not computed when the corresponding stage is disabled.
+        const uint64_t hardnessSeed = stageSeed(rec.chunkSeed, SeedTag::Hardness);
+        const uint64_t hydroSeed    = stageSeed(rec.chunkSeed, SeedTag::Hydraulic);
+		const uint64_t thermalSeed  = stageSeed(rec.chunkSeed, SeedTag::Thermal);
+		const uint64_t ridgeSeed    = stageSeed(rec.chunkSeed, SeedTag::Ridge);
+		const uint64_t smoothSeed   = stageSeed(rec.chunkSeed, SeedTag::Smooth);
+
+        // Convenient way to retrieve heights for copying
+        // const auto* hf = requestHeights(rec.coord, /*frame*/0).get(); 
+        // Use this approach (above) if we ever need to guarantee completion of a prerequisite stage.
+        // However, in our architecture we've synchronized stages so this isn't necessary.
+
+        // Or do something like the below snippet, to be safe, should we change our design.
+        (void)requestHeights(rec.coord, 0 /*frameIndex*/).get(); // ensure built
+        (void)requestAllPoints(rec.coord, 0 /*frameIndex*/).get(); // ensure built
+        //auto const& heights = rec.heightField->heights;
+
+        // Get heights for copying.
+        auto const& heights = rec.heightField->heights;
+        const size_t N = heights.size();
+
+        // Resize to num points we're working on
+        ws.workHeights.resize(N);
+        ws.delta.resize(N);
+        ws.hardness.resize(N);
+
+        // Init working heights and deltas
+        std::copy(heights.begin(), heights.end(), ws.workHeights.begin());
+        std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+
+        // 2) Hardness in scratch
+        procgen::ComputeHardnessMap(
+            ws.workHeights,
+			rec.allPoints->pts, // INVARIANT - allPoints->pts.size() == heightField->heights.size()
+            ws.hardness, 
+            settings.hardness,
+            hardnessSeed
+        );
+
+        // 3) Hydraulic pass writes ws.delta, then apply into ws.workHeights
+        HydraulicPass(ws.workHeights, ws.hardness, ws.delta, /*...*/);
+        ApplyDelta(ws.workHeights, ws.delta);
+
+        // 4) Thermal pass writes ws.delta, then apply
+        ThermalPass(ws.workHeights, ws.hardness, ws.delta, /*...*/);
+        ApplyDelta(ws.workHeights, ws.delta);
+
+        // 5) Ridge enhancement can use ping-pong:
+        ws.ping.resize(N);
+        RidgePassPingPong(ws.workHeights, ws.ping, /*...*/);
+        ws.workHeights.swap(ws.ping);
+
+        // 4) Allocate the published product in FINAL memory.
+        //    This is the pointer that the future will return, so it must outlive scratch.
+        if (!rec.erosion) {
+            auto alloc = std::pmr::polymorphic_allocator<ErosionField>(rec.final.mr());
+            rec.erosion = alloc.allocate(1);
+            std::construct_at(rec.erosion, rec.final.mr()); // Points(mr)
+        }
+
+        // 5) Copy candidates from thread-local scratch to final arena
+		//    eHeights are the completed heights with erosion deltas applied, ready for mesh generation.
+        rec.erosion->eHeights.clear();
+        rec.erosion->eHeights.reserve(ws.workHeights.size());
+        rec.erosion->eHeights.insert(rec.erosion->eHeights.end(), ws.workHeights.begin(), ws.workHeights.end());
+
+        // 6) Done. Scratch can be reused immediately by this worker for the next job.
+        return rec.erosion;
+
+        //// 6) Publish output in final
+        //auto* out = rec.final.make<ErosionField>(finalMr); // however you allocate
+        //out->heights = std::pmr::vector<float>(finalMr);
+        //out->heights.resize(N);
+        //std::copy(ws.workHeights.begin(), ws.workHeights.end(), out->heights.begin());
+
+        //rec.erosion = out;
+        //return out;
     }
 
     /* Lifetime saftey features below */
