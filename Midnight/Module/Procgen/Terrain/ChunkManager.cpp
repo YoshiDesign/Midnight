@@ -803,7 +803,7 @@ namespace aveng {
         // 2) Hardness in scratch
         procgen::ComputeHardnessMap(
             ws.workHeights,
-			rec.allPoints->pts, // INVARIANT - allPoints->pts.size() == heightField->heights.size()
+			rec.allPoints->pts, // INVARIANT REMINDER - allPoints->pts.size() == heightField->heights.size()
             ws.hardness, 
             settings.hardness,
             hardnessSeed
@@ -823,13 +823,13 @@ namespace aveng {
         ApplyDelta(ws.workHeights, ws.delta);
 
         // 4) Thermal pass writes ws.delta, then apply
-        ThermalPass(ws.workHeights, ws.hardness, ws.delta, /*...*/);
-        ApplyDelta(ws.workHeights, ws.delta);
+        //ComputeThermalErosion(ws.workHeights, ws.hardness, ws.delta, /*...*/);
+        //ApplyDelta(ws.workHeights, ws.delta);
 
-        // 5) Ridge enhancement can use ping-pong:
-        ws.ping.resize(N);
-        RidgePassPingPong(ws.workHeights, ws.ping, /*...*/);
-        ws.workHeights.swap(ws.ping);
+        //// 5) Ridge enhancement can use ping-pong:
+        //ws.ping.resize(N);
+        //RidgePassPingPong(ws.workHeights, ws.ping, /*...*/);
+        //ws.workHeights.swap(ws.ping);
 
         // 4) Allocate the published product in FINAL memory.
         //    This is the pointer that the future will return, so it must outlive scratch.

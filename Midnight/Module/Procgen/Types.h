@@ -116,6 +116,7 @@ namespace aveng {
 		uint32_t numDroplets = 60000;   // total droplets
 		uint32_t maxSteps = 32;      // steps per droplet (upper bound)
 		uint32_t batchSize = 2048;    // droplets per task
+		uint32_t maxWorkers = 8;
 
 		float inertia = 0.05f;   // Pinertia
 		float gravity = 4.0f;

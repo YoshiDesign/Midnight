@@ -4,6 +4,8 @@
 #include <span>
 #include "Core/Math/Math.h"
 #include "Core/Math/Vector.h"
+// #include "Runtime/Threading/Scratch.h"
+// #include "Runtime/Memory/ChunkArena.h" // Including this here causes a TU mega-collision
 #include "Module/Procgen/Rng.h"
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/Delaunay.h"
@@ -11,6 +13,18 @@
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Module/Procgen/Terrain/ChunkRecord.h"
 #include "Module/Procgen/Terrain/Erosion/Data.h"
+
+/*
+TODO: Hydraulic Erosion Optimizations
+* - Tile sparse accumulation (best overall)
+*   Each batch accumulates into a small set of tiles (or per-tile arrays)
+*   Reduction only touches tiles that were hit
+* -Per-thread (not per-batch) deltas
+*   Instead of 30 full deltas, have W full deltas (one per worker thread), reuse them
+*   Each task writes into its thread’s delta
+*   Then reduce W deltas (W << numBatches)
+*   Still bandwidth heavy, but much less than 30×N
+*/
 
 namespace procgen {
 
@@ -55,6 +69,17 @@ namespace procgen::detail {
     }
 
 }
+
+/*
+* Notes from the pro's:
+* More advanced hydraulic variants might include:
+*    small "erosion brush" neighbor lists
+*    triangle/vertex adjacency fetch buffers (wait... come back here after reviewing the adjacency work that's on deck.)
+*    per-step visited sets / queues
+*    tiny vectors for "affected vertices" when doing localized accumulation
+* 
+* TLS Scratch becomes essential here.
+*/
 
 namespace procgen {
 
@@ -102,8 +127,15 @@ namespace procgen {
 
         // Batch scheduling
         const uint32_t total = cfg.numDroplets;
-        const uint32_t batchSize = std::max<uint32_t>(1, cfg.batchSize);
-        const uint32_t numBatches = (total + batchSize - 1u) / batchSize;
+
+        // Hard cap on hydraulic parallelism
+        const uint32_t maxTasks = cfg.maxWorkers;
+
+        // Don’t spawn more tasks than droplets
+        const uint32_t numBatches = std::min(maxTasks, total);
+
+        // Now derive batch size from desired task count
+        const uint32_t batchSize = (total + numBatches - 1u) / numBatches;
 
         // Each task returns a full-size local delta array (simple + deterministic; optimize later with tiling/sparse).
         std::vector<std::shared_future<std::vector<float>>> futures;
@@ -117,7 +149,24 @@ namespace procgen {
             const uint32_t begin = b * batchSize;
             const uint32_t end = std::min(total, begin + batchSize);
 
+            // TODO : I don't think we're using thread local scratch allocation
             futures.push_back(tasks.submit([=, &pts, &tri, &sg, &cfg]() -> std::vector<float> {
+
+                /*
+                    TODO: Debugging
+                    Use null_memory_resource() to catch heap allocation
+                */
+
+                // Get per-worker scratch
+                //aveng::ChunkArena& arena = aveng::tlsScratchArena();
+                //if (!arena.mr()) {
+                //    // once per thread; pick a size you like
+                //    arena.reserve(3 * 1024 * 1024); // example: 3MB
+                //}
+                //arena.reset(); // IMPORTANT: wipe previous task allocations on this worker
+
+                //std::pmr::memory_resource* mr = arena.mr();
+
                 std::vector<float> localDelta;
                 localDelta.assign(pts.pts.size(), 0.0f);
 
@@ -300,7 +349,7 @@ namespace procgen {
         // Reduce all local deltas into ws.delta (single-threaded reduction for now)
         // (You can parallelize the reduction later by chunking the index range.)
         for (auto& fut : futures) {
-            std::vector<float> local = fut.get();
+             /* std::vector<float> */ auto local = fut.get(); // auto might cause a move
             // accumulate
             for (size_t i = 0; i < N; ++i) {
                 ws.delta[i] += local[i];
