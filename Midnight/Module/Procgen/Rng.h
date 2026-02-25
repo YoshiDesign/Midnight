@@ -28,6 +28,13 @@ namespace aveng {
             z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
             return z ^ (z >> 31);
         }
+
+        // 
+        float nextFloat01() {
+            // Take top 24 bits (better statistical quality than low bits)
+            const uint32_t v = static_cast<uint32_t>(next() >> 40);
+            return static_cast<float>(v) * (1.0f / 16777216.0f); // 2^24
+        }
     };
 
     // Mix baseSeed + tag into a new 64-bit seed.
@@ -37,6 +44,15 @@ namespace aveng {
         // SplitMix64 is commonly used exactly for this purpose.
         SplitMix64 sm(baseSeed ^ tag);
         return sm.next();
+    }
+
+    static inline uint64_t cheapMix(uint64_t a, uint64_t b) {
+        // splitmix-like combine
+        uint64_t x = a ^ (b + 0x9E3779B97F4A7C15ull + (a << 6) + (a >> 2));
+        x ^= x >> 30; x *= 0xBF58476D1CE4E5B9ull;
+        x ^= x >> 27; x *= 0x94D049BB133111EBull;
+        x ^= x >> 31;
+        return x;
     }
     
     // ------------------------------------------------------------
@@ -158,6 +174,4 @@ namespace aveng {
             }
         }
     }
-    
-
 }

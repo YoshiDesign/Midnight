@@ -144,7 +144,7 @@ namespace aveng {
 		 */
 
 		ChunkCoord coord{};
-		Bounds2 coreBounds{};
+		Bounds2 coreBounds{}; // World space bounds for the chunk area
 		float halo = 0.f;
 		uint64_t chunkSeed = 0;
 
@@ -185,7 +185,7 @@ namespace aveng {
 		std::once_flag spatialOnce;
 		std::shared_future<SpatialGrid const*> spatialF;
 
-		// Note - The SpatialGrid is best being ephemeral
+		// Note - SpatialGrid bounds are core + halo
 		std::optional<SpatialGrid> spatial; // Not trivially destructible!
 											// This must also remain moveable due to its usage in the StripeBucket. 
 

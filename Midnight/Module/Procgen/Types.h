@@ -113,15 +113,29 @@ namespace aveng {
 
 	/* Stage Params */
 	struct HydraulicErosionParams{
-		float pInertia;	    // 0-1, higher means droplets are more influenced by their current velocity, less by terrain slope
-		float pCapacity;    // Higher means droplets can carry more sediment, leading to more erosion and deposition
-		float pDeposition;  // 0-1, higher means sediment is more likely to be deposited, lower means it’s more likely to be carried further
-		float pErosion;
-		float pEvaporation;
-		float pMinSlope;
-		float gravity;
-		float numDroplets;
-		float numSteps;
+		uint32_t numDroplets = 60000;   // total droplets
+		uint32_t maxSteps = 32;      // steps per droplet (upper bound)
+		uint32_t batchSize = 2048;    // droplets per task
+
+		float inertia = 0.05f;   // Pinertia
+		float gravity = 4.0f;
+		float pCapacity = 4.0f;
+		float pMinSlope = 0.01f;
+		float pDeposition = 0.3f;
+		float pErosion = 0.3f;
+		float pEvaporation = 0.01f;
+
+		// adjustable spawn margin (WORLD units). You asked to keep this tweakable.
+		float spawnMargin = 16.0f;
+
+		// extra evaporation in flats (requested)
+		float flatSlopeEps = 1e-4f;   // threshold for "close to 0" slope
+		float flatCapEps = 1e-4f;   // threshold for "nearly 0" capacity
+		float flatExtraEvap = 0.35f;   // additional evaporation factor when flat+low-cap
+
+		// droplet initial state
+		float initWater = 0.8f;
+		float initVel = 1.0f;
 	};
 
 	struct ThermalErosionParams {

@@ -6,6 +6,7 @@
 #include "Module/Procgen/Delaunay.h"
 #include "Module/Procgen/Terrain/Erosion/Data.h"
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
+#include "Module/Procgen/Terrain/Erosion/HydraulicErosion.h"
 #include "Module/Procgen/Terrain/Erosion/Initialization.h"
 
 #ifdef M_DEBUG
@@ -17,10 +18,23 @@
 #include "Runtime/Debug.h"
 #endif
 
+namespace {
+
+    void ApplyDelta(std::span<float> work, std::span<const float> delta) {
+#ifdef M_DEBUG
+        assert(work.size() == delta.size() && "ApplyDelta: size mismatch");
+#endif
+        for (size_t i = 0; i < work.size(); ++i) {
+            work[i] += delta[i];
+        }
+
+    }
+
+}
+
 namespace aveng {
 
 #ifdef M_DEBUG
-
 
     void dumpSpatialGridData(ChunkCoord coord, const SpatialGrid* grid) {
         namespace fs = std::filesystem;
@@ -235,7 +249,7 @@ namespace aveng {
         auto rec = std::make_unique<ChunkRecord>();
         rec->coord = coord;
         rec->halo = cfg_.halo;
-        rec->coreBounds = {
+        rec->coreBounds = { // Bounds are in world space
             coord.x * cfg_.chunkSize,
             coord.z * cfg_.chunkSize,
             (coord.x + 1) * cfg_.chunkSize,
@@ -781,6 +795,11 @@ namespace aveng {
         std::copy(heights.begin(), heights.end(), ws.workHeights.begin());
         std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
 
+        /*
+        * Signatures get a little messy here.
+        * Haste be with us.
+        */
+
         // 2) Hardness in scratch
         procgen::ComputeHardnessMap(
             ws.workHeights,
@@ -791,7 +810,16 @@ namespace aveng {
         );
 
         // 3) Hydraulic pass writes ws.delta, then apply into ws.workHeights
-        HydraulicPass(ws.workHeights, ws.hardness, ws.delta, /*...*/);
+        procgen::ComputeHydraulicErosion(
+            ws, 
+            *rec.allPoints, 
+            *rec.triangulation, 
+            rec.spatial.value(), 
+            erosionMgr_->getActiveSettings().erosion,
+            hydroSeed,
+            tasks_
+        );
+
         ApplyDelta(ws.workHeights, ws.delta);
 
         // 4) Thermal pass writes ws.delta, then apply

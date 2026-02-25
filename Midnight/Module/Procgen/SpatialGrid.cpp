@@ -62,6 +62,9 @@ namespace aveng {
         sg->minz = minZ;
         sg->maxx = maxX;
         sg->maxz = maxZ;
+
+        sg->worldBounds = { minX, minZ, maxX, maxZ };
+
         sg->gridw = gridW;
         sg->gridh = gridH;
 
@@ -85,7 +88,7 @@ namespace aveng {
             int cellMinZ = /* static_cast<int> ( */(triMinZ - minZ) / cellSize /* )*/; // Warning - Implicit conversion
             int cellMaxZ = /* static_cast<int> ( */(triMaxZ - minZ) / cellSize /* )*/; // Warning - Implicit conversion
 
-            // If gridW/H are ever negative you need to unscrew yourself.
+            // If gridW/H are ever negative please seek help, frantically
             cellMinX = clampInt(cellMinX, 0, gridW - 1);
             cellMaxX = clampInt(cellMaxX, 0, gridW - 1);
             cellMinZ = clampInt(cellMinZ, 0, gridH - 1);

@@ -216,7 +216,9 @@
     <ClCompile Include="Module\Procgen\Noise\Bluenoise.cpp" />
     <ClCompile Include="Module\Procgen\SpatialGrid.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\ChunkManager.cpp" />
-    <ClCompile Include="Module\Procgen\Terrain\Erosion.cpp" />
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.cpp" />
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\Initialization.cpp" />
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\ThermalErosion.cpp" />
     <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
     <ClCompile Include="Runtime\Memory\ChunkArena.h" />
     <ClCompile Include="Runtime\Play\Controller\DebugController.cpp" />
@@ -294,7 +296,12 @@
     <ClInclude Include="Module\Procgen\SpatialGrid.h" />
     <ClInclude Include="Module\Procgen\Terrain\ChunkManager.h" />
     <ClInclude Include="Module\Procgen\Terrain\ChunkRecord.h" />
-    <ClInclude Include="Module\Procgen\Terrain\Erosion.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\Data.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\ErosionManager.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\Initialization.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\Presets.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\ThermalErosion.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
     <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
     <ClInclude Include="Runtime\Debug.h" />

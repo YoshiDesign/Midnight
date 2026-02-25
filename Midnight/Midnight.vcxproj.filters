@@ -159,7 +159,7 @@
     <ClCompile Include="Module\Procgen\SpatialGrid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Module\Procgen\Terrain\Erosion.cpp">
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Module\Procgen\Noise\Bluenoise.cpp">
@@ -190,6 +190,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Runtime\Threading\Types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\ThermalErosion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\Initialization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1382,7 +1388,7 @@
     <ClInclude Include="Module\Procgen\SpatialGrid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Module\Procgen\Terrain\Erosion.h">
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Module\Procgen\Noise\Bluenoise.h">
@@ -1443,6 +1449,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Module\Procgen\Terrain\ChunkRecord.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\ErosionManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\Presets.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\Data.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\ThermalErosion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\Initialization.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

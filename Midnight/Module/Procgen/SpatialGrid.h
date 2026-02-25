@@ -35,6 +35,8 @@ namespace aveng {
         int   gridw = 0, gridh = 0;
         float cellSize = 0.f;
 
+        Bounds2 worldBounds{}; // min/max dimensions. Core + Halo
+
         // ---- Cell -> triangles mapping ----
         // cellOffsets size = numCells + 1
         // cellTriangles is flat triangle-index list

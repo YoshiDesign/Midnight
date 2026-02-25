@@ -24,7 +24,9 @@
 
 // I still suck at organizing namespaces. This project is very long-lived, we'll get there.
 namespace procgen {
+
     struct ErosionManager;
+
 }
 
 namespace aveng {
@@ -61,7 +63,6 @@ namespace aveng {
         explicit ChunkManager(ITaskSystem& tasks)
             : tasks_(tasks) {
             cfg_ = defaultTerrainConfig(); // Global Config
-			cSeed_ = chunkSeed(cfg_.worldSeed, { 0, 0 }); // Example of using chunkSeed utility
         }
 
         noise::NoiseParams defaultNoiseParams() {

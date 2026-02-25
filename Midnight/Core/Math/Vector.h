@@ -9,15 +9,33 @@ namespace aveng{
         Vec2() = default;
         Vec2(float x_, float y_) : x(x_), y(y_) {}
 
-        Vec2 operator-(const Vec2& rhs) const { return { x - rhs.x, y - rhs.y }; }
+        // Arithmetic
         Vec2 operator+(const Vec2& rhs) const { return { x + rhs.x, y + rhs.y }; }
+        Vec2 operator-(const Vec2& rhs) const { return { x - rhs.x, y - rhs.y }; }
         Vec2 operator*(float s) const { return { x * s, y * s }; }
 
+        // Dot / Cross
         float dot(const Vec2& rhs) const { return x * rhs.x + y * rhs.y; }
         float cross(const Vec2& rhs) const { return x * rhs.y - y * rhs.x; }
 
+        // Length
         float len2() const { return x * x + y * y; }
-        float len() const { return std::sqrt(len2()); }
+        float len()  const { return std::sqrt(len2()); }
+
+        // Normalization
+        Vec2 normalized() const {
+            const float L2 = len2();
+            if (L2 < 1e-20f) return { 0.f, 0.f };
+            const float inv = 1.0f / std::sqrt(L2);
+            return { x * inv, y * inv };
+        }
+
+        Vec2 normalizedOr(const Vec2& fallbackUnit) const {
+            const float L2 = len2();
+            if (L2 < 1e-20f) return fallbackUnit;
+            const float inv = 1.0f / std::sqrt(L2);
+            return { x * inv, y * inv };
+        }
     };
 
     struct Vec3 {

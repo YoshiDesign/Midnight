@@ -672,9 +672,9 @@ namespace aveng {
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
         if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
 
-        const Vec2 a = pts.pts[static_cast<size_t>(A)];
-        const Vec2 b = pts.pts[static_cast<size_t>(B)];
-        const Vec2 c = pts.pts[static_cast<size_t>(C)];
+        const Vec2 a = pts.pts[A];
+        const Vec2 b = pts.pts[B];
+        const Vec2 c = pts.pts[C];
 
         const Vec2 v0 = b - a;
         const Vec2 v1 = c - a;
@@ -715,9 +715,9 @@ namespace aveng {
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
         if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
 
-        const float va = valuesAtSites[static_cast<size_t>(A)];
-        const float vb = valuesAtSites[static_cast<size_t>(B)];
-        const float vc = valuesAtSites[static_cast<size_t>(C)];
+        const float va = valuesAtSites[A];
+        const float vb = valuesAtSites[B];
+        const float vc = valuesAtSites[C];
 
         outValue = w.wa * va + w.wb * vb + w.wc * vc;
         return true;
@@ -739,13 +739,13 @@ namespace aveng {
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
         if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
 
-        const Vec2 a = pts.pts[static_cast<size_t>(A)];
-        const Vec2 b = pts.pts[static_cast<size_t>(B)];
-        const Vec2 c = pts.pts[static_cast<size_t>(C)];
+        const Vec2 a = pts.pts[A];
+        const Vec2 b = pts.pts[B];
+        const Vec2 c = pts.pts[C];
 
-        const float ha = valuesAtSites[static_cast<size_t>(A)];
-        const float hb = valuesAtSites[static_cast<size_t>(B)];
-        const float hc = valuesAtSites[static_cast<size_t>(C)];
+        const float ha = valuesAtSites[A];
+        const float hb = valuesAtSites[B];
+        const float hc = valuesAtSites[C];
 
         const Vec2 ab = b - a;
         const Vec2 ac = c - a;
@@ -778,13 +778,13 @@ namespace aveng {
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
         if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
 
-        const Vec2 a2 = pts.pts[static_cast<size_t>(A)];
-        const Vec2 b2 = pts.pts[static_cast<size_t>(B)];
-        const Vec2 c2 = pts.pts[static_cast<size_t>(C)];
+        const Vec2 a2 = pts.pts[A];
+        const Vec2 b2 = pts.pts[B];
+        const Vec2 c2 = pts.pts[C];
 
-        const Vec3 a{ a2.x, heights[static_cast<size_t>(A)], a2.y };
-        const Vec3 b{ b2.x, heights[static_cast<size_t>(B)], b2.y };
-        const Vec3 c{ c2.x, heights[static_cast<size_t>(C)], c2.y };
+        const Vec3 a{ a2.x, heights[A], a2.y };
+        const Vec3 b{ b2.x, heights[B], b2.y };
+        const Vec3 c{ c2.x, heights[C], c2.y };
 
         const Vec3 ab = b - a;
         const Vec3 ac = c - a;
@@ -835,7 +835,9 @@ namespace aveng {
     static EdgeIndex findAnyOutgoing(const Triangulation& tri, SiteIndex site) {
         // This is O(E). You already have tri.siteEdge, so this is only a defensive fallback.
         for (size_t i = 0; i < tri.halfEdges.size(); ++i) {
-            if (heOrigin(tri.halfEdges[i]) == site) return static_cast<EdgeIndex>(i);
+            if (heOrigin(tri.halfEdges[i]) == site) {
+                return static_cast<EdgeIndex>(i);
+            }
         }
         return -1;
     }
