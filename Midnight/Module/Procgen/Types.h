@@ -173,6 +173,8 @@ namespace aveng {
 		int Iterations;		 // Number of enhancement passes
 		float MinHeight;     // Minimum elevation for ridge enhancement (world units)
 		std::string MinHeightMode; // "absolute" = world height, "normalized" = 0-1 within chunk
+		uint16_t MaxWorkers;
+		bool Enabled;
 	};
 
 	/* Stage Settings */

@@ -54,7 +54,7 @@ namespace procgen {
     ) {
         if (siteIdx >= tri.siteEdge.size()) { return; }
 
-        aveng::EdgeIndex start = tri.siteEdge[siteIdx] > siteIdx ? aveng::kInvalidEdge;
+        aveng::EdgeIndex start = tri.siteEdge[siteIdx] > siteIdx ? tri.siteEdge[siteIdx] : aveng::kInvalidEdge;
         if (isInvalidEdge(start)) { return; }
 
         aveng::EdgeIndex edgeIdx = start;
@@ -84,7 +84,7 @@ namespace procgen {
     }
 
     void ComputeThermalErosion(
-        procgen::ErosionWorkingSet& ws,
+        ErosionWorkingSet& ws,
         const aveng::AllPoints& allPts,
         const aveng::Triangulation& tri,
         const aveng::SpatialGrid& /*sg*/,

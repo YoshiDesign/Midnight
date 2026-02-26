@@ -73,7 +73,7 @@ namespace aveng {
             return {
                 7,      // octaves
                 0.01f,  // frequency
-                5.0f,   // amplitude
+                20.0f,   // amplitude
                 0.5f,   // persistence
                 2.0f    // lacunarity
             };

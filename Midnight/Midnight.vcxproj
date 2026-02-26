@@ -219,6 +219,7 @@
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ErosionManager.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\Initialization.cpp" />
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\RidgeEnhancement.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ThermalErosion.cpp" />
     <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
     <ClCompile Include="Runtime\Memory\ChunkArena.h" />
@@ -255,6 +256,7 @@
     <ClInclude Include="Core\Input\IInputHandler.h" />
     <ClInclude Include="Core\Input\InputState.h" />
     <ClInclude Include="Core\Input\InputSystem.h" />
+    <ClInclude Include="Core\Math\Conventions.h" />
     <ClInclude Include="Core\Math\Math.h" />
     <ClInclude Include="Core\Math\Vector.h" />
     <ClInclude Include="Core\Midnight.h" />
@@ -302,6 +304,7 @@
     <ClInclude Include="Module\Procgen\Terrain\Erosion\ErosionManager.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\Initialization.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\Presets.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Erosion\RidgeEnhancement.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\ThermalErosion.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
     <ClInclude Include="Runtime\Commands\TerrainCMD.h" />

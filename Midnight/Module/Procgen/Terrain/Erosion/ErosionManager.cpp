@@ -9,7 +9,7 @@ namespace procgen {
 		if (settings_.size() == 0 && nThreads != 0) {
 			// Init
 			settings_.reserve(12); // arbitrary capacity
-			settings_.push_back(DefaultHydraulicErosion(nThreads));
+			settings_.push_back(DefaultErosion(nThreads));
 			activeSettings_ = settings_[0];
 			return true;
 		}

@@ -15,7 +15,7 @@ namespace procgen {
 	struct ErosionWorkingSet;
     // ---- The actual pass ----
     void ComputeThermalErosion(
-        procgen::ErosionWorkingSet& ws,
+        ErosionWorkingSet& ws,
         const aveng::AllPoints& pts,
         const aveng::Triangulation& tri,
         const aveng::SpatialGrid& sg,
@@ -23,6 +23,5 @@ namespace procgen {
         uint64_t thermalSeed,
         aveng::ITaskSystem& tasks
     );
-
 
 }

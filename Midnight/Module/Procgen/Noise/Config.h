@@ -3,6 +3,7 @@
 namespace aveng::noise {
     // -------------------------
     // Terrain config
+    // See Also: ChunkManager.h for `defaultNoiseParams()`
     // -------------------------
     struct NoiseParams {
         int   octaves = 7;

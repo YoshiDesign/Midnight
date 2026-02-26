@@ -7,6 +7,7 @@
 #include "Module/Procgen/Terrain/Erosion/Data.h"
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Terrain/Erosion/HydraulicErosion.h"
+#include "Module/Procgen/Terrain/Erosion/RidgeEnhancement.h"
 #include "Module/Procgen/Terrain/Erosion/ThermalErosion.h"
 #include "Module/Procgen/Terrain/Erosion/Initialization.h"
 
@@ -910,12 +911,18 @@ namespace aveng {
         ApplyDelta(ws.workHeights, ws.delta);
         std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
 
-        dumpChunkFinalHeightData(rec.coord, ws.workHeights);
-
-        //// 5) Ridge enhancement can use ping-pong:
-        //ws.ping.resize(N);
-        //RidgePassPingPong(ws.workHeights, ws.ping, /*...*/);
-        //ws.workHeights.swap(ws.ping);
+        // 5) Ridge enhancement can use ping-pong:
+        ws.ping.resize(N);
+        ComputeRidgeEnhancement( /* WARNING: I DID NOT AUDIT THIS CODE AT ALL */
+            ws,
+            *rec.allPoints,
+            *rec.triangulation,
+            rec.spatial.value(),
+            settings.ridges,
+            ridgeSeed,
+            tasks_
+        );
+        ws.workHeights.swap(ws.ping);
 
         // Allocate the published product in FINAL memory
         // This is the pointer that the future will return
@@ -930,6 +937,10 @@ namespace aveng {
         rec.erosion->eHeights.clear();
         rec.erosion->eHeights.reserve(ws.workHeights.size());
         rec.erosion->eHeights.insert(rec.erosion->eHeights.end(), ws.workHeights.begin(), ws.workHeights.end());
+
+#ifdef M_DEBUG
+        dumpChunkFinalHeightData(rec.coord, rec.erosion->eHeights);
+#endif
 
         // 6) Done. Scratch can be reused immediately by this worker for the next job.
         return rec.erosion;
