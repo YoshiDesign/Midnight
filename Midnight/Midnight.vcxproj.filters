@@ -198,6 +198,9 @@
     <ClCompile Include="Module\Procgen\Terrain\Erosion\Initialization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\ErosionManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">

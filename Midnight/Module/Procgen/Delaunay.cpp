@@ -262,15 +262,15 @@ namespace { // Note - these could be specified `inline` only to hint to the comp
     }
 
     // Adjust these field names to match your Triangle struct.
-    aveng::SiteIndex triA(const aveng::Triangle& t) { return static_cast<aveng::SiteIndex>(t.A); }
-    aveng::SiteIndex triB(const aveng::Triangle& t) { return static_cast<aveng::SiteIndex>(t.B); }
-    aveng::SiteIndex triC(const aveng::Triangle& t) { return static_cast<aveng::SiteIndex>(t.C); }
+    aveng::SiteIndex triA(const aveng::Triangle& t) { return t.A; }
+    aveng::SiteIndex triB(const aveng::Triangle& t) { return t.B; }
+    aveng::SiteIndex triC(const aveng::Triangle& t) { return t.C; }
 
     // Adjust these field names to match your HalfEdge struct.
-    aveng::SiteIndex heOrigin(const aveng::HalfEdge& e) { return static_cast<aveng::SiteIndex>(e.origin); }
-    aveng::EdgeIndex heTwin(const aveng::HalfEdge& e) { return static_cast<aveng::EdgeIndex>(e.twin); }
-    aveng::EdgeIndex heNext(const aveng::HalfEdge& e) { return static_cast<aveng::EdgeIndex>(e.next); }
-    aveng::TriIndex  heTri(const aveng::HalfEdge& e) { return static_cast<aveng::TriIndex>(e.tri); }
+    aveng::SiteIndex heOrigin(const aveng::HalfEdge& e) { return e.origin; }
+    aveng::EdgeIndex heTwin(const aveng::HalfEdge& e) { return e.twin; }
+    aveng::EdgeIndex heNext(const aveng::HalfEdge& e) { return e.next; }
+    aveng::TriIndex  heTri(const aveng::HalfEdge& e) { return e.tri; }
 
 
 }
@@ -281,6 +281,11 @@ namespace aveng {
     // Builds connectivity + caches from triangles.
     // - tris must be CCW for "inside circumcircle" / Voronoi orientation sanity.
     // - vertexPos is only needed for cache + circumcenters (can be omitted if you don’t want them).
+    /*
+    * Good to know things:
+    * - An edge's destination (proto: EdgeDest) is `halfEdges[ halfEdges[e].next ].origin;`
+    * - We don't have a `prev` member. We just use delaunay traversal based on next/twin to do that
+    */
     void BuildHalfEdgeMesh(
         std::span<const Vec2> vertexPos,
         Triangulation& out,
@@ -656,10 +661,16 @@ namespace aveng {
         return result;
     }
 
-    /* Math Warning */
-    /* You are now entering mathematical territory */
+    /*
+    * Math Warning 
+    * Barycentric / SampleScalar / TriangleGradient / TriangleNormal / SlopeAngle / SlopePercent: 
+    * these are for treating the terrain as a piecewise-linear continuous surface.
+    * (sample heights and gradients inside triangles)
+    * 
+    * 
+    */
     bool Barycentric(
-        const AllPoints& pts,
+        const AllPoints& allPts,
         const Triangulation& tri,
         TriIndex triID,
         const Vec2& p,
@@ -670,11 +681,11 @@ namespace aveng {
 
         const Triangle& t = getTri(tri, triID);
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
-        if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
+        if (!validSite(allPts, A) || !validSite(allPts, B) || !validSite(allPts, C)) return false;
 
-        const Vec2 a = pts.pts[A];
-        const Vec2 b = pts.pts[B];
-        const Vec2 c = pts.pts[C];
+        const Vec2 a = allPts.pts[A];
+        const Vec2 b = allPts.pts[B];
+        const Vec2 c = allPts.pts[C];
 
         const Vec2 v0 = b - a;
         const Vec2 v1 = c - a;
@@ -692,28 +703,28 @@ namespace aveng {
     }
 
     bool SampleScalar(
-        const AllPoints& pts,
+        const AllPoints& allPts,
         const Triangulation& tri,
         TriIndex triID,
         const Vec2& p,
         const float* valuesAtSites, size_t valuesCount,
         float& outValue
     ) {
-        (void)pts; // pts used via validSite checks / indexing
+        (void)allPts; // pts used via validSite checks / indexing
         if (!valuesAtSites) return false;
         if (!validTri(tri, triID)) return false;
         if (valuesCount < tri.siteEdge.size() && valuesCount < valuesCount) {
             // No-op; left intentionally empty (we can’t assume siteEdge == vertexCount always)
         }
         // We actually need valuesCount >= pts.pts.size()
-        if (valuesCount < pts.pts.size()) return false;
+        if (valuesCount < allPts.pts.size()) return false;
 
         BaryWeights w{};
-        if (!Barycentric(pts, tri, triID, p, w)) return false;
+        if (!Barycentric(allPts, tri, triID, p, w)) return false;
 
         const Triangle& t = getTri(tri, triID);
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
-        if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
+        if (!validSite(allPts, A) || !validSite(allPts, B) || !validSite(allPts, C)) return false;
 
         const float va = valuesAtSites[A];
         const float vb = valuesAtSites[B];
@@ -724,7 +735,7 @@ namespace aveng {
     }
 
     bool TriangleGradient(
-        const AllPoints& pts,
+        const AllPoints& allPts,
         const Triangulation& tri,
         TriIndex triID,
         const float* valuesAtSites, size_t valuesCount,
@@ -733,15 +744,15 @@ namespace aveng {
     ) {
         if (!valuesAtSites) return false;
         if (!validTri(tri, triID)) return false;
-        if (valuesCount < pts.pts.size()) return false;
+        if (valuesCount < allPts.pts.size()) return false;
 
         const Triangle& t = getTri(tri, triID);
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
-        if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
+        if (!validSite(allPts, A) || !validSite(allPts, B) || !validSite(allPts, C)) return false;
 
-        const Vec2 a = pts.pts[A];
-        const Vec2 b = pts.pts[B];
-        const Vec2 c = pts.pts[C];
+        const Vec2 a = allPts.pts[A];
+        const Vec2 b = allPts.pts[B];
+        const Vec2 c = allPts.pts[C];
 
         const float ha = valuesAtSites[A];
         const float hb = valuesAtSites[B];
@@ -764,7 +775,7 @@ namespace aveng {
     }
 
     bool TriangleNormal(
-        const AllPoints& pts,
+        const AllPoints& allPts,
         const Triangulation& tri,
         TriIndex triID,
         const float* heights, size_t heightsCount,
@@ -772,15 +783,15 @@ namespace aveng {
     ) {
         if (!heights) return false;
         if (!validTri(tri, triID)) return false;
-        if (heightsCount < pts.pts.size()) return false;
+        if (heightsCount < allPts.pts.size()) return false;
 
         const Triangle& t = getTri(tri, triID);
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
-        if (!validSite(pts, A) || !validSite(pts, B) || !validSite(pts, C)) return false;
+        if (!validSite(allPts, A) || !validSite(allPts, B) || !validSite(allPts, C)) return false;
 
-        const Vec2 a2 = pts.pts[A];
-        const Vec2 b2 = pts.pts[B];
-        const Vec2 c2 = pts.pts[C];
+        const Vec2 a2 = allPts.pts[A];
+        const Vec2 b2 = allPts.pts[B];
+        const Vec2 c2 = allPts.pts[C];
 
         const Vec3 a{ a2.x, heights[A], a2.y };
         const Vec3 b{ b2.x, heights[B], b2.y };
@@ -801,16 +812,16 @@ namespace aveng {
     }
 
     bool SlopeAngleRadians(
-        const AllPoints& pts,
+        const AllPoints& allPts,
         const Triangulation& tri,
         TriIndex triID,
         const float* heights, size_t heightsCount,
         float& outAngleRad
     ) {
         Vec3 n{};
-        if (!TriangleNormal(pts, tri, triID, heights, heightsCount, n)) return false;
+        if (!TriangleNormal(allPts, tri, triID, heights, heightsCount, n)) return false;
 
-        float cosAngle = n.y; // dot(n, up) since up=(0,1,0)
+        float cosAngle = -n.y; // dot(n, up) since up=(0,-1,0)
         cosAngle = std::clamp(cosAngle, -1.f, 1.f);
 
         outAngleRad = std::acos(cosAngle);
@@ -818,14 +829,14 @@ namespace aveng {
     }
 
     bool SlopePercent(
-        const AllPoints& pts,
+        const AllPoints& allPts,
         const Triangulation& tri,
         TriIndex triID,
         const float* heights, size_t heightsCount,
         float& outPercent
     ) {
         float dhdx = 0.f, dhdz = 0.f;
-        if (!TriangleGradient(pts, tri, triID, heights, heightsCount, dhdx, dhdz)) return false;
+        if (!TriangleGradient(allPts, tri, triID, heights, heightsCount, dhdx, dhdz)) return false;
 
         const float slope = std::sqrt(dhdx * dhdx + dhdz * dhdz);
         outPercent = slope * 100.f;
@@ -839,7 +850,7 @@ namespace aveng {
                 return static_cast<EdgeIndex>(i);
             }
         }
-        return -1;
+        return kInvalidEdge;
     }
 
     static void angleSortAround(
@@ -887,18 +898,18 @@ namespace aveng {
         if (!mr) return cell;
         if (!validSite(pts, site)) return cell;
 
-        EdgeIndex start = -1;
+        EdgeIndex start = kInvalidEdge;
         if (site >= 0 && static_cast<size_t>(site) < tri.siteEdge.size()) {
             start = tri.siteEdge[static_cast<size_t>(site)];
         }
-        if (start == -1) return cell;
+        if (start == kInvalidEdge) return cell;
 
         // Ensure we have an outgoing edge whose origin == site (defensive)
         if (start < 0 || static_cast<size_t>(start) >= tri.halfEdges.size() ||
             heOrigin(tri.halfEdges[static_cast<size_t>(start)]) != site)
         {
             start = findAnyOutgoing(tri, site);
-            if (start == -1) return cell;
+            if (start == kInvalidEdge) { return cell; }
         }
 
         cell.tris.reserve(8);
@@ -915,29 +926,29 @@ namespace aveng {
             if (visited.find(e) != visited.end()) break;
             visited.insert(e);
 
-            const HalfEdge& he = tri.halfEdges[static_cast<size_t>(e)];
+            const HalfEdge& he = tri.halfEdges[e];
             const TriIndex ti = heTri(he);
 
-            if (!validTri(tri, ti) || static_cast<size_t>(ti) >= tri.circumcenters.size()) {
+            if (!validTri(tri, ti) || ti >= tri.circumcenters.size()) {
                 closed = false;
                 break;
             }
 
             cell.tris.push_back(ti);
-            cell.vertices.push_back(tri.circumcenters[static_cast<size_t>(ti)]);
+            cell.vertices.push_back(tri.circumcenters[ti]);
 
             const EdgeIndex tw = heTwin(he);
-            if (tw == -1) { closed = false; break; }
-            if (tw < 0 || static_cast<size_t>(tw) >= tri.halfEdges.size()) { closed = false; break; }
+            if (tw == kInvalidEdge) { closed = false; break; }
+            if (tw < 0 || tw >= tri.halfEdges.size()) { closed = false; break; }
 
             // Move to next edge around the same site: twin.next
-            const EdgeIndex next = heNext(tri.halfEdges[static_cast<size_t>(tw)]);
-            if (next < 0 || static_cast<size_t>(next) >= tri.halfEdges.size()) { closed = false; break; }
+            const EdgeIndex next = heNext(tri.halfEdges[tw]);
+            if (next < 0 || next >= tri.halfEdges.size()) { closed = false; break; }
 
             e = next;
 
             // Safety: ensure we're still around the same site
-            if (heOrigin(tri.halfEdges[static_cast<size_t>(e)]) != site) {
+            if (heOrigin(tri.halfEdges[e]) != site) {
                 closed = false;
                 break;
             }
@@ -947,7 +958,7 @@ namespace aveng {
 
         if (doAngleSort) {
             angleSortAround(
-                pts.pts[static_cast<size_t>(site)],
+                pts.pts[site],
                 cell.tris,
                 cell.vertices,
                 mr

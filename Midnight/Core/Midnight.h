@@ -73,9 +73,6 @@ namespace aveng {
 		// ---- External state
 		GameData& game_data;
 
-		// ---- Internal APIs
-		TerrainController terrain_;
-		DebugController debug_;
 		GameServices gs_; // GameContext.h
 
 		// ---- Core state (order matters!)
@@ -112,7 +109,11 @@ namespace aveng {
 
 		// Threadpool
 		ThreadPoolTaskSystem taskSystem_;
+
+		// ---- Internal APIs
 		ChunkManager chunkManager_;
+		TerrainController terrain_;
+		DebugController debug_;
 
 		/*
 		* Note to self:

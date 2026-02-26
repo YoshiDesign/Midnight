@@ -5,11 +5,11 @@
 
 namespace aveng {
 
-	using EdgeIndex = int32_t;
-	using TriIndex = int32_t;
+	using EdgeIndex = uint32_t;
+	using TriIndex = uint32_t;
 	using SiteIndex = uint32_t;
-	static constexpr EdgeIndex kInvalidEdge = -1;
-	static constexpr TriIndex  kInvalidTri = -1;
+	static constexpr EdgeIndex kInvalidEdge = -1; // NOTE - These wrap... bc their types are uint32_t. I oops'd, but we can scale to 64 if we really need validity at that scale.
+	static constexpr TriIndex  kInvalidTri = -1;  // NOTE - So be consistently aware of this subtle alarm bell.
 
 	const enum Border {
 		Border_None = 0,
@@ -29,9 +29,9 @@ namespace aveng {
 	// Note that we don't have a `prev` member. We just use delaunay traversal based on next/twin to do that
 	struct HalfEdge {
 		SiteIndex origin;
-		int tri;    // face index
-		int next;
-		int twin;
+		uint32_t tri;    // face index
+		uint32_t next;
+		uint32_t twin;
 	};
 
 	// ---------- Temporary adjacency triangle (scratch) ----------
@@ -98,12 +98,19 @@ namespace aveng {
 		}
 	};
 
-	/* Global Terrain Config */
+	/*
+	* The ChunkManager makes use of each of the stage managers.
+	* It owns a TerrainConfig, while each of the other managers
+	* Have their own "Params" struct.
+	*/
+
+	/* Global Terrain Config - Used by the ChunkManager to orchestrate and define chunk generation */
 	struct TerrainConfig {
 		uint64_t worldSeed = 42;
-		float chunkSize = 256.f;
-		float minPointDist = 8.f;
-		float halo = 32.f;   // consider 4x minPointDist as a starting point
+		float chunkSize = 256.f;	// This determines the resolution of our chunks
+		float minPointDist = 8.f;	// Min distance between points - This number has a large influence on the perf of BlueNoise
+		float halo = 32.f;			// 4x minPointDist, for now
+		uint16_t nThreads = 0;
 		noise::NoiseParams noise{};
 		bool hydraulicErosionEnabled = true;
 		bool thermalErosionEnabled = true;
@@ -111,38 +118,42 @@ namespace aveng {
 		bool hardnessMapEnabled = true;
 	};
 
-	/* Stage Params */
+	/* Stage Params 
+	 * [IMPORTANT] Stage params set a hard limit on parallelism
+	 * by reading ITaskSystem::nThreads. Set this or else.
+	 * TODO - Remove defaults from this declaration
+	 */
 	struct HydraulicErosionParams{
-		uint32_t numDroplets = 60000;   // total droplets
-		uint32_t maxSteps = 32;      // steps per droplet (upper bound)
-		uint32_t batchSize = 2048;    // droplets per task
-		uint32_t maxWorkers = 8;
+		uint32_t numDroplets;   // total droplets
+		uint32_t maxSteps;		// steps per droplet (upper bound)
+		uint32_t batchSize;		// droplets per task
+		uint16_t maxWorkers;	// Dont forget to set this based on TerrainConfig::nThreads !!!!
 
-		float inertia = 0.05f;   // Pinertia
-		float gravity = 4.0f;
-		float pCapacity = 4.0f;
-		float pMinSlope = 0.01f;
-		float pDeposition = 0.3f;
-		float pErosion = 0.3f;
-		float pEvaporation = 0.01f;
+		float inertia;		   // Per the whitepaper
+		float gravity;		   // Per the whitepaper
+		float pCapacity;	   // Per the whitepaper
+		float pMinSlope;	   // Per the whitepaper
+		float pDeposition;	   // Per the whitepaper
+		float pErosion;		   // Per the whitepaper
+		float pEvaporation;	   // Per the whitepaper
 
-		// adjustable spawn margin (WORLD units). You asked to keep this tweakable.
-		float spawnMargin = 16.0f;
+		float spawnMargin;		// Drops don't land in the margin (in world space)
 
-		// extra evaporation in flats (requested)
-		float flatSlopeEps = 1e-4f;   // threshold for "close to 0" slope
-		float flatCapEps = 1e-4f;   // threshold for "nearly 0" capacity
-		float flatExtraEvap = 0.35f;   // additional evaporation factor when flat+low-cap
+		// extra evaporation in flats (this is my own addition, to save on compute)
+		float flatSlopeEps;		// threshold for "close to 0" slope
+		float flatCapEps;		// threshold for "nearly 0" capacity
+		float flatExtraEvap;	// additional evaporation factor when flat+low-cap
 
 		// droplet initial state
-		float initWater = 0.8f;
-		float initVel = 1.0f;
+		float initWater;
+		float initVel;
 	};
 
 	struct ThermalErosionParams {
 		float TalusThreshold;	// degrees angle of repose
 		float TransferRate;		// Transfer % of excess per iteration
 		size_t Iterations;
+		uint16_t maxWorkers;
 	};
 
 	struct HardnessParams {
@@ -166,7 +177,7 @@ namespace aveng {
 
 	/* Stage Settings */
 	struct ErosionSettings {
-		HydraulicErosionParams erosion{};
+		HydraulicErosionParams hydraulic{};
 		ThermalErosionParams thermal{};
 		HardnessParams hardness{};
 		RidgeParams ridges{};

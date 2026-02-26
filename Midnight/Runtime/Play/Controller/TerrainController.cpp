@@ -8,8 +8,9 @@ namespace aveng {
 	TerrainController::TerrainController(ChunkManager& chunks) noexcept 
 		: chunks_(&chunks) 
 	{
-        chunks_->setErosionManager(&erosionMgr_);
+        // Clearly, the Controller must outlive the Chunk Manager
 		std::printf("[%s] Constructing TerrainController\n", __FUNCTION__);
+        chunks_->initManagers(&erosionMgr_);
 	}
 
     // TODO - this isn't the only mgr which will need a frame index. Put it in 1 place and read it every frame.

@@ -2,34 +2,38 @@
 #include "Module/Procgen/Types.h"
 namespace procgen {
 
-	static aveng::ErosionSettings DefaultHydraulicErosion() {
+	/* Consider passing in the TerrainConfig to each, instead of nThreads - Add nThreads to TerrainConfig */
+
+	static aveng::ErosionSettings DefaultHydraulicErosion(uint16_t nThreads) {
 
 		aveng::HydraulicErosionParams hydraulic {
-			60000,	// total droplets
-			32,		// steps per droplet (upper bound)
-			2048,	// droplets per task
-			8,		// threads max
+			60000,	// numDroplets
+			32,		// maxSteps
+			2048,	// batchSize
+			std::floor(nThreads / 6), // maxWorkers: 1/6 of the hardware's threads
 
-			0.05f,	// Pinertia
-			4.0f,
-			4.0f,
-			0.01f,
-			0.3f,
-			0.3f,
-			0.01f,
+			0.05f,	 // inertia
+			4.0f,	 // gravity 
+			4.0f,	 // pCapacity 
+			0.01f,	 // pMinSlope 
+			0.3f,	 // pDeposition 
+			0.3f,	 // pErosion 
+			0.01f,	 // pEvaporation 
 
-			16.0f,
-			1e-4f,   // threshold for "close to 0" slope
-			1e-4f,   // threshold for "nearly 0" capacity
-			0.35f,   // additional evaporation factor when flat+low-capdrostate
-			0.8f,
-			1.0f
+			16.0f,	 // spawnMargin
+			1e-4f,   // flatSlopeEps
+			1e-4f,   // flatCapEps
+			0.35f,   // flatExtraEvap
+
+			0.8f,	 // initWater
+			1.0f	 // initVel
 		};
 
-		aveng::ThermalErosionParams thermal {
+		aveng::ThermalErosionParams thermal{
 			0.57,  // ~30 degrees angle of repose
 			0.25,  // Transfer 25% of excess per iteration
-			20	   // 20 Iterations
+			20,	   // 20 Iterations
+			std::floor(nThreads / 3)
 		};
 
 		aveng::HardnessParams hardness{

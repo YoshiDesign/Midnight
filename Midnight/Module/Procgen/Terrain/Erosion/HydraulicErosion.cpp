@@ -79,6 +79,9 @@ namespace procgen::detail {
 *    tiny vectors for "affected vertices" when doing localized accumulation
 * 
 * TLS Scratch becomes essential here.
+* 
+* [Optimizations]
+* 1. tiling/sparse accumulation
 */
 
 namespace procgen {
@@ -86,14 +89,14 @@ namespace procgen {
     // ---- The actual pass ----
     void ComputeHydraulicErosion(
         procgen::ErosionWorkingSet& ws,
-        const aveng::AllPoints& pts,
+        const aveng::AllPoints& allPts,
         const aveng::Triangulation& tri,
         const aveng::SpatialGrid& sg,
         const aveng::HydraulicErosionParams& cfg,
         uint64_t hydroSeed,
         aveng::ITaskSystem& tasks
     ) {
-        const size_t N = pts.pts.size(); // assuming AllPoints::pts is a vector<Vec2> in WORLD space
+        const size_t N = allPts.pts.size(); // assuming AllPoints::pts is a vector<Vec2> in WORLD space
         if (N == 0) return;
 
         // Ensure scratch buffers are sized
@@ -150,7 +153,7 @@ namespace procgen {
             const uint32_t end = std::min(total, begin + batchSize);
 
             // TODO : I don't think we're using thread local scratch allocation
-            futures.push_back(tasks.submit([=, &pts, &tri, &sg, &cfg]() -> std::vector<float> {
+            futures.push_back(tasks.submit([=, &allPts, &tri, &sg, &cfg]() -> std::vector<float> {
 
                 /*
                     TODO: Debugging
@@ -168,7 +171,7 @@ namespace procgen {
                 //std::pmr::memory_resource* mr = arena.mr();
 
                 std::vector<float> localDelta;
-                localDelta.assign(pts.pts.size(), 0.0f);
+                localDelta.assign(allPts.pts.size(), 0.0f);
 
                 for (uint32_t di = begin; di < end; ++di) {
                     aveng::SplitMix64 rng(aveng::cheapMix(hydroSeed, uint64_t(di)));
@@ -199,17 +202,17 @@ namespace procgen {
 
                         // Barycentric at current position
                         aveng::BaryWeights w1{};
-                        if (!aveng::Barycentric(pts, tri, t1, d.pos, w1)) { d.alive = false; break; }
+                        if (!aveng::Barycentric(allPts, tri, t1, d.pos, w1)) { d.alive = false; break; }
 
                         // Sample height at current position
                         float h1 = 0.f;
-                        if (!aveng::SampleScalar(pts, tri, t1, d.pos, heights, pts.pts.size(), h1)) {
+                        if (!aveng::SampleScalar(allPts, tri, t1, d.pos, heights, allPts.pts.size(), h1)) {
                             d.alive = false; break;
                         }
 
                         // Triangle gradient (constant over triangle)
                         float dhdx = 0.f, dhdz = 0.f;
-                        if (!aveng::TriangleGradient(pts, tri, t1, heights, pts.pts.size(), dhdx, dhdz)) {
+                        if (!aveng::TriangleGradient(allPts, tri, t1, heights, allPts.pts.size(), dhdx, dhdz)) {
                             d.alive = false; break;
                         }
 
@@ -227,21 +230,19 @@ namespace procgen {
 
                         // Sample height at new position
                         float h2 = 0.f;
-                        if (!aveng::SampleScalar(pts, tri, t2, d.pos, heights, pts.pts.size(), h2)) {
+                        if (!aveng::SampleScalar(allPts, tri, t2, d.pos, heights, allPts.pts.size(), h2)) {
                             d.alive = false; break;
                         }
                         
                         // Barycentric at new position (only needed for uphill logic; cheap enough to compute once)
                         aveng::BaryWeights w2{};
-                        if (!aveng::Barycentric(pts, tri, t2, d.pos, w2)) {
+                        if (!aveng::Barycentric(allPts, tri, t2, d.pos, w2)) {
                             d.alive = false; break;
                         }
                         
                         const float hdiff = h2 - h1; // <0 downhill
 
-                        // Tri vertex indices (you’ll have these in your Triangulation triangle storage)
-                        // IMPORTANT: replace this with your actual triangle access:
-                        // auto T1 = tri.tris[t1]; aveng::SiteIndex A = T1.A; ...
+                        // Tri vertex indices
                         const auto& T1 = tri.tris[t1];
                         const auto& T2 = tri.tris[t2];
                         const aveng::SiteIndex A1 = T1.A, B1 = T1.B, C1 = T1.C;
@@ -270,7 +271,7 @@ namespace procgen {
                                 toErode = std::min(toErode, -hdiff);
 
                                 // Hardness scaling: harder erodes less (hardness assumed [0..1])
-                                const float avgH = detail::AvgHardnessTri(std::span<const float>(hard, pts.pts.size()),
+                                const float avgH = detail::AvgHardnessTri(std::span<const float>(hard, allPts.pts.size()),
                                    A1, B1, C1, w1);
                                 toErode *= (1.0f - avgH);
 
@@ -356,10 +357,10 @@ namespace procgen {
             }
         }
 
-        // Apply delta into workHeights (in-place)
-        for (size_t i = 0; i < N; ++i) {
-            ws.workHeights[i] += ws.delta[i];
-        }
+        //// Apply delta into workHeights (in-place)
+        //for (size_t i = 0; i < N; ++i) {
+        //    ws.workHeights[i] += ws.delta[i];
+        //}
     }
 
 }

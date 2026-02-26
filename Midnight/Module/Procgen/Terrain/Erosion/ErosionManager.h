@@ -22,9 +22,11 @@ namespace procgen {
 		ErosionManager() = default;
 		~ErosionManager() = default;
 
-		const aveng::ErosionSettings& getActiveSettings() { return activeSettings; }
-		aveng::ErosionSettings setActiveSettings(size_t setIdx) { activeSettings = settings[setIdx]; return activeSettings; }
+		const aveng::ErosionSettings& getActiveSettings() { return activeSettings_; }
+		aveng::ErosionSettings switchToSettings(size_t setIdx) { activeSettings_ = settings_[setIdx]; return activeSettings_; }
+		bool switchToDefaultSettings(uint16_t nThreads=0);
 
+		// Set Explicit Parameters inside of the currently active ErosionSettings - Or we can provide an index to an ErosionSettings
 		void setHydraulicErosionParams(aveng::HydraulicErosionParams p) {} // TODO
 		void setThermalErosionParams(aveng::ThermalErosionParams p) {} // TODO
 		void setHardnessParams(aveng::HardnessParams p) {} // TODO
@@ -38,8 +40,9 @@ namespace procgen {
 
 	private:
 		// Selectable settings, whether presets or user-defined
-		std::vector<aveng::ErosionSettings> settings;
-		aveng::ErosionSettings activeSettings;
+		std::vector<aveng::ErosionSettings> settings_;
+		aveng::ErosionSettings activeSettings_;
+		uint16_t nThreads;
 
 	};
 }

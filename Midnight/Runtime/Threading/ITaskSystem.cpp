@@ -8,6 +8,7 @@ namespace aveng {
 
     ThreadPoolTaskSystem::ThreadPoolTaskSystem(uint32_t threadCount) {
         std::cout << __FUNCTION__ << "Starting ThreadPoolTaskSystem with " << threadCount << " threads." << std::endl;
+        nThreads_ = threadCount;
         start(threadCount);
     }
 

@@ -216,6 +216,7 @@
     <ClCompile Include="Module\Procgen\Noise\Bluenoise.cpp" />
     <ClCompile Include="Module\Procgen\SpatialGrid.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\ChunkManager.cpp" />
+    <ClCompile Include="Module\Procgen\Terrain\Erosion\ErosionManager.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\Initialization.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ThermalErosion.cpp" />

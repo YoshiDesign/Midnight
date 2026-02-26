@@ -7,6 +7,7 @@
 #include "Module/Procgen/Terrain/Erosion/Data.h"
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Terrain/Erosion/HydraulicErosion.h"
+#include "Module/Procgen/Terrain/Erosion/ThermalErosion.h"
 #include "Module/Procgen/Terrain/Erosion/Initialization.h"
 
 #ifdef M_DEBUG
@@ -20,6 +21,8 @@
 
 namespace {
 
+    // TODO - Idk where to put this yet. I'm sure we'll land on a convention
+    // as procgen grows.
     void ApplyDelta(std::span<float> work, std::span<const float> delta) {
 #ifdef M_DEBUG
         assert(work.size() == delta.size() && "ApplyDelta: size mismatch");
@@ -35,20 +38,6 @@ namespace {
 namespace aveng {
 
 #ifdef M_DEBUG
-
-    void dumpSpatialGridData(ChunkCoord coord, const SpatialGrid* grid) {
-        namespace fs = std::filesystem;
-
-        fs::path exeDir = fs::current_path() / "dump";
-
-        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
-
-        fs::path fullPath = exeDir /
-            std::format("chunk_{}_sgrid.txt", name);
-
-        Debug::writeSgridDataToFile(fullPath, grid);
-
-    }
 
 	// Height data writer for debugging
     void dumpChunkHeightData(ChunkCoord coord, std::span<float> data)
@@ -78,6 +67,64 @@ namespace aveng {
 		Debug::writeTriangulationDataToFile(fullPath, tri_data);
 
     }
+
+    void dumpSpatialGridData(ChunkCoord coord, const SpatialGrid* grid) {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}_sgrid.txt", name);
+
+        Debug::writeSgridDataToFile(fullPath, grid);
+
+    }
+
+    void dumpHydraulicData(ChunkCoord coord, const procgen::ErosionWorkingSet* ws) {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}_hydro.txt", name);
+
+        Debug::writeHydroDataToFile(fullPath, ws->delta);
+
+    }
+
+    void dumpThermalData(ChunkCoord coord, const procgen::ErosionWorkingSet* ws) {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}_hydro.txt", name);
+
+        Debug::writeThermalDataToFile(fullPath, ws->delta);
+
+    }
+
+    // Height data writer for debugging
+    void dumpChunkFinalHeightData(ChunkCoord coord, std::span<float> data)
+    {
+        namespace fs = std::filesystem;
+
+        fs::path exeDir = fs::current_path() / "dump";
+
+        std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
+
+        fs::path fullPath = exeDir /
+            std::format("chunk_{}_FinalHeights.txt", name);
+
+        Debug::writeFinalHeightDataToFile(fullPath, data);
+    }
+
 #endif
 
     // Get 3x3 neighborhood coordinates (including self at center)
@@ -176,11 +223,23 @@ namespace aveng {
         }
     };
 
-    void ChunkManager::setErosionManager(procgen::ErosionManager* er)
+    /* Manager Setups */
+    void ChunkManager::initManagers(procgen::ErosionManager* er)
     {
+        // So far we only have an ErosionManager
         erosionMgr_ = er;
+        initManagerDefaults();
     }
-    
+
+    void ChunkManager::initManagerDefaults()
+    {
+        // nThreads is required for init.
+        if (!erosionMgr_->switchToDefaultSettings(cfg_.nThreads)) {
+            // User Error... you probably didn't init TerrainConfig properly.
+        }
+    }
+    /* Manager Setups */
+
     /*
     * Policy 
     * - pointers returned by futures are only valid while the chunk is pinned.
@@ -293,8 +352,7 @@ namespace aveng {
                 auto h = tasks_.wait(requestHeights(rec->coord, frameIndex));
                 auto tri = tasks_.wait(requestTriangulation(rec->coord, frameIndex));
                 auto spa = tasks_.wait(requestSpatialGrid(rec->coord, frameIndex));
-                
-                //auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
+                auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
 
                 //auto mesh = buildMesh(*rec);
 
@@ -307,6 +365,12 @@ namespace aveng {
         return rec->meshF;
     }
 
+
+    ChunkManager::ChunkManager(ThreadPoolTaskSystem& tasks)
+        : tasks_(tasks) 
+    {
+        cfg_ = defaultTerrainConfig(); // Global Config
+    }
 
     std::shared_future<Points const*> ChunkManager::requestPoints(ChunkCoord c, uint64_t frameIndex)
     {
@@ -420,11 +484,15 @@ namespace aveng {
         auto rec = getOrCreateRecord(c);
 
         std::call_once(rec->erosionOnce, [this, rec, frameIndex] {
+
+            // Get settings
             const ErosionSettings s = erosionMgr_ ? erosionMgr_->getActiveSettings() : ErosionSettings{};
+
             rec->erosionF = tasks_.submit([this, rec, s, frameIndex]() -> ErosionField const* {
                 RecordPin taskHold(*this, rec);
                 return buildErosion(*rec, s);
             });
+
         });
 
         return rec->erosionF;
@@ -750,6 +818,7 @@ namespace aveng {
         dumpSpatialGridData(rec.coord, &(*rec.spatial));
         // Return stable pointer into the optional.
         return &(*rec.spatial);
+
     }
 
     ErosionField const* ChunkManager::buildErosion(ChunkRecord& rec, const ErosionSettings& settings)
@@ -802,9 +871,9 @@ namespace aveng {
 
         // 2) Hardness in scratch
         procgen::ComputeHardnessMap(
-            ws.workHeights,
-			rec.allPoints->pts, // INVARIANT REMINDER - allPoints->pts.size() == heightField->heights.size()
             ws.hardness, 
+			rec.allPoints->pts, // INVARIANT REMINDER - allPoints->pts.size() == heightField->heights.size()
+            ws.workHeights,
             settings.hardness,
             hardnessSeed
         );
@@ -815,24 +884,41 @@ namespace aveng {
             *rec.allPoints, 
             *rec.triangulation, 
             rec.spatial.value(), 
-            erosionMgr_->getActiveSettings().erosion,
+            settings.hydraulic,
             hydroSeed,
             tasks_
         );
 
+#ifdef M_DEBUG
+        dumpHydraulicData(rec.coord, &ws);
+#endif
+
         ApplyDelta(ws.workHeights, ws.delta);
+        std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
 
         // 4) Thermal pass writes ws.delta, then apply
-        //ComputeThermalErosion(ws.workHeights, ws.hardness, ws.delta, /*...*/);
-        //ApplyDelta(ws.workHeights, ws.delta);
+        procgen::ComputeThermalErosion(
+            ws,  
+            *rec.allPoints,
+            *rec.triangulation,
+            rec.spatial.value(),
+            settings.thermal,
+            thermalSeed,
+            tasks_
+        );
+
+        ApplyDelta(ws.workHeights, ws.delta);
+        std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+
+        dumpChunkFinalHeightData(rec.coord, ws.workHeights);
 
         //// 5) Ridge enhancement can use ping-pong:
         //ws.ping.resize(N);
         //RidgePassPingPong(ws.workHeights, ws.ping, /*...*/);
         //ws.workHeights.swap(ws.ping);
 
-        // 4) Allocate the published product in FINAL memory.
-        //    This is the pointer that the future will return, so it must outlive scratch.
+        // Allocate the published product in FINAL memory
+        // This is the pointer that the future will return
         if (!rec.erosion) {
             auto alloc = std::pmr::polymorphic_allocator<ErosionField>(rec.final.mr());
             rec.erosion = alloc.allocate(1);
@@ -848,14 +934,6 @@ namespace aveng {
         // 6) Done. Scratch can be reused immediately by this worker for the next job.
         return rec.erosion;
 
-        //// 6) Publish output in final
-        //auto* out = rec.final.make<ErosionField>(finalMr); // however you allocate
-        //out->heights = std::pmr::vector<float>(finalMr);
-        //out->heights.resize(N);
-        //std::copy(ws.workHeights.begin(), ws.workHeights.end(), out->heights.begin());
-
-        //rec.erosion = out;
-        //return out;
     }
 
     /* Lifetime saftey features below */

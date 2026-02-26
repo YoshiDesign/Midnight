@@ -39,7 +39,9 @@ namespace aveng {
     private:
         static ChunkCoord offsetCoord(ChunkCoord base, int dx, int dz) noexcept;
 
+        // CEO
         ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
+        // Managers
         procgen::ErosionManager erosionMgr_;
 
         uint64_t frameIndex_ = 0;

@@ -119,6 +119,8 @@ namespace aveng {
 
         ~ThreadPoolTaskSystem() override;
 
+        uint16_t nThreads() { return nThreads_; }
+
     private:
 
       /*
@@ -148,6 +150,7 @@ namespace aveng {
         std::deque<std::function<void()>> q_;
         std::vector<std::thread> workers_;
         std::atomic<bool> stopping_{ false };
+        uint16_t nThreads_{0}; // Access for MT'd stages to adjust concurrency
 
 		// This allows us to detect if we're on a worker thread. You set it inside of worker threads.
 		// Currently unused, but this would allow us to implement features like:

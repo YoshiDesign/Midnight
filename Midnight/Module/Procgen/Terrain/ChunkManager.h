@@ -60,10 +60,14 @@ namespace aveng {
     class ChunkManager {
     public:
 
-        explicit ChunkManager(ITaskSystem& tasks)
-            : tasks_(tasks) {
-            cfg_ = defaultTerrainConfig(); // Global Config
-        }
+        explicit ChunkManager(ThreadPoolTaskSystem& tasks);
+
+        /*
+        * Note: Configs & Params are bound to balloon into a sub-system
+        * 
+        * - Noise Params live inside of TerrainConfig
+        * - 
+        */
 
         noise::NoiseParams defaultNoiseParams() {
             return {
@@ -81,6 +85,7 @@ namespace aveng {
                 256.f,  // chunkSize
                 8.f,    // minPointDist
                 32.f,   // halo
+                tasks_.nThreads(),
 				defaultNoiseParams(),
                 true,
                 true,
@@ -89,7 +94,6 @@ namespace aveng {
             };
         }
 
-        void setErosionManager(procgen::ErosionManager* er);
 
         // Very dangerous Public API (extend as needed, but work in tandem with pin/unpin)
         // Lifetime safety is paramount.
@@ -113,8 +117,15 @@ namespace aveng {
                                                         // or: % STRIPES if not power-of-two
         }
 
+        /* Managers - TODO - More managers */
+        void initManagers(procgen::ErosionManager* er);
+
     private:
         ChunkRecord* getOrCreateRecord(ChunkCoord c);
+
+        /* Params, stage managers and Configs */
+        void initManagerDefaults();
+
 
         procgen::ErosionManager* erosionMgr_ = nullptr;
 
@@ -127,7 +138,7 @@ namespace aveng {
         ErosionField const* buildErosion(ChunkRecord& r, const ErosionSettings& settings);       // alloc in scratch
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
 
-        ITaskSystem& tasks_;
+        ThreadPoolTaskSystem& tasks_;
         TerrainConfig cfg_; // Note that this differs from our prototype, where each Chunk owned its own config
 
 		static constexpr size_t STRIPES = 64; // This should be a power of two for the bitwise bucket calculation to work correctly

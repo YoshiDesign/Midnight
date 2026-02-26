@@ -73,8 +73,10 @@ namespace aveng {
             }
         }
 
-        static void writeHeightDataToFile(const fs::path& path,
-            const std::span<float> heights)
+        static void writeHeightDataToFile(
+            const fs::path& path,
+            const std::span<float> heights
+        )
         {
             // Ensure parent directory exists
             if (!path.parent_path().empty())
@@ -693,6 +695,90 @@ namespace aveng {
             file << "\n--- Done ---\n";
         }
 
+        // Dump hydro erosion deltas
+        static void writeHydroDataToFile(const fs::path& path, std::span<const float> deltas) {
+        
+            // Ensure parent directory exists
+            if (!path.parent_path().empty())
+            {
+                fs::create_directories(path.parent_path());
+            }
+            std::ofstream file(path);
+            if (!file)
+            {
+                throw std::runtime_error(
+                    std::format("Failed to open debug file: {}", path.string()));
+            }
+
+            file << "--- Hydraulic Height Deltas ---\n";
+            file << "Count: " << deltas.size() << "\n\n";
+
+            // Column header
+            file << "Index,Delta-Height\n";
+
+            for (size_t i = 0; i < deltas.size(); ++i)
+            {
+                file << i << ","
+                    << deltas[i] << "\n";
+            }
+        }
+        
+        // Dump thermal erosion deltas
+        static void writeThermalDataToFile(const fs::path& path, std::span<const float> deltas) {
+        
+            // Ensure parent directory exists
+            if (!path.parent_path().empty())
+            {
+                fs::create_directories(path.parent_path());
+            }
+            std::ofstream file(path);
+            if (!file)
+            {
+                throw std::runtime_error(
+                    std::format("Failed to open debug file: {}", path.string()));
+            }
+
+            file << "--- Thermal Height Deltas ---\n";
+            file << "Count: " << deltas.size() << "\n\n";
+
+            // Column header
+            file << "Index,Delta-Height\n";
+
+            for (size_t i = 0; i < deltas.size(); ++i)
+            {
+                file << i << ","
+                    << deltas[i] << "\n";
+            }
+        }
+
+        static void writeFinalHeightDataToFile(
+            const fs::path& path,
+            const std::span<float> heights
+        )
+        {
+            // Ensure parent directory exists
+            if (!path.parent_path().empty())
+            {
+                fs::create_directories(path.parent_path());
+            }
+            std::ofstream file(path);
+            if (!file)
+            {
+                throw std::runtime_error(
+                    std::format("Failed to open debug file: {}", path.string()));
+            }
+            file << "--- Final Height Data ---\n";
+            file << "Count: " << heights.size() << "\n\n";
+            // Column header
+            file << "Index,Height\n";
+            for (size_t i = 0; i < heights.size(); ++i)
+            {
+                file << i << ","
+                    << heights[i] << "\n";
+            }
+        }
+
 	private:
 	};
+
 }
