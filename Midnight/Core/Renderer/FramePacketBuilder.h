@@ -67,6 +67,7 @@ namespace aveng {
         uint32_t boneBaseOffset = 0;        // running prefix sum in bone matrices
     };
 
+    // Frame Packet data is 100% ready draw routines
     struct FramePacket {
         uint32_t frameIndex = 0;
         uint64_t frameNumber = 0;
@@ -84,8 +85,8 @@ namespace aveng {
         uint32_t staticBatchCount = 0;
         uint32_t animatedBatchCount = 0;
 
-        // Pre-extracted instance data (ready for GPU upload)
-        std::vector<glm::mat4> worldMatrices;
+        // Instance data
+        std::vector<glm::mat4> worldMatrices; // Each Model Matrix of this packet's draw list
         std::vector<NodeTransformData> nodeTransformData;  // Already padded to aligned counts
 
         std::span<const uint32_t> dirtyStaticSlots{};
@@ -97,13 +98,13 @@ namespace aveng {
         bool deterministicBatches = false;
 
         // Choose your "source of truth" for ordering:
-        // - instancesInOrder keeps a global per-pool order
+        // - instancesInOrder keeps a global per-pool order - do not use this.
         // - instancesPerModel groups by model first (order within model = vector order)
         bool preferInstancesInOrder = false;
 
         // If true, assigns basePickId per batch (1..N). If false, basePickId=0.
         bool assignPickIds = false;
-        uint32_t pickIdStart = 1;
+        uint32_t pickIdStart = 1; // Skip the null instance
     };
 
     class FramePacketBuilder final {
@@ -151,7 +152,7 @@ namespace aveng {
 
             // Clear previous frame data - we could alternatively clean this up after each frame is completed in a GC step
             pkt.drawList.clear();
-            pkt.batches.clear();    /// TODO can we reserve this too? Only if you can determine batches in advance
+            pkt.batches.clear();    /// TODO can we reserve this too? - Only if you can determine batches in advance
             pkt.worldMatrices.clear();
             pkt.frameIndex = frameIndex;
             pkt.frameNumber = frameNumber;

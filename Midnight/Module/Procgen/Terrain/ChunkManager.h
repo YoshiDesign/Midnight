@@ -94,7 +94,6 @@ namespace aveng {
             };
         }
 
-
         // Very dangerous Public API (extend as needed, but work in tandem with pin/unpin)
         // Lifetime safety is paramount.
         std::shared_future<Points const*>           requestPoints(ChunkCoord c, uint64_t frameIndex);

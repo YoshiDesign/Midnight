@@ -51,7 +51,7 @@ const uint MAX_ADJACENT_TRIS = 12;
 
 struct VertexAdjacency
 {
-    // IMPORTANT ASSUMPTION:
+    // IMPORTANT
     // triangleIndices[] are CHUNK-LOCAL triangle IDs in [0..numTriangles).
     // We'll add pc.baseTriangle when indexing shared triangle/face arrays.
     uint triangleIndices[MAX_ADJACENT_TRIS];
@@ -240,7 +240,7 @@ void main()
     // -------------------------
     // 3) Material weights (grass/rock/snow)
     // -------------------------
-    float h = positions[vGlobal].y;
+    float h = -positions[vGlobal].y;                                // Note: negated to assume our convention
 
     float rockW = smooth01(ubo.rockStart, ubo.rockEnd, steepness);
 

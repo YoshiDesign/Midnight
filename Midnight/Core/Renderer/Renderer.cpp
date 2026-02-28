@@ -56,6 +56,8 @@ namespace aveng {
 		renderData.rdAvengAnimationDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		renderData.rdAvengBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		renderData.rdAvengComputeBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.basicLightingDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 
 		recreateSwapChain();
@@ -511,7 +513,8 @@ namespace aveng {
 			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpCreateInfo,
 				nullptr, &renderData.rdAvengDescriptorLayout);
 			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+				Logger::log(1, "%s error: could not create Assimp buffer descriptor \
+					set layout (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
 		}
@@ -557,7 +560,8 @@ namespace aveng {
 			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpSkinningCreateInfo,
 				nullptr, &renderData.rdAvengAnimationDescriptorLayout);
 			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp skinning buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+				Logger::log(1, "%s error: could not create Assimp skinning buffer descriptor \
+					set layout (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
 		}
@@ -588,7 +592,8 @@ namespace aveng {
 			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpTransformCreateInfo,
 				nullptr, &renderData.rdAvengComputeTransformDescriptorLayout);
 			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp transform compute buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+				Logger::log(1, "%s error: could not create Assimp transform compute \
+					buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
 		}
@@ -620,7 +625,8 @@ namespace aveng {
 			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpMatrixMultCreateInfo,
 				nullptr, &renderData.rdAvengComputeMatrixMultDescriptorLayout);
 			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp matrix multiplication global compute buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+				Logger::log(1, "%s error: could not create Assimp matrix multiplication \
+					global compute buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
 		}
@@ -657,6 +663,128 @@ namespace aveng {
 			}
 		}
 
+		/* 
+		 * Terrain - Basic Vertex & Fragment Shader support (currently terrain_1.vert and terrain-triplanar_1.frag)
+		 * Note that we're including the texture binding in this descriptor set. Binding 0
+		 */
+		{
+			VkDescriptorSetLayoutBinding uboProjViewBind{};
+			uboProjViewBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			uboProjViewBind.binding = 1;
+			uboProjViewBind.descriptorCount = 1;
+			uboProjViewBind.pImmutableSamplers = nullptr;
+			uboProjViewBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			
+			VkDescriptorSetLayoutBinding uboTerrainModelMatBind{};
+			uboTerrainModelMatBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			uboTerrainModelMatBind.binding = 2;
+			uboTerrainModelMatBind.descriptorCount = 1;
+			uboTerrainModelMatBind.pImmutableSamplers = nullptr;
+			uboTerrainModelMatBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+			VkDescriptorSetLayoutBinding inCompVertexNormBind{};
+			inCompVertexNormBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			inCompVertexNormBind.binding = 3;
+			inCompVertexNormBind.descriptorCount = 1;
+			inCompVertexNormBind.pImmutableSamplers = nullptr;
+			inCompVertexNormBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+			VkDescriptorSetLayoutBinding inCompVertexWeightBind{};
+			inCompVertexWeightBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			inCompVertexWeightBind.binding = 4;
+			inCompVertexWeightBind.descriptorCount = 1;
+			inCompVertexWeightBind.pImmutableSamplers = nullptr;
+			inCompVertexWeightBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			
+			VkDescriptorSetLayoutBinding inCompVertexSteepBind{};
+			inCompVertexSteepBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			inCompVertexSteepBind.binding = 5;
+			inCompVertexSteepBind.descriptorCount = 1;
+			inCompVertexSteepBind.pImmutableSamplers = nullptr;
+			inCompVertexSteepBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+			/* Terrain Texturing - Triplanar (used in [terrain-triplanar_1.frag]) */
+			VkDescriptorSetLayoutBinding terrainTextureBind{};
+			terrainTextureBind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			terrainTextureBind.binding = 0;
+			terrainTextureBind.descriptorCount = 1;
+			terrainTextureBind.pImmutableSamplers = nullptr;
+			terrainTextureBind.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			std::vector<VkDescriptorSetLayoutBinding> terrainBindings = { 
+				terrainTextureBind, uboProjViewBind, uboTerrainModelMatBind,
+				inCompVertexNormBind, inCompVertexWeightBind, inCompVertexSteepBind
+			};
+
+			VkDescriptorSetLayoutCreateInfo terrainBasicCreateInfo{};
+			terrainBasicCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			terrainBasicCreateInfo.bindingCount = static_cast<uint32_t>(terrainBindings.size());
+			terrainBasicCreateInfo.pBindings = terrainBindings.data();
+
+			result = vkCreateDescriptorSetLayout(engineDevice.device(), &terrainBasicCreateInfo,
+				nullptr, &renderData.rdTerrainBasicDescriptorLayout);
+			if (result != VK_SUCCESS) {
+				Logger::log(1, "%s error: could not create Assimp texture descriptor set layout (error: %i)\n", __FUNCTION__, result);
+				return false;
+			}
+		}
+
+		{ // Basic Terrain Compute
+			VkDescriptorSetLayoutBinding terrainSettingsUBOBind{};
+			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			terrainSettingsUBOBind.binding = 0;
+			terrainSettingsUBOBind.descriptorCount = 1;
+			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkDescriptorSetLayoutBinding terrainFaceNormAreaSsboBind{};
+			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			terrainSettingsUBOBind.binding = 1;
+			terrainSettingsUBOBind.descriptorCount = 1;
+			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkDescriptorSetLayoutBinding terrainAdjacencySsboBind{};
+			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			terrainSettingsUBOBind.binding = 2;
+			terrainSettingsUBOBind.descriptorCount = 1;
+			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkDescriptorSetLayoutBinding terrainTrianglesSsboBind{};
+			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			terrainSettingsUBOBind.binding = 3;
+			terrainSettingsUBOBind.descriptorCount = 1;
+			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			VkDescriptorSetLayoutBinding terrainPositionsSsboBind{};
+			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			terrainSettingsUBOBind.binding = 4;
+			terrainSettingsUBOBind.descriptorCount = 1;
+			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+			std::vector<VkDescriptorSetLayoutBinding> terrainBasicCompBindings = { 
+				terrainSettingsUBOBind, 
+				terrainFaceNormAreaSsboBind, 
+				terrainAdjacencySsboBind, 
+				terrainTrianglesSsboBind, 
+				terrainPositionsSsboBind 
+			};
+
+			VkDescriptorSetLayoutCreateInfo BasicTerrainCompCreateInfo{};
+			BasicTerrainCompCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			BasicTerrainCompCreateInfo.bindingCount = static_cast<uint32_t>(terrainBasicCompBindings.size());
+			BasicTerrainCompCreateInfo.pBindings = terrainBasicCompBindings.data();
+
+			result = vkCreateDescriptorSetLayout(engineDevice.device(), &BasicTerrainCompCreateInfo,
+				nullptr, &renderData.rdAvengComputeBasicTerrainDescriptorLayout);
+			if (result != VK_SUCCESS) {
+				Logger::log(1, "%s error: could not create Assimp skinning buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -716,6 +844,36 @@ namespace aveng {
 				&renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
 			if (result != VK_SUCCESS) {
 				Logger::log(1, "%s error: could not allocate Assimp Matrix Mult Compute descriptor set (error: %i)\n", __FUNCTION__, result);
+				return false;
+			}
+
+			/* Basic Terrain */
+			VkDescriptorSetAllocateInfo basicTerrainInfo{};
+			basicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			basicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
+			basicTerrainInfo.descriptorSetCount = 1;
+			basicTerrainInfo.pSetLayouts = &renderData.rdTerrainBasicDescriptorLayout;
+
+			result = vkAllocateDescriptorSets(engineDevice.device(), &basicTerrainInfo,
+				&renderData.rdAvengBasicTerrainDescriptorSets[i]);
+			if (result != VK_SUCCESS) {
+				Logger::log(1, "%s error: could not allocate Basic \
+					Terrain descriptor set (error: %i)\n", __FUNCTION__, result);
+				return false;
+			}
+
+			/* Basic Terrain Compute */
+			VkDescriptorSetAllocateInfo computeBasicTerrainInfo{};
+			computeBasicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			computeBasicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
+			computeBasicTerrainInfo.descriptorSetCount = 1;
+			computeBasicTerrainInfo.pSetLayouts = &renderData.rdAvengComputeBasicTerrainDescriptorLayout;
+
+			result = vkAllocateDescriptorSets(engineDevice.device(), &computeBasicTerrainInfo,
+				&renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
+			if (result != VK_SUCCESS) {
+				Logger::log(1, "%s error: could not allocate Basic Terrain \
+					Compute descriptor set (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
 
@@ -812,9 +970,10 @@ namespace aveng {
 			return false;
 		}
 
-		/* transform compute */
+		/* Compute PCs */
 		std::vector<VkPushConstantRange> computePushConstants = { { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkComputePushConstants) } };
 
+		/* Animation Dispatch - transform compute */
 		std::vector<VkDescriptorSetLayout> transformLayouts = { renderData.rdAvengComputeTransformDescriptorLayout };
 
 		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout, transformLayouts, computePushConstants)) {
@@ -822,11 +981,24 @@ namespace aveng {
 			return false;
 		}
 
-		/* matrix mult compute */
+		/* Animation Dispatch - matrix mult compute - Descriptor Layouts */
 		std::vector<VkDescriptorSetLayout> matrixMultLayouts = {
 		  renderData.rdAvengComputeMatrixMultDescriptorLayout, renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout};
 
+		// Pipeline
 		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout, matrixMultLayouts, computePushConstants)) {
+			std::printf("%s error: could not init Assimp matrix multiplication compute pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+
+		/* Terrain Compute - PCs */
+		std::vector<VkPushConstantRange> terrainComputePushConstant = { {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkBasicTerrainComputePushConstants)} };
+
+		/* Terrain Dispatch - basic terrain compute */
+		std::vector<VkDescriptorSetLayout> terrainLayouts = { renderData.rdAvengComputeBasicTerrainDescriptorLayout };
+
+		// Pipeline
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeBasicTerrainPipelineLayout, matrixMultLayouts, computePushConstants)) {
 			std::printf("%s error: could not init Assimp matrix multiplication compute pipeline layout\n", __FUNCTION__);
 			return false;
 		}
@@ -872,6 +1044,7 @@ namespace aveng {
 			return false;
 		}
 
+		// For future reference, we'll be adding a line drawing pipeline during the game's runtime too, not just the editor.
 		//vertexShaderFile = "shader/line.vert.spv";
 		//fragmentShaderFile = "shader/line.frag.spv";
 		//if (!LinePipeline::init(engineDevice, renderPass, renderData.rdLinePipelineLayout, renderData.rdLinePipeline,
@@ -892,6 +1065,30 @@ namespace aveng {
 	}
 
 	void Renderer::runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t numberOfBones) {
+
+		/*
+		* Potential for optimization:
+		* Use the same pipeline layout for both pipelines (trs and skin-mat) (same set layouts / push constants), so descriptor sets stay compatible.
+		* Ideally, use one descriptor set that contains both buffers, and just dispatch twice (you'll still bind pipelines, 
+		* but you may not need to rebind sets if they're unchanged). So, still 2 pipeline binds, but no rebinding descriptors / pc's
+		* 
+		* However... If the trs -> skin mat compute is a strict chain, we can just combine them into 1 compute shader.
+		* This only works as long as skinning reads from only identical invocations.
+		* 
+		* Or, VK_EXT_shader_object and redesign the whole lot (might not be relevant to this particular renderer)
+		* 
+		* Moderninzing:
+		* Since we support Vulkan 1.3+, refer vkCmdPipelineBarrier2 with VkBufferMemoryBarrier2 and explicit stage/access masks.
+		*/
+
+		/*
+		* Good thing to note here about synchronization:
+		* `vkCmdPipelineBarrier` creates a dependency for commands before/after it in the same command buffer.
+		* Our draws are in a different command buffer than compute cmd's, so the barrier below can't directly 
+		* form a dependency with graphics commands.
+		* This is why we use a semaphore to signal 
+		*/
+
 		// VkCommandBuffer computeCommandBuffer = getCurrentCommandBufferCompute();
 		uint32_t groupsY = (numInstances + 31) / 32;
 		/* node transformation */
@@ -956,7 +1153,7 @@ namespace aveng {
 		boneMatrixBufferBarrier.size = VK_WHOLE_SIZE;
 
 		vkCmdPipelineBarrier(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, // TODO - Inspect the dstStageMask usage
 			&boneMatrixBufferBarrier, 0, nullptr);
 	}
 
@@ -1543,13 +1740,13 @@ namespace aveng {
 			std::vector<VkWriteDescriptorSet> matrixMultWriteDescriptorSets =
 			{ trsWriteDescriptorSet, boneMatrixWriteDescriptorSet };
 
-			std::cout
-				<< "[DS BONEMAT UPDATE] frame=" << currentFrameIndex
-				<< " set=1 binding=1"
-				<< " buffer=" << mShaderTrsMatrixBuffers.at(currentFrameIndex).buffer
-				<< " range=" << boneMatrixInfo.range
-				<< " ssboSize=" << mShaderTrsMatrixBuffers.at(currentFrameIndex).bufferSize
-				<< std::endl;
+			//std::cout
+			//	<< "[DS BONEMAT UPDATE] frame=" << currentFrameIndex
+			//	<< " set=1 binding=1"
+			//	<< " buffer=" << mShaderTrsMatrixBuffers.at(currentFrameIndex).buffer
+			//	<< " range=" << boneMatrixInfo.range
+			//	<< " ssboSize=" << mShaderTrsMatrixBuffers.at(currentFrameIndex).bufferSize
+			//	<< std::endl;
 
 			vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(matrixMultWriteDescriptorSets.size()),
 				matrixMultWriteDescriptorSets.data(), 0, nullptr);
@@ -1611,6 +1808,7 @@ namespace aveng {
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengAnimationPipelineLayout);
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformPipelineLayout);
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeBasicTerrainPipelineLayout);
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
@@ -1625,6 +1823,7 @@ namespace aveng {
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeTransformDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
+			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
 
 		}
 
@@ -1634,6 +1833,7 @@ namespace aveng {
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeTransformDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeBasicTerrainDescriptorLayout, nullptr);
 
 		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
 

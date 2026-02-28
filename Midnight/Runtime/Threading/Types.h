@@ -43,6 +43,8 @@ namespace aveng
 	// Hence, our .cpp implementation of StripeBucket defines the destructor out-of-line, where we can include 
     // the full definition of ChunkRecord without blowing anything to smithereens.
 
+    // This is currently our Terrain Chunk storage during generation stages.
+    // This data should be able to be safely discarded once the final renderable is derived.
     struct StripeBucket {
         std::mutex mut;
         std::unordered_map<ChunkCoord, std::unique_ptr<ChunkRecord>, ChunkCoordHash> map;

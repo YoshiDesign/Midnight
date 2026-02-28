@@ -10,6 +10,10 @@
 #include "Utils/glm_includes.h"
 #include "Utils/Timer.h"
 
+namespace procgen {
+	struct TerrainMeshCpu;
+}
+
 namespace aveng {
 
 	class EngineDevice;
@@ -18,7 +22,7 @@ namespace aveng {
 	class CameraManager;
 	struct CameraTransform;
 	struct IRenderSceneView;
-
+	
 	class Renderer {
 
 	public:
@@ -66,6 +70,9 @@ namespace aveng {
 		bool createLightsUBO();
 
 		void updateLights();
+
+		/* ProcGen - TODO */
+		void enqueueTerrainUpload(procgen::TerrainMeshCpu tMesh);
 
 		AnyInstanceHandle getPickedHandle(int pickId);
 

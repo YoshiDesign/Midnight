@@ -204,6 +204,12 @@
     <ClCompile Include="Module\Procgen\Terrain\Erosion\RidgeEnhancement.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Module\Procgen\Rendering\BasicTerrainAsset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Module\Procgen\Rendering\TerrainPipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1476,6 +1482,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Module\Procgen\Terrain\Erosion\RidgeEnhancement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Rendering\BasicTerrainAsset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Rendering\TerrainPipeline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,7 +1,5 @@
 /* Vulkan */
 #pragma once
-
-
 /**
 * BIG TODO : Remove anything that's a std::vector from VkRenderData.
 *			 Doing so will make things waaaaay more cache friendly.
@@ -22,8 +20,8 @@
 
 #include <assimp/material.h>
 
-#include "CoreVK/aveng_descriptors.h"
-#include "CoreVK/aveng_buffer.h"
+#include "CoreVK/aveng_descriptors.h" // I think we can remove this
+#include "CoreVK/aveng_buffer.h"	  // I think we can remove this too
 
 #ifndef WTF_BOOM
 #define WTF_BOOM 9002
@@ -109,10 +107,16 @@ namespace aveng {
 
 	struct VkVertex {
 		glm::vec4 position = glm::vec4(0.0f);	// last float is uv.x
-		glm::vec4 color = glm::vec4(1.0f);
 		glm::vec4 normal = glm::vec4(0.0f);		// last float is uv.y
+		glm::vec4 color = glm::vec4(1.0f);
 		glm::uvec4 boneNumber = glm::uvec4(0);
 		glm::vec4 boneWeight = glm::vec4(0.0f);
+	};
+
+	struct VkBasicVertex {
+		glm::vec4 position = glm::vec4(0.0f);	// last float is uv.x
+		glm::vec4 normal = glm::vec4(0.0f);		// last float is uv.y
+		glm::vec4 color = glm::vec4(1.0f);
 	};
 
 	struct VkMesh {
@@ -152,10 +156,25 @@ namespace aveng {
 		uint32_t pkSkinMatOffset;
 		uint32_t pkBasePickId;
 		uint32_t pkPickId;
+
+	};
+
+	struct VkTerrainPushConstant {
+		uint32_t baseVertex;
+		uint32_t baseTriangle;
+		uint32_t numVertices;
+		uint32_t numTriangles;
 	};
 
 	struct VkComputePushConstants {
 		uint32_t pkModelOffset;
+	};
+
+	struct VkBasicTerrainComputePushConstants {
+		uint32_t baseVertex;
+		uint32_t baseTriangle;
+		uint32_t numVertices;
+		uint32_t numTriangles;
 	};
 
 	enum class instanceEditMode : uint8_t {
@@ -250,11 +269,11 @@ namespace aveng {
 		std::vector<VkSemaphore> rdPresentSemaphore;
 		std::vector<VkSemaphore> rdRenderSemaphore;
 		std::vector<VkSemaphore> rdGraphicSemaphore;
-		std::vector<VkSemaphore> rdComputeSemaphore;
+		std::vector<VkSemaphore> rdComputeSemaphore; // Used by Animation compute (there are 2) and terrain compute (1)
 		std::vector<VkFence> rdRenderFence;
-		std::vector<VkFence> rdComputeFence;
-		std::vector<VkFence> rdRuntimeGraphicsFence;
-		std::vector<VkFence> rdRuntimeComputeFence;
+		std::vector<VkFence> rdComputeFence; // Used by Animation compute (there are 2) and terrain compute (1)
+		//std::vector<VkFence> rdRuntimeGraphicsFence;
+		//std::vector<VkFence> rdRuntimeComputeFence;
 		std::vector<VkFence> rdImagesInFlight; // Tracks which frame's fence is using each swapchain image
 
 		/*
@@ -263,26 +282,28 @@ namespace aveng {
 		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
 		VkDescriptorPool editorDescriptorPool = VK_NULL_HANDLE;
 
-		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE; // EDITOR
-		VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE; // EDITOR
-		VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE; // EDITOR
-		VkDescriptorSetLayout rdPointLightDescriptorLayout = VK_NULL_HANDLE; // EDITOR
+		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;				// Static
+		VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
+		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;		// Texture
+		VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;		// Animation
+		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			 // Animation
+		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;		 // Animation
+		VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE; // Animation
+		VkDescriptorSetLayout rdAvengComputeBasicTerrainDescriptorLayout = VK_NULL_HANDLE;  // Terrain
+		VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE;			// EDITOR
+		VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE;	// EDITOR
+		VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE;						// EDITOR
+		VkDescriptorSetLayout rdPointLightDescriptorLayout = VK_NULL_HANDLE;				// EDITOR
 
-		std::vector<VkDescriptorSet> rdAvengDescriptorSets;
-		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;
-		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;
-		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;
-		// std::vector<VkDescriptorSet> basicLightingDescriptorSets;
-		std::vector<VkDescriptorSet> textureDescriptorSets;
-		std::vector<VkDescriptorSet> rdAvengSelectionDescriptorSets;	// EDITOR
-		std::vector<VkDescriptorSet> rdAvengAnimationSelectionDescriptorSets; // EDITOR
-		std::vector<VkDescriptorSet> rdLineDescriptorSets;			// EDITOR
+		std::vector<VkDescriptorSet> rdAvengDescriptorSets;					// Static
+		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;		// Animation
+		std::vector<VkDescriptorSet> rdAvengBasicTerrainDescriptorSets;			// Terrain
+		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;		// Animation
+		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;	// Animation
+		std::vector<VkDescriptorSet> rdAvengComputeBasicTerrainDescriptorSets;	// Terrain
+		std::vector<VkDescriptorSet> rdAvengSelectionDescriptorSets;				// EDITOR
+		std::vector<VkDescriptorSet> rdAvengAnimationSelectionDescriptorSets;		// EDITOR
+		std::vector<VkDescriptorSet> rdLineDescriptorSets;							// EDITOR
 
 		/*
 		* Pipeline
@@ -294,6 +315,7 @@ namespace aveng {
 		VkPipelineLayout rdAvengSelectionPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengAnimationSelectionPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdLinePipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengComputeBasicTerrainPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
 

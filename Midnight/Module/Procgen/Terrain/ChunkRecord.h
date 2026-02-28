@@ -80,8 +80,8 @@ namespace aveng {
 	};
 
 	struct AllPoints {
-		std::pmr::vector<Vec2>  pts;     // core + halo
-		std::pmr::vector<uint32_t>   coreIdx; // indices into pts that are core
+		std::pmr::vector<Vec2> pts;     // core + halo
+		std::pmr::vector<uint32_t> coreIdx; // indices into pts that are core
 		explicit AllPoints(std::pmr::memory_resource* mr) : pts(mr), coreIdx(mr) {}
 	};
 

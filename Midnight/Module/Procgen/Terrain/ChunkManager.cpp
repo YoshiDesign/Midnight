@@ -343,7 +343,7 @@ namespace aveng {
                 // But, they keep the pipeline honest in case a consumer ever needs to rely on the restulting
                 // data without first referencing the chunk record and hoping it's all there.
                 // This also forces some obvious invariance: "future is ready so the product exists"
-                //
+                // 
                 // You are the dependency manager here. Invariants are implicit to the weary observer.
                 // There's nothing preventing us from requesting heights without having generated points first.
                 // We sequentially list stages in order here, instead of wiring stages together explicitly.
@@ -355,7 +355,7 @@ namespace aveng {
                 auto spa = tasks_.wait(requestSpatialGrid(rec->coord, frameIndex));
                 auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
 
-                //auto mesh = buildMesh(*rec);
+                auto mesh = buildMesh(*rec);
 
                 //return mesh;
                 return nullptr;
@@ -759,7 +759,6 @@ namespace aveng {
         // Cell size: prototype used ~MinPointDist for good performance.
         const float cellSize = cfg_.minPointDist;
 
-
 #ifdef M_DEBUG
         {
             std::printf("[SpatialGrid] prereqs: tri=%p pts=%p hf=%p\n",
@@ -844,7 +843,7 @@ namespace aveng {
 
         // Convenient way to retrieve heights for copying
         // const auto* hf = requestHeights(rec.coord, /*frame*/0).get(); 
-        // Use this approach (above) if we ever need to guarantee completion of a prerequisite stage.
+        // Use this approach (above) if we ever need to guarantee completion of all prerequisite stages.
         // However, in our architecture we've synchronized stages so this isn't necessary.
 
         // Or do something like the below snippet, to be safe, should we change our design.
@@ -945,6 +944,12 @@ namespace aveng {
         // 6) Done. Scratch can be reused immediately by this worker for the next job.
         return rec.erosion;
 
+    }
+
+    FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& r)
+    {
+        // Punt to the BasicTerrainAsset
+        return nullptr;
     }
 
     /* Lifetime saftey features below */

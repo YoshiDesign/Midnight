@@ -63,40 +63,47 @@ namespace aveng {
         sg->maxx = maxX;
         sg->maxz = maxZ;
 
+        // world space min and max for the chunk
         sg->worldBounds = { minX, minZ, maxX, maxZ };
 
         sg->gridw = gridW;
         sg->gridh = gridH;
 
         // Pass 1: count triangle references per cell
-        std::vector<uint32_t> counts(numCells, 0);
+        // These values have a few uses here.
+        std::vector<uint32_t> counts(numCells, 0); 
 
         for (uint32_t ti = 0; ti < sg->tris.size(); ++ti) {
             const Triangle& t = sg->tris[ti];
 
+            // Triangle vertices
             const Vec2 a = sg->vertexPos[t.A]; // [IMPORTANT] SiteIndex is a 32-bit type. Keep in mind if we decide to go crazy on resolution.
             const Vec2 b = sg->vertexPos[t.B]; // [IMPORTANT] SiteIndex is a 32-bit type. Keep in mind if we decide to go crazy on resolution.
             const Vec2 c = sg->vertexPos[t.C]; // [IMPORTANT] SiteIndex is a 32-bit type. Keep in mind if we decide to go crazy on resolution.
 
+            // Triangle AABB
             const float triMinX = std::min({ a.x, b.x, c.x });
             const float triMaxX = std::max({ a.x, b.x, c.x });
             const float triMinZ = std::min({ a.y, b.y, c.y });
             const float triMaxZ = std::max({ a.y, b.y, c.y });
 
+            // Cell AABB that this triangle lands in
             int cellMinX = /* static_cast<int> ( */(triMinX - minX) / cellSize /* )*/; // Warning - Implicit conversion
             int cellMaxX = /* static_cast<int> ( */(triMaxX - minX) / cellSize /* )*/; // Warning - Implicit conversion
             int cellMinZ = /* static_cast<int> ( */(triMinZ - minZ) / cellSize /* )*/; // Warning - Implicit conversion
             int cellMaxZ = /* static_cast<int> ( */(triMaxZ - minZ) / cellSize /* )*/; // Warning - Implicit conversion
 
-            // If gridW/H are ever negative please seek help, frantically
+            // clamp to chunk bounds
             cellMinX = clampInt(cellMinX, 0, gridW - 1);
             cellMaxX = clampInt(cellMaxX, 0, gridW - 1);
             cellMinZ = clampInt(cellMinZ, 0, gridH - 1);
             cellMaxZ = clampInt(cellMaxZ, 0, gridH - 1);
 
+            // 
             for (int cz = cellMinZ; cz <= cellMaxZ; ++cz) {
                 for (int cx = cellMinX; cx <= cellMaxX; ++cx) {
                     const int cellIdx = cz * gridW + cx;
+                    // Increment the number of triangles in this cell
                     counts[cellIdx]++;
                 }
             }
@@ -105,17 +112,21 @@ namespace aveng {
         // Prefix sum -> offsets
         sg->cellOffsets.assign(numCells + 1, 0);
         for (size_t i = 0; i < numCells; ++i) {
-            sg->cellOffsets[i + 1] =
-                sg->cellOffsets[i] + counts[i];
+            // Cell 0's offset is always 0. derp.
+            // Standard base + stride indexing for cells and their triangles.
+            // Note that we're doing this to be able to pre-size cellTriangles
+            sg->cellOffsets[i + 1] = sg->cellOffsets[i] + counts[i]; 
         }
 
-        const size_t totalRefs = sg->cellOffsets.back();
-        sg->cellTriangles.resize(totalRefs);
+        // const size_t totalRefs = sg->cellOffsets.back();
+        sg->cellTriangles.resize(sg->cellOffsets.back());
 
         // Pass 2: fill using per-cell cursors (reuse counts)
         std::fill(counts.begin(), counts.end(), 0);
-
         for (uint32_t ti = 0; ti < static_cast<uint32_t>(sg->tris.size()); ++ti) {
+
+            // TODO: Cache the results from the first pass
+
             const Triangle& t = sg->tris[ti];
 
             const Vec2 a = sg->vertexPos[t.A];
@@ -132,7 +143,6 @@ namespace aveng {
             int cellMinZ = (triMinZ - minZ) / cellSize;
             int cellMaxZ = (triMaxZ - minZ) / cellSize;
 
-            // If gridW/H are ever negative you need to unscrew yourself.
             cellMinX = clampInt(cellMinX, 0, gridW - 1);
             cellMaxX = clampInt(cellMaxX, 0, gridW - 1);
             cellMinZ = clampInt(cellMinZ, 0, gridH - 1);
@@ -142,11 +152,11 @@ namespace aveng {
                 for (int cx = cellMinX; cx <= cellMaxX; ++cx) {
 
                     const size_t cellIdx = cz * gridW + cx;
-                    const size_t writeBase = sg->cellOffsets[cellIdx];
-                    const size_t writeAt = writeBase + counts[cellIdx];
+                    const size_t writeBase = sg->cellOffsets[cellIdx];  // Acquire the base triangle index for this cell
+                    const size_t writeAt = writeBase + counts[cellIdx]; // Next available write position for this cell
 
                     sg->cellTriangles[writeAt] = ti;
-                    counts[cellIdx]++;
+                    counts[cellIdx]++; // We increment to influence writeAt for when we land in this cell again
                 }
             }
         }

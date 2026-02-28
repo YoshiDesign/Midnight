@@ -107,17 +107,17 @@ namespace aveng {
 		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixOffsetBuffers;
 
 		/* a map to find the node by name */
-		std::unordered_map<std::string, std::shared_ptr<AssimpNode>> mNodeMap{};
+		std::unordered_map<std::string, std::shared_ptr<AssimpNode>> mNodeMap{}; // Shared ptr nonsense
 		/* and a 'flat' map to keep the order of insertation  */
-		std::vector<std::shared_ptr<AssimpNode>> mNodeList{};
+		std::vector<std::shared_ptr<AssimpNode>> mNodeList{}; // Shared ptr nonsense
 
-		std::vector<std::shared_ptr<AssimpBone>> mBoneList;
+		std::vector<std::shared_ptr<AssimpBone>> mBoneList; // Shared ptr nonsense
 
-		std::vector<std::shared_ptr<AssimpAnimClip>> mAnimClips{};
+		std::vector<std::shared_ptr<AssimpAnimClip>> mAnimClips{}; // Shared ptr nonsense
 
 
 		/*
-		 FOR REFACTOR
+		 FOR SoA REFACTOR
 		std::vector<AssimpNode>     mNodes;
 		std::unordered_map<std::string, uint32_t> mNodeIdByName;
 

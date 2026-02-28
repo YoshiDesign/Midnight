@@ -1,9 +1,9 @@
 #include "VertexBuffer.h"
-#include "CoreVK/EngineDevice.h"
-#include "Utils/Logger.h"
-
 #include <cstring>
-
+#include <vulkan/vulkan.h>
+#include "CoreVK/EngineDevice.h"
+#include "CoreVK/VkRenderData.h"
+#include "Utils/Logger.h"
 
 namespace aveng {
 
@@ -53,7 +53,7 @@ namespace aveng {
     /*
     * VkLineVertex VBO
     */
-    bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkLineMesh vertexData) {
+    bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const VkLineMesh& vertexData) {
         size_t vertexDataSize = vertexData.vertices.size() * sizeof(VkLineVertex);
 
         /* buffer too small, resize */
@@ -85,7 +85,7 @@ namespace aveng {
     
     }
 
-    bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, VkMesh vertexData) {
+    bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const VkMesh& vertexData) {
 
         unsigned int vertexDataSize = vertexData.vertices.size() * sizeof(VkVertex);
 

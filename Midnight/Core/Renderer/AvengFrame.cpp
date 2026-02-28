@@ -223,19 +223,35 @@ namespace aveng {
 		}
 #endif
 
+		/* 
+		* TODO: The logic below can be cleaned up based on whether or not
+		* the graphics and compute queues belong to the same family.
+		* Note the use of engineDevice.sameGraphicsComputeQueue(). When this
+		* is the case, we can take a no-semaphore, no-cross-submission approach.
+		* 
+		* This has higher reaching implications. If graphics and compute use the same queue family:
+		* - Record a single primary graphics command buffer.
+		* - Update to vkCmdPipelineBarrier2 while you're at it...
+		* - Keep the secondary compute command buffer but don't apply
+		* 
+		* I still need to understand this better. But to reiterate:
+		* - vkCmdPipelineBarrier creates a dependency for commands before/after it in the same command buffer
+		* This is why we use semaphores to sync with compute shader read/writes
+		*/
+
 		/* submit command buffer */
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
 		// When graphics and compute use the same queue, skip compute semaphore sync
 		// Submission order on the same queue already guarantees compute finishes before graphics uses its output
-		std::vector<VkSemaphore> waitSemaphores;
+		std::vector<VkSemaphore> waitSemaphores; // TODO: Move these to member var's - we're allocating vectors every frame!!
 		std::vector<VkPipelineStageFlags> waitStages;
 		
 		if (!engineDevice.sameGraphicsComputeQueue()) {
 			// Different queues: wait for compute semaphore
 			waitSemaphores.push_back(renderData.rdComputeSemaphore.at(currentFrameIndex));
-			waitStages.push_back(VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+			waitStages.push_back(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT); // not VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
 		}
 		// Always wait for present semaphore (swapchain image acquisition)
 		waitSemaphores.push_back(renderData.rdPresentSemaphore.at(currentFrameIndex));
@@ -247,7 +263,7 @@ namespace aveng {
 
 		// Signal semaphores: always signal render semaphore for present
 		// Only signal graphics semaphore if using separate queues (for compute to wait on)
-		std::vector<VkSemaphore> signalSemaphores;
+		std::vector<VkSemaphore> signalSemaphores; // TODO
 		signalSemaphores.push_back(renderData.rdRenderSemaphore.at(currentFrameIndex));
 		if (!engineDevice.sameGraphicsComputeQueue()) {
 			signalSemaphores.push_back(renderData.rdGraphicSemaphore.at(currentFrameIndex));

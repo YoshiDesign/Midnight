@@ -4,13 +4,13 @@ layout(location = 0) in vec3 inPosition; // from vertex buffer
 
 layout(location = 0) out vec3 vWorldPos;
 layout(location = 1) out vec3 vWorldNormal;
-layout(location = 2) out vec3 vMatWeights;
+layout(location = 2) out vec3 vMatWeights; // Useless when rendering weights to a 2D image
 layout(location = 3) out float vSteep; // Extensible! We're not using this for much rn
 
-// Matrices (use UBO or push constants; UBO is typical)
-layout(set = 0, binding = 1, std140) uniform CameraUBO {
-    mat4 viewProj;
-} uCam;
+layout (std140, set = 0, binding = 1) uniform Matrices {
+  mat4 view;
+  mat4 projection;
+};
 
 // Model transform for this draw (chunk transform). If you already use push constants for this,
 // swap this to push constants. Keeping it simple here.
