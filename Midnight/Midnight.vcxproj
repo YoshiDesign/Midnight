@@ -249,11 +249,16 @@
     <ClInclude Include="CoreVK\LightPipeline.h" />
     <ClInclude Include="CoreVK\LinePipeline.h" />
     <ClInclude Include="CoreVK\PipelineLayout.h" />
+    <ClInclude Include="CoreVK\Resources\gpu_resources.h" />
+    <ClInclude Include="CoreVK\Resources\graphics_enums.h" />
+    <ClInclude Include="CoreVK\Resources\quantize.h" />
+    <ClInclude Include="CoreVK\Resources\wyhash.h" />
     <ClInclude Include="CoreVK\Shader.h" />
     <ClInclude Include="CoreVK\SkinningPipeline.h" />
     <ClInclude Include="CoreVK\SyncObjects.h" />
     <ClInclude Include="CoreVK\VertexBuffer.h" />
     <ClInclude Include="Core\Camera\aveng_camera.h" />
+    <ClInclude Include="Core\gltf.h" />
     <ClInclude Include="Core\Input\EventPayloads.h" />
     <ClInclude Include="Core\Input\IInputHandler.h" />
     <ClInclude Include="Core\Input\InputState.h" />

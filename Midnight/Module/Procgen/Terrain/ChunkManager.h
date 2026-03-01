@@ -5,6 +5,7 @@
 #include "Module/Procgen/Types.h"
 #include "Runtime/Threading/Types.h"
 #include "Module/Procgen/Noise/Config.h"
+#include "CoreVK/Resources/wyhash.h"
 
 /*
  * TODO: Review scratch vs. final
@@ -41,18 +42,6 @@ namespace aveng {
 	struct ChunkRecord; // forward declaration for chunk record
 	class SpatialGrid; // forward declaration for spatial grid product
 
-    // Utility: chunk seed
-    inline uint64_t chunkSeed(uint64_t worldSeed, ChunkCoord c) {
-        // simple 64-bit mix; replace with your preferred hash
-        uint64_t x = (uint32_t)c.x;
-        uint64_t z = (uint32_t)c.z;
-        uint64_t h = worldSeed ^ (x * 0x9E3779B185EBCA87ULL) ^ (z * 0xC2B2AE3D27D4EB4FULL);
-        h ^= (h >> 30); h *= 0xBF58476D1CE4E5B9ULL;
-        h ^= (h >> 27); h *= 0x94D049BB133111EBULL;
-        h ^= (h >> 31);
-        return h;
-    }
-
 	struct RecordPin; // forward declaration for pinning helper
 
     static constexpr size_t STRIPES = 64; // Up to 64 buckets for striped mutex maps
@@ -68,7 +57,6 @@ namespace aveng {
         * - Noise Params live inside of TerrainConfig
         * - 
         */
-
         noise::NoiseParams defaultNoiseParams() {
             return {
                 7,      // octaves
@@ -94,6 +82,14 @@ namespace aveng {
             };
         }
 
+#ifdef MIDNIGHT_WYHASH
+        size_t stripeIndexwh(aveng::ChunkCoord c) {
+            constexpr uint64_t Salt = 0xD1B54A32D192ED03ULL; // any constant or randomized at startup
+            uint64_t h = aveng::wyhash64(Salt, packChunkCoord(c));
+            return size_t(h) & (STRIPES - 1); // STRIPES must be a power of 2
+        }
+#endif
+
         // Very dangerous Public API (extend as needed, but work in tandem with pin/unpin)
         // Lifetime safety is paramount.
         std::shared_future<Points const*>           requestPoints(ChunkCoord c, uint64_t frameIndex);
@@ -110,11 +106,6 @@ namespace aveng {
         void pin(ChunkRecord* rec); // touch
         void unpin(ChunkRecord* rec);
         void evictUnpinnedOlderThan(uint64_t frameIndex, uint64_t ageFrames);
-
-        size_t stripeIndexFor(ChunkCoord c) const {
-            return ChunkCoordHash{}(c) & (STRIPES - 1); // STRIPES must be power-of-two
-                                                        // or: % STRIPES if not power-of-two
-        }
 
         /* Managers - TODO - More managers */
         void initManagers(procgen::ErosionManager* er);

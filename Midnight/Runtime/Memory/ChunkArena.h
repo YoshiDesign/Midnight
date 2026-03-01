@@ -118,10 +118,15 @@ namespace aveng {
 			);
 		}
 
-		// This exposes the allocator (Memory Resource)
+		// This exposes the allocator (Memory Resource). Don't call before reserve()
 		// usage: std::pmr::vector<T> myVec(arena.mr());
 		std::pmr::memory_resource* mr() noexcept {
 			return mono_.get();
+		}
+
+		// Const overload
+		std::pmr::memory_resource* mr() const noexcept { 
+			return mono_.get(); 
 		}
 
 		// Resets the bump pointer. All allocations are gone instantly.

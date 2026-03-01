@@ -272,7 +272,6 @@ namespace { // Note - these could be specified `inline` only to hint to the comp
     aveng::EdgeIndex heNext(const aveng::HalfEdge& e) { return e.next; }
     aveng::TriIndex  heTri(const aveng::HalfEdge& e) { return e.tri; }
 
-
 }
 
 namespace aveng {
@@ -339,9 +338,9 @@ namespace aveng {
             out.halfEdges[e2] = HalfEdge{ c, (TriIndex)ti, e0, kInvalidEdge };
 
             // Remember one outgoing edge per site
-            if (a < vertexCount && out.siteEdge[a] == kInvalidEdge) out.siteEdge[a] = e0;
-            if (b < vertexCount && out.siteEdge[b] == kInvalidEdge) out.siteEdge[b] = e1;
-            if (c < vertexCount && out.siteEdge[c] == kInvalidEdge) out.siteEdge[c] = e2;
+            if (a < vertexCount && out.siteEdge[a] == kInvalidEdge) { out.siteEdge[a] = e0; }
+            if (b < vertexCount && out.siteEdge[b] == kInvalidEdge) { out.siteEdge[b] = e1; }
+            if (c < vertexCount && out.siteEdge[c] == kInvalidEdge) { out.siteEdge[c] = e2; }
 
             // Register directed edges for twin linking
             dirEdge.emplace(makeDirKey(a, b), e0);

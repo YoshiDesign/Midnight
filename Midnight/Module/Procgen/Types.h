@@ -1,7 +1,10 @@
 #pragma once
 #include <string>
+#include "CoreVK/Resources/wyhash.h"
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Noise/Config.h"
+
+#define MIDNIGHT_WYHASH
 
 namespace aveng {
 
@@ -71,23 +74,6 @@ namespace aveng {
 
 	inline bool operator==(ChunkCoord a, ChunkCoord b) noexcept { return a.x == b.x && a.z == b.z; }
 
-	// TODO - Template this, it's the same as QKeyHash
-	// Note: A weak hash often has poor low-bit behavior. This would result in less 
-	// bucket utilization for our striped mutex map.
-	struct ChunkCoordHash {
-		size_t operator()(ChunkCoord const& c) const noexcept {
-			uint64_t ux = (uint32_t)c.x;
-			uint64_t uz = (uint32_t)c.z;
-			uint64_t h = (ux << 32) ^ uz;
-
-			// MurmurHash3 avalanche - ensures good distribution of low bits
-			h ^= (h >> 33); h *= 0xff51afd7ed558ccdULL;
-			h ^= (h >> 33); h *= 0xc4ceb9fe1a85ec53ULL;
-			h ^= (h >> 33);
-			return (size_t)h;
-		}
-	};
-
 	// -------------------------
 	// Bounds2
 	// -------------------------
@@ -95,6 +81,50 @@ namespace aveng {
 		float minX{}, minZ{}, maxX{}, maxZ{};
 		bool contains(float x, float z) const noexcept {
 			return x >= minX && x < maxX && z >= minZ && z < maxZ;
+		}
+	};
+
+#ifdef MIDNIGHT_WYHASH
+	// Utility: chunk seed
+	inline uint64_t packChunkCoord(ChunkCoord c) {
+		return (uint64_t(uint32_t(c.x)) << 32) | uint64_t(uint32_t(c.z));
+	}
+
+	inline uint64_t mix64(uint64_t a, uint64_t b) {
+		return wyhash64(a, b); // from wyhash
+	}
+
+	inline uint64_t chunkSeed(uint64_t worldSeed, ChunkCoord c) {
+		return mix64(worldSeed, packChunkCoord(c));
+	}
+#else
+	inline uint64_t chunkSeed(uint64_t worldSeed, ChunkCoord c) {
+		// simple 64-bit mix
+		uint64_t x = (uint32_t)c.x;
+		uint64_t z = (uint32_t)c.z;
+		uint64_t h = worldSeed ^ (x * 0x9E3779B185EBCA87ULL) ^ (z * 0xC2B2AE3D27D4EB4FULL);
+		h ^= (h >> 30); h *= 0xBF58476D1CE4E5B9ULL;
+		h ^= (h >> 27); h *= 0x94D049BB133111EBULL;
+		h ^= (h >> 31);
+		return h;
+	}
+#endif
+
+	//inline uint64_t chunkCoordSalt() {
+	//    static const uint64_t salt = /* random once */ 0x...;
+	//    return salt;
+	//}
+	//uint64_t h = mix64(chunkCoordSalt(), packChunkCoord(c));
+
+	// TODO - Template this, it's the same as QKeyHash
+	// Note: A weak hash often has poor low-bit behavior. This would result in less 
+	// bucket utilization for our striped mutex map.
+	struct ChunkCoordHash {
+		size_t operator()(ChunkCoord const& c) const noexcept {
+			// No need to include worldSeed here; this is just a key hash.
+			// If you want DoS resistance, add a process-random salt.
+			uint64_t h = mix64(0, packChunkCoord(c)); // uses wyhash at the moment
+			return size_t(h);
 		}
 	};
 

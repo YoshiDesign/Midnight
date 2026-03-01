@@ -53,7 +53,7 @@ namespace aveng {
 
 	// In case any configurables come to mind.
 	struct TerrainBuilderOptions {
-
+	
 	};
 	
 	// for compute

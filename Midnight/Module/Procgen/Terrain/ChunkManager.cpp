@@ -1,5 +1,6 @@
 #include "ChunkManager.h"
 #include "avpch.h"
+#include "CoreVK/Resources/quantize.h"
 #include "Runtime/Threading/Scratch.h"
 #include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Noise/Functions.h"
@@ -13,7 +14,6 @@
 
 #ifdef M_DEBUG
 #include <filesystem>
-#include <fstream>
 #include <string>
 #include <cstdint>
 #include <format>
@@ -32,6 +32,30 @@ namespace {
             work[i] += delta[i];
         }
 
+    }
+
+    // Get 3x3 neighborhood coordinates (including self at center)
+    void get3x3Neighborhood(aveng::ChunkCoord center, aveng::ChunkCoord out[9]) noexcept {
+        out[0] = { center.x - 1, center.z - 1 };
+        out[1] = { center.x,     center.z - 1 };
+        out[2] = { center.x + 1, center.z - 1 };
+        out[3] = { center.x - 1, center.z };
+        out[4] = { center.x,     center.z };
+        out[5] = { center.x + 1, center.z };
+        out[6] = { center.x - 1, center.z + 1 };
+        out[7] = { center.x,     center.z + 1 };
+        out[8] = { center.x + 1, center.z + 1 };
+    }
+
+    aveng::Bounds2 expandBounds(aveng::Bounds2 b, float halo) noexcept {
+        b.minX -= halo; b.minZ -= halo;
+        b.maxX += halo; b.maxZ += halo;
+        return b;
+    }
+
+    bool inBoundsInclusiveMax(const aveng::Bounds2& b, float x, float z) noexcept {
+        // Use inclusive max to be robust against FP jitter on borders.
+        return x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
     }
 
 }
@@ -127,62 +151,6 @@ namespace aveng {
     }
 
 #endif
-
-    // Get 3x3 neighborhood coordinates (including self at center)
-    inline void get3x3Neighborhood(ChunkCoord center, ChunkCoord out[9]) noexcept {
-        out[0] = {center.x - 1, center.z - 1};
-        out[1] = {center.x,     center.z - 1};
-        out[2] = {center.x + 1, center.z - 1};
-        out[3] = {center.x - 1, center.z};
-        out[4] = {center.x,     center.z};
-        out[5] = {center.x + 1, center.z};
-        out[6] = {center.x - 1, center.z + 1};
-        out[7] = {center.x,     center.z + 1};
-        out[8] = {center.x + 1, center.z + 1};
-    }
-
-    inline Bounds2 expandBounds(Bounds2 b, float halo) noexcept {
-        b.minX -= halo; b.minZ -= halo;
-        b.maxX += halo; b.maxZ += halo;
-        return b;
-    }
-
-    inline bool inBoundsInclusiveMax(const Bounds2& b, float x, float z) noexcept {
-        // Use inclusive max to be robust against FP jitter on borders.
-        return x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
-    }
-
-    // Quantize to a grid for stable dedupe (works well for floating point).
-    // eps should be smaller than your minimum point spacing (e.g. 1e-3 or 1e-4 * world units),
-    // and much smaller than any meaningful distances in your simulation.
-    struct QKey {
-        int64_t qx{};
-        int64_t qz{};
-        friend bool operator==(QKey a, QKey b) noexcept { return a.qx == b.qx && a.qz == b.qz; }
-    };
-
-    // TODO - Template this, it's the same as ChunkCoordHash
-    struct QKeyHash {
-        size_t operator()(QKey k) const noexcept {
-            // 64-bit mix
-            uint64_t ux = (uint64_t)k.qx;
-            uint64_t uz = (uint64_t)k.qz;
-            uint64_t h = (ux << 32) ^ uz;
-            h ^= (h >> 33); h *= 0xff51afd7ed558ccdULL;
-            h ^= (h >> 33); h *= 0xc4ceb9fe1a85ec53ULL;
-            h ^= (h >> 33);
-            return (size_t)h;
-        }
-    };
-
-    inline QKey quantize(const Vec2& p, float eps) noexcept {
-        // round to nearest integer grid step
-        const float inv = 1.0f / eps;
-        return QKey{
-            (int64_t)llround((double)p.x * (double)inv),
-            (int64_t)llround((double)p.y * (double)inv)
-        };
-    }
 
     struct RecordPin {
         ChunkManager* mgr{};
@@ -292,7 +260,11 @@ namespace aveng {
         const size_t hash = ChunkCoordHash{}(coord); // turns (x,z) into a size_t
         // Note: This only looks at the lowest 6 bits of the final hash. We use the MurmurHash3 algorithm for this.
         // const size_t stripeIdx = hash % STRIPES; // Determine which bucket's map the record ends up in - index will always be [0, STRIPES)
+#ifdef MIDNIGHT_WYHASH
+        const size_t stripeIdx = stripeIndexwh(coord);
+#else
         const size_t stripeIdx = hash & (STRIPES - 1); // Use bitwise AND to get the lowest 6 bits - faster than % but only works if STRIPES is a power of two (it is)
+#endif
         auto& bucket = records_[stripeIdx];
 
         // Nifty RAII lock_guard
@@ -523,7 +495,7 @@ namespace aveng {
         bnCfg.MaxTries = 30;
 
         auto candidates = GenerateBlueNoiseSeeded(
-            static_cast<int64_t>(rec.chunkSeed),
+            rec.chunkSeed,
             rec.coreBounds.minX,
             rec.coreBounds.minZ,
             rec.coreBounds.maxX,
@@ -569,7 +541,7 @@ namespace aveng {
         
         // 4) Temporary collection using thread-local scratch
         std::pmr::vector<Vec2> collected(tlsScratchArena().mr());
-        collected.reserve(10000); // heuristic: ~1000 points/chunk × 9 neighbors
+        collected.reserve(12000); // heuristic: ~1000 points/chunk x 9 neighbors
         
         // 5) Iterate through 9 neighbors and collect points within halo
         std::array<ChunkCoord, 9> neighbors;
@@ -591,8 +563,10 @@ namespace aveng {
             }
         }
         
+        // We grab points from generated neighbors, we don't generate halo points for the coord.
+        // However, it's still nice to dedupe
         // 6) Deduplicate using quantization - This can actually be improved upon!
-        constexpr float DEDUPE_EPS = 1e-4f; // smaller than minPointDist
+        constexpr float DEDUPE_EPS = 1e-4f; // smaller than minPointDist - we might be able to optimize further if the our algo's are deterministic (they are...)
         // std::pmr::unordered_set<QKey, QKeyHash> seen(tlsScratch.mr());
         std::pmr::unordered_set<QKey, QKeyHash> seen(
             0, QKeyHash{}, std::equal_to<QKey>{}, tlsScratchArena().mr()
@@ -603,7 +577,7 @@ namespace aveng {
         unique.reserve(collected.size());
         
         for (const auto& pt : collected) {
-            QKey key = quantize(pt, DEDUPE_EPS);
+            QKey key = quantizeFast(pt, DEDUPE_EPS);
             if (seen.insert(key).second) {
                 unique.push_back(pt);
             }
@@ -835,11 +809,11 @@ namespace aveng {
 		// Seeds for any stochastic components in each stage
         // ensures deterministic output per chunk, but different patterns across stages.
         // TODO: move them elsewhere so they're not computed when the corresponding stage is disabled.
-        const uint64_t hardnessSeed = stageSeed(rec.chunkSeed, SeedTag::Hardness);
-        const uint64_t hydroSeed    = stageSeed(rec.chunkSeed, SeedTag::Hydraulic);
-		const uint64_t thermalSeed  = stageSeed(rec.chunkSeed, SeedTag::Thermal);
-		const uint64_t ridgeSeed    = stageSeed(rec.chunkSeed, SeedTag::Ridge);
-		const uint64_t smoothSeed   = stageSeed(rec.chunkSeed, SeedTag::Smooth);
+        const uint64_t hardnessSeed = wyhash64(rec.chunkSeed, SeedTag::Hardness);
+        const uint64_t hydroSeed    = wyhash64(rec.chunkSeed, SeedTag::Hydraulic);
+		const uint64_t thermalSeed  = wyhash64(rec.chunkSeed, SeedTag::Thermal);
+		const uint64_t ridgeSeed    = wyhash64(rec.chunkSeed, SeedTag::Ridge);
+		const uint64_t smoothSeed   = wyhash64(rec.chunkSeed, SeedTag::Smooth);
 
         // Convenient way to retrieve heights for copying
         // const auto* hf = requestHeights(rec.coord, /*frame*/0).get(); 

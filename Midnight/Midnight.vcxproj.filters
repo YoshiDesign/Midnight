@@ -1490,6 +1490,21 @@
     <ClInclude Include="Module\Procgen\Rendering\TerrainPipeline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CoreVK\Resources\graphics_enums.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\Resources\gpu_resources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\gltf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\Resources\wyhash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\Resources\quantize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="vendor\glm\detail\func_common.inl">

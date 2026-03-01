@@ -179,7 +179,7 @@ namespace aveng {
     }
 
     std::pmr::vector<Vec2> GenerateBlueNoiseSeeded(
-        int64_t seed,
+        uint64_t seed,
         float minX, float minZ,
         float maxX, float maxZ,
         noise::BlueNoiseConfig cfg,
@@ -189,7 +189,7 @@ namespace aveng {
 #endif
     ) {
         Rng rng{};
-        SeedRng(rng, static_cast<uint64_t>(seed));
+        SeedRng(rng, seed);
         return GenerateBlueNoise(rng, minX, minZ, maxX, maxZ, cfg, mr
 #ifdef M_DEBUG
         , coord

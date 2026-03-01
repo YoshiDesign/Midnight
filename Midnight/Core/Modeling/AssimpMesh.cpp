@@ -5,7 +5,15 @@
 #include "Tools.h"
 namespace aveng {
 
-    bool AssimpMesh::processMesh(const VkRenderData& renderData, EngineDevice& engineDevice, aiMesh* mesh, const aiScene* scene, /*std::string assetDirectory*/const std::string modelBaseDir, const std::string contentRoot, std::unordered_map<std::string, VkTextureData>& textures) {
+    bool AssimpMesh::processMesh(
+        const VkRenderData& renderData, 
+        EngineDevice& engineDevice, 
+        aiMesh* mesh, 
+        const aiScene* scene, 
+        /*std::string assetDirectory*/const std::string modelBaseDir,
+        const std::string contentRoot, 
+        std::unordered_map<std::string, VkTextureData>& textures
+    ) {
         mMeshName = mesh->mName.C_Str();
         // std::cout << "--------------- Processign Mesh " << mMeshName << std::endl;
         mTriangleCount = mesh->mNumFaces;
@@ -32,7 +40,7 @@ namespace aveng {
 
             bool texturesFound = false;
             if (mesh->mMaterialIndex >= 0) {
-                // scan only for difuse and scalar textures for a start
+                // scan only for diffuse and scalar textures for a start
                 // @TODO : aiTextureType_BASE_COLOR
                 std::vector<aiTextureType> supportedTexTypes = { aiTextureType_DIFFUSE, aiTextureType_SPECULAR };
                 for (const auto& texType : supportedTexTypes) {
@@ -234,7 +242,6 @@ namespace aveng {
                     }
                     mMesh.vertices.at(vertexId).boneNumber = currentIds;
                     mMesh.vertices.at(vertexId).boneWeight = currentWeights;
-
                 }
             }
         }

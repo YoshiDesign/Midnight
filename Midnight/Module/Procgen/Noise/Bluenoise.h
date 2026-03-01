@@ -41,7 +41,7 @@ namespace aveng {
 	);
 	
 	std::pmr::vector<Vec2> GenerateBlueNoiseSeeded(
-		int64_t seed,
+		uint64_t seed,
 		float minX, float minZ,
 		float maxX, float maxZ,
 		noise::BlueNoiseConfig cfg,

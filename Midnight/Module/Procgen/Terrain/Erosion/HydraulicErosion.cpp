@@ -13,6 +13,7 @@
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Module/Procgen/Terrain/ChunkRecord.h"
 #include "Module/Procgen/Terrain/Erosion/Data.h"
+#include "CoreVK/Resources/wyhash.h"
 
 /*
 TODO: Hydraulic Erosion Optimizations
@@ -148,6 +149,12 @@ namespace procgen {
         const float* heights = ws.workHeights.data();
         const float* hard = ws.hardness.data();
 
+        // float in [0,1) from top 24 bits
+        auto u24_to_f01 = [](uint64_t r) {
+            uint32_t v = uint32_t(r >> 40);
+            return float(v) * (1.0f / 16777216.0f);
+        };
+
         for (uint32_t b = 0; b < numBatches; ++b) {
             const uint32_t begin = b * batchSize;
             const uint32_t end = std::min(total, begin + batchSize);
@@ -174,7 +181,15 @@ namespace procgen {
                 localDelta.assign(allPts.pts.size(), 0.0f);
 
                 for (uint32_t di = begin; di < end; ++di) {
-                    aveng::SplitMix64 rng(aveng::cheapMix(hydroSeed, uint64_t(di)));
+
+                    //aveng::SplitMix64 rng(aveng::wyhash64(hydroSeed, uint64_t(di))); OLD - not about it
+                    uint64_t r0 = aveng::wyhash64(hydroSeed, uint64_t(di) * 2 + 0);
+                    uint64_t r1 = aveng::wyhash64(hydroSeed, uint64_t(di) * 2 + 1);
+
+                    /*
+                    * NOTE: If we ever need more random numbers than just a handful,
+                    * the xoshiro approach (SplitMix64) is much cleaner
+                    */
 
                     Droplet d;
                     d.water = cfg.initWater;
@@ -183,14 +198,18 @@ namespace procgen {
                     d.capacity = cfg.pCapacity;
                     d.alive = true;
 
-                    // Spawn position (WORLD) with adjustable margin
-                    const float rx = rng.nextFloat01();
-                    const float rz = rng.nextFloat01();
+                    // Spawn position (world. prng) with adjustable margin
+                    float rx = float(uint32_t(r0 >> 40)) * (1.0f / 16777216.0f);
+                    float rz = float(uint32_t(r1 >> 40)) * (1.0f / 16777216.0f);
                     d.pos = { aMinX + (aMaxX - aMinX) * rx,
                               aMinZ + (aMaxZ - aMinZ) * rz };
 
                     // Random initial direction (unit)
-                    aveng::Vec2 rdir{ rng.nextFloat01() * 2.0f - 1.0f, rng.nextFloat01() * 2.0f - 1.0f };
+                    // aveng::Vec2 rdir{ rng.nextFloat01() * 2.0f - 1.0f, rng.nextFloat01() * 2.0f - 1.0f };
+                    aveng::Vec2 rdir{
+                        rx * 2.0f - 1.0f,
+                        rz * 2.0f - 1.0f
+                    };
                     d.dir = rdir.normalizedOr(aveng::Vec2{ 1,0 });
 
                     for (uint32_t step = 0; step < cfg.maxSteps; ++step) {

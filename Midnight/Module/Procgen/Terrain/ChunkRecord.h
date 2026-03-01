@@ -155,7 +155,7 @@ namespace aveng {
 		ChunkArena scratch; // Tier 2
 		// Tier 1 is thread-local scratch allocation
 
-// Arenas own the memory; record lifetime owns arenas.
+		// Arenas own the memory; record lifetime owns arenas.
 		Points* points = nullptr;
 		AllPoints* allPoints = nullptr;
 		HeightField* heightField = nullptr;

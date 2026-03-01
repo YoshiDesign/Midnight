@@ -15,7 +15,9 @@ namespace SeedTag {
 namespace aveng {
 
     // ------------------------------------------------------------
-    // SplitMix64: used only for seeding other RNGs
+    // SplitMix64: used only for seeding other RNGs.
+    // Expand a seed into 4x64-bit state for RNG.
+    // For individual seed generation, see wyhash.h
     // ------------------------------------------------------------
     struct SplitMix64 {
         uint64_t x;
@@ -46,15 +48,15 @@ namespace aveng {
         return sm.next();
     }
 
-    static inline uint64_t cheapMix(uint64_t a, uint64_t b) {
-        // splitmix-like combine
-        uint64_t x = a ^ (b + 0x9E3779B97F4A7C15ull + (a << 6) + (a >> 2));
-        x ^= x >> 30; x *= 0xBF58476D1CE4E5B9ull;
-        x ^= x >> 27; x *= 0x94D049BB133111EBull;
-        x ^= x >> 31;
-        return x;
-    }
-    
+    //static inline uint64_t cheapMix(uint64_t a, uint64_t b) {
+    //    // splitmix-like combine
+    //    uint64_t x = a ^ (b + 0x9E3779B97F4A7C15ull + (a << 6) + (a >> 2));
+    //    x ^= x >> 30; x *= 0xBF58476D1CE4E5B9ull;
+    //    x ^= x >> 27; x *= 0x94D049BB133111EBull;
+    //    x ^= x >> 31;
+    //    return x;
+    //}
+
     // ------------------------------------------------------------
     // xoroshiro256**
     // Reference: Blackman & Vigna (public domain reference impl)
@@ -67,18 +69,16 @@ namespace aveng {
     inline uint64_t rotl_u64(uint64_t x, int k) {
         return (x << k) | (x >> (64 - k));
     }
-    
-    // Seed from a single 64-bit seed into a full 256-bit state.
-    // IMPORTANT: State must not be all zeros; SplitMix64 makes that vanishingly unlikely,
-    // but we still defensively guard it.
+
+    // Expand (due to SplitMix)
     inline void SeedRng(Rng& rng, uint64_t seed) {
         SplitMix64 sm(seed);
-    
+
         rng.s[0] = sm.next();
         rng.s[1] = sm.next();
         rng.s[2] = sm.next();
         rng.s[3] = sm.next();
-    
+
         // Defensive: avoid forbidden all-zero state
         if ((rng.s[0] | rng.s[1] | rng.s[2] | rng.s[3]) == 0ull) {
             rng.s[0] = 0x9E3779B97F4A7C15ull;

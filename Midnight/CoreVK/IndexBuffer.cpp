@@ -52,7 +52,7 @@ namespace aveng {
                 return false;
             }
             std::printf("%s: index buffer resize to %i bytes\n", __FUNCTION__, indexDataSize);
-            bufferData.bufferSize = indexDataSize;
+            // bufferData.bufferSize = indexDataSize;
         }
 
         /* copy data to staging buffer */
@@ -68,8 +68,8 @@ namespace aveng {
 
         VkBufferMemoryBarrier indexBufferBarrier{};
         indexBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        indexBufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-        indexBufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+        indexBufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; // VK_ACCESS_MEMORY_WRITE_BIT; // The latter here assumes we want read-access after copying
+        indexBufferBarrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT;
         indexBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         indexBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         indexBufferBarrier.buffer = bufferData.stagingBuffer;
