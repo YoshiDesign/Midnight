@@ -5,6 +5,7 @@
 
 namespace aveng {
 
+	// OLD
 	// from: https://stackoverflow.com/a/57595105
 	template <typename T, typename... Rest>
 	void hashCombine(std::size_t& seed, const T& v, const Rest&... rest) {
@@ -27,7 +28,7 @@ namespace aveng {
 		if (v.size() != n) v.resize(n);
 	}
 
-
+	// I think this was a helper for dynamic UBO usage.
 	//size_t pad_uniform_buffer_size(size_t originalSize, VkDeviceSize minUniformBufferOffsetAlignment)
 	//{
 	//	// Calculate required alignment based on minimum device offset alignment

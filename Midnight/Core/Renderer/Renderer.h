@@ -1,13 +1,11 @@
 #pragma once
 #include "avpch.h"
 #include "Core/Renderer/FramePacketBuilder.h"
-#include "Core/Modeling/Sources/IModelSource.h"
-#include "Core/Modeling/ModelAndInstanceData.h"
+#include "Core/PointLightSystem.h"
+// #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/VkRenderData.h"
 #include "Core/aveng_model.h"
-#include "Core/PointLightSystem.h"
 #include "CoreVK/swapchain.h"
-#include "Utils/glm_includes.h"
 #include "Utils/Timer.h"
 
 namespace procgen {

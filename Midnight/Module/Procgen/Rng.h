@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <limits>
 #include <type_traits>
+#include "CoreVK/Resources/wyhash.h"
 
 namespace SeedTag {
     // Arbitrary, but keep these stable or the world will never be the same.
@@ -13,6 +14,16 @@ namespace SeedTag {
 }
 
 namespace aveng {
+
+    // float in [0,1) from top 24 bits
+    inline auto u24_to_f01 = [](uint64_t r) -> float {
+        return float(uint32_t(r >> 40)) * (1.0f / 16777216.0f); // [0,1)
+    };
+
+    inline auto randSigned = [&](uint64_t& s) -> float {
+        // [-1,1)
+        return u24_to_f01(wyrand(&s)) * 2.0f - 1.0f;
+    };
 
     // ------------------------------------------------------------
     // SplitMix64: used only for seeding other RNGs.

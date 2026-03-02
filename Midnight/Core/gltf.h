@@ -1,9 +1,10 @@
 #pragma once
 #include <cstdint>
+#define INT32_MAX        2147483647i32
 namespace aveng {
 
     static const int32_t INVALID_INT_VALUE = 2147483647;
-    static_assert(INVALID_INT_VALUE == int32_t_max, "Mismatch between invalid int and int32_t max");
+    static_assert(INVALID_INT_VALUE == INT32_MAX, "Mismatch between invalid int and int32_t max");
     static const float INVALID_FLOAT_VALUE = 3.402823466e+38F;
 
     struct Asset {

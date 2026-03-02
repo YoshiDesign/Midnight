@@ -6,6 +6,26 @@
 
 namespace aveng {
 
+    // Example Mat
+    struct GpuMaterial {
+        uint32_t baseColorTex;
+        uint32_t normalTex;
+        uint32_t ormTex;
+        uint32_t emissiveTex;
+
+        uint32_t baseColorSampler;
+        uint32_t normalSampler;
+        uint32_t ormSampler;
+        uint32_t emissiveSampler;
+
+        uint8_t baseColorUvSet;
+        uint8_t normalUvSet;
+        uint8_t ormUvSet;
+        uint8_t emissiveUvSet;
+
+        // factors...
+    };
+
     typedef uint32_t ResourceHandle;
 
     static const uint32_t k_invalid_index = 0xffffffff;

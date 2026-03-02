@@ -2,8 +2,6 @@
 #include "avpch.h"
 #include "Core/aveng_model.h"
 #include "Core/Modeling/ModelRegistry.h"
-#include "Core/Modeling/Sources/FilesystemModelSource.h"
-#include "Core/Modeling/Sources/PackModelSource.h"
 
 namespace aveng {
 
@@ -23,6 +21,8 @@ namespace aveng {
      *  The `onDestroyInstancesForModel_` callback gets registered when we init Midnight
      */
 
+    struct IAssetSource;
+
     class ModelLibrary final : public IModelLibrary {
     public:
 
@@ -39,7 +39,7 @@ namespace aveng {
         bool unloadModel(const AssetKey& assetKey) override;
         const AvengModel* pModel(ModelId id) const override;
 
-        std::unique_ptr<IModelSource> createModelSource();
+        std::unique_ptr<IAssetSource> createAssetSource();
         std::unique_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
         std::string baseDirForAssetKey(const AssetKey& key) const;
         void processPendingModelLoads();
@@ -62,7 +62,7 @@ namespace aveng {
         VkRenderData& renderData_;
         ModelId nextModelId_ = 1; // 0 reserved for the NullModelId
         DestroyInstancesForModelFn onDestroyInstancesForModel_;
-        std::unique_ptr<IModelSource> modelSource_;
+        std::unique_ptr<IAssetSource> assetSource_;
 
         std::string contentRoot_ = "";    // or "." or absolute
         std::string textureRoot_ = "";  // relative to contentRoot_

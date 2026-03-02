@@ -1,6 +1,11 @@
 #pragma once
 #include <utility>
 
+/*
+    This is here for educational purposes.
+
+*/
+
 namespace aveng {
     class MoveOnlyFunction {
     public:

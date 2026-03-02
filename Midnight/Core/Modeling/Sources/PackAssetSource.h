@@ -1,12 +1,10 @@
 #pragma once
 #include "avpch.h"
-#include "IModelSource.h"
-#include <vector>
-#include <cstddef>
+#include "IAssetSource.h"
 
 namespace aveng {
 
-	class FilesystemModelSource : public IModelSource {
+	class PackAssetSource : public IAssetSource {
 	public:
 		std::vector<std::byte> readModelBytes(const AssetKey& key) override;
 	};

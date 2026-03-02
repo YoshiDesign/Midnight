@@ -4,6 +4,12 @@
 
 namespace aveng {
 
+	/*
+	* TODO: 
+	* - Create a custom allocator for models, instead of unique_ptr/heap
+	* - 
+	*/
+
 	class AvengModel; // Note: this is causing a benign include cycle in aveng_model.h. Ownership must live elsewhere
 
 	using AssetKey = std::string; // Identifies a model - Used to request a model that hasn't been loaded into memory yet

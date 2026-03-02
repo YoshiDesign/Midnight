@@ -186,8 +186,8 @@
     <ClCompile Include="Core\Midnight.cpp" />
     <ClCompile Include="Core\Modeling\AvengInstance.cpp" />
     <ClCompile Include="Core\Modeling\ModelRegistry.cpp" />
-    <ClCompile Include="Core\Modeling\Sources\FilesystemModelSource.cpp" />
-    <ClCompile Include="Core\Modeling\Sources\PackModelSource.cpp" />
+    <ClCompile Include="Core\Modeling\Sources\FilesystemAssetSource.cpp" />
+    <ClCompile Include="Core\Modeling\Sources\PackAssetSource.cpp" />
     <ClCompile Include="Core\PointLightSystem.cpp" />
     <ClCompile Include="CoreVK\Shader.cpp" />
     <ClCompile Include="CoreVK\SkinningPipeline.cpp" />
@@ -270,9 +270,9 @@
     <ClInclude Include="Core\Modeling\AvengInstance.h" />
     <ClInclude Include="Core\Modeling\InstanceCommon.h" />
     <ClInclude Include="Core\Modeling\ModelRegistry.h" />
-    <ClInclude Include="Core\Modeling\Sources\FilesystemModelSource.h" />
-    <ClInclude Include="Core\Modeling\Sources\IModelSource.h" />
-    <ClInclude Include="Core\Modeling\Sources\PackModelSource.h" />
+    <ClInclude Include="Core\Modeling\Sources\FilesystemAssetSource.h" />
+    <ClInclude Include="Core\Modeling\Sources\IAssetSource.h" />
+    <ClInclude Include="Core\Modeling\Sources\PackAssetSource.h" />
     <ClInclude Include="Core\PointLightSystem.h" />
     <ClInclude Include="CoreVK\swapchain.h" />
     <ClInclude Include="CoreVK\VkRenderData.h" />

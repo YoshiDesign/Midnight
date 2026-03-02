@@ -170,7 +170,7 @@ namespace aveng {
 		std::vector<AnimatedHandle> tmpAnimatedHandles_;
 		std::vector<InstanceTransform> tmpAnimatedXforms_;
 
-		// Instance pools (you can also inject references if you don’t want ownership here)
+		// Instance pools owned by the SceneFacade
 		InstanceManager<StaticTag>   staticMgr_{ modelQuery_ };
 		InstanceManager<AnimatedTag> animatedMgr_{ modelQuery_ };
 
@@ -179,5 +179,5 @@ namespace aveng {
 		// Mutable because validateModel() can fill cache even in const operations.
 		mutable std::unordered_map<ModelId, ModelValidation> validated_; // Unused at the moment. It's an optimization path, but not a very high-priority one
 	};
-
+	 
 }

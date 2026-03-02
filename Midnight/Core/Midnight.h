@@ -43,7 +43,7 @@ namespace aveng {
 		const AppMode mode() { return game_data.currentAppMode; }
 		// Editor Only
 
-		std::unique_ptr<IModelSource> createModelSource();
+		std::unique_ptr<IAssetSource> createModelSource();
 
 		const VkDevice device() { return engineDevice.device(); }
 
@@ -87,7 +87,7 @@ namespace aveng {
 		VkRenderData renderData{};
 
 		// Model source (how assets load) lifetime owned by Midnight, passed into Renderer
-		std::unique_ptr<IModelSource> modelSource_;
+		std::unique_ptr<IAssetSource> assetSource_;
 
 		ModelLibrary modelLib_;
 		SceneFacade sceneFacade_;

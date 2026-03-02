@@ -40,7 +40,7 @@ namespace aveng {
 		bool loadModelV2(
 			const VkRenderData& renderData,
 			const AssetKey& key,                       // keep for debug + extension hint
-			std::span<const std::byte> bytes,          // data from IModelSource
+			std::span<const std::byte> bytes,          // data from IAssetSource
 			unsigned int extraImportFlags,
 			const std::string& modelBaseDir = "",
 			const std::string& contentRoot = ""

@@ -1,21 +1,21 @@
-#include "FilesystemModelSource.h"
+#include "FilesystemAssetSource.h"
 #include <fstream>
 #include <iterator>
 #include <cstdio>
 
 namespace aveng {
 
-    std::vector<std::byte> FilesystemModelSource::readModelBytes(const AssetKey& key) {
+    std::vector<std::byte> FilesystemAssetSource::readModelBytes(const AssetKey& key) {
         // key is assumed to be a normalized filesystem path at this stage
         std::ifstream file(key, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
-            std::printf("[FilesystemModelSource] Failed to open file: %s\n", key.c_str());
+            std::printf("[FilesystemAssetSource] Failed to open file: %s\n", key.c_str());
             return {};
         }
 
         const std::streamsize size = file.tellg();
         if (size <= 0) {
-            std::printf("[FilesystemModelSource] File empty or unreadable: %s\n", key.c_str());
+            std::printf("[FilesystemAssetSource] File empty or unreadable: %s\n", key.c_str());
             return {};
         }
 
@@ -23,7 +23,7 @@ namespace aveng {
         file.seekg(0, std::ios::beg);
 
         if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
-            std::printf("[FilesystemModelSource] Failed to read file: %s\n", key.c_str());
+            std::printf("[FilesystemAssetSource] Failed to read file: %s\n", key.c_str());
             return {};
         }
 

@@ -132,10 +132,10 @@
     <ClCompile Include="Core\Modeling\AvengInstance.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Modeling\Sources\FilesystemModelSource.cpp">
+    <ClCompile Include="Core\Modeling\Sources\FilesystemAssetSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Modeling\Sources\PackModelSource.cpp">
+    <ClCompile Include="Core\Modeling\Sources\PackAssetSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Utils\AssetResolution.cpp">
@@ -1361,13 +1361,13 @@
     <ClInclude Include="Core\Modeling\AvengInstance.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Modeling\Sources\IModelSource.h">
+    <ClInclude Include="Core\Modeling\Sources\IAssetSource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Modeling\Sources\FilesystemModelSource.h">
+    <ClInclude Include="Core\Modeling\Sources\FilesystemAssetSource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Modeling\Sources\PackModelSource.h">
+    <ClInclude Include="Core\Modeling\Sources\PackAssetSource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\Modeling\ModelRegistry.h">

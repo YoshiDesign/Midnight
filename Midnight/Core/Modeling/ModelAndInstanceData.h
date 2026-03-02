@@ -3,7 +3,7 @@
 #include "avpch.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Core/Modeling/AvengInstance.h"
-#include "Core/Modeling/Sources/IModelSource.h"
+#include "Core/Modeling/Sources/IAssetSource.h"
 
 namespace aveng {
 

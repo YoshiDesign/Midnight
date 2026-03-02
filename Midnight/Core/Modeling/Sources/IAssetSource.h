@@ -9,7 +9,7 @@
     For now, bytes is fine.
 
     Variants:
-    FilesystemModelSource (Editor)
+    FilesystemAssetSource (Editor)
     PackModelSource / VirtualFSModelSource (Shipping build)
     MemoryModelSource (unit tests)
     NetworkModelSource (streaming / mod support)
@@ -18,8 +18,8 @@
 
 namespace aveng {
 
-    struct IModelSource {
-        virtual ~IModelSource() = default;
+    struct IAssetSource {
+        virtual ~IAssetSource() = default;
         virtual std::vector<std::byte> readModelBytes(const AssetKey& key) = 0;
     };
 

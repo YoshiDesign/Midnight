@@ -1,4 +1,6 @@
 #include "ModelLibrary.h"
+#include "Core/Modeling/Sources/FilesystemAssetSource.h"
+#include "Core/Modeling/Sources/PackAssetSource.h"
 #include "CoreVK/EngineDevice.h"
 
 namespace aveng {
@@ -13,11 +15,11 @@ namespace aveng {
 		return out;
 	}
 
-	std::unique_ptr<IModelSource> ModelLibrary::createModelSource() {
+	std::unique_ptr<IAssetSource> ModelLibrary::createAssetSource() {
 #ifdef ENABLE_EDITOR
-		return std::make_unique<FilesystemModelSource>();
+		return std::make_unique<FilesystemAssetSource>();
 #else
-		return std::make_unique<FilesystemModelSource>();
+		return std::make_unique<FilesystemAssetSource>();
 		//return std::make_unique<PackModelSource>("assets.pak");
 #endif
 	}
@@ -40,7 +42,7 @@ namespace aveng {
 		registry_.indexById.emplace(NullModelId, 0); // Lives at index 0
 
 		// Determine model source
-		modelSource_ = createModelSource();
+		assetSource_ = createAssetSource();
 	}
 
 	/* IModelLibrary Overload */
@@ -256,11 +258,11 @@ namespace aveng {
 				continue;
 			}
 
-			// 1) Read bytes (or ignore bytes if your builder loads from path)
-			std::vector<std::byte> bytes = modelSource_->readModelBytes(key);
+			// 1) Read
+			std::vector<std::byte> modelBytes = assetSource_->readModelBytes(key);
 
 			// 2) Build/import
-			std::unique_ptr<AvengModel> model = buildModelFromSource(key, bytes);
+			std::unique_ptr<AvengModel> model = buildModelFromSource(key, modelBytes);
 			if (!model) {
 				ejectModel(registry_.idByKey[key], key);
 				std::printf("[ModelLibrary] Failed to load model: %s\n", key.c_str());

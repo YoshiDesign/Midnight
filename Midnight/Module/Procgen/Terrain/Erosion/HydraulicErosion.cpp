@@ -4,6 +4,7 @@
 #include <span>
 #include "Core/Math/Math.h"
 #include "Core/Math/Vector.h"
+#include "Module/Procgen/Rng.h"
 // #include "Runtime/Threading/Scratch.h"
 // #include "Runtime/Memory/ChunkArena.h" // Including this here causes a TU mega-collision
 #include "Module/Procgen/Rng.h"
@@ -45,7 +46,7 @@ namespace procgen {
 namespace procgen::detail {
 
     // Weighted average hardness on a triangle
-    static float AvgHardnessTri(
+    float AvgHardnessTri(
         std::span<const float> hardness,
         aveng::SiteIndex a, 
         aveng::SiteIndex b, 
@@ -59,7 +60,7 @@ namespace procgen::detail {
     }
 
     // Move direction update (unit step length preserved)
-    static void UpdateDirectionUnitStep(procgen::Droplet& d, aveng::Vec2 gradDownhill, const aveng::HydraulicErosionParams& cfg) {
+    void UpdateDirectionUnitStep(procgen::Droplet& d, aveng::Vec2 gradDownhill, const aveng::HydraulicErosionParams& cfg) {
         // Paper-style: dirNew = dirOld*inertia - grad*(1-inertia), then normalize (magnitude 1)
         const float pin = cfg.inertia;
         aveng::Vec2 dirNew{
@@ -149,12 +150,6 @@ namespace procgen {
         const float* heights = ws.workHeights.data();
         const float* hard = ws.hardness.data();
 
-        // float in [0,1) from top 24 bits
-        auto u24_to_f01 = [](uint64_t r) {
-            uint32_t v = uint32_t(r >> 40);
-            return float(v) * (1.0f / 16777216.0f);
-        };
-
         for (uint32_t b = 0; b < numBatches; ++b) {
             const uint32_t begin = b * batchSize;
             const uint32_t end = std::min(total, begin + batchSize);
@@ -182,13 +177,15 @@ namespace procgen {
 
                 for (uint32_t di = begin; di < end; ++di) {
 
+                    uint64_t s = aveng::wyhash64(hydroSeed, uint64_t(di)); // per-droplet stream seed
+                    // spawn
+                    float rx = aveng::u24_to_f01(aveng::wyrand(&s));
+                    float rz = aveng::u24_to_f01(aveng::wyrand(&s));
                     //aveng::SplitMix64 rng(aveng::wyhash64(hydroSeed, uint64_t(di))); OLD - not about it
-                    uint64_t r0 = aveng::wyhash64(hydroSeed, uint64_t(di) * 2 + 0);
-                    uint64_t r1 = aveng::wyhash64(hydroSeed, uint64_t(di) * 2 + 1);
 
                     /*
                     * NOTE: If we ever need more random numbers than just a handful,
-                    * the xoshiro approach (SplitMix64) is much cleaner
+                    * the xoshiro approach (SplitMix64) is (apparently) much cleaner
                     */
 
                     Droplet d;
@@ -197,20 +194,31 @@ namespace procgen {
                     d.sediment = 0.0f;
                     d.capacity = cfg.pCapacity;
                     d.alive = true;
-
-                    // Spawn position (world. prng) with adjustable margin
-                    float rx = float(uint32_t(r0 >> 40)) * (1.0f / 16777216.0f);
-                    float rz = float(uint32_t(r1 >> 40)) * (1.0f / 16777216.0f);
                     d.pos = { aMinX + (aMaxX - aMinX) * rx,
                               aMinZ + (aMaxZ - aMinZ) * rz };
 
-                    // Random initial direction (unit)
-                    // aveng::Vec2 rdir{ rng.nextFloat01() * 2.0f - 1.0f, rng.nextFloat01() * 2.0f - 1.0f };
-                    aveng::Vec2 rdir{
-                        rx * 2.0f - 1.0f,
-                        rz * 2.0f - 1.0f
-                    };
-                    d.dir = rdir.normalizedOr(aveng::Vec2{ 1,0 });
+                    // Old - Initial direction (unit)
+                    //aveng::Vec2 rdir{
+                    //    rx * 2.0f - 1.0f,
+                    //    rz * 2.0f - 1.0f
+                    //};
+                    //d.dir = rdir.normalizedOr(aveng::Vec2{ 1,0 });
+
+                    // New - uses wyrand. This loop should typically execute no more than twice, average.
+                    aveng::Vec2 v;
+                    for (;;) {
+                        float x = aveng::randSigned(s);
+                        float y = aveng::randSigned(s);
+
+                        float r2 = x * x + y * y;
+
+                        if (r2 > 1e-12f && r2 <= 1.0f) {
+                            float invLen = 1.0f / std::sqrt(r2); // "what the fuck"
+                            d.dir.x = x * invLen;
+                            d.dir.y = y * invLen;
+                            break;
+                        }
+                    }
 
                     for (uint32_t step = 0; step < cfg.maxSteps; ++step) {
                         if (!d.alive) { break; }
