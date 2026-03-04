@@ -2,6 +2,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 #include "Texture.h"
+#include "CoreVK/EngineDevice.h"
 
 namespace aveng {
     /* This signature is used if we're loading a texture from a file */
@@ -58,6 +59,7 @@ namespace aveng {
             std::printf("%s error: could not map texture memory (error: %i)\n", __FUNCTION__, result);
             return false;
         }
+
         std::memcpy(uploadData, textureData, imageSize);
         vmaUnmapMemory(engineDevice.allocator(), stagingBufferAlloc);
         vmaFlushAllocation(engineDevice.allocator(), stagingBufferAlloc, 0, imageSize);

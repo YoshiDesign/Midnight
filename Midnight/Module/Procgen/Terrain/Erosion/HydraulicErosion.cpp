@@ -14,7 +14,7 @@
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Module/Procgen/Terrain/ChunkRecord.h"
 #include "Module/Procgen/Terrain/Erosion/Data.h"
-#include "CoreVK/Resources/wyhash.h"
+#include "Core/Math/wyhash.h"
 
 /*
 TODO: Hydraulic Erosion Optimizations

@@ -6,7 +6,7 @@
 #include "Core/Modeling/AssimpMesh.h"
 #include "Core/Modeling/AssimpAnimClip.h"
 #include "Core/Modeling/Tools.h"
-#include "Core/Modeling/ModelRegistry.h"
+#include "Core/Asset/AssetRegistry.h"
 #include "CoreVK/aveng_descriptors.h"
 #include "CoreVK/VkRenderData.h"
 
@@ -36,6 +36,15 @@ namespace aveng {
 		AvengModel(AvengModel&&) noexcept = default;
 		AvengModel& operator=(AvengModel&&) noexcept = default;
 		~AvengModel() = default;
+
+		bool loadModelV3(
+			const VkRenderData& renderData,
+			const AssetKey& key,                // keep for debug + extension hint
+			std::span<const std::byte> bytes,   // data from IAssetSource
+			unsigned int extraImportFlags,		// Assimp flags
+			const std::string& modelBaseDir,    // for model-owned refs
+			const std::string& contentRoot      // Texture root. for engine-owned defaults
+		);
 
 		bool loadModelV2(
 			const VkRenderData& renderData,

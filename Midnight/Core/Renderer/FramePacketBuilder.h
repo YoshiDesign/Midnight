@@ -1,6 +1,6 @@
 #pragma once
 #include "avpch.h"
-// #include "Core/Modeling/ModelRegistry.h"
+// #include "Core/Asset/AssetRegistry.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 
 // [!] Do not include SceneFacade or InstanceManager in this header.

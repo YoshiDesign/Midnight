@@ -185,7 +185,7 @@
     <ClCompile Include="Core\Input\InputSystem.cpp" />
     <ClCompile Include="Core\Midnight.cpp" />
     <ClCompile Include="Core\Modeling\AvengInstance.cpp" />
-    <ClCompile Include="Core\Modeling\ModelRegistry.cpp" />
+    <ClCompile Include="Core\Asset\AssetRegistry.cpp" />
     <ClCompile Include="Core\Modeling\Sources\FilesystemAssetSource.cpp" />
     <ClCompile Include="Core\Modeling\Sources\PackAssetSource.cpp" />
     <ClCompile Include="Core\PointLightSystem.cpp" />
@@ -234,7 +234,6 @@
     <ClCompile Include="Utils\AssetResolution.cpp" />
     <ClCompile Include="Utils\Logger.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />
-    <ClCompile Include="Utils\window_callbacks.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="avpch.h" />
@@ -251,8 +250,8 @@
     <ClInclude Include="CoreVK\PipelineLayout.h" />
     <ClInclude Include="CoreVK\Resources\gpu_resources.h" />
     <ClInclude Include="CoreVK\Resources\graphics_enums.h" />
-    <ClInclude Include="CoreVK\Resources\quantize.h" />
-    <ClInclude Include="CoreVK\Resources\wyhash.h" />
+    <ClInclude Include="Core\Math\quantize.h" />
+    <ClInclude Include="Core\Math\wyhash.h" />
     <ClInclude Include="CoreVK\Shader.h" />
     <ClInclude Include="CoreVK\SkinningPipeline.h" />
     <ClInclude Include="CoreVK\SyncObjects.h" />
@@ -269,7 +268,7 @@
     <ClInclude Include="Core\Midnight.h" />
     <ClInclude Include="Core\Modeling\AvengInstance.h" />
     <ClInclude Include="Core\Modeling\InstanceCommon.h" />
-    <ClInclude Include="Core\Modeling\ModelRegistry.h" />
+    <ClInclude Include="Core\Asset\AssetRegistry.h" />
     <ClInclude Include="Core\Modeling\Sources\FilesystemAssetSource.h" />
     <ClInclude Include="Core\Modeling\Sources\IAssetSource.h" />
     <ClInclude Include="Core\Modeling\Sources\PackAssetSource.h" />
@@ -355,9 +354,7 @@
     <ClInclude Include="Utils\glm_includes.h" />
     <ClInclude Include="Utils\AssetResolution.h" />
     <ClInclude Include="Utils\Logger.h" />
-    <ClInclude Include="Utils\MoveOnlyFunction.h" />
     <ClInclude Include="Utils\Timer.h" />
-    <ClInclude Include="Utils\window_callbacks.h" />
     <ClInclude Include="vendor\GLFW\glfw3.h" />
     <ClInclude Include="vendor\GLFW\glfw3native.h" />
     <ClInclude Include="vendor\glm\common.hpp" />

@@ -1,7 +1,7 @@
 #pragma once
 #include "avpch.h"
 #include "Core/aveng_model.h"
-#include "Core/Modeling/ModelRegistry.h"
+#include "Core/Asset/AssetRegistry.h"
 
 namespace aveng {
 

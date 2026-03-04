@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "CoreVK/Resources/wyhash.h"
+#include "Core/Math/wyhash.h"
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Noise/Config.h"
 

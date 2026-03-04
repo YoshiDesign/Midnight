@@ -1,12 +1,5 @@
-/* Vulkan */
 #pragma once
-/**
-* BIG TODO : Remove anything that's a std::vector from VkRenderData.
-*			 Doing so will make things waaaaay more cache friendly.
-*			 The Renderer class can own most of the things stored in vec's.
-*/
 
-#include <memory>
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -16,12 +9,9 @@
 
 #include <vulkan/vulkan.h>
 #include "AMD/vk_mem_alloc.h"
-#include <GLFW/glfw3.h>
 
 #include <assimp/material.h>
 
-#include "CoreVK/aveng_descriptors.h" // I think we can remove this
-#include "CoreVK/aveng_buffer.h"	  // I think we can remove this too
 
 #ifndef WTF_BOOM
 #define WTF_BOOM 9002
@@ -281,10 +271,12 @@ namespace aveng {
 		*/
 		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
 		VkDescriptorPool editorDescriptorPool = VK_NULL_HANDLE;
+		VkDescriptorPool avengBindlessDescriptorPool = VK_NULL_HANDLE;
 
 		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;				// Static
 		VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
 		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;		// Texture
+		VkDescriptorSetLayout rdBindlessTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
 		VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;		// Animation
 		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			 // Animation
 		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;		 // Animation
@@ -298,6 +290,7 @@ namespace aveng {
 		std::vector<VkDescriptorSet> rdAvengDescriptorSets;					// Static
 		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;		// Animation
 		std::vector<VkDescriptorSet> rdAvengBasicTerrainDescriptorSets;			// Terrain
+		std::vector<VkDescriptorSet> rdAvengBindlessTextureDescriptorSets;		// Terrain
 		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;		// Animation
 		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;	// Animation
 		std::vector<VkDescriptorSet> rdAvengComputeBasicTerrainDescriptorSets;	// Terrain

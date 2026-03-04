@@ -5,7 +5,7 @@
 #include "Module/Procgen/Types.h"
 #include "Runtime/Threading/Types.h"
 #include "Module/Procgen/Noise/Config.h"
-#include "CoreVK/Resources/wyhash.h"
+#include "Core/Math/wyhash.h"
 
 /*
  * TODO: Review scratch vs. final

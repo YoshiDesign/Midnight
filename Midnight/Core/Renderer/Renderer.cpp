@@ -1,10 +1,10 @@
 #include "Renderer.h"
 #include "avpch.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
-#include "Utils/AssetResolution.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/SkinningPipeline.h"
 #include "CoreVK/ComputePipeline.h"
+#include "Core/Texture.h"
 // #include "CoreVK/LinePipeline.h"
 #include "CoreVK/AvengStorageBuffer.h"
 #include "CoreVK/AvengUniformBuffer.h"
@@ -420,9 +420,9 @@ namespace aveng {
 
 		std::vector<VkDescriptorPoolSize> poolSizes =
 		{
-		  { VK_DESCRIPTOR_TYPE_SAMPLER, 10000 },
-		  { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10000 },
-		  { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 10000 },
+		  { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		  { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		  { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
 		  { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
 		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
 		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
@@ -454,10 +454,8 @@ namespace aveng {
 	}
 
 	bool Renderer::createDescriptorLayouts() {
-		VkResult result;
 
 		{
-
 			 /* texture */
 			VkDescriptorSetLayoutBinding assimpTextureBind{};
 			assimpTextureBind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1383,7 +1381,7 @@ namespace aveng {
 				const DrawBatch& b = pkt.batches[i];
 				if (b.boneCount == 0 || b.instanceCount == 0) continue;
 
-				const AvengModel* model = modelLib.pModel(b.modelId); /* TODO - Another vtable ref... */
+				const AvengModel* model = modelLib.pModel(b.modelId); /* TODO */
 				if (!model) continue;
 				//std::vector<glm::mat4> debugBoneMat(model->getMatOffBuffer(currentFrameIndex).bufferSize, glm::mat4(1.0f));
 				//ShaderStorageBuffer::uploadSsboData(engineDevice, model->getMatOffBuffer(currentFrameIndex), debugBoneMat);
@@ -1551,9 +1549,7 @@ namespace aveng {
 	}
 
 	void Renderer::updateDescriptorSets(int frameIndex) {
-		Logger::log(1, "%s: Renderer updating descriptor sets\n", __FUNCTION__);
 
-		/* we must update the descriptor sets whenever the buffer size has changed */
 		{
 			/* non-animated shader */
 			VkDescriptorBufferInfo matrixInfo{};
@@ -1878,6 +1874,117 @@ namespace aveng {
 		return true;
 	}
 
+	bool Renderer::createBindlessDescriptors()
+	{
+
+		std::vector<VkDescriptorPoolSize> b_poolSizes =
+		{
+		  { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_TEXTURES } // type, descriptorCount
+		};
+
+		VkDescriptorPoolCreateInfo b_poolInfo{};
+		b_poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		b_poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		b_poolInfo.poolSizeCount = static_cast<uint32_t>(b_poolSizes.size());
+		b_poolInfo.pPoolSizes = b_poolSizes.data();
+		b_poolInfo.maxSets = 1;
+
+		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &b_poolInfo, nullptr, &renderData.avengBindlessDescriptorPool);
+		if (result != VK_SUCCESS) {
+			Logger::log(1, "%s error: could not init descriptor pool (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		createBindlessDescriptorLayouts();
+		createBindlessDescriptorSets();
+
+		// We do this every time we upload a texture
+		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+		//	updateBindlessDescriptorSets(i, TextureSlot, SlotIdx);
+		//}
+
+	}
+
+	bool Renderer::createBindlessDescriptorLayouts() {
+	
+		VkDescriptorSetLayoutBinding binding{};
+		binding.binding = 0;
+		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding.descriptorCount = MAX_BINDLESS_TEXTURES;
+		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding.pImmutableSamplers = nullptr;
+
+		VkDescriptorBindingFlags bindingFlags =
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT; // This enables us to treat descriptors like they're indexable, I think
+
+		// Required to designate flags on this layout
+		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo {
+			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO
+		};
+
+		flagsInfo.bindingCount = 1;
+		flagsInfo.pBindingFlags = &bindingFlags;
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo{
+			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
+		};
+		layoutInfo.pNext = &flagsInfo; // First usage of pNext. Not bad!
+		layoutInfo.bindingCount = 1;
+		layoutInfo.pBindings = &binding;
+
+		VkDescriptorSetLayout bindlessSetLayout;
+
+		result = vkCreateDescriptorSetLayout(engineDevice.device(), &layoutInfo, nullptr, 
+									&renderData.rdBindlessTextureDescriptorLayout);
+		if (result != VK_SUCCESS) {
+			Logger::log(1, "%s error: could not create bindless descriptor set layout\n", __FUNCTION__, result);
+			return false;
+		}
+		return true;
+
+	}
+
+	bool Renderer::createBindlessDescriptorSets() {
+
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			VkDescriptorSetAllocateInfo allocInfo{
+			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
+			};
+			allocInfo.descriptorPool = renderData.avengBindlessDescriptorPool;
+			allocInfo.descriptorSetCount = 1;
+			allocInfo.pSetLayouts = &renderData.rdBindlessTextureDescriptorLayout;
+
+			result = vkAllocateDescriptorSets(engineDevice.device(), &allocInfo, &renderData.rdAvengBindlessTextureDescriptorSets[i]);
+			if (result != VK_SUCCESS) {
+				Logger::log(1, "%s error: could not allocate bindless descriptor sets\n", __FUNCTION__, result);
+				return false;
+			}
+
+		}
+
+		return true;
+	}
+
+	bool Renderer::updateBindlessDescriptorSets(int frameIndex, TextureSlot tex, size_t slotIdx) {
+
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		imageInfo.imageView = tex.view;
+		imageInfo.sampler = tex.sampler;
+
+		VkWriteDescriptorSet write{
+			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET
+		};
+		write.dstSet = renderData.rdAvengBindlessTextureDescriptorSets[frameIndex];
+		write.dstBinding = 0;
+		write.dstArrayElement = slotIdx;
+		write.descriptorCount = 1;
+		write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		write.pImageInfo = &imageInfo;
+
+		vkUpdateDescriptorSets(engineDevice.device(), 1, &write, 0, nullptr);
+	}
 
 
 	bool Renderer::createSSBOs() {

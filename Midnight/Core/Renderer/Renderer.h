@@ -61,11 +61,21 @@ namespace aveng {
 		VkFramebuffer getCurrentFramebuffer() { return aveng_swapchain->getFrameBuffer(currentImageIndex); }
 		VkFramebuffer getCurrentSelectionFramebuffer() { return aveng_swapchain->getSelectionFrameBuffer(currentImageIndex); }
 
+		bool setupDescriptors();
 		bool createPipelineLayouts();
 		bool createPipelines();
 		bool createSSBOs();
 		bool createMatrixUBO();
 		bool createLightsUBO();
+		bool createDescriptorLayouts();
+		bool createDescriptorSets();
+		bool createBindlessDescriptors();
+		bool createBindlessDescriptorLayouts();
+		bool createBindlessDescriptorSets();
+		void updateDescriptorSets(int frameIndex);
+		void updateComputeDescriptorSets(int frameIndex);
+		void updateLightingDescriptorSets(int frameIndex);
+		bool updateBindlessDescriptorSets(int frameIndex, TextureSlot tex, size_t slotIdx);
 
 		void updateLights();
 
@@ -96,13 +106,6 @@ namespace aveng {
 		}
 
 		void setRenderpassBypass(bool _state) { mRenderpassBypass = _state; }
-
-		bool createDescriptorLayouts();
-		bool createDescriptorSets();
-		bool setupDescriptors();
-		void updateDescriptorSets(int frameIndex);
-		void updateComputeDescriptorSets(int frameIndex);
-		void updateLightingDescriptorSets(int frameIndex);
 
 		bool createSyncObjects();
 
@@ -202,6 +205,7 @@ namespace aveng {
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 		VkPushConstants mModelPushConst{};
 
+		// Ugh...
 		VkComputePushConstants mComputeModelData{};
 
 		/* for animated and non-animated models */

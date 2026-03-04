@@ -1,10 +1,10 @@
-#include "ModelRegistry.h"
+#include "AssetRegistry.h"
 #include "Core/aveng_model.h"
 
 /* 
 	This file provides us with the necessary evasive maneuvering around circular dependencies.
-	aveng_model.h requires types in ModelRegistry.h but our ModelEntry and ModelRegistryData
-	require the AvengModel definitions. They can have them via this TU so we can fwd declare in ModelRegistry.h
+	aveng_model.h requires types in AssetRegistry.h but our ModelEntry and ModelRegistryData
+	require the AvengModel definitions. They can have them via this TU so we can fwd declare in AssetRegistry.h
 */
 namespace aveng {
 

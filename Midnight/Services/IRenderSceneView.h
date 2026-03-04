@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Modeling/ModelRegistry.h"
+#include "Core/Asset/AssetRegistry.h"
 #include "Core/Renderer/FramePacketBuilder.h"
 namespace aveng {
 

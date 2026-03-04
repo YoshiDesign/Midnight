@@ -7,7 +7,7 @@ namespace aveng {
 	/*
 	* Arena Allocator - (AKA Bump allocator or Region allocator)
 	*
-	*	- You allocate a large contiguous block of memory up front
+	*	- You allocate a large contiguous block of memory up front (we're using the heap (vector))
 	*	- All allocations inside the arena are done by bumping a pointer forward
 	*	- You do not free individual allocations
 	*	- You free everything at once by resetting the arena

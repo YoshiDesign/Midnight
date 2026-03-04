@@ -1,7 +1,7 @@
 #pragma once
 #include <cmath>
 #include <cstdint>
-#include "CoreVK/Resources/wyhash.h"
+#include "Core/Math/wyhash.h"
 #include "Core/Math/Vector.h"
 namespace aveng {
 

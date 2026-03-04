@@ -1,4 +1,7 @@
 #pragma once
+#include <cstdint>
+#include <string>
+#include <memory>
 #include "avpch.h"
 #include "Core/Modeling/AssimpAnimChannel.h"
 
@@ -7,7 +10,6 @@ namespace aveng {
 	/*
 	* TODO: 
 	* - Create a custom allocator for models, instead of unique_ptr/heap
-	* - 
 	*/
 
 	class AvengModel; // Note: this is causing a benign include cycle in aveng_model.h. Ownership must live elsewhere

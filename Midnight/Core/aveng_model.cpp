@@ -72,6 +72,92 @@ namespace {
 
 namespace aveng {
 
+	static bool loadModelV3(
+		const VkRenderData& renderData,
+		const AssetKey& key,                // keep for debug + extension hint
+		std::span<const std::byte> bytes,   // data from IAssetSource
+		unsigned int extraImportFlags,		// Assimp flags
+		const std::string& modelBaseDir,    // for model-owned refs
+		const std::string& contentRoot      // Texture root. for engine-owned defaults
+	) {
+
+		Assimp::Importer importer;
+
+		const unsigned int flags =
+			aiProcess_Triangulate |
+			aiProcess_GenNormals |
+			aiProcess_ValidateDataStructure |
+			aiProcess_FlipUVs |
+			extraImportFlags;
+
+		const aiScene* scene = nullptr;
+
+		if (!bytes.empty()) {
+			// Extension hint helps Assimp choose the correct importer.
+			// Passing key.c_str() works well if key is a path-like string (it usually is today).
+			scene = importer.ReadFileFromMemory(
+				bytes.data(),
+				bytes.size(),
+				flags,
+				key.c_str()
+			);
+		}
+
+		if (!scene || !scene->mRootNode) {
+			std::printf("[AvengModel] Assimp load failed for %s: %s\n",
+				key.c_str(),
+				importer.GetErrorString()
+			);
+			return false;
+		}
+
+		unsigned int numMeshes = scene->mNumMeshes;
+
+		// Count vertices and faces
+		for (unsigned int i = 0; i < numMeshes; ++i) {
+			unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
+			unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
+
+			mVertexCount += numVertices;
+			mTriangleCount += numFaces;
+
+		}
+		std::printf("AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
+
+		aiNode* rootNode = scene->mRootNode;
+
+		// Only for Embedded textures.
+		if (scene->HasTextures()) {
+			unsigned int numTextures = scene->mNumTextures;
+
+			std::cout << "Model has an embedded texture!!" << std::endl;
+
+			for (int i = 0; i < scene->mNumTextures; ++i) {
+				std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
+
+				int height = scene->mTextures[i]->mHeight;
+				int width = scene->mTextures[i]->mWidth;
+				aiTexel* data = scene->mTextures[i]->pcData;
+
+				VkTextureData newTex{};
+				if (!Texture::loadTexture(engineDevice, renderData, newTex, texName, data, width, height)) {
+					return false;
+				}
+
+				std::string internalTexName = "*" + std::to_string(i);
+
+				mTextures.insert({ internalTexName, newTex });
+			}
+
+			// std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
+		}
+
+	}
+
+
+
+
+
 	AvengModel::AvengModel(EngineDevice& device) 
 		: engineDevice{ device },
 		  mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
@@ -140,7 +226,7 @@ namespace aveng {
 	 *  V2
 	 *	Big TODO: Clean this sh*t up.
 	 *	renderData has been factored out of many of the places it propagates through.
-	 *	It will receive an overhaul sooner than later
+	 *  There are still shared_ptr lurking in the animation computations.
 	 */
 	bool AvengModel::loadModelV2(
 		const VkRenderData& renderData,
@@ -171,8 +257,7 @@ namespace aveng {
 				flags,
 				key.c_str()
 			);
-		}
-		else {
+		} else {
 			// Transitional fallback only (optional)
 			scene = importer.ReadFile(key, flags);
 		}
@@ -184,12 +269,6 @@ namespace aveng {
 			);
 			return false;
 		}
-
-		// ... your existing pipeline:
-		// - establish rootNode
-		// - build vertex/index buffers
-		// - bones/animations
-		// - etc.
 
 		unsigned int numMeshes = scene->mNumMeshes;
 		// std::printf("Loaded AssimpModel: Found %d mesh%s.\n", numMeshes, numMeshes == 1 ? "" : "es");
@@ -251,7 +330,6 @@ namespace aveng {
 		/* the textures are stored directly or relative to the model file */
 		//std::string assetDirectory = filepath.substr(0, filepath.find_last_of('/'));
 
-
 		std::string rootNodeName = rootNode->mName.C_Str();
 		mRootNode = AssimpNode::createNode(rootNodeName);
 		std::printf("%s: root node name: '%s'\n", __FUNCTION__, rootNodeName.c_str());
@@ -287,16 +365,6 @@ namespace aveng {
 				boneParentIndexList.emplace_back(std::distance(mBoneList.begin(), boneIter));
 			}
 		}
-
-		 //std::printf("[THEM BONE PARENTS] bone parents --\n");
-		 //for (unsigned int i = 0; i < mBoneList.size(); ++i) {
-			// std::printf("-- bone %i (%s) has parent %i (%s)\n", i, mBoneList.at(i)->getBoneName().c_str(), boneParentIndexList.at(i),
-			//	 boneParentIndexList.at(i) < 0 ? "invalid" : mBoneList.at(boneParentIndexList.at(i))->getBoneName().c_str());
-			// if (boneParentIndexList.at(i) == -1) {
-			//	 std::printf("NEG 1\n");
-			// }
-		 //}
-		 //std::printf("[END BONE PARENTS] bone parents --\n");
 
 		/* create vertex buffers for the meshes */
 		for (const auto& mesh : mModelMeshes) {
@@ -340,9 +408,6 @@ namespace aveng {
 		for (unsigned int i = 0; i < numAnims; ++i) {
 			aiAnimation* animation = scene->mAnimations[i];
 
-			// std::printf("%s: -- animation clip %i has %i skeletal channels, %i mesh channels, and %i morph mesh channels\n",
-				// __FUNCTION__, i, animation->mNumChannels, animation->mNumMeshChannels, animation->mNumMorphMeshChannels);
-
 			std::shared_ptr<AssimpAnimClip> animClip = std::make_shared<AssimpAnimClip>();
 			animClip->addChannels(animation, mBoneList);
 			if (animClip->getClipName().empty()) {
@@ -350,9 +415,6 @@ namespace aveng {
 			}
 			mAnimClips.emplace_back(animClip);
 		}
-
-		// mModelFilenamePath = baseDir;
-		// mModelFilename = std::filesystem::path(filepath).filename().generic_string();
 
 		/* get root transformation matrix from model's root node */
 		glm::mat4 local_gltf = Tools::convertAiToGLM(rootNode->mTransformation);
@@ -374,7 +436,7 @@ namespace aveng {
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			/* matrix multiplication, per-model data */
-			VkDescriptorSetAllocateInfo computeMatrixMultPerModelDescriptorAllocateInfo{}; // ...This descriptor
+			VkDescriptorSetAllocateInfo computeMatrixMultPerModelDescriptorAllocateInfo{}; // ...The descriptor being described
 			computeMatrixMultPerModelDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			computeMatrixMultPerModelDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
 			computeMatrixMultPerModelDescriptorAllocateInfo.descriptorSetCount = 1;
@@ -386,10 +448,6 @@ namespace aveng {
 				Logger::log(1, "%s error: could not allocate Assimp Matrix Mult Compute per-model descriptor set (error: %i)\n", __FUNCTION__, result);
 				return false;
 			}
-
-			//std::cout << "Index:\t"  << i << "\n" <<
-			//	"[Creating Model (mShaderBoneMatrixOffsetBuffers) Buffers] Size:\t" <<
-			//	mShaderBoneMatrixOffsetBuffers[i].bufferSize << std::endl;
 
 			VkDescriptorBufferInfo parentNodeInfo{};
 			parentNodeInfo.buffer = mBoneParentMatrixBuffers[i].buffer;	// ...attaching this data buffer

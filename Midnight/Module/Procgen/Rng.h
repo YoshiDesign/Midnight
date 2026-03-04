@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <limits>
 #include <type_traits>
-#include "CoreVK/Resources/wyhash.h"
+#include "Core/Math/wyhash.h"
 
 namespace SeedTag {
     // Arbitrary, but keep these stable or the world will never be the same.

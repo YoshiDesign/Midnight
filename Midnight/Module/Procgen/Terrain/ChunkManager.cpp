@@ -1,6 +1,6 @@
 #include "ChunkManager.h"
 #include "avpch.h"
-#include "CoreVK/Resources/quantize.h"
+#include "Core/Math/quantize.h"
 #include "Runtime/Threading/Scratch.h"
 #include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Noise/Functions.h"

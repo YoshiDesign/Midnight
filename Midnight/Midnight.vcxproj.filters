@@ -39,9 +39,6 @@
     <ClCompile Include="Core\aveng_model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\window_callbacks.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Core\app_object.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -150,7 +147,7 @@
     <ClCompile Include="Core\Renderer\FramePacketBuilder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Modeling\ModelRegistry.cpp">
+    <ClCompile Include="Core\Asset\AssetRegistry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Module\Procgen\Delaunay.cpp">
@@ -1226,9 +1223,6 @@
     <ClInclude Include="Utils\aveng_utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\window_callbacks.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Core\UUID.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1370,7 +1364,7 @@
     <ClInclude Include="Core\Modeling\Sources\PackAssetSource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Modeling\ModelRegistry.h">
+    <ClInclude Include="Core\Asset\AssetRegistry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Utils\AssetResolution.h">
@@ -1419,9 +1413,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Runtime\Threading\ITaskSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\MoveOnlyFunction.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Module\Procgen\Terrain\ChunkManager.h">
@@ -1499,10 +1490,10 @@
     <ClInclude Include="Core\gltf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreVK\Resources\wyhash.h">
+    <ClInclude Include="Core\Math\wyhash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreVK\Resources\quantize.h">
+    <ClInclude Include="Core\Math\quantize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

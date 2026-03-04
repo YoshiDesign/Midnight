@@ -1,7 +1,7 @@
 #pragma once
 #include "avpch.h"
 #include "Core/Modeling/InstanceSettings.h"
-#include "Core/Modeling/ModelRegistry.h"
+#include "Core/Asset/AssetRegistry.h"
 
 namespace aveng {
     /* Important: this is implemented in our template-trait-bundle
