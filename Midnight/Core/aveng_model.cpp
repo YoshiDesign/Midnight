@@ -72,87 +72,87 @@ namespace {
 
 namespace aveng {
 
-	static bool loadModelV3(
-		const VkRenderData& renderData,
-		const AssetKey& key,                // keep for debug + extension hint
-		std::span<const std::byte> bytes,   // data from IAssetSource
-		unsigned int extraImportFlags,		// Assimp flags
-		const std::string& modelBaseDir,    // for model-owned refs
-		const std::string& contentRoot      // Texture root. for engine-owned defaults
-	) {
+	//static bool loadModelV3(
+	//	const VkRenderData& renderData,
+	//	const AssetKey& key,                // keep for debug + extension hint
+	//	std::span<const std::byte> bytes,   // data from IAssetSource
+	//	unsigned int extraImportFlags,		// Assimp flags
+	//	const std::string& modelBaseDir,    // for model-owned refs
+	//	const std::string& contentRoot      // Texture root. for engine-owned defaults
+	//) {
 
-		Assimp::Importer importer;
+	//	Assimp::Importer importer;
 
-		const unsigned int flags =
-			aiProcess_Triangulate |
-			aiProcess_GenNormals |
-			aiProcess_ValidateDataStructure |
-			aiProcess_FlipUVs |
-			extraImportFlags;
+	//	const unsigned int flags =
+	//		aiProcess_Triangulate |
+	//		aiProcess_GenNormals |
+	//		aiProcess_ValidateDataStructure |
+	//		aiProcess_FlipUVs |
+	//		extraImportFlags;
 
-		const aiScene* scene = nullptr;
+	//	const aiScene* scene = nullptr;
 
-		if (!bytes.empty()) {
-			// Extension hint helps Assimp choose the correct importer.
-			// Passing key.c_str() works well if key is a path-like string (it usually is today).
-			scene = importer.ReadFileFromMemory(
-				bytes.data(),
-				bytes.size(),
-				flags,
-				key.c_str()
-			);
-		}
+	//	if (!bytes.empty()) {
+	//		// Extension hint helps Assimp choose the correct importer.
+	//		// Passing key.c_str() works well if key is a path-like string (it usually is today).
+	//		scene = importer.ReadFileFromMemory(
+	//			bytes.data(),
+	//			bytes.size(),
+	//			flags,
+	//			key.c_str()
+	//		);
+	//	}
 
-		if (!scene || !scene->mRootNode) {
-			std::printf("[AvengModel] Assimp load failed for %s: %s\n",
-				key.c_str(),
-				importer.GetErrorString()
-			);
-			return false;
-		}
+	//	if (!scene || !scene->mRootNode) {
+	//		std::printf("[AvengModel] Assimp load failed for %s: %s\n",
+	//			key.c_str(),
+	//			importer.GetErrorString()
+	//		);
+	//		return false;
+	//	}
 
-		unsigned int numMeshes = scene->mNumMeshes;
+	//	unsigned int numMeshes = scene->mNumMeshes;
 
-		// Count vertices and faces
-		for (unsigned int i = 0; i < numMeshes; ++i) {
-			unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
-			unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
+	//	// Count vertices and faces
+	//	for (unsigned int i = 0; i < numMeshes; ++i) {
+	//		unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
+	//		unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
 
-			mVertexCount += numVertices;
-			mTriangleCount += numFaces;
+	//		mVertexCount += numVertices;
+	//		mTriangleCount += numFaces;
 
-		}
-		std::printf("AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
+	//	}
+	//	std::printf("AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
 
-		aiNode* rootNode = scene->mRootNode;
+	//	aiNode* rootNode = scene->mRootNode;
 
-		// Only for Embedded textures.
-		if (scene->HasTextures()) {
-			unsigned int numTextures = scene->mNumTextures;
+	//	// Only for Embedded textures.
+	//	if (scene->HasTextures()) {
+	//		unsigned int numTextures = scene->mNumTextures;
 
-			std::cout << "Model has an embedded texture!!" << std::endl;
+	//		std::cout << "Model has an embedded texture!!" << std::endl;
 
-			for (int i = 0; i < scene->mNumTextures; ++i) {
-				std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
+	//		for (int i = 0; i < scene->mNumTextures; ++i) {
+	//			std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
 
-				int height = scene->mTextures[i]->mHeight;
-				int width = scene->mTextures[i]->mWidth;
-				aiTexel* data = scene->mTextures[i]->pcData;
+	//			int height = scene->mTextures[i]->mHeight;
+	//			int width = scene->mTextures[i]->mWidth;
+	//			aiTexel* data = scene->mTextures[i]->pcData;
 
-				VkTextureData newTex{};
-				if (!Texture::loadTexture(engineDevice, renderData, newTex, texName, data, width, height)) {
-					return false;
-				}
+	//			VkTextureData newTex{};
+	//			if (!Texture::loadTexture(engineDevice, renderData, newTex, texName, data, width, height)) {
+	//				return false;
+	//			}
 
-				std::string internalTexName = "*" + std::to_string(i);
+	//			std::string internalTexName = "*" + std::to_string(i);
 
-				mTextures.insert({ internalTexName, newTex });
-			}
+	//			mTextures.insert({ internalTexName, newTex });
+	//		}
 
-			// std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
-		}
+	//		// std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
+	//	}
 
-	}
+	//}
 
 
 

@@ -121,7 +121,6 @@ namespace aveng {
 		CameraManager& cameraManager;
 		int editor_camera_id;
 
-		Timer mUploadToVBOTimer{};
 		unsigned int currentFrameIndex = 0; // Updated at render() from the renderer
 		float aspect;
 

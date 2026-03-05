@@ -1,6 +1,7 @@
 #include <vector>
 #include "ComputePipeline.h"
 #include "CoreVK/Shader.h"
+#include "CoreVK/EngineDevice.h"
 #include <cstdio>
 
 namespace aveng {

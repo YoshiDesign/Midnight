@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreVK/VkRenderData.h"
+#include "Utils/Timer.h"
 #include "Utils/glm_includes.h"
 #include "Game/data.h"
 
@@ -37,6 +38,8 @@ namespace aveng {
 		const IModelLibrary& modelLib_;
 		ModelLibrary& modelLib__;
 		IRenderSceneView& sceneView_;
+
+		Timer mFrameTimer;
 
 		std::vector<VkCommandBuffer> commandBuffers;
 		bool drawGizmo = false;

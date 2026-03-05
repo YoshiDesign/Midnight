@@ -224,12 +224,16 @@ namespace aveng {
 
 		int rdFieldOfView = 60;
 
-		float rdFrameTime = 0.0f;
+		float rdDrawTime = 0.0f;
+		float rdFrameTime = 0.0f; // AvengFrame.h
+		float rdComputeTime = 0.0f;
 		float rdMatrixGenerateTime = 0.0f;
-		float rdUploadToVBOTime = 0.0f;
+		float rdUploadSSBO1Time = 0.0f;
+		float rdUploadSSBO2Time = 0.0f;
 		float rdUploadToUBOTime = 0.0f;
 		float rdUIGenerateTime = 0.0f;
 		float rdUIDrawTime = 0.0f;
+		float rdFramePacketTime = 0.0f;
 
 		int rdMoveForward = 0;
 		int rdMoveRight = 0;

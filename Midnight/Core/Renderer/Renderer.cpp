@@ -117,7 +117,6 @@ namespace aveng {
 			std::cout << "[Renderer] Same queue detected - skipping graphics/compute semaphore sync" << std::endl;
 		}
 
-		mFrameTimer.start();
 		std::printf("Vulkan renderer initialized!\n");
 
 	}
@@ -662,128 +661,128 @@ namespace aveng {
 			}
 		}
 
-		/* 
-		 * Terrain - Basic Vertex & Fragment Shader support (currently terrain_1.vert and terrain-triplanar_1.frag)
-		 * Note that we're including the texture binding in this descriptor set. Binding 0
-		 */
-		{
-			VkDescriptorSetLayoutBinding uboProjViewBind{};
-			uboProjViewBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			uboProjViewBind.binding = 1;
-			uboProjViewBind.descriptorCount = 1;
-			uboProjViewBind.pImmutableSamplers = nullptr;
-			uboProjViewBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			
-			VkDescriptorSetLayoutBinding uboTerrainModelMatBind{};
-			uboTerrainModelMatBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			uboTerrainModelMatBind.binding = 2;
-			uboTerrainModelMatBind.descriptorCount = 1;
-			uboTerrainModelMatBind.pImmutableSamplers = nullptr;
-			uboTerrainModelMatBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		///* 
+		// * Terrain - Basic Vertex & Fragment Shader support (currently terrain_1.vert and terrain-triplanar_1.frag)
+		// * Note that we're including the texture binding in this descriptor set. Binding 0
+		// */
+		//{
+		//	VkDescriptorSetLayoutBinding uboProjViewBind{};
+		//	uboProjViewBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		//	uboProjViewBind.binding = 1;
+		//	uboProjViewBind.descriptorCount = 1;
+		//	uboProjViewBind.pImmutableSamplers = nullptr;
+		//	uboProjViewBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//	
+		//	VkDescriptorSetLayoutBinding uboTerrainModelMatBind{};
+		//	uboTerrainModelMatBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		//	uboTerrainModelMatBind.binding = 2;
+		//	uboTerrainModelMatBind.descriptorCount = 1;
+		//	uboTerrainModelMatBind.pImmutableSamplers = nullptr;
+		//	uboTerrainModelMatBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			VkDescriptorSetLayoutBinding inCompVertexNormBind{};
-			inCompVertexNormBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			inCompVertexNormBind.binding = 3;
-			inCompVertexNormBind.descriptorCount = 1;
-			inCompVertexNormBind.pImmutableSamplers = nullptr;
-			inCompVertexNormBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//	VkDescriptorSetLayoutBinding inCompVertexNormBind{};
+		//	inCompVertexNormBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		//	inCompVertexNormBind.binding = 3;
+		//	inCompVertexNormBind.descriptorCount = 1;
+		//	inCompVertexNormBind.pImmutableSamplers = nullptr;
+		//	inCompVertexNormBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			VkDescriptorSetLayoutBinding inCompVertexWeightBind{};
-			inCompVertexWeightBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			inCompVertexWeightBind.binding = 4;
-			inCompVertexWeightBind.descriptorCount = 1;
-			inCompVertexWeightBind.pImmutableSamplers = nullptr;
-			inCompVertexWeightBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			
-			VkDescriptorSetLayoutBinding inCompVertexSteepBind{};
-			inCompVertexSteepBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			inCompVertexSteepBind.binding = 5;
-			inCompVertexSteepBind.descriptorCount = 1;
-			inCompVertexSteepBind.pImmutableSamplers = nullptr;
-			inCompVertexSteepBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//	VkDescriptorSetLayoutBinding inCompVertexWeightBind{};
+		//	inCompVertexWeightBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		//	inCompVertexWeightBind.binding = 4;
+		//	inCompVertexWeightBind.descriptorCount = 1;
+		//	inCompVertexWeightBind.pImmutableSamplers = nullptr;
+		//	inCompVertexWeightBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//	
+		//	VkDescriptorSetLayoutBinding inCompVertexSteepBind{};
+		//	inCompVertexSteepBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		//	inCompVertexSteepBind.binding = 5;
+		//	inCompVertexSteepBind.descriptorCount = 1;
+		//	inCompVertexSteepBind.pImmutableSamplers = nullptr;
+		//	inCompVertexSteepBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			/* Terrain Texturing - Triplanar (used in [terrain-triplanar_1.frag]) */
-			VkDescriptorSetLayoutBinding terrainTextureBind{};
-			terrainTextureBind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			terrainTextureBind.binding = 0;
-			terrainTextureBind.descriptorCount = 1;
-			terrainTextureBind.pImmutableSamplers = nullptr;
-			terrainTextureBind.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		//	/* Terrain Texturing - Triplanar (used in [terrain-triplanar_1.frag]) */
+		//	VkDescriptorSetLayoutBinding terrainTextureBind{};
+		//	terrainTextureBind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		//	terrainTextureBind.binding = 0;
+		//	terrainTextureBind.descriptorCount = 1;
+		//	terrainTextureBind.pImmutableSamplers = nullptr;
+		//	terrainTextureBind.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> terrainBindings = { 
-				terrainTextureBind, uboProjViewBind, uboTerrainModelMatBind,
-				inCompVertexNormBind, inCompVertexWeightBind, inCompVertexSteepBind
-			};
+		//	std::vector<VkDescriptorSetLayoutBinding> terrainBindings = { 
+		//		terrainTextureBind, uboProjViewBind, uboTerrainModelMatBind,
+		//		inCompVertexNormBind, inCompVertexWeightBind, inCompVertexSteepBind
+		//	};
 
-			VkDescriptorSetLayoutCreateInfo terrainBasicCreateInfo{};
-			terrainBasicCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			terrainBasicCreateInfo.bindingCount = static_cast<uint32_t>(terrainBindings.size());
-			terrainBasicCreateInfo.pBindings = terrainBindings.data();
+		//	VkDescriptorSetLayoutCreateInfo terrainBasicCreateInfo{};
+		//	terrainBasicCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		//	terrainBasicCreateInfo.bindingCount = static_cast<uint32_t>(terrainBindings.size());
+		//	terrainBasicCreateInfo.pBindings = terrainBindings.data();
 
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &terrainBasicCreateInfo,
-				nullptr, &renderData.rdTerrainBasicDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp texture descriptor set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+		//	result = vkCreateDescriptorSetLayout(engineDevice.device(), &terrainBasicCreateInfo,
+		//		nullptr, &renderData.rdTerrainBasicDescriptorLayout);
+		//	if (result != VK_SUCCESS) {
+		//		Logger::log(1, "%s error: could not create Assimp texture descriptor set layout (error: %i)\n", __FUNCTION__, result);
+		//		return false;
+		//	}
+		//}
 
-		{ // Basic Terrain Compute
-			VkDescriptorSetLayoutBinding terrainSettingsUBOBind{};
-			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			terrainSettingsUBOBind.binding = 0;
-			terrainSettingsUBOBind.descriptorCount = 1;
-			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
-			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		//{ // Basic Terrain Compute
+		//	VkDescriptorSetLayoutBinding terrainSettingsUBOBind{};
+		//	terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		//	terrainSettingsUBOBind.binding = 0;
+		//	terrainSettingsUBOBind.descriptorCount = 1;
+		//	terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+		//	terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			VkDescriptorSetLayoutBinding terrainFaceNormAreaSsboBind{};
-			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			terrainSettingsUBOBind.binding = 1;
-			terrainSettingsUBOBind.descriptorCount = 1;
-			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
-			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		//	VkDescriptorSetLayoutBinding terrainFaceNormAreaSsboBind{};
+		//	terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		//	terrainSettingsUBOBind.binding = 1;
+		//	terrainSettingsUBOBind.descriptorCount = 1;
+		//	terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+		//	terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			VkDescriptorSetLayoutBinding terrainAdjacencySsboBind{};
-			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			terrainSettingsUBOBind.binding = 2;
-			terrainSettingsUBOBind.descriptorCount = 1;
-			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
-			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		//	VkDescriptorSetLayoutBinding terrainAdjacencySsboBind{};
+		//	terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		//	terrainSettingsUBOBind.binding = 2;
+		//	terrainSettingsUBOBind.descriptorCount = 1;
+		//	terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+		//	terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			VkDescriptorSetLayoutBinding terrainTrianglesSsboBind{};
-			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			terrainSettingsUBOBind.binding = 3;
-			terrainSettingsUBOBind.descriptorCount = 1;
-			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
-			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		//	VkDescriptorSetLayoutBinding terrainTrianglesSsboBind{};
+		//	terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		//	terrainSettingsUBOBind.binding = 3;
+		//	terrainSettingsUBOBind.descriptorCount = 1;
+		//	terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+		//	terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			VkDescriptorSetLayoutBinding terrainPositionsSsboBind{};
-			terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			terrainSettingsUBOBind.binding = 4;
-			terrainSettingsUBOBind.descriptorCount = 1;
-			terrainSettingsUBOBind.pImmutableSamplers = nullptr;
-			terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		//	VkDescriptorSetLayoutBinding terrainPositionsSsboBind{};
+		//	terrainSettingsUBOBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		//	terrainSettingsUBOBind.binding = 4;
+		//	terrainSettingsUBOBind.descriptorCount = 1;
+		//	terrainSettingsUBOBind.pImmutableSamplers = nullptr;
+		//	terrainSettingsUBOBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> terrainBasicCompBindings = { 
-				terrainSettingsUBOBind, 
-				terrainFaceNormAreaSsboBind, 
-				terrainAdjacencySsboBind, 
-				terrainTrianglesSsboBind, 
-				terrainPositionsSsboBind 
-			};
+		//	std::vector<VkDescriptorSetLayoutBinding> terrainBasicCompBindings = { 
+		//		terrainSettingsUBOBind, 
+		//		terrainFaceNormAreaSsboBind, 
+		//		terrainAdjacencySsboBind, 
+		//		terrainTrianglesSsboBind, 
+		//		terrainPositionsSsboBind 
+		//	};
 
-			VkDescriptorSetLayoutCreateInfo BasicTerrainCompCreateInfo{};
-			BasicTerrainCompCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			BasicTerrainCompCreateInfo.bindingCount = static_cast<uint32_t>(terrainBasicCompBindings.size());
-			BasicTerrainCompCreateInfo.pBindings = terrainBasicCompBindings.data();
+		//	VkDescriptorSetLayoutCreateInfo BasicTerrainCompCreateInfo{};
+		//	BasicTerrainCompCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		//	BasicTerrainCompCreateInfo.bindingCount = static_cast<uint32_t>(terrainBasicCompBindings.size());
+		//	BasicTerrainCompCreateInfo.pBindings = terrainBasicCompBindings.data();
 
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &BasicTerrainCompCreateInfo,
-				nullptr, &renderData.rdAvengComputeBasicTerrainDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp skinning buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+		//	result = vkCreateDescriptorSetLayout(engineDevice.device(), &BasicTerrainCompCreateInfo,
+		//		nullptr, &renderData.rdAvengComputeBasicTerrainDescriptorLayout);
+		//	if (result != VK_SUCCESS) {
+		//		Logger::log(1, "%s error: could not create Assimp skinning buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+		//		return false;
+		//	}
+		//}
 		return true;
 	}
 
@@ -846,35 +845,35 @@ namespace aveng {
 				return false;
 			}
 
-			/* Basic Terrain */
-			VkDescriptorSetAllocateInfo basicTerrainInfo{};
-			basicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			basicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
-			basicTerrainInfo.descriptorSetCount = 1;
-			basicTerrainInfo.pSetLayouts = &renderData.rdTerrainBasicDescriptorLayout;
+			///* Basic Terrain */
+			//VkDescriptorSetAllocateInfo basicTerrainInfo{};
+			//basicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			//basicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
+			//basicTerrainInfo.descriptorSetCount = 1;
+			//basicTerrainInfo.pSetLayouts = &renderData.rdTerrainBasicDescriptorLayout;
 
-			result = vkAllocateDescriptorSets(engineDevice.device(), &basicTerrainInfo,
-				&renderData.rdAvengBasicTerrainDescriptorSets[i]);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not allocate Basic \
-					Terrain descriptor set (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
+			//result = vkAllocateDescriptorSets(engineDevice.device(), &basicTerrainInfo,
+			//	&renderData.rdAvengBasicTerrainDescriptorSets[i]);
+			//if (result != VK_SUCCESS) {
+			//	Logger::log(1, "%s error: could not allocate Basic \
+			//		Terrain descriptor set (error: %i)\n", __FUNCTION__, result);
+			//	return false;
+			//}
 
-			/* Basic Terrain Compute */
-			VkDescriptorSetAllocateInfo computeBasicTerrainInfo{};
-			computeBasicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			computeBasicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
-			computeBasicTerrainInfo.descriptorSetCount = 1;
-			computeBasicTerrainInfo.pSetLayouts = &renderData.rdAvengComputeBasicTerrainDescriptorLayout;
+			///* Basic Terrain Compute */
+			//VkDescriptorSetAllocateInfo computeBasicTerrainInfo{};
+			//computeBasicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			//computeBasicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
+			//computeBasicTerrainInfo.descriptorSetCount = 1;
+			//computeBasicTerrainInfo.pSetLayouts = &renderData.rdAvengComputeBasicTerrainDescriptorLayout;
 
-			result = vkAllocateDescriptorSets(engineDevice.device(), &computeBasicTerrainInfo,
-				&renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not allocate Basic Terrain \
-					Compute descriptor set (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
+			//result = vkAllocateDescriptorSets(engineDevice.device(), &computeBasicTerrainInfo,
+			//	&renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
+			//if (result != VK_SUCCESS) {
+			//	Logger::log(1, "%s error: could not allocate Basic Terrain \
+			//		Compute descriptor set (error: %i)\n", __FUNCTION__, result);
+			//	return false;
+			//}
 
 		}
 
@@ -990,17 +989,17 @@ namespace aveng {
 			return false;
 		}
 
-		/* Terrain Compute - PCs */
-		std::vector<VkPushConstantRange> terrainComputePushConstant = { {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkBasicTerrainComputePushConstants)} };
+		///* Terrain Compute - PCs */
+		//std::vector<VkPushConstantRange> terrainComputePushConstant = { {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkBasicTerrainComputePushConstants)} };
 
-		/* Terrain Dispatch - basic terrain compute */
-		std::vector<VkDescriptorSetLayout> terrainLayouts = { renderData.rdAvengComputeBasicTerrainDescriptorLayout };
+		///* Terrain Dispatch - basic terrain compute */
+		//std::vector<VkDescriptorSetLayout> terrainLayouts = { renderData.rdAvengComputeBasicTerrainDescriptorLayout };
 
-		// Pipeline
-		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeBasicTerrainPipelineLayout, matrixMultLayouts, computePushConstants)) {
-			std::printf("%s error: could not init Assimp matrix multiplication compute pipeline layout\n", __FUNCTION__);
-			return false;
-		}
+		//// Pipeline
+		//if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeBasicTerrainPipelineLayout, matrixMultLayouts, computePushConstants)) {
+		//	std::printf("%s error: could not init Assimp matrix multiplication compute pipeline layout\n", __FUNCTION__);
+		//	return false;
+		//}
 
 		return true;
 	}
@@ -1172,17 +1171,9 @@ namespace aveng {
 			return 0;
 		}
 
-		renderData.rdFrameTime = mFrameTimer.stop();
-		mFrameTimer.start();
-
-		/* reset timers and other values */
-		animatedModelLoaded = false;
-		renderData.rdMatricesSize = 0;
-		renderData.rdUploadToUBOTime = 0.0f;
-		renderData.rdUploadToVBOTime = 0.0f;
-		renderData.rdMatrixGenerateTime = 0.0f;
-		renderData.rdUIGenerateTime = 0.0f;\
-
+#ifdef M_DEBUG
+		reset_timers();
+#endif
 		if (!isFrameStarted) {
 			std::printf("beginFrame failed/skipped (swapchain recreation), skipping frame\n");
 			return 0;  // Skip this frame gracefully
@@ -1204,16 +1195,18 @@ namespace aveng {
 				0, // tmp/unused frame number
 				deltaTime,
 				FramePacketBuildOptions{} // opts
+#ifdef M_DEBUG
+				, renderData
+#endif
 			);
-
-		mUploadToUBOTimer.start();
 
 		/*
 		* TIL: mNodeTransFormData is updated via instance->updateAnimation()
 		*	   That is also when & where we update mWorldPosMatrices.
 		*	   TRS and BoneMat buffers are updated by the compute shaders so you won't see uploadSsboData here on their behalf
 		*/
-
+		// Timer
+		mUploadToSSBO1Timer.start();
 		bool bufferResized = false;
 		//for (size_t i = 0; i < std::min(pkt.nodeTransformData.size(), (size_t)5); ++i) {
 		//	auto& n = pkt.nodeTransformData[i];
@@ -1222,6 +1215,7 @@ namespace aveng {
 		//		n.scale.x, n.scale.y, n.scale.z,
 		//		n.rotation.x, n.rotation.y, n.rotation.z, n.rotation.w);
 		//}
+		
 		// TODO - This upload only needs to occur if there are Animated Models!
 		bufferResized = ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), pkt.nodeTransformData);
 		// Upload every instance's current transform data (translation, scale, rotation)
@@ -1250,7 +1244,8 @@ namespace aveng {
 
 		}
 
-		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+		// Timer
+		renderData.rdUploadSSBO1Time += mUploadToSSBO1Timer.stop();
 
 		// Feels hacky
 		boneMatrixBufferSize = pkt.nodeTransformData.size();
@@ -1315,15 +1310,17 @@ namespace aveng {
 			updateComputeDescriptorSets(currentFrameIndex);
 		}
 
+		// Timer
 		/* we need to update descriptors after the upload if buffer size changed */
 		mUploadToUBOTimer.start();
-
 		UniformBuffer::uploadPersistentData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices); // View/Proj Matrices
 		UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
 		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
 
+		// Timer
+		mUploadToSSBO2Timer.start();
 		// Upload the model mat's
-		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) { 
+		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
 			Logger::log(1, "[2] mModelMatrixBuffers resized!!\n");
 			size_t newBufferSize = std::max(pkt.worldMatrices.size() * sizeof glm::mat4, mModelMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
@@ -1353,8 +1350,12 @@ namespace aveng {
 			updateComputeDescriptorSets(currentFrameIndex);
 		}
 
+		// Timer
+		renderData.rdUploadSSBO2Time = mUploadToSSBO2Timer.stop();
+
 		/* record compute commands */
 		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence.at(currentFrameIndex));
+		mComputeTimer.start();
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
 			return WTF_BOOM;
@@ -1442,6 +1443,8 @@ namespace aveng {
 				return WTF_BOOM;
 			};
 		}
+
+		renderData.rdComputeTime = mComputeTimer.stop();
 
 	}
 
@@ -1546,6 +1549,20 @@ namespace aveng {
 		}
 
 		return true;
+	}
+
+	// Timers in this class
+	void Renderer::reset_timers()
+	{
+		renderData.rdDrawTime = mDrawTimer.stop();
+		mDrawTimer.start();
+
+		animatedModelLoaded = false;
+		renderData.rdMatricesSize = 0;
+		renderData.rdUploadToUBOTime = 0.0f;
+		renderData.rdUploadSSBO1Time = 0.0f;
+		renderData.rdUploadSSBO2Time = 0.0f;
+		renderData.rdMatrixGenerateTime = 0.0f;
 	}
 
 	void Renderer::updateDescriptorSets(int frameIndex) {
@@ -1984,8 +2001,9 @@ namespace aveng {
 		write.pImageInfo = &imageInfo;
 
 		vkUpdateDescriptorSets(engineDevice.device(), 1, &write, 0, nullptr);
-	}
 
+		return true;
+	}
 
 	bool Renderer::createSSBOs() {
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {

@@ -1,4 +1,5 @@
 #include "SyncObjects.h"
+#include "CoreVK/EngineDevice.h"
 
 namespace aveng {
     bool SyncObjects::init(EngineDevice& engineDevice, VkRenderData& renderData, int frames) {

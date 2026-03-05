@@ -85,14 +85,17 @@ namespace aveng {
         std::vector<float> mFrameTimeValues{};
         int mNumFrameTimeValues = 90;
 
-        std::vector<float> mModelUploadValues{};
-        int mNumModelUploadValues = 90;
+        std::vector<float> mSSBO1TimeValues{};
+        int mNumSSBO1TimeValues = 90;
 
-        std::vector<float> mMatrixGenerationValues{};
-        int mNumMatrixGenerationValues = 90;
+        std::vector<float> mSSBO2TimeValues{};
+        int mNumSSBO2TimeValues = 90;
 
-        std::vector<float> mMatrixUploadValues{};
-        int mNumMatrixUploadValues = 90;
+        std::vector<float> mFramePacketValues{};
+        int mNumFramePacketValues = 90;
+
+        std::vector<float> mUBO1TimeValues{};
+        int mNumUBO1TimeValues = 90;
 
         std::vector<float> mUiGenValues{};
         int mNumUiGenValues = 90;
@@ -100,16 +103,22 @@ namespace aveng {
         std::vector<float> mUiDrawValues{};
         int mNumUiDrawValues = 90;
 
+        std::vector<float> mComputeDisValues{};
+        int mNumComputeDisValues = 90;
+        
         float mNewFps = 0.0f;
+        double rawFps = 0.0f;
         double mUpdateTime = 0.0;
 
         int mFpsOffset = 0;
         int mFrameTimeOffset = 0;
-        int mModelUploadOffset = 0;
-        int mMatrixGenOffset = 0;
-        int mMatrixUploadOffset = 0;
+        int mSSBO2TimeOffset = 0;
+        int mSSBO1TimeOffset = 0;
+        int mUBO1TimeOffset = 0;
+        int mFramePacketOffset = 0;
         int mUiGenOffset = 0;
         int mUiDrawOffset = 0;
+        int mComputeDisOffset = 0;
 
         // Selected instance data
         InstanceTransform curInstXform;

@@ -127,6 +127,8 @@ namespace aveng {
 			VkDescriptorSet animationDescriptorSet,
 			int frameIndex);
 
+		void reset_timers();
+
 		bool beginFrame(); // Synchronization
 		void endFrame(); // Synchronization
 		void beginSwapChainRenderPass(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer, VkRenderPass renderpass, bool selection = false);
@@ -176,11 +178,11 @@ namespace aveng {
 		VkResult err;
 		VkResult result;
 
-		Timer mFrameTimer{};
-		Timer mMatrixGenerateTimer{};
+		Timer mDrawTimer{};
+		Timer mComputeTimer{};
 		Timer mUploadToUBOTimer{};
-		Timer mUIGenerateTimer{};
-		Timer mUIDrawTimer{};
+		Timer mUploadToSSBO1Timer{};
+		Timer mUploadToSSBO2Timer{};
 
 		std::unique_ptr<SwapChain> aveng_swapchain;			// Swapchain - Heap Allocated makes it easier to rebuild when the window resizes
 		PointLightSystem pointLightSystem{ engineDevice, renderData };	// Light stuff

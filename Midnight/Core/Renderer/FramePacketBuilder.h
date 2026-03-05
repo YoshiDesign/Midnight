@@ -1,7 +1,9 @@
 #pragma once
 #include "avpch.h"
 // #include "Core/Asset/AssetRegistry.h"
+#include "Utils/Timer.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
+#include "CoreVK/VkRenderData.h"
 
 // [!] Do not include SceneFacade or InstanceManager in this header.
 
@@ -109,7 +111,7 @@ namespace aveng {
 
     class FramePacketBuilder final {
     public:
-
+            
         void setModelQuery(const IModelQuery* q) { modelQ_ = q; }
         void setAnimQuery(IModelAnimQuery* aq) { animQ_ = aq; }
         void setFramesInFlight(int n) { framePackets_.resize(n); }
@@ -140,8 +142,16 @@ namespace aveng {
             uint32_t frameIndex,
             uint64_t frameNumber, // Could become useful for profiling
             float deltaTime,
-            const FramePacketBuildOptions& opt)
+            const FramePacketBuildOptions& opt
+#ifdef M_DEBUG
+            , VkRenderData& renderData
+#endif
+        )
         {
+
+#ifdef M_DEBUG
+            mFramePacketTimer.start();
+#endif
             // Ensure we have storage for this frame index
             if (frameIndex >= framePackets_.size()) {
                 framePackets_.resize(frameIndex + 1);
@@ -473,7 +483,9 @@ namespace aveng {
                     next += b.instanceCount;
                 }
             }*/
-
+#ifdef M_DEBUG
+            renderData.rdFramePacketTime = mFramePacketTimer.stop();
+#endif
             return pkt;
         }
 
@@ -484,6 +496,8 @@ namespace aveng {
         BatchSortFn customBatchSort_{};
         size_t maxInstances = 0;
         uint32_t nextPickId = 1;
+        Timer mFramePacketTimer{};
+
     };
 
 

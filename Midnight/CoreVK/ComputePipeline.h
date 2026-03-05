@@ -6,6 +6,9 @@
 
 #include "VkRenderData.h"
 namespace aveng{
+
+    class EngineDevice;
+
     class ComputePipeline {
     public:
         static bool init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline, std::string computeShaderFilename);

@@ -27,6 +27,7 @@ namespace aveng {
 		, pEditor{ editor }
 		, modelLib__{ modelLibrary }
 	{
+		mFrameTimer.start();
 	}
 
 #ifdef ENABLE_EDITOR
@@ -40,6 +41,8 @@ namespace aveng {
 
 	bool AvengFrame::render(float deltaTime)
 	{
+
+ 		mFrameTimer.start();
 
 		// Clear the Frame's vector of command buffer handles that we'll be submitting to the graphics queue
 		commandBuffers.clear();
@@ -315,6 +318,7 @@ namespace aveng {
 
 		
 		renderer.endFrame();
+		renderData.rdFrameTime = mFrameTimer.stop();
 
 	}
 }

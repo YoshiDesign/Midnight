@@ -455,9 +455,8 @@ namespace aveng {
 				renderer.getCurrentFramebuffer(),
 				renderData.rdLineRenderpass);
 
-			mUploadToVBOTimer.start();
+			// TODO - Timers
 			VertexBuffer::uploadData(engineDevice, mLineVertexBuffer, *mLineMesh);
-			renderData.rdUploadToVBOTime += mUploadToVBOTimer.stop();
 
 			vkCmdBindPipeline(renderData.rdLineCommandBuffers.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdLinePipeline);
 
