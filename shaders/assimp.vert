@@ -36,4 +36,5 @@ void main() {
   normal = vec4(aNormal.xyz, 0.0); // transpose(inverse(modelMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
   texCoord = vec2(aPos.w, aNormal.w);
   fragPosWorld = positionWorld.xyz;
+
 }

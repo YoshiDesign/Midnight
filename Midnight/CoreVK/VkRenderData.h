@@ -146,15 +146,35 @@ namespace aveng {
 		uint32_t pkSkinMatOffset;
 		uint32_t pkBasePickId;
 		uint32_t pkPickId;
-
 	};
 
-	struct VkTerrainPushConstant {
-		uint32_t baseVertex;
-		uint32_t baseTriangle;
-		uint32_t numVertices;
-		uint32_t numTriangles;
+	struct MnPushConstant {
+		uint32_t boneOffset;
+		uint32_t nBones;
+		uint32_t instanceOffset;
 	};
+
+	struct InstanceMaterial {
+		uint32_t baseTex;
+		uint32_t data_1;
+		uint32_t data_2;
+		//uint32_t normalTex;
+		//uint32_t ormTex;
+		//uint32_t emissiveTex;
+		uint32_t b_index; // Link to larger mat struct that not every model may need
+	};
+
+	struct InstanceMaterialB {
+		uint32_t data_3;
+		uint32_t data_4;
+	};
+
+	//struct PK {
+	//	uint32_t baseVertex;
+	//	uint32_t baseTriangle;
+	//	uint32_t numVertices;
+	//	uint32_t numTriangles;
+	//};
 
 	struct VkComputePushConstants {
 		uint32_t pkModelOffset;
@@ -280,7 +300,7 @@ namespace aveng {
 		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;				// Static
 		VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
 		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;		// Texture
-		VkDescriptorSetLayout rdBindlessTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
+		VkDescriptorSetLayout rdBindlessDescriptorLayout = VK_NULL_HANDLE;		// Texture
 		VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;		// Animation
 		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			 // Animation
 		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;		 // Animation

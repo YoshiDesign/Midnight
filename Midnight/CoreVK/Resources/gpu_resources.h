@@ -6,6 +6,11 @@
 
 namespace aveng {
 
+
+    const uint32_t MAX_BINDLESS_TEXTURES = 500;
+    const uint32_t MAX_BINDLESS_BUFFERS  = 10000;
+    const uint32_t MAX_BINDLESS_TEXEL_BUFFERS  = 1000;
+
     // Example Mat
     struct GpuMaterial {
         uint32_t baseColorTex;

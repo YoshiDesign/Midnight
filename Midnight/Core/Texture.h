@@ -14,8 +14,6 @@ namespace aveng {
 
     class EngineDevice;
 
-    const int MAX_BINDLESS_TEXTURES = 500;
-
 /// /// /// 
     struct TextureSlot {
         VkImage image = VK_NULL_HANDLE;

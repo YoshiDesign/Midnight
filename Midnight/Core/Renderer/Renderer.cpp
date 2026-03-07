@@ -1,10 +1,12 @@
 #include "Renderer.h"
 #include "avpch.h"
+#include "CoreVK/Resources/platform.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/SkinningPipeline.h"
 #include "CoreVK/ComputePipeline.h"
 #include "Core/Texture.h"
+#include "CoreVK/Resources/gpu_resources.h"
 // #include "CoreVK/LinePipeline.h"
 #include "CoreVK/AvengStorageBuffer.h"
 #include "CoreVK/AvengUniformBuffer.h"
@@ -424,7 +426,7 @@ namespace aveng {
 		  { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
 		  { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
 		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+//		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
 		};
 
 		VkDescriptorPoolCreateInfo poolInfo{};
@@ -1894,16 +1896,19 @@ namespace aveng {
 	bool Renderer::createBindlessDescriptors()
 	{
 
-		std::vector<VkDescriptorPoolSize> b_poolSizes =
+		VkDescriptorPoolSize b_poolSizes[] =
 		{
-		  { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_TEXTURES } // type, descriptorCount
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_TEXTURES },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_BINDLESS_TEXEL_BUFFERS * 2},
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_BINDLESS_BUFFERS * 5},
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_BINDLESS_BUFFERS * 3}
 		};
 
 		VkDescriptorPoolCreateInfo b_poolInfo{};
 		b_poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		b_poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		b_poolInfo.poolSizeCount = static_cast<uint32_t>(b_poolSizes.size());
-		b_poolInfo.pPoolSizes = b_poolSizes.data();
+		b_poolInfo.poolSizeCount = static_cast<uint32_t>(ArraySize(b_poolSizes));
+		b_poolInfo.pPoolSizes = b_poolSizes;
 		b_poolInfo.maxSets = 1;
 
 		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &b_poolInfo, nullptr, &renderData.avengBindlessDescriptorPool);
@@ -1924,37 +1929,97 @@ namespace aveng {
 
 	bool Renderer::createBindlessDescriptorLayouts() {
 	
-		VkDescriptorSetLayoutBinding binding{};
-		binding.binding = 0;
-		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding.descriptorCount = MAX_BINDLESS_TEXTURES;
-		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		binding.pImmutableSamplers = nullptr;
+		VkDescriptorSetLayoutBinding bindless_bindings[7];
 
-		VkDescriptorBindingFlags bindingFlags =
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT; // This enables us to treat descriptors like they're indexable, I think
+		VkDescriptorSetLayoutBinding& sampler_binding = bindless_bindings[0];
+		sampler_binding.binding = 0;
+		sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		sampler_binding.descriptorCount = MAX_BINDLESS_TEXTURES;
+		sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		sampler_binding.pImmutableSamplers = nullptr;
 
-		// Required to designate flags on this layout
-		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo {
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO
-		};
+		VkDescriptorSetLayoutBinding& storage_image_binding = bindless_bindings[1];
+		storage_image_binding.binding = 1;
+		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_TEXEL_BUFFERS;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.pImmutableSamplers = nullptr;
 
-		flagsInfo.bindingCount = 1;
-		flagsInfo.pBindingFlags = &bindingFlags;
+		VkDescriptorSetLayoutBinding& ssbo1_binding = bindless_bindings[2];
+		storage_image_binding.binding = 2;
+		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_TEXEL_BUFFERS;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutBinding& ssbo2_binding = bindless_bindings[3];
+		storage_image_binding.binding = 3;
+		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutBinding& ssbo3_binding = bindless_bindings[4];
+		storage_image_binding.binding = 4;
+		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutBinding& ubo1_binding = bindless_bindings[5];
+		storage_image_binding.binding = 5;
+		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutBinding& ubo2_binding = bindless_bindings[6];
+		storage_image_binding.binding = 6;
+		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.pImmutableSamplers = nullptr;
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo{
 			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
 		};
-		layoutInfo.pNext = &flagsInfo; // First usage of pNext. Not bad!
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &binding;
 
-		VkDescriptorSetLayout bindlessSetLayout;
+		layoutInfo.bindingCount = ArraySize(bindless_bindings);
+		layoutInfo.pBindings = bindless_bindings;
+
+		// TODO - Query device support for update after bind
+		VkDescriptorBindingFlags flags =
+			// This enables us to treat descriptors like they're indexable (I think)
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | 
+			// This allows us to update descriptor bindings after they've already been bound
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT; 
+
+		// Required to designate flags on this layout
+		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo {
+			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+			nullptr,
+			ArraySize(bindless_bindings),
+			&flags
+		};
+	
+		VkDescriptorBindingFlags bindless_flags[2];
+		bindless_flags[0] = flags; // Both of these bindings will have the same flags
+		bindless_flags[1] = flags; // Both of these bindings will have the same flags
+
+		layoutInfo.pNext = &flagsInfo; // First usage of pNext. Not bad!
+
+		/*
+		 *	Binding Flags are part of Vulkan Core as of 1.2. They allow the use of:
+		 *	VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT — allows updating descriptors after the set is bound.
+		 *	VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT — allows some descriptors in an array to be unbound.
+		 *	VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT — allows variable-sized descriptor arrays.
+		 *	VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT_EXT — allows updating descriptors that are not currently used.
+		 */
 
 		result = vkCreateDescriptorSetLayout(engineDevice.device(), &layoutInfo, nullptr, 
-									&renderData.rdBindlessTextureDescriptorLayout);
+									&renderData.rdBindlessDescriptorLayout);
 		if (result != VK_SUCCESS) {
-			Logger::log(1, "%s error: could not create bindless descriptor set layout\n", __FUNCTION__, result);
+			Logger::log(1, "%s error: could not create bindless descriptor set layouts\n", __FUNCTION__, result);
 			return false;
 		}
 		return true;
@@ -1970,7 +2035,7 @@ namespace aveng {
 			};
 			allocInfo.descriptorPool = renderData.avengBindlessDescriptorPool;
 			allocInfo.descriptorSetCount = 1;
-			allocInfo.pSetLayouts = &renderData.rdBindlessTextureDescriptorLayout;
+			allocInfo.pSetLayouts = &renderData.rdBindlessDescriptorLayout;
 
 			result = vkAllocateDescriptorSets(engineDevice.device(), &allocInfo, &renderData.rdAvengBindlessTextureDescriptorSets[i]);
 			if (result != VK_SUCCESS) {
