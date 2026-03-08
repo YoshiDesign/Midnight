@@ -15,6 +15,7 @@ namespace procgen {
 
 namespace aveng {
 
+	class ModelLibrary;
 	class EngineDevice;
 	class AssimpInstance;
 	class AvengWindow;
@@ -114,7 +115,7 @@ namespace aveng {
 		// Alternatively you could store IRenderSceneView* but only if your engine guarantees it’s always valid and you prefer a slightly simpler callsite.
 		int update(
 			const FramePacket& pkt,
-			const IModelLibrary& modelLib_, // used to get Model pointers, *for now*
+			const ModelLibrary& modelLib, // used to get Model pointers, *for now*
 			float deltaTime);
 
 		bool drawModels(
@@ -127,6 +128,18 @@ namespace aveng {
 			VkPipelineLayout animationLayout, 
 			VkDescriptorSet basicDescriptorSet,
 			VkDescriptorSet animationDescriptorSet,
+			int frameIndex);
+
+		bool drawModelsBindless(
+			const FramePacket& pkt,
+			const IModelLibrary& modelLib,
+			VkCommandBuffer commandBuffer,
+			VkPipeline basicPipeline,
+			VkPipeline animationPipeline,
+			VkPipelineLayout basicLayout,
+			VkPipelineLayout animationLayout,
+			//VkDescriptorSet basicDescriptorSet,
+			//VkDescriptorSet animationDescriptorSet,
 			int frameIndex);
 
 		void reset_timers();

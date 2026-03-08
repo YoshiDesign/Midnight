@@ -11,7 +11,7 @@ layout (location = 2) out vec2 texCoord;
 layout (location = 3) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
-  uint modelStride;
+  uint modelStride; // model bone stride
   uint worldPosOffset;
   uint skinMatrixOffset;
   uint basePickId;

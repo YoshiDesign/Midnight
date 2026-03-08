@@ -19,7 +19,7 @@
 #include "Core/aveng_window.h"
 #include "Runtime/Facade/SceneFacade.h" // IRenderSceneView, currently
 #include "Game/Camera/CameraManager.h"
-
+#include "Core/Renderer/ModelLibrary.h"
 
 #define LOG(a) std::cout<<a<<std::endl;
 #define DESTROY_UNIFORM_BUFFERS 1	// Unused as far as I can tell
@@ -1165,7 +1165,7 @@ namespace aveng {
 	* - Primary graphics renderpass has begun
 	* 
 	*/
-	int Renderer::update(const FramePacket& pkt, const IModelLibrary& modelLib, float deltaTime) {
+	int Renderer::update(const FramePacket& pkt, const ModelLibrary& modelLib, float deltaTime) {
 
 		/* no update on zero diff. This caused an issue */
 		if (deltaTime == 0.0f && !firstFrame) {
@@ -1504,6 +1504,71 @@ namespace aveng {
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, animationPipeline);
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			animationLayout, 1, 1, &animationDescriptorSet, 0, nullptr);
+
+		for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
+			const DrawBatch& b = pkt.batches[i];
+			if (b.instanceCount == 0) continue;
+
+			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
+			if (!model) continue;
+
+			mModelPushConst.pkWorldPosOffset = b.drawListOffset; // instance offset
+			mModelPushConst.pkModelBoneStride = b.boneCount;	// stride per model
+			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;	// 
+			mModelPushConst.pkBasePickId = b.basePickId;
+			mModelPushConst.pkPickId = renderData.selectedPickId;
+			vkCmdPushConstants(commandBuffer, animationLayout,
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
+
+			model->drawInstancedV2(commandBuffer, animationLayout, b.instanceCount, frameIndex);
+		}
+
+		return true;
+	}
+	
+	bool Renderer::drawModelsBindless(
+		const FramePacket& pkt,
+		const IModelLibrary& modelLib,
+		VkCommandBuffer commandBuffer,
+		VkPipeline basicPipeline,
+		VkPipeline animationPipeline,
+		VkPipelineLayout basicLayout,
+		VkPipelineLayout animationLayout,
+		//VkDescriptorSet basicDescriptorSet,
+		//VkDescriptorSet animationDescriptorSet,
+		int frameIndex)
+	{
+
+		// ========== STATIC PASS ==========
+		// Bind static pipeline once, then draw all static batches
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
+		//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		//	basicLayout, 1, 1, &basicDescriptorSet, 0, nullptr);
+
+		for (uint32_t i = 0; i < pkt.staticBatchCount; ++i) {
+			const DrawBatch& b = pkt.batches[i];
+			if (b.instanceCount == 0) continue;
+
+			// Pointer here? Really?
+			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
+			if (!model) continue;
+
+			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
+			mModelPushConst.pkModelBoneStride = 0; // static - unused
+			mModelPushConst.pkSkinMatOffset = 0; // static - unused
+			mModelPushConst.pkBasePickId = b.basePickId; // if basePickId + gl_InstanceIndex == SelectedPickId, the instance is selected
+			mModelPushConst.pkPickId = renderData.selectedPickId;
+			vkCmdPushConstants(commandBuffer, basicLayout,
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
+
+			model->drawInstancedV2(commandBuffer, basicLayout, b.instanceCount, frameIndex);
+		}
+
+		// ========== ANIMATED PASS ==========
+		// Bind animated pipeline once, then draw all animated batches
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, animationPipeline);
+		//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		//	animationLayout, 1, 1, &animationDescriptorSet, 0, nullptr);
 
 		for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
 			const DrawBatch& b = pkt.batches[i];
