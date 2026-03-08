@@ -7,28 +7,12 @@
 #include <vulkan/vulkan_core.h>
 #include <AMD/vk_mem_alloc.h>
 #include <assimp/texture.h>
-
+#include "CoreVK/Resources/gpu_resources.h"
 #include "CoreVK/VkRenderData.h"
 
 namespace aveng {
 
     class EngineDevice;
-
-/// /// /// 
-    struct TextureSlot {
-        VkImage image = VK_NULL_HANDLE;
-        VmaAllocation alloc = nullptr; 
-        VkImageView view = VK_NULL_HANDLE;
-        VkSampler sampler = VK_NULL_HANDLE;
-        // TODO: format, extent, mipCount, debugName, etc.
-        bool alive = false;
-    };
-
-    struct TextureRegistry {
-        std::vector<TextureSlot> slots; // Slot index == descriptor index for bindless textures
-        std::vector<uint32_t> freeList; // indices into slots
-    };
-/// /// ///
 
 	struct VkTextureStagingBuffer {
 		VkBuffer stagingBuffer = VK_NULL_HANDLE;

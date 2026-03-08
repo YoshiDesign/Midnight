@@ -181,6 +181,7 @@
     <ClCompile Include="CoreVK\LightPipeline.cpp" />
     <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
+    <ClCompile Include="CoreVK\Resources\MTexture.cpp" />
     <ClCompile Include="Core\Camera\aveng_camera.cpp" />
     <ClCompile Include="Core\Input\InputSystem.cpp" />
     <ClCompile Include="Core\Midnight.cpp" />
@@ -250,6 +251,8 @@
     <ClInclude Include="CoreVK\PipelineLayout.h" />
     <ClInclude Include="CoreVK\Resources\gpu_resources.h" />
     <ClInclude Include="CoreVK\Resources\graphics_enums.h" />
+    <ClInclude Include="CoreVK\Resources\MTexture.h" />
+    <ClInclude Include="CoreVK\Resources\platform.h" />
     <ClInclude Include="Core\Math\quantize.h" />
     <ClInclude Include="Core\Math\wyhash.h" />
     <ClInclude Include="CoreVK\Shader.h" />

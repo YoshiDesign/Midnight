@@ -7,6 +7,7 @@
 #include "Core/aveng_model.h"
 #include "CoreVK/swapchain.h"
 #include "Utils/Timer.h"
+#include "CoreVK/Resources/MTexture.h"
 
 namespace procgen {
 	struct TerrainMeshCpu;
@@ -79,10 +80,10 @@ namespace aveng {
 
 		void updateLights();
 
+		int dispatchCompute(const IModelLibrary& modelLib, const FramePacket& pkt);
+
 		/* ProcGen - TODO */
 		void enqueueTerrainUpload(procgen::TerrainMeshCpu tMesh);
-
-		AnyInstanceHandle getPickedHandle(int pickId);
 
 		// Just use the returned values directly if working in renderer.cpp. This is for clients
 		VkCommandBuffer getCurrentCommandBufferGraphics() const 
@@ -111,12 +112,13 @@ namespace aveng {
 
 		// IRenderSceneView as an arg allows us to use different scene sources.
 		// Alternatively you could store IRenderSceneView* but only if your engine guarantees it’s always valid and you prefer a slightly simpler callsite.
-		int draw(
-			IRenderSceneView& sceneView,
+		int update(
+			const FramePacket& pkt,
 			const IModelLibrary& modelLib_, // used to get Model pointers, *for now*
 			float deltaTime);
 
 		bool drawModels(
+			const FramePacket& pkt,
 			const IModelLibrary& modelLib_, // used to get Model pointers, *for now*
 			VkCommandBuffer commandBuffer, 
 			VkPipeline basicPipeline, 
@@ -153,6 +155,15 @@ namespace aveng {
 		
 		void destroyTrash();
 		void cleanup();
+
+		// New Resource Methods 
+
+		/**
+		 * Textures
+		 */
+		TextureRef new_texture(EngineDevice& engineDevice, TextureRef& ref, bool generateMipmaps, bool flipImage);
+		bool gpu_upload_texture(EngineDevice& engineDevice, VkTextureStagingBuffer stagingData, uint32_t width, uint32_t height, 
+								bool generateMipmaps, uint32_t mipmapLevels);
 
 	private:
 
@@ -192,8 +203,6 @@ namespace aveng {
 		int currentFrameIndex{ 0 }; // Not tied to the image index
 		bool isFrameStarted{ false };
 
-		FramePacketBuilder framePacketBuilder_;
-
 		// Descriptors and Buffers
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
 		std::vector<VkUniformBufferData> mPointLightUBOBuffers;
@@ -216,7 +225,7 @@ namespace aveng {
 		std::vector<NodeTransformData> mNodeTransFormData{};
 		PointLightData mPointLightData{};
 
-		bool animatedModelLoaded{false};
+		TextureRegistry texReg;
 
 	};
 

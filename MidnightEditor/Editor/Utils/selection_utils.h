@@ -41,7 +41,7 @@ namespace aveng {
 
     /* Add handle to vec if it doesn't exist */
     inline void addUnique(std::vector<AnyInstanceHandle>& v, AnyInstanceHandle h) {
-        if (!containsHandle(v, h)) v.push_back(h);
+        if (!containsHandle(v, h)) { v.push_back(h); }
     }
 
 }

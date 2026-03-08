@@ -62,21 +62,6 @@ namespace aveng {
                                 continue;
                             }
 
-                            // internal textures
-                            //if (!texName.empty() && texName.find("*") != 0) {
-                            //    VkTextureData newTex{};
-                            //    // std::string texNameWithPath = assetDirectory + '/' + texName;
-                            //    std::string resolved = resolveModelTexturePath(modelBaseDir, contentRoot, texName);
-
-                            //    // if (!Texture::loadTexture(engineDevice, renderData, newTex, texNameWithPath)) {
-                            //    if (!Texture::loadTexture(engineDevice, renderData, newTex, resolved)) {
-                            //        // std::printf("%s error: could not load texture file '%s', skipping\n", __FUNCTION__, texNameWithPath.c_str());
-                            //        Texture::cleanup(engineDevice, renderData, newTex);
-                            //        continue;
-                            //    }
-
-                            //    textures.insert({ texName, newTex });
-                            //}
                             // external textures referenced by materials (NOT embedded "*0")
                             if (!texName.empty() && texName.rfind("*", 0) != 0) {
 

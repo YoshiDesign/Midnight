@@ -1,9 +1,9 @@
 #pragma once
-#include "CoreVK/VkRenderData.h"
+// #include "CoreVK/VkRenderData.h"
+#include "avpch.h"
 #include "Core/Modeling/AssimpInstance.h"
 #include "Game/Camera/CameraManager.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
-#include "avpch.h"
 
 namespace aveng {
 
@@ -23,6 +23,7 @@ namespace aveng {
 
         // --- instance selection ---
         AnyInstanceHandle primarySelection{}; // last clicked / active
+        // int primarySelection; // last clicked / active
         std::vector<AnyInstanceHandle> selectedMany; // multi-select set (unique)
         AnyInstanceHandle noSelect{};
 

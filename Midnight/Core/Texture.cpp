@@ -78,7 +78,10 @@ namespace aveng {
     }
 
     /* This signature is used if we're loading an embedded texture */
-    bool Texture::loadTexture(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData, std::string textureName, aiTexel* textureData, int width, int height, bool generateMipmaps, bool flipImage) {
+    bool Texture::loadTexture(EngineDevice& engineDevice, const VkRenderData& renderData, 
+        VkTextureData& texData, std::string textureName, aiTexel* textureData, 
+        int width, int height, bool generateMipmaps, bool flipImage) 
+    {
         // Check if texture is already loaded (defensive check to prevent double-loading)
         if (texData.image != VK_NULL_HANDLE) {
             std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureName.c_str());

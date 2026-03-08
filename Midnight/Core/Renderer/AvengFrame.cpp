@@ -6,6 +6,7 @@
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "Core/Renderer/Renderer.h"
 #include "Services/IRenderSceneView.h"
+#include "CoreVK/Resources/platform.h"
 #include <cassert>
 
 namespace aveng {
@@ -13,21 +14,24 @@ namespace aveng {
 	AvengFrame::AvengFrame(Renderer& renderer,
 		ModelLibrary& modelLibrary,
 		IRenderSceneView& sceneView,
-		const IModelLibrary& modelLib,
 		VkRenderData& renderData,
 		GameData& gameData,
 		EngineDevice& engineDevice,
 		Editor* editor)
 		: renderer{ renderer }
 		, sceneView_{ sceneView }
-		, modelLib_{ modelLib }
 		, renderData{ renderData }
 		, gameData { gameData }
 		, engineDevice{ engineDevice }
 		, pEditor{ editor }
-		, modelLib__{ modelLibrary }
+		, modelLib__{ modelLibrary } // TODO ...?
 	{
 		mFrameTimer.start();
+
+		/* framePacketBuilder_ dependencies */
+		framePacketBuilder_.setModelQuery(&modelLib__.query());
+		framePacketBuilder_.setAnimQuery(&modelLib__.animQuery());
+		framePacketBuilder_.setFramesInFlight(SwapChain::MAX_FRAMES_IN_FLIGHT);
 	}
 
 #ifdef ENABLE_EDITOR
@@ -37,12 +41,19 @@ namespace aveng {
 	}
 #endif
 
+	// 
 	int AvengFrame::currentFrameIndex() { return renderer.getFrameIndex(); }
 
-	bool AvengFrame::render(float deltaTime)
+	// 
+	void AvengFrame::reset_timers()
 	{
+		renderData.rdFramePacketTime = 0.0f;
+	}
 
- 		mFrameTimer.start();
+	//
+	bool AvengFrame::start_frame() {
+
+		mFrameTimer.start();
 
 		// Clear the Frame's vector of command buffer handles that we'll be submitting to the graphics queue
 		commandBuffers.clear();
@@ -56,8 +67,6 @@ namespace aveng {
 #endif
 			return false;
 		}
-
-  		int currentFrameIndex = renderer.getFrameIndex();
 
 		/* start graphics rendering */
 		// result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence.at(currentFrameIndex));
@@ -73,21 +82,68 @@ namespace aveng {
 		modelLib__.processPendingModelLoads();
 
 		renderer.updateCamera();
+	}
+	
+	// 
+	FramePacket& AvengFrame::frame_packet(float deltaTime, int currentFrameIndex) {
+
+#ifdef M_DEBUG
+		reset_timers();
+#endif
+
+		auto stat = sceneView_.staticPoolInputs();
+		auto anim = sceneView_.animatedPoolInputs();
+		auto& stat_slots = *stat.slots;
+		auto& anim_slots = *anim.slots;
+
+		// animatedModelLoaded = anim_slots.size() > 0;
+
+		// Fetch the next frame packet and construct it
+		return framePacketBuilder_.build<AvengInstance, AssimpInstance>(
+				stat,
+				anim,
+				currentFrameIndex,
+				0, // tmp/unused frame number
+				deltaTime,
+				FramePacketBuildOptions{} // opts
+#ifdef M_DEBUG
+				, renderData
+#endif
+			);
+
+	}
+
+	//
+	bool AvengFrame::render(float deltaTime)
+	{
+
+		if (!start_frame()) { return false;  }
+
+		const int currentFrameIndex = renderer.getFrameIndex();
+
+
+		// Build Frame Packet using AssetLibrary
+		const auto& pkt = frame_packet(deltaTime, currentFrameIndex);
 
 		/**
 		* Update Model Buffer Data - Does not record commands
-		* Side-effects: Buffers resizes cause descriptor sets to update
+		* Side-effects: If Buffers resize, this causes descriptor sets to update
 		*/
-		int drawResult = renderer.draw(sceneView_, modelLib_, deltaTime);
+		int drawResult = renderer.update(pkt, modelLib__, deltaTime);
 		
-		// If draw() returned early (e.g., deltaTime == 0 or frame not started),
-		// the compute semaphore was never signaled. We must skip this frame entirely
-		// to avoid graphics queue waiting on an unsignaled semaphore.
-		// NOTE: We check this BEFORE resetting the render fence to avoid deadlock.
-		if (drawResult == 0 || !renderer.isFrameInProgress()) {
-			std::printf("%s: draw() skipped frame, aborting render\n", __FUNCTION__);
+		// Not Fatal upon failure
+		// Note: We check this BEFORE resetting the render fence to avoid deadlock.
+		if (drawResult == WTF_BOOM || !renderer.isFrameInProgress()) {
+			std::printf("%s: draw() dropped frame, aborting render\n", __FUNCTION__);
 			renderer.endFrame();
 			return false;
+		}
+
+		// Compute bone transforms for skinning mat's
+		int animComputeResult = renderer.dispatchCompute(modelLib__, pkt);
+		if (animComputeResult == WTF_BOOM) {
+			// Terrible sync issue. Die.
+			throw std::runtime_error("Failed to dispatch animation compute.");
 		}
 
 		/* start graphics rendering - reset fence only after we're committed to submitting */
@@ -156,7 +212,7 @@ namespace aveng {
 			pEditor->updateLights();
 
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
-			pEditor->drawModels(modelLib_, currentFrameIndex); 
+			pEditor->drawModels(modelLib__, pkt, currentFrameIndex); 
 			
 		}
 		else {
@@ -165,7 +221,8 @@ namespace aveng {
 			renderer.updateLights();
 
 			renderer.drawModels(
-				modelLib_,
+				framePacketBuilder_.getFramePacket(currentFrameIndex),
+				modelLib__,
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
 				renderData.rdAvengAnimationPipeline,
@@ -226,17 +283,23 @@ namespace aveng {
 		}
 #endif
 
-		/* 
+		end_frame(pkt, currentFrameIndex);
+
+	}
+
+	void AvengFrame::end_frame(const FramePacket& pkt, int currentFrameIndex) {
+
+		/*
 		* TODO: The logic below can be cleaned up based on whether or not
 		* the graphics and compute queues belong to the same family.
 		* Note the use of engineDevice.sameGraphicsComputeQueue(). When this
 		* is the case, we can take a no-semaphore, no-cross-submission approach.
-		* 
+		*
 		* This has higher reaching implications. If graphics and compute use the same queue family:
 		* - Record a single primary graphics command buffer.
 		* - Update to vkCmdPipelineBarrier2 while you're at it...
 		* - Keep the secondary compute command buffer but don't apply
-		* 
+		*
 		* I still need to understand this better. But to reiterate:
 		* - vkCmdPipelineBarrier creates a dependency for commands before/after it in the same command buffer
 		* This is why we use semaphores to sync with compute shader read/writes
@@ -250,7 +313,7 @@ namespace aveng {
 		// Submission order on the same queue already guarantees compute finishes before graphics uses its output
 		std::vector<VkSemaphore> waitSemaphores; // TODO: Move these to member var's - we're allocating vectors every frame!!
 		std::vector<VkPipelineStageFlags> waitStages;
-		
+
 		if (!engineDevice.sameGraphicsComputeQueue()) {
 			// Different queues: wait for compute semaphore
 			waitSemaphores.push_back(renderData.rdComputeSemaphore.at(currentFrameIndex));
@@ -288,7 +351,7 @@ namespace aveng {
 
 			// Get the selected instance ID after the frag shader writes it to the Selection FrameBuffer texture
 			// Side-Effect : Sets editor's clicked flag to false
-			pEditor->readPixelDataPos();
+			pEditor->readPixelDataPos(pkt);
 		}
 #endif
 		/* trigger swapchain image presentation */
@@ -316,9 +379,9 @@ namespace aveng {
 		}
 		vkDeviceWaitIdle(engineDevice.device()); // TEMPORARY - removes all parallelism
 
-		
 		renderer.endFrame();
 		renderData.rdFrameTime = mFrameTimer.stop();
 
 	}
+
 }

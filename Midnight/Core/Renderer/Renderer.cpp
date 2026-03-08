@@ -1,6 +1,9 @@
+#include <cstring>
+//#define STB_IMAGE_IMPLEMENTATION
+//#include "stb/stb_image.h"
 #include "Renderer.h"
-#include "avpch.h"
 #include "CoreVK/Resources/platform.h"
+#include "avpch.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/SkinningPipeline.h"
@@ -126,10 +129,6 @@ namespace aveng {
 	void Renderer::initialize() {
 		initializePointLights();
 
-		/* framePacketBuilder_ dependencies */
-		framePacketBuilder_.setModelQuery(&modelQuery_);
-		framePacketBuilder_.setAnimQuery(&animQuery_);
-		framePacketBuilder_.setFramesInFlight(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		addLight(
 			glm::vec3(20.0f, 0.0f, 20.0f),
@@ -1164,43 +1163,20 @@ namespace aveng {
 	* - isFrameStarted = true
 	* - Primary Graphics Command buffer is reset and in a recording state.
 	* - Primary graphics renderpass has begun
+	* 
 	*/
-	int Renderer::draw(IRenderSceneView& sceneView, const IModelLibrary& modelLib, float deltaTime) {
+	int Renderer::update(const FramePacket& pkt, const IModelLibrary& modelLib, float deltaTime) {
 
 		/* no update on zero diff. This caused an issue */
 		if (deltaTime == 0.0f && !firstFrame) {
 			isFrameStarted = false;
-			return 0;
+			return -1;
 		}
 
-#ifdef M_DEBUG
-		reset_timers();
-#endif
 		if (!isFrameStarted) {
 			std::printf("beginFrame failed/skipped (swapchain recreation), skipping frame\n");
-			return 0;  // Skip this frame gracefully
+			return -1;  // Skip this frame gracefully
 		}
-
-		auto stat = sceneView.staticPoolInputs();
-		auto anim = sceneView.animatedPoolInputs();
-		auto& stat_slots = *stat.slots;
-		auto& anim_slots = *anim.slots;
-
-		animatedModelLoaded = anim_slots.size() > 0;
-
-		// Fetch the next frame packet and construct it
-		FramePacket& pkt =
-			framePacketBuilder_.build<AvengInstance, AssimpInstance>(
-				stat,
-				anim,
-				currentFrameIndex,
-				0, // tmp/unused frame number
-				deltaTime,
-				FramePacketBuildOptions{} // opts
-#ifdef M_DEBUG
-				, renderData
-#endif
-			);
 
 		/*
 		* TIL: mNodeTransFormData is updated via instance->updateAnimation()
@@ -1210,14 +1186,8 @@ namespace aveng {
 		// Timer
 		mUploadToSSBO1Timer.start();
 		bool bufferResized = false;
-		//for (size_t i = 0; i < std::min(pkt.nodeTransformData.size(), (size_t)5); ++i) {
-		//	auto& n = pkt.nodeTransformData[i];
-		//	std::printf("[NodeTRS %zu] T=(%.2f,%.2f,%.2f) S=(%.2f,%.2f,%.2f) R=(%.2f,%.2f,%.2f,%.2f)\n",
-		//		i, n.translation.x, n.translation.y, n.translation.z,
-		//		n.scale.x, n.scale.y, n.scale.z,
-		//		n.rotation.x, n.rotation.y, n.rotation.z, n.rotation.w);
-		//}
-		
+
+		// Compute stage 1 input
 		// TODO - This upload only needs to occur if there are Animated Models!
 		bufferResized = ShaderStorageBuffer::uploadPersistentSsboData(engineDevice, mNodeTransformBuffers.at(currentFrameIndex), pkt.nodeTransformData);
 		// Upload every instance's current transform data (translation, scale, rotation)
@@ -1254,9 +1224,12 @@ namespace aveng {
 
 		/* resize SSBO if needed - Both of these are written by the compute shaders so we just make sure they're the right size (hence only using checkForResize) */
 		
+		// These two are also only for animations
+		// Compute stage 2 read (stage 1 out)
 		bool trsResized = ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers.at(currentFrameIndex), boneMatrixBufferSize * sizeof(glm::mat4));
+		// Compute stage 2 write (vertex in)
 		bool boneResized = ShaderStorageBuffer::checkForResize(engineDevice, mShaderBoneMatrixBuffers.at(currentFrameIndex), boneMatrixBufferSize * sizeof(glm::mat4));
-
+		
 		bufferResized |= trsResized;
 		bufferResized |= boneResized;
 
@@ -1312,6 +1285,8 @@ namespace aveng {
 			updateComputeDescriptorSets(currentFrameIndex);
 		}
 
+		// Every upload from here on is for any model type
+
 		// Timer
 		/* we need to update descriptors after the upload if buffer size changed */
 		mUploadToUBOTimer.start();
@@ -1355,6 +1330,10 @@ namespace aveng {
 		// Timer
 		renderData.rdUploadSSBO2Time = mUploadToSSBO2Timer.stop();
 
+	}
+
+	int Renderer::dispatchCompute(const IModelLibrary& modelLib, const FramePacket& pkt) {
+
 		/* record compute commands */
 		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence.at(currentFrameIndex));
 		mComputeTimer.start();
@@ -1363,7 +1342,7 @@ namespace aveng {
 			return WTF_BOOM;
 		}
 
-		if (animatedModelLoaded) {
+		if (pkt.animatedInstanceCount > 0) {
 
 			/*
 			* Command Buffer recording for the Compute queue
@@ -1447,7 +1426,6 @@ namespace aveng {
 		}
 
 		renderData.rdComputeTime = mComputeTimer.stop();
-
 	}
 
 	void Renderer::beginGraphicsCommands(int frameIndex)
@@ -1483,12 +1461,8 @@ namespace aveng {
 		renderLights(pointLightSystem.getPipeline(), pointLightSystem.getPipelineLayout());
 	}
 
-	AnyInstanceHandle Renderer::getPickedHandle(int pickId) {
-		const auto& pkt = framePacketBuilder_.getFramePacket(currentFrameIndex);
-		return pkt.pickToHandle[pickId];
-	}
-
 	bool Renderer::drawModels(
+		const FramePacket& pkt,
 		const IModelLibrary& modelLib,
 		VkCommandBuffer commandBuffer,
 		VkPipeline basicPipeline,
@@ -1499,7 +1473,6 @@ namespace aveng {
 		VkDescriptorSet animationDescriptorSet,
 		int frameIndex)
 	{
-		const auto& pkt = framePacketBuilder_.getFramePacket(frameIndex);
 
 		// ========== STATIC PASS ==========
 		// Bind static pipeline once, then draw all static batches
@@ -1559,7 +1532,7 @@ namespace aveng {
 		renderData.rdDrawTime = mDrawTimer.stop();
 		mDrawTimer.start();
 
-		animatedModelLoaded = false;
+		// animatedModelLoaded = false;
 		renderData.rdMatricesSize = 0;
 		renderData.rdUploadToUBOTime = 0.0f;
 		renderData.rdUploadSSBO1Time = 0.0f;
@@ -2138,5 +2111,93 @@ namespace aveng {
 		}
 		return;
 	}
+
+	// Resource Methods:
+
+
+	/*
+	* TODOs:
+	* - Remove VkRenderData and structure the {pool, descriptor set layout}
+	*/
+	//TextureRef Renderer::new_texture(EngineDevice& engineDevice, TextureRef& ref, bool generateMipmaps, bool flipImage) {
+
+	//	// Note: Defensive checks are now handled by the renderer
+
+	//	TextureSlot slot;
+
+	//	int texWidth;
+	//	int texHeight;
+	//	int numberOfChannels;
+	//	uint32_t mipmapLevels = 1;
+
+	//	stbi_set_flip_vertically_on_load(flipImage);
+	//	/* always load as RGBA */
+	//	unsigned char* textureData = stbi_load(ref.key, &texWidth, &texHeight, &numberOfChannels, STBI_rgb_alpha);
+
+	//	if (!textureData) {
+	//		std::printf("%s error: could not load file '%s'\n", __FUNCTION__, ref.key);
+	//		stbi_image_free(textureData);
+	//		return { k_invalid_index, "_" };
+	//	}
+
+	//	if (generateMipmaps) {
+	//		mipmapLevels += static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight))));
+	//	}
+
+	//	VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+	//	/* staging buffer */
+	//	VkBufferCreateInfo stagingBufferInfo{};
+	//	stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	//	stagingBufferInfo.size = imageSize;
+	//	stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+	//	VkBuffer stagingBuffer;
+	//	VmaAllocation stagingBufferAlloc;
+
+	//	VmaAllocationCreateInfo stagingAllocInfo{};
+	//	stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+	//	VkResult result = vmaCreateBuffer(engineDevice.allocator(), &stagingBufferInfo, &stagingAllocInfo, &stagingBuffer, &stagingBufferAlloc, nullptr);
+	//	if (result != VK_SUCCESS) {
+	//		std::printf("%s error: could not allocate texture staging buffer via VMA (error: %i)\n", __FUNCTION__, result);
+	//		return { k_invalid_index, "_" };
+	//	}
+
+	//	void* uploadData;
+	//	result = vmaMapMemory(engineDevice.allocator(), stagingBufferAlloc, &uploadData);
+	//	if (result != VK_SUCCESS) {
+	//		std::printf("%s error: could not map texture memory (error: %i)\n", __FUNCTION__, result);
+	//		return { k_invalid_index, "_" };
+	//	}
+
+	//	std::memcpy(uploadData, textureData, imageSize);
+	//	vmaUnmapMemory(engineDevice.allocator(), stagingBufferAlloc);
+	//	vmaFlushAllocation(engineDevice.allocator(), stagingBufferAlloc, 0, imageSize);
+
+	//	stbi_image_free(textureData);
+
+	//	VkTextureStagingBuffer stagingData = { stagingBuffer, stagingBufferAlloc };
+
+	//	if (!gpu_upload_texture(engineDevice, stagingData, texWidth, texHeight, generateMipmaps, mipmapLevels)) {
+	//		std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, ref.key);
+	//		return { k_invalid_index, "_" };
+	//	}
+
+	//	return ref;
+	//}
+
+	//bool Renderer::gpu_upload_texture(
+	//	EngineDevice& engineDevice, 
+	//	VkTextureStagingBuffer stagingData, 
+	//	uint32_t width, 
+	//	uint32_t height, 
+	//	bool generateMipmaps, 
+	//	uint32_t mipmapLevels) 
+	//{
+	//	TextureSlot slot;
+
+	//	return true;
+	//}
 
 } // NS

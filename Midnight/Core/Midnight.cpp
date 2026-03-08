@@ -35,7 +35,6 @@ namespace aveng {
 			renderer,
 			modelLib_,
 			sceneFacade_, /// Interface
-			modelLib_, /// Interface
 			renderData,
 			game_data,
 			engineDevice,
@@ -48,7 +47,6 @@ namespace aveng {
 			renderer,
 			modelLib_,
 			sceneFacade_, /// Interface
-			modelLib_, /// Interface
 			renderData,
 			game_data,
 			engineDevice,

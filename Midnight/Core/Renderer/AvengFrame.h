@@ -2,6 +2,7 @@
 #include "CoreVK/VkRenderData.h"
 #include "Utils/Timer.h"
 #include "Utils/glm_includes.h"
+#include "Core/Renderer/FramePacketBuilder.h"
 #include "Game/data.h"
 
 namespace aveng {
@@ -20,14 +21,17 @@ namespace aveng {
 			Renderer& renderer,
 			ModelLibrary& modelLibrary,
 			IRenderSceneView& sceneView,
-			const IModelLibrary& modelLib, // used to get Model pointers to the renderer, *for now*
 			VkRenderData& renderData,
 			GameData& gameData,
 			EngineDevice& engineDevice,
 			Editor* editor = nullptr);
 
+		bool start_frame();
+		void end_frame(const FramePacket& pkt, int currentFrameIndex);
+		FramePacket& frame_packet(float deltaTime, int currentFrameIndex);
 		bool render(float deltaTime);
 		int currentFrameIndex();
+		void reset_timers();
 
 #ifdef ENABLE_EDITOR
 		// Editor helpers
@@ -35,11 +39,12 @@ namespace aveng {
 #endif
 
 	private:
-		const IModelLibrary& modelLib_;
 		ModelLibrary& modelLib__;
 		IRenderSceneView& sceneView_;
+		FramePacketBuilder framePacketBuilder_;
 
 		Timer mFrameTimer;
+		Timer mFramePacketTimer;
 
 		std::vector<VkCommandBuffer> commandBuffers;
 		bool drawGizmo = false;

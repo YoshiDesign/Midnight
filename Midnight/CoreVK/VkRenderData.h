@@ -12,11 +12,6 @@
 
 #include <assimp/material.h>
 
-
-#ifndef WTF_BOOM
-#define WTF_BOOM 9002
-#endif
-
 namespace aveng {
 
 	enum class MapMode { OnDemand, Persistent, GpuOnly };

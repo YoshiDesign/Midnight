@@ -12,8 +12,11 @@
 #include "Core/Input/InputState.h"
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/AvengStorageBuffer.h"
-#include "Runtime/World/InstanceManager.h"
+// #include "Runtime/World/InstanceManager.h"
 #include "Runtime/Facade/SceneFacade.h"
+#include "Core/Renderer/FramePacketBuilder.h"
+#include "Game/Camera/CameraManager.h"
+#include "Editor/EditorCamera.h"
 
 namespace aveng {
 
@@ -158,7 +161,7 @@ namespace aveng {
 
 	}
 
-	void Editor::readPixelDataPos()
+	void Editor::readPixelDataPos(const FramePacket& pkt)
 	{
 		if (!editorData.eMousePick || renderer.isRecreatingSwapChain()) {
 			return;
@@ -193,12 +196,15 @@ namespace aveng {
 
 			renderData.selectedPickId = static_cast<int>(pickId);
 
-			editorData.primarySelection = renderer.getPickedHandle(pickId);
+			editorData.primarySelection = pkt.pickToHandle[pickId];
+			// editorData.primarySelection = pickId;
 			editorData.selectedMany.clear();
 			editorData.eShowTRSPanel = true; // Not necessary here, just being explicit
+
+			// For Multi-Select
 			addUnique(editorData.selectedMany, editorData.primarySelection);
 
-			//std::cout << "Picked Handle Index: " << editorData.primarySelection.index;
+			// std::cout << "Picked Handle Index: " << editorData.primarySelection.index;
 		}
 		else {
 			std::cout << "False Selection: SelectedID\t" << pickId << std::endl;
@@ -206,6 +212,7 @@ namespace aveng {
 			renderData.selectedPickId = 0;
 
 			editorData.primarySelection = AnyInstanceHandle{};
+			// editorData.primarySelection = -1;
 			editorData.selectedMany.clear();
 			editorData.eShowTRSPanel = false;
 		}
@@ -503,7 +510,7 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
-	void Editor::drawModels(const IModelLibrary& modelLib, int frameIndex)
+	void Editor::drawModels(const IModelLibrary& modelLib, const FramePacket& pkt, int frameIndex)
 	{
 		//
 		//renderer.drawModels(
@@ -518,6 +525,7 @@ namespace aveng {
 		//	frameIndex);
 		//
 		renderer.drawModels(
+			pkt,
 			modelLib,
 			renderData.rdCommandBuffersGraphics[frameIndex],
 			renderData.rdDebugPipeline,

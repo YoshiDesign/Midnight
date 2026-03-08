@@ -38,18 +38,18 @@ namespace aveng {
 	// A basic terrain asset represents a 3x3 set of generated terrain chunks.
 	// Read the chat-gpt conversation from the notes above for exhaustive info.
 	// Remember: We ARE the dark matter
-	struct BasicTerrainAsset {
-		// TODO - Texture Data
-		unsigned int mTriangleCount = 0;
-		unsigned int mVertexCount = 0;
-		std::vector<VkVertexBufferData> mVertexBuffers{}; // Mapped into Vulkan memory
-		std::vector<VkIndexBufferData> mIndexBuffers{};	  // Mapped into Vulkan memory
-		std::vector<VkUniformBufferData> mModelMat{}; // Model Position Data
-		std::vector<VkShaderStorageBufferData> mTriangles{}; // Compute
-		std::vector<VkShaderStorageBufferData> mAdjacency{}; // Compute - vector of vectors of (incident?) triangles
+	//struct BasicTerrainAsset {
+	//	// TODO - Texture Data
+	//	unsigned int mTriangleCount = 0;
+	//	unsigned int mVertexCount = 0;
+	//	std::vector<VkVertexBufferData> mVertexBuffers{}; // Mapped into Vulkan memory
+	//	std::vector<VkIndexBufferData> mIndexBuffers{};	  // Mapped into Vulkan memory
+	//	std::vector<VkUniformBufferData> mModelMat{}; // Model Position Data
+	//	std::vector<VkShaderStorageBufferData> mTriangles{}; // Compute
+	//	std::vector<VkShaderStorageBufferData> mAdjacency{}; // Compute - vector of vectors of (incident?) triangles
 
-		VkTerrainPushConstant pc;
-	};
+	//	VkTerrainPushConstant pc;
+	//};
 
 	// In case any configurables come to mind.
 	struct TerrainBuilderOptions {

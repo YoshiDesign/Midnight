@@ -1,14 +1,13 @@
 #pragma once
 #include "avpch.h"
 #include "Core/PointLightSystem.h"
-#include "Core/Camera/aveng_camera.h"
+// #include "Core/Camera/aveng_camera.h"
 #include "Core/Input/EventPayloads.h"
 #include "Editor/API/IEditorUIAPI.h"
 #include "Editor/API/SceneEditAPI.h"
 #include "Editor/GUI/aveng_imgui.h"
-#include "EditorCamera.h"
+// #include "EditorCamera.h"
 #include "EditorData.h"
-#include "Game/Camera/CameraManager.h"
 #include "Game/data.h"
 
 /**
@@ -19,6 +18,7 @@
 
 namespace aveng {
 
+	class CameraManager;
 	class SwapChain;
 	class EngineDevice;
 	class AvengWindow;
@@ -28,6 +28,7 @@ namespace aveng {
 	struct IModelQuery;
 	struct IModelAnimQuery;
 	struct IInstanceQuery;
+	struct FramePacket;
 
 	class Editor {
 
@@ -59,7 +60,7 @@ namespace aveng {
 		void update(float frameTime, unsigned int frameIndex);
 		void renderGUI(float frameTime);
 		void updateLights();
-		void drawModels(const IModelLibrary& modelLib, int frameIndex);
+		void drawModels(const IModelLibrary& modelLib, const FramePacket& pkt, int frameIndex);
 		void cleanup();
 		void destroyTrash();
 		void recreateFrameBuffers(SwapChain* swapchain);
@@ -75,7 +76,7 @@ namespace aveng {
 			/* Open to suggestions */
 		}
 
-		void readPixelDataPos();
+		void readPixelDataPos(const FramePacket& pkt);
 		void setupSelectionHighlight(float dt);
 		void setSelectedInstance();
 		bool drawInstanceGizmo();
