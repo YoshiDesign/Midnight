@@ -2,9 +2,11 @@
 #include "avpch.h"
 #include "Core/aveng_model.h"
 #include "Core/Asset/AssetRegistry.h"
+#include "Core/Imaging/TextureRegistry.h"
 
 namespace aveng {
 
+    class MidnightTextureSystem;
     class EngineDevice;
 
     /* 
@@ -32,7 +34,7 @@ namespace aveng {
             onDestroyInstancesForModel_ = std::move(fn);
         }
 
-        ModelLibrary(EngineDevice& engineDevice, VkRenderData& renderData);
+        ModelLibrary(EngineDevice& engineDevice, VkRenderData& renderData, MidnightTextureSystem& textureSystem);
         ~ModelLibrary() = default;
 
         ModelRef getOrLoadModel(const AssetKey& assetKey) override;
@@ -40,9 +42,9 @@ namespace aveng {
         const AvengModel* pModel(ModelId id) const override;
 
         std::unique_ptr<IAssetSource> createAssetSource();
-        std::unique_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes);
+        std::unique_ptr<AvengModel> buildModelFromSource(const AssetKey& key, std::span<const std::byte> bytes, const int frameIndex);
         std::string baseDirForAssetKey(const AssetKey& key) const;
-        void processPendingModelLoads();
+        void processPendingModelLoads(const int frameIndex);
         void processPendingUnloads();
 
         // ---- Query accessors ----
@@ -58,6 +60,7 @@ namespace aveng {
 
     private:
         ModelRegistryData registry_;
+        TextureRegistry textureRegistry_;
         EngineDevice& engineDevice_;
         VkRenderData& renderData_;
         ModelId nextModelId_ = 1; // 0 reserved for the NullModelId

@@ -4,6 +4,7 @@
 #include "Renderer.h"
 #include "CoreVK/Resources/platform.h"
 #include "avpch.h"
+#include "Core/Renderer/FramePacketBuilder.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/SkinningPipeline.h"
@@ -1970,7 +1971,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding bindless_bindings[7];
 
 		VkDescriptorSetLayoutBinding& sampler_binding = bindless_bindings[0];
-		sampler_binding.binding = 0;
+		sampler_binding.binding = BINDLESS_TEXTURE_BINDING_0;
 		sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		sampler_binding.descriptorCount = MAX_BINDLESS_TEXTURES;
 		sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1986,7 +1987,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding& ssbo1_binding = bindless_bindings[2];
 		storage_image_binding.binding = 2;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_TEXEL_BUFFERS;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
@@ -2075,35 +2076,13 @@ namespace aveng {
 			allocInfo.descriptorSetCount = 1;
 			allocInfo.pSetLayouts = &renderData.rdBindlessDescriptorLayout;
 
-			result = vkAllocateDescriptorSets(engineDevice.device(), &allocInfo, &renderData.rdAvengBindlessTextureDescriptorSets[i]);
+			result = vkAllocateDescriptorSets(engineDevice.device(), &allocInfo, &renderData.rdAvengBindlessDescriptorSets[i]);
 			if (result != VK_SUCCESS) {
 				Logger::log(1, "%s error: could not allocate bindless descriptor sets\n", __FUNCTION__, result);
 				return false;
 			}
 
 		}
-
-		return true;
-	}
-
-	bool Renderer::updateBindlessDescriptorSets(int frameIndex, TextureSlot tex, size_t slotIdx) {
-
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = tex.view;
-		imageInfo.sampler = tex.sampler;
-
-		VkWriteDescriptorSet write{
-			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET
-		};
-		write.dstSet = renderData.rdAvengBindlessTextureDescriptorSets[frameIndex];
-		write.dstBinding = 0;
-		write.dstArrayElement = slotIdx;
-		write.descriptorCount = 1;
-		write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		write.pImageInfo = &imageInfo;
-
-		vkUpdateDescriptorSets(engineDevice.device(), 1, &write, 0, nullptr);
 
 		return true;
 	}

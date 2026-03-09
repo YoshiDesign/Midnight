@@ -17,6 +17,8 @@ namespace aveng {
 	enum class MapMode { OnDemand, Persistent, GpuOnly };
 	enum class ResidentMode { CPU, GPU };
 
+	const size_t BINDLESS_TEXTURE_BINDING_0 = 0;
+
 	// std::span<T> super-lightweight doppleganger. Used to create a window into our data
 	// so the Editor can access buffers.
 	// Don't forget that the same mapped buffer rules apply: don't randomly index into buffers with VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
@@ -309,7 +311,7 @@ namespace aveng {
 		std::vector<VkDescriptorSet> rdAvengDescriptorSets;					// Static
 		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;		// Animation
 		std::vector<VkDescriptorSet> rdAvengBasicTerrainDescriptorSets;			// Terrain
-		std::vector<VkDescriptorSet> rdAvengBindlessTextureDescriptorSets;		// Terrain
+		std::vector<VkDescriptorSet> rdAvengBindlessDescriptorSets;		// Terrain
 		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;		// Animation
 		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;	// Animation
 		std::vector<VkDescriptorSet> rdAvengComputeBasicTerrainDescriptorSets;	// Terrain

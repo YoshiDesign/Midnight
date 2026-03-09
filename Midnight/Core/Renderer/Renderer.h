@@ -1,13 +1,12 @@
 #pragma once
 #include "avpch.h"
-#include "Core/Renderer/FramePacketBuilder.h"
 #include "Core/PointLightSystem.h"
 // #include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/VkRenderData.h"
 #include "Core/aveng_model.h"
 #include "CoreVK/swapchain.h"
 #include "Utils/Timer.h"
-#include "CoreVK/Resources/MTexture.h"
+#include "Core/Imaging/TextureRegistry.h"
 
 namespace procgen {
 	struct TerrainMeshCpu;
@@ -15,6 +14,7 @@ namespace procgen {
 
 namespace aveng {
 
+	struct FramePacket;
 	class ModelLibrary;
 	class EngineDevice;
 	class AssimpInstance;
@@ -31,9 +31,9 @@ namespace aveng {
 			EngineDevice& engineDevice, 
 			AvengWindow& window, 
 			VkRenderData& renderData, 
-			CameraManager& cameraManager,
-			const IModelQuery& mq,
-			IModelAnimQuery& aq
+			CameraManager& cameraManager,	// These systems could be composed into another "services" struct
+			const IModelQuery& mq,			// These systems could be composed into another "services" struct
+			IModelAnimQuery& aq				// These systems could be composed into another "services" struct
 		);
 		~Renderer() = default;
 
@@ -77,6 +77,7 @@ namespace aveng {
 		void updateDescriptorSets(int frameIndex);
 		void updateComputeDescriptorSets(int frameIndex);
 		void updateLightingDescriptorSets(int frameIndex);
+
 		bool updateBindlessDescriptorSets(int frameIndex, TextureSlot tex, size_t slotIdx);
 
 		void updateLights();
@@ -237,8 +238,6 @@ namespace aveng {
 		std::vector<glm::mat4> mWorldPosMatrices{};
 		std::vector<NodeTransformData> mNodeTransFormData{};
 		PointLightData mPointLightData{};
-
-		TextureRegistry texReg;
 
 	};
 

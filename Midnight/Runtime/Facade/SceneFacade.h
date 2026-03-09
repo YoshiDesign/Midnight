@@ -60,6 +60,8 @@ namespace aveng {
 
 		/* IRenderSceneView overrides - and pool views for frame packet builder */
 		const IModelQuery& modelQuery() const override;
+
+		/* Just a sane reminder that pools include instance data, not (directly) models */
 		FramePacketBuilder::PoolInputs<StaticTag, AvengInstance>
 			staticPoolInputs() override { return staticMgr_.poolInputs(); }
 		FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance>
@@ -72,7 +74,7 @@ namespace aveng {
 		std::vector<AnyInstanceHandle> listInstancesForModel(ModelId id) const override;
 		bool isAlive(AnyInstanceHandle h) const override;
 
-		/* IModelLibrary overrides */
+		/* (I)ModelLibrary overrides */
 		ModelRef getOrLoadModel(const AssetKey& key) override;	// Load a model or retrieve a ref to it
 		bool    unloadModel(const AssetKey& key) override;		// Queue a model for unloading next frame
 		const AvengModel* pModel(ModelId id) const override;	// ptr to model

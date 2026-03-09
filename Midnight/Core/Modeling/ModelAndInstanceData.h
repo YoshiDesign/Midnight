@@ -34,7 +34,7 @@ namespace aveng {
 	// They carry no behavior, and don't mutate. They are simple values. Keeps InstanceHandles purely data.
 	// It also decouples us from comparison semantics becoming breaking changes.
 	// Non-member operators participate more cleanly in argument-dependent lookup (ADL)
-	// etc.
+	// 
 	// C++ Guidelines: Value types should prefer non-member operators unless the operation 
 	//				   conceptually modifies the object or relies on private invariants.
 	template<class Tag>

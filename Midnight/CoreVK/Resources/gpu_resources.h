@@ -6,142 +6,135 @@
 
 namespace aveng  {
 
-    const uint32_t MAX_BINDLESS_TEXTURES = 500;
-    const uint32_t MAX_BINDLESS_BUFFERS  = 10000;
-    const uint32_t MAX_BINDLESS_TEXEL_BUFFERS  = 1000;
+    VkSamplerCreateInfo defaultSampler{
+        
+    };
 
-    //VkSamplerCreateInfo defaultSampler{
-    //    
-    //};
+     typedef uint32_t ResourceHandle;
+
+    struct Buffer {
+
+        VkBuffer                        vk_buffer;
+        VmaAllocation                   vma_allocation;
+        VkDeviceMemory                  vk_device_memory;
+        VkDeviceSize                    vk_device_size;
+
+        VkBufferUsageFlags              type_flags = 0;
+        ResourceTypes::Enum             usage = ResourceTypes::Immutable;
+        uint32_t                             size = 0;
+        uint32_t                             global_offset = 0;    // Offset into global constant, if dynamic
+
+        BufferHandle                    handle;
+        BufferHandle                    parent_buffer;
+
+        const char* name = nullptr;
+
+    }; // struct Buffer
+
+    
+    struct Texture {
+
+        VkImage           vk_image;
+        VkImageView       vk_image_view;
+        VkFormat          vk_format;
+        VkImageLayout     vk_image_layout;
+        VmaAllocation     vma_allocation;
+
+        uint16_t          width = 1;
+        uint16_t          height = 1;
+        uint16_t          depth = 1;
+        uint8_t                mipmaps = 1;
+        uint8_t                flags = 0;
+
+        TextureHandle     handle;
+        TextureType::Enum type = TextureType::Texture2D;
+
+        Sampler* sampler = nullptr;
+
+        const char* name = nullptr;
+
+    }; // struct Texture
 
     //
-    // FOR FUTURE REFERENCE
     //
-    // typedef uint32_t ResourceHandle;
+    struct Sampler {
 
-    //struct Buffer {
+        VkSampler                       vk_sampler;
 
-    //    VkBuffer                        vk_buffer;
-    //    VmaAllocation                   vma_allocation;
-    //    VkDeviceMemory                  vk_device_memory;
-    //    VkDeviceSize                    vk_device_size;
+        VkFilter                        min_filter = VK_FILTER_NEAREST;
+        VkFilter                        mag_filter = VK_FILTER_NEAREST;
+        VkSamplerMipmapMode             mip_filter = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 
-    //    VkBufferUsageFlags              type_flags = 0;
-    //    ResourceTypes::Enum             usage = ResourceTypes::Immutable;
-    //    uint32_t                             size = 0;
-    //    uint32_t                             global_offset = 0;    // Offset into global constant, if dynamic
+        VkSamplerAddressMode            address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VkSamplerAddressMode            address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VkSamplerAddressMode            address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-    //    BufferHandle                    handle;
-    //    BufferHandle                    parent_buffer;
+        const char* name = nullptr;
 
-    //    const char* name = nullptr;
-
-    //}; // struct Buffer
+    }; // struct Sampler
 
     //
-    //struct Texture {
+    //
+    struct BufferCreation {
 
-    //    VkImage           vk_image;
-    //    VkImageView       vk_image_view;
-    //    VkFormat          vk_format;
-    //    VkImageLayout     vk_image_layout;
-    //    VmaAllocation     vma_allocation;
+        VkBufferUsageFlags              type_flags = 0;
+        ResourceTypes::Enum             usage = ResourceTypes::Immutable;
+        uint32_t                        size = 0;
+        void* initial_data = nullptr;
 
-    //    uint16_t          width = 1;
-    //    uint16_t          height = 1;
-    //    uint16_t          depth = 1;
-    //    uint8_t                mipmaps = 1;
-    //    uint8_t                flags = 0;
+        const char* name = nullptr;
 
-    //    TextureHandle     handle;
-    //    TextureType::Enum type = TextureType::Texture2D;
+        BufferCreation& reset();
+        BufferCreation& set(VkBufferUsageFlags flags, ResourceTypes::Enum usage, uint32_t size);
+        BufferCreation& set_data(void* data);
+        BufferCreation& set_name(const char* name);
 
-    //    Sampler* sampler = nullptr;
+    }; // struct BufferCreation
 
-    //    const char* name = nullptr;
+    //
+    //
+    struct TextureCreation {
 
-    //}; // struct Texture
+        void*       initial_data = nullptr;
+        uint16_t    width = 1;
+        uint16_t    height = 1;
+        uint16_t    depth = 1;
+        uint8_t     mipmaps = 1;
+        uint8_t     flags = 0;    // TextureFlags bitmasks
 
-    ////
-    ////
-    //struct Sampler {
+        VkFormat           format = VK_FORMAT_UNDEFINED;
+        TextureType::Enum  type = TextureType::Texture2D;
 
-    //    VkSampler                       vk_sampler;
+        const char* name = nullptr;
 
-    //    VkFilter                        min_filter = VK_FILTER_NEAREST;
-    //    VkFilter                        mag_filter = VK_FILTER_NEAREST;
-    //    VkSamplerMipmapMode             mip_filter = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        TextureCreation& set_size(uint16_t width, uint16_t height, uint16_t depth);
+        TextureCreation& set_flags(uint8_t mipmaps, uint8_t flags);
+        TextureCreation& set_format_type(VkFormat format, TextureType::Enum type);
+        TextureCreation& set_name(const char* name);
+        TextureCreation& set_data(void* data);
 
-    //    VkSamplerAddressMode            address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    //    VkSamplerAddressMode            address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    //    VkSamplerAddressMode            address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }; // struct TextureCreation
 
-    //    const char* name = nullptr;
+    //
+    //
+    struct SamplerCreation {
 
-    //}; // struct Sampler
+        VkFilter              min_filter = VK_FILTER_NEAREST;
+        VkFilter              mag_filter = VK_FILTER_NEAREST;
+        VkSamplerMipmapMode   mip_filter = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+                              
+        VkSamplerAddressMode  address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VkSamplerAddressMode  address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VkSamplerAddressMode  address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-    ////
-    ////
-    //struct BufferCreation {
+        const char* name = nullptr;
 
-    //    VkBufferUsageFlags              type_flags = 0;
-    //    ResourceTypes::Enum             usage = ResourceTypes::Immutable;
-    //    uint32_t                        size = 0;
-    //    void* initial_data = nullptr;
+        SamplerCreation& set_min_mag_mip(VkFilter min, VkFilter mag, VkSamplerMipmapMode mip);
+        SamplerCreation& set_address_mode_u(VkSamplerAddressMode u);
+        SamplerCreation& set_address_mode_uv(VkSamplerAddressMode u, VkSamplerAddressMode v);
+        SamplerCreation& set_address_mode_uvw(VkSamplerAddressMode u, VkSamplerAddressMode v, VkSamplerAddressMode w);
+        SamplerCreation& set_name(const char* name);
 
-    //    const char* name = nullptr;
-
-    //    BufferCreation& reset();
-    //    BufferCreation& set(VkBufferUsageFlags flags, ResourceTypes::Enum usage, uint32_t size);
-    //    BufferCreation& set_data(void* data);
-    //    BufferCreation& set_name(const char* name);
-
-    //}; // struct BufferCreation
-
-    ////
-    ////
-    //struct TextureCreation {
-
-    //    void*       initial_data = nullptr;
-    //    uint16_t    width = 1;
-    //    uint16_t    height = 1;
-    //    uint16_t    depth = 1;
-    //    uint8_t     mipmaps = 1;
-    //    uint8_t     flags = 0;    // TextureFlags bitmasks
-
-    //    VkFormat           format = VK_FORMAT_UNDEFINED;
-    //    TextureType::Enum  type = TextureType::Texture2D;
-
-    //    const char* name = nullptr;
-
-    //    TextureCreation& set_size(uint16_t width, uint16_t height, uint16_t depth);
-    //    TextureCreation& set_flags(uint8_t mipmaps, uint8_t flags);
-    //    TextureCreation& set_format_type(VkFormat format, TextureType::Enum type);
-    //    TextureCreation& set_name(const char* name);
-    //    TextureCreation& set_data(void* data);
-
-    //}; // struct TextureCreation
-
-    ////
-    ////
-    //struct SamplerCreation {
-
-    //    VkFilter              min_filter = VK_FILTER_NEAREST;
-    //    VkFilter              mag_filter = VK_FILTER_NEAREST;
-    //    VkSamplerMipmapMode   mip_filter = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    //                          
-    //    VkSamplerAddressMode  address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    //    VkSamplerAddressMode  address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    //    VkSamplerAddressMode  address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-    //    const char* name = nullptr;
-
-    //    SamplerCreation& set_min_mag_mip(VkFilter min, VkFilter mag, VkSamplerMipmapMode mip);
-    //    SamplerCreation& set_address_mode_u(VkSamplerAddressMode u);
-    //    SamplerCreation& set_address_mode_uv(VkSamplerAddressMode u, VkSamplerAddressMode v);
-    //    SamplerCreation& set_address_mode_uvw(VkSamplerAddressMode u, VkSamplerAddressMode v, VkSamplerAddressMode w);
-    //    SamplerCreation& set_name(const char* name);
-
-    //}; // struct SamplerCreation
+    }; // struct SamplerCreation
 
 }

@@ -6,6 +6,7 @@
 #include "Core/Renderer/ModelLibrary.h"
 #include "Core/Renderer/Renderer.h"
 #include "Core/Renderer/AvengFrame.h"
+#include "Core/Imaging/MidnightTextureSystem.h"
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Runtime/Facade/SceneFacade.h"
 #include "Runtime/Play/Controller/TerrainController.h"
@@ -38,8 +39,7 @@ namespace aveng {
 
 		const InputState& inputState() { return inputSystem_->inputState(); }
 
-
-		// Editor Only
+		// Editor Only -  currently
 		const AppMode mode() { return game_data.currentAppMode; }
 		// Editor Only
 
@@ -70,32 +70,24 @@ namespace aveng {
 		void shutdown();
 
 	private:
+		float aspect = 0.0f; // ?
+
 		// ---- External state
 		GameData& game_data;
-
-		GameServices gs_; // GameContext.h
-
-		// ---- Core state (order matters!)
-		float aspect = 0.0f;
+		GameServices gs_;
 		CameraManager cameraManager;
-
-		// Window must exist before EngineDevice (surface/device)
 		AvengWindow  aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
 		EngineDevice engineDevice{ aveng_window };
-
-		// Render data depends on device/window typically
 		VkRenderData renderData{};
+		Renderer renderer;
+
+		std::unique_ptr<AvengFrame>  frame_;
 
 		// Model source (how assets load) lifetime owned by Midnight, passed into Renderer
 		std::unique_ptr<IAssetSource> assetSource_;
 
-		ModelLibrary modelLib_;
-		SceneFacade sceneFacade_;
-
-		// Renderer consumes device/window/renderData/cameraManager/modelSource
-		Renderer renderer;
-
 		std::unique_ptr<GameInput> gameInput_;
+		std::unique_ptr<InputSystem> inputSystem_;
 
 #ifdef ENABLE_EDITOR
 		// Prefer pointers/optional to avoid duplicating big member-init lists
@@ -104,16 +96,16 @@ namespace aveng {
 		std::unique_ptr<EditorGameRouter> inputRouter_; // Used when toggling between game/editor modes
 #endif
 
-		std::unique_ptr<InputSystem> inputSystem_;
-		std::unique_ptr<AvengFrame>  frame_;
-
-		// Threadpool
+		// Primary Threadpool
 		ThreadPoolTaskSystem taskSystem_;
 
 		// ---- Internal APIs
 		ChunkManager chunkManager_;
 		TerrainController terrain_;
 		DebugController debug_;
+		ModelLibrary modelLib_;
+		SceneFacade sceneFacade_;
+		MidnightTextureSystem textureSystem_;
 
 		/*
 		* Note to self:

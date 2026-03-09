@@ -58,6 +58,8 @@ namespace xone {
 				midnight.inputState() 
 			};
 
+			// We may not need to pass gameServices during update(), 
+			// if the members of that struct don't necessarily update, or are just APIs
 			play.update(tick, midnight.gameServices());
 
 #ifdef ENABLE_EDITOR

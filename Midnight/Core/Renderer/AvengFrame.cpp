@@ -13,7 +13,7 @@ namespace aveng {
 
 	AvengFrame::AvengFrame(Renderer& renderer,
 		ModelLibrary& modelLibrary,
-		IRenderSceneView& sceneView,
+		IRenderSceneView& sceneView, // TODO: Interface. I don't enjoy the fact that this is an interface
 		VkRenderData& renderData,
 		GameData& gameData,
 		EngineDevice& engineDevice,
@@ -79,7 +79,7 @@ namespace aveng {
 		renderer.destroyTrash();
 
 		modelLib__.processPendingUnloads();
-		modelLib__.processPendingModelLoads();
+		modelLib__.processPendingModelLoads(renderer.getFrameIndex());
 
 		renderer.updateCamera();
 	}

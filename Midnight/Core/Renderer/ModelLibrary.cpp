@@ -1,4 +1,5 @@
 #include "ModelLibrary.h"
+#include "Core/Imaging/MidnightTextureSystem.h"
 #include "Core/Modeling/Sources/FilesystemAssetSource.h"
 #include "Core/Modeling/Sources/PackAssetSource.h"
 #include "CoreVK/EngineDevice.h"
@@ -26,8 +27,9 @@ namespace aveng {
 
 	ModelLibrary::ModelLibrary(
 		EngineDevice& engineDevice,
-		VkRenderData& renderData
-	) : engineDevice_{ engineDevice }, renderData_{renderData} {
+		VkRenderData& renderData,
+		MidnightTextureSystem& textureSystem
+	) : engineDevice_{ engineDevice }, renderData_{ renderData }, textureRegistry_{ textureSystem } {
 		
 		// Register a null model for "no selected models"
 		ModelEntry entry;
@@ -221,7 +223,7 @@ namespace aveng {
 		}
 	}
 
-	void ModelLibrary::processPendingModelLoads()
+	void ModelLibrary::processPendingModelLoads(const int frameIndex)
 	{
 		if (registry_.pendingLoads.empty()) {
 			return;
@@ -262,7 +264,7 @@ namespace aveng {
 			std::vector<std::byte> modelBytes = assetSource_->readModelBytes(key);
 
 			// 2) Build/import
-			std::unique_ptr<AvengModel> model = buildModelFromSource(key, modelBytes);
+			std::unique_ptr<AvengModel> model = buildModelFromSource(key, modelBytes, frameIndex);
 			if (!model) {
 				ejectModel(registry_.idByKey[key], key);
 				std::printf("[ModelLibrary] Failed to load model: %s\n", key.c_str());
@@ -314,7 +316,8 @@ namespace aveng {
 
 	std::unique_ptr<AvengModel> ModelLibrary::buildModelFromSource(
 		const AssetKey& key,
-		std::span<const std::byte> bytes
+		std::span<const std::byte> bytes,
+		const int frameIndex
 	) {
 		// Construct model
 		auto model = std::make_unique<AvengModel>(engineDevice_);
@@ -328,13 +331,24 @@ namespace aveng {
 		const std::string baseDir = baseDirForAssetKey(key);
 
 		// NOTE: AvengModel now does "import/build", not IO.
-		const bool ok = model->loadModelV2(
+		//const bool ok = model->loadModelV2(
+		//	renderData_,
+		//	key,
+		//	bytes,
+		//	extraImportFlags,
+		//	modelBaseDir,
+		//	engineTextureDir
+		//);
+		
+		const bool ok = model->loadModelV3(
 			renderData_,
 			key,
 			bytes,
 			extraImportFlags,
 			modelBaseDir,
-			engineTextureDir
+			engineTextureDir,
+			textureRegistry_,
+			frameIndex
 		);
 
 		if (!ok) {

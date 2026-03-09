@@ -4,6 +4,8 @@
 #include "CoreVK/AvengStorageBuffer.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/swapchain.h"
+#include "Core/Imaging/TextureRegistry.h"
+#include "Core/Imaging/TextureGltfSource.h"
 #include "Utils/glm_includes.h"
 #include "Utils/aveng_utils.h"
 #include "Utils/Logger.h"
@@ -17,8 +19,8 @@
 #include <filesystem>
 #include <unordered_map>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader/tiny_obj_loader.h>
+//#define TINYOBJLOADER_IMPLEMENTATION
+//#include <tiny_obj_loader/tiny_obj_loader.h>
 
 namespace std {
 
@@ -72,148 +74,6 @@ namespace {
 
 namespace aveng {
 
-	//static bool loadModelV3(
-	//	const VkRenderData& renderData,
-	//	const AssetKey& key,                // keep for debug + extension hint
-	//	std::span<const std::byte> bytes,   // data from IAssetSource
-	//	unsigned int extraImportFlags,		// Assimp flags
-	//	const std::string& modelBaseDir,    // for model-owned refs
-	//	const std::string& contentRoot      // Texture root. for engine-owned defaults
-	//) {
-
-	//	Assimp::Importer importer;
-
-	//	const unsigned int flags =
-	//		aiProcess_Triangulate |
-	//		aiProcess_GenNormals |
-	//		aiProcess_ValidateDataStructure |
-	//		aiProcess_FlipUVs |
-	//		extraImportFlags;
-
-	//	const aiScene* scene = nullptr;
-
-	//	if (!bytes.empty()) {
-	//		// Extension hint helps Assimp choose the correct importer.
-	//		// Passing key.c_str() works well if key is a path-like string (it usually is today).
-	//		scene = importer.ReadFileFromMemory(
-	//			bytes.data(),
-	//			bytes.size(),
-	//			flags,
-	//			key.c_str()
-	//		);
-	//	}
-
-	//	if (!scene || !scene->mRootNode) {
-	//		std::printf("[AvengModel] Assimp load failed for %s: %s\n",
-	//			key.c_str(),
-	//			importer.GetErrorString()
-	//		);
-	//		return false;
-	//	}
-
-	//	unsigned int numMeshes = scene->mNumMeshes;
-
-	//	// Count vertices and faces
-	//	for (unsigned int i = 0; i < numMeshes; ++i) {
-	//		unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
-	//		unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
-
-	//		mVertexCount += numVertices;
-	//		mTriangleCount += numFaces;
-
-	//	}
-	//	std::printf("AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
-
-	//	aiNode* rootNode = scene->mRootNode;
-
-	//	// Only for Embedded textures.
-	//	if (scene->HasTextures()) {
-	//		unsigned int numTextures = scene->mNumTextures;
-
-	//		std::cout << "Model has an embedded texture!!" << std::endl;
-
-	//		for (int i = 0; i < scene->mNumTextures; ++i) {
-	//			std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
-
-	//			int height = scene->mTextures[i]->mHeight;
-	//			int width = scene->mTextures[i]->mWidth;
-	//			aiTexel* data = scene->mTextures[i]->pcData;
-
-	//			VkTextureData newTex{};
-	//			if (!Texture::loadTexture(engineDevice, renderData, newTex, texName, data, width, height)) {
-	//				return false;
-	//			}
-
-	//			std::string internalTexName = "*" + std::to_string(i);
-
-	//			mTextures.insert({ internalTexName, newTex });
-	//		}
-
-	//		// std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
-	//	}
-
-	//}
-
-
-
-
-
-	AvengModel::AvengModel(EngineDevice& device) 
-		: engineDevice{ device },
-		  mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
-		  mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
-		  mMatrixMultPerModelDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT)
-	{ /*Keep the null model in mind if logic should find its way here - see <ModelLibrary> */ }
-
-	void AvengModel::drawInstancedV2(
-		VkCommandBuffer graphicsCommandBuffer, 
-		VkPipelineLayout pipelineLayout,
-		uint32_t instanceCount, 
-		int frameIndex) const
-	{
-		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
-			const VkMesh& mesh = mModelMeshes.at(i);
-
-			/*
-			* @Note
-			* For glTF imports, Assimp often maps glTF baseColorTexture -> aiTextureType_DIFFUSE 
-			* for compatibility with older code paths. Later, Assimp added a dedicated texture 
-			* type aiTextureType_BASE_COLOR specifically to represent glTF’s baseColor without pretending it’s "diffuse"
-			*/
-
-			// find diffuse texture by name
-			VkTextureData diffuseTex{};
-			auto diffuseTexName = mesh.textures.find(aiTextureType_DIFFUSE);
-			if (diffuseTexName != mesh.textures.end()) {
-				auto diffuseTexture = mTextures.find(diffuseTexName->second);
-				if (diffuseTexture != mTextures.end()) {
-					diffuseTex = diffuseTexture->second;
-				}
-			}
-
-			if (diffuseTex.image != VK_NULL_HANDLE) {
-				
-				vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					pipelineLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
-			}
-			else {
-				if (mesh.usesPBRColors) {
-					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						pipelineLayout, 0, 1, &mWhiteTexture.descriptorSet, 0, nullptr);
-				}
-				else {
-					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						pipelineLayout, 0, 1, &mPlaceholderTexture.descriptorSet, 0, nullptr);
-				}
-			}
-
-			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(graphicsCommandBuffer, 0, 1, &mVertexBuffers.at(i).buffer, &offset);
-			vkCmdBindIndexBuffer(graphicsCommandBuffer, mIndexBuffers.at(i).buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(graphicsCommandBuffer, static_cast<uint32_t>(mesh.indices.size()), instanceCount, 0, 0, 0);
-		}
-	}
-
 	std::string AvengModel::getModelFileName() {
 		return mModelFilename;
 	}
@@ -222,11 +82,140 @@ namespace aveng {
 		return mModelFilenamePath;
 	}
 
-	/*
+	AvengModel::AvengModel(EngineDevice& device)
+		: engineDevice{ device },
+		mBoneParentMatrixBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
+		mShaderBoneMatrixOffsetBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT),
+		mMatrixMultPerModelDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT)
+	{ /*Keep the null model in mind if logic should find its way here - see <ModelLibrary> */
+	}
+
+	/* TODO: loadModelV4
+		A more mature architecture would decouple the loading process
+		from the actual model's representation. Models are chunky process-heavy
+		objects at the moment. We could:
+		- Operate upon models, not operate within them.
+		- Make better use of .gltf parsing
+		- Avoid drilling the Texture Registry to where it's needed. Use a custom GLTF parser!
+		- Represent models as a simpler struct of VK/Backend resources
+	*/
+
+	bool AvengModel::loadModelV3( // Quick n' dirty for the new texture system. TODO: V4
+		const VkRenderData& renderData,
+		const AssetKey& key,                // keep for debug + extension hint
+		std::span<const std::byte> bytes,   // data from IAssetSource
+		unsigned int extraImportFlags,		// Assimp flags
+		const std::string& modelBaseDir,    // for model-owned refs
+		const std::string& contentRoot,     // Texture root. for engine-owned defaults
+		TextureRegistry& texReg,		// I'm new here - Register textures globally
+		const int frameIndex
+	) {
+
+		TextureGltfSource gltfSrc{};
+		Assimp::Importer importer;
+
+		const unsigned int flags =
+			aiProcess_Triangulate |
+			aiProcess_GenNormals |
+			aiProcess_ValidateDataStructure |
+			aiProcess_FlipUVs |
+			extraImportFlags;
+
+		const aiScene* scene = nullptr;
+
+		if (!bytes.empty()) {
+			// Extension hint helps Assimp choose the correct importer.
+			// Passing key.c_str() works well if key is a path-like string (it usually is today).
+			scene = importer.ReadFileFromMemory(
+				bytes.data(),
+				bytes.size(),
+				flags,
+				key.c_str()
+			);
+		}
+
+		if (!scene || !scene->mRootNode) {
+			std::printf("[AvengModel] Assimp load failed for %s: %s\n",
+				key.c_str(),
+				importer.GetErrorString()
+			);
+			return false;
+		}
+
+		unsigned int numMeshes = scene->mNumMeshes;
+
+		// Count vertices and faces
+		for (unsigned int i = 0; i < numMeshes; ++i) {
+			unsigned int numVertices = scene->mMeshes[i]->mNumVertices;
+			unsigned int numFaces = scene->mMeshes[i]->mNumFaces;
+
+			mVertexCount += numVertices;
+			mTriangleCount += numFaces;
+
+		}
+		std::printf("AssimpModel: Total %d vertices and %d faces\n", mVertexCount, mTriangleCount);
+
+		aiNode* rootNode = scene->mRootNode;
+
+		// Only for Embedded textures.
+		if (scene->HasTextures()) {
+			unsigned int numTextures = scene->mNumTextures;
+
+			std::cout << "Model has an embedded texture!!" << std::endl;
+
+			for (int i = 0; i < scene->mNumTextures; ++i) {
+				TextureAssetKey newKey{ scene->mTextures[i]->mFilename.C_Str() };
+				// std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
+
+				TextureCreateRequest t_req;
+				t_req.assetKey = newKey;
+				t_req.debugName = "[Embedded]" + newKey.value;
+				t_req.width = scene->mTextures[i]->mWidth;
+				t_req.height = scene->mTextures[i]->mHeight;
+				t_req.assimp_data = scene->mTextures[i]->pcData;
+
+				texReg.getOrCreate(newKey, gltfSrc, t_req, frameIndex);
+
+				// This is the more widely used Assimp convention
+				/*std::string internalTexName = "*" + std::to_string(i);
+				mTextures.insert({ internalTexName, newTex });*/
+			}
+
+			// std::printf("%s: scene has %i embedded textures\n", __FUNCTION__, numTextures);
+		}
+
+		/* add a white texture in case there is no diffuse tex but colors */
+		std::string whiteTexName = joinPath(contentRoot, "textures/white.png");
+		if (!Texture::loadTexture(engineDevice, renderData, mWhiteTexture, whiteTexName)) {
+			// std::printf("%s error: could not load white default texture '%s'\n", __FUNCTION__, whiteTexName.c_str());
+			return false;
+		}
+
+		/* add a placeholder texture in case there is no diffuse tex */
+		std::string placeholderTexName = joinPath(contentRoot, "textures/missing_tex.png");
+		if (!Texture::loadTexture(engineDevice, renderData, mPlaceholderTexture, placeholderTexName)) {
+			// std::printf("%s error: could not load placeholder texture '%s'\n", __FUNCTION__, placeholderTexName.c_str());
+			return false;
+		}
+
+		/* the textures are stored directly or relative to the model file */
+		//std::string assetDirectory = filepath.substr(0, filepath.find_last_of('/'));
+
+		std::string rootNodeName = rootNode->mName.C_Str();
+		mRootNode = AssimpNode::createNode(rootNodeName);
+		std::printf("%s: root node name: '%s'\n", __FUNCTION__, rootNodeName.c_str());
+
+		processNode(renderData, mRootNode, rootNode, scene, modelBaseDir, contentRoot, texReg);
+
+		build(renderData, key, scene, rootNode, frameIndex);
+
+	}
+
+	/* 
 	 *  V2
 	 *	Big TODO: Clean this sh*t up.
 	 *	renderData has been factored out of many of the places it propagates through.
-	 *  There are still shared_ptr lurking in the animation computations.
+	 *  There are still shared_ptr lurking in the animation data.
 	 */
 	bool AvengModel::loadModelV2(
 		const VkRenderData& renderData,
@@ -334,7 +323,7 @@ namespace aveng {
 		mRootNode = AssimpNode::createNode(rootNodeName);
 		std::printf("%s: root node name: '%s'\n", __FUNCTION__, rootNodeName.c_str());
 
-		processNode(renderData, mRootNode, rootNode, scene, modelBaseDir, contentRoot);
+		// processNode(renderData, mRootNode, rootNode, scene, modelBaseDir, contentRoot);
 		
 		/**
 		  * Check your work
@@ -350,6 +339,106 @@ namespace aveng {
 		//	}
 		//}
 
+		// buildV2(renderData, key, scene, rootNode);
+
+	}
+
+	bool AvengModel::build(
+		const VkRenderData& renderData,
+		const AssetKey& key, // Not strictly needed
+		const aiScene* scene,
+		aiNode* rootNode,
+		const int frameIndex
+	) {
+	
+		std::vector<glm::mat4> boneOffsetMatricesList{};
+		std::vector<int32_t> boneParentIndexList{};
+		std::cout << "Model Loading: " << key << "\n";
+		for (const auto& bone : mBoneList) {
+			boneOffsetMatricesList.emplace_back(bone->getOffsetMatrix());
+
+			std::string parentNodeName = mNodeMap.at(bone->getBoneName())->getParentNodeName();
+			const auto boneIter = std::find_if(mBoneList.begin(), mBoneList.end(), [parentNodeName](std::shared_ptr<AssimpBone>& bone) { return bone->getBoneName() == parentNodeName; });
+			if (boneIter == mBoneList.end()) {
+				boneParentIndexList.emplace_back(-1); // root node gets a -1 to identify
+			}
+			else {
+				boneParentIndexList.emplace_back(std::distance(mBoneList.begin(), boneIter));
+			}
+		}
+
+		/* create vertex buffers for the meshes */
+		for (const auto& mesh : mModelMeshes) {
+			VkVertexBufferData vertexBuffer;
+			VertexBuffer::init(engineDevice, vertexBuffer, mesh.vertices.size() * sizeof(VkVertex));
+			VertexBuffer::uploadData(engineDevice, vertexBuffer, mesh);
+			mVertexBuffers.emplace_back(vertexBuffer);
+
+			VkIndexBufferData indexBuffer;
+			IndexBuffer::init(engineDevice, indexBuffer, mesh.indices.size() * sizeof(uint32_t));
+			IndexBuffer::uploadData(engineDevice, indexBuffer, mesh);
+			mIndexBuffers.emplace_back(indexBuffer);
+		}
+
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+			size_t boneMatBufferSize = boneOffsetMatricesList.size() * sizeof(glm::mat4);
+			size_t boneParentBufferSize = boneParentIndexList.size() * sizeof(int32_t);
+
+			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
+			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
+
+			/* SSBOs uploaded once and forgotten about. No need to persistently map */
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList))
+			{
+				throw std::runtime_error("model buffer allocation size was incorrect");
+			};
+
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList))
+			{
+				throw std::runtime_error("model buffer allocation size was incorrect");
+			};
+
+		}
+
+		/* create descriptor set (for each available frame in flight) for per-model data */
+		createDescriptorSet(renderData);
+
+		/* animations */
+		unsigned int numAnims = scene->mNumAnimations;
+		for (unsigned int i = 0; i < numAnims; ++i) {
+			aiAnimation* animation = scene->mAnimations[i];
+
+			std::shared_ptr<AssimpAnimClip> animClip = std::make_shared<AssimpAnimClip>();
+			animClip->addChannels(animation, mBoneList);
+			if (animClip->getClipName().empty()) {
+				animClip->setClipName(std::to_string(i));
+			}
+			mAnimClips.emplace_back(animClip);
+		}
+
+		/* get root transformation matrix from model's root node */
+		glm::mat4 local_gltf = Tools::convertAiToGLM(rootNode->mTransformation);
+		glm::mat4 local_engine =
+			Tools::gltfToEngine * local_gltf * glm::inverse(Tools::gltfToEngine);
+
+		mRootTransformMatrix = local_engine;
+
+		Logger::log(1, "%s: - model has a total of %i texture%s\n", __FUNCTION__, mTextures.size(), mTextures.size() == 1 ? "" : "s");
+		std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
+		std::printf("%s: - model has a total of %zi animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
+		// std::printf("%s: successfully loaded model '%s' (%s)\n", __FUNCTION__, filepath.c_str(), mModelFilename.c_str());
+		return true;
+
+	}
+
+	bool AvengModel::buildV2(
+		const VkRenderData& renderData,
+		const AssetKey& key, // Not strictly needed
+		const aiScene* scene,
+		aiNode* rootNode
+	) {
+	
 		std::vector<glm::mat4> boneOffsetMatricesList{};
 		std::vector<int32_t> boneParentIndexList{};
 		std::cout << "Model Loading: " << key << "\n";
@@ -494,7 +583,9 @@ namespace aveng {
 		const aiScene* scene, 
 		/*std::string assetDirectory*/ 
 		const std::string modelBaseDir, 
-		const std::string contentRoot) 
+		const std::string contentRoot,
+		TextureRegistry& texReg
+		) 
 	{
 		std::string nodeName = aNode->mName.C_Str();
 		// std::printf("%s: node name: '%s'\n", __FUNCTION__, nodeName.c_str());
@@ -532,7 +623,57 @@ namespace aveng {
 			// std::printf("%s: --- found child node '%s'\n", __FUNCTION__, childName.c_str());
 
 			std::shared_ptr<AssimpNode> childNode = node->addChild(childName);
-			processNode(renderData, childNode, aNode->mChildren[i], scene, /*assetDirectory*/ modelBaseDir, contentRoot);
+			processNode(renderData, childNode, aNode->mChildren[i], scene, /*assetDirectory*/ modelBaseDir, contentRoot, texReg);
+		}
+	}
+
+
+	void AvengModel::drawInstancedV2(
+		VkCommandBuffer graphicsCommandBuffer,
+		VkPipelineLayout pipelineLayout,
+		uint32_t instanceCount,
+		int frameIndex) const
+	{
+		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
+			const VkMesh& mesh = mModelMeshes.at(i);
+
+			/*
+			* @Note
+			* For glTF imports, Assimp often maps glTF baseColorTexture -> aiTextureType_DIFFUSE
+			* for compatibility with older code paths. Later, Assimp added a dedicated texture
+			* type aiTextureType_BASE_COLOR specifically to represent glTF’s baseColor without pretending it’s "diffuse"
+			*/
+
+			// find diffuse texture by name
+			VkTextureData diffuseTex{};
+			auto diffuseTexName = mesh.textures.find(aiTextureType_DIFFUSE);
+			if (diffuseTexName != mesh.textures.end()) {
+				auto diffuseTexture = mTextures.find(diffuseTexName->second);
+				if (diffuseTexture != mTextures.end()) {
+					diffuseTex = diffuseTexture->second;
+				}
+			}
+
+			if (diffuseTex.image != VK_NULL_HANDLE) {
+
+				vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					pipelineLayout, 0, 1, &diffuseTex.descriptorSet, 0, nullptr);
+			}
+			else {
+				if (mesh.usesPBRColors) {
+					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						pipelineLayout, 0, 1, &mWhiteTexture.descriptorSet, 0, nullptr);
+				}
+				else {
+					vkCmdBindDescriptorSets(graphicsCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						pipelineLayout, 0, 1, &mPlaceholderTexture.descriptorSet, 0, nullptr);
+				}
+			}
+
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(graphicsCommandBuffer, 0, 1, &mVertexBuffers.at(i).buffer, &offset);
+			vkCmdBindIndexBuffer(graphicsCommandBuffer, mIndexBuffers.at(i).buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(graphicsCommandBuffer, static_cast<uint32_t>(mesh.indices.size()), instanceCount, 0, 0, 0);
 		}
 	}
 

@@ -10,13 +10,21 @@ namespace aveng {
 		, chunkManager_(taskSystem_)
 		, terrain_(chunkManager_)
 		, debug_{}
-		, gs_{terrain_, debug_}
 		, game_data(gd)
 		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
 		, engineDevice(aveng_window)
-		, modelLib_(engineDevice, renderData)
+		, textureSystem_(engineDevice, renderData)
+		, modelLib_(engineDevice, renderData, textureSystem_)
 		, sceneFacade_(modelLib_, modelLib_.query()) // intentionally injecting registry as a separate interface (query())
-		, renderer(engineDevice, aveng_window, renderData, cameraManager, modelLib_.query(), modelLib_.animQuery())
+		, gs_{ terrain_, debug_, sceneFacade_ }
+		, renderer(
+			engineDevice, 
+			aveng_window, 
+			renderData, 
+			cameraManager, 
+			modelLib_.query(), 
+			modelLib_.animQuery()
+		)
 #ifdef ENABLE_EDITOR
 		, editor_{ std::make_unique<Editor>(renderData,
 			renderer,

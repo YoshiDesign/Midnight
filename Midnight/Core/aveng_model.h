@@ -14,9 +14,10 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 
-class EngineDevice;
-
 namespace aveng {
+
+	class EngineDevice;
+	class TextureRegistry;
 
 	class AvengModel 
 	{
@@ -37,15 +38,33 @@ namespace aveng {
 		AvengModel& operator=(AvengModel&&) noexcept = default;
 		~AvengModel() = default;
 
-		bool loadModelV3(
+		bool loadModelV3( // TODO - V4
 			const VkRenderData& renderData,
 			const AssetKey& key,                // keep for debug + extension hint
 			std::span<const std::byte> bytes,   // data from IAssetSource
 			unsigned int extraImportFlags,		// Assimp flags
-			const std::string& modelBaseDir,    // for model-owned refs
-			const std::string& contentRoot      // Texture root. for engine-owned defaults
+			const std::string& modelBaseDir = "",    // for model-owned refs
+			const std::string& contentRoot = "",     // Texture root. for engine-owned defaults
+			TextureRegistry& texReg,		// New in V3
+			const int frameIndex
 		);
 
+		bool build(
+			const VkRenderData& renderData,
+			const AssetKey& key, // Not strictly needed
+			const aiScene* scene,
+			aiNode* rootNode,
+			const int frameIndex
+		);
+
+		[[deprecated("Use V3 instead")]]
+		bool buildV2(
+			const VkRenderData& renderData,
+			const AssetKey& key, // Not strictly needed
+			const aiScene* scene,
+			aiNode* rootNode);
+
+		[[deprecated("Use V3 instead")]]
 		bool loadModelV2(
 			const VkRenderData& renderData,
 			const AssetKey& key,                       // keep for debug + extension hint
@@ -63,7 +82,8 @@ namespace aveng {
 			aiNode* aNode, 
 			const aiScene* scene, 
 			const std::string modelBaseDir, 
-			const std::string contentRoot // Texture root
+			const std::string contentRoot, // Texture root
+			TextureRegistry& texReg
 		/* std::string assetDirectory*/);
 
 		std::string getModelFileName();
