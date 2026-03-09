@@ -24,7 +24,7 @@ namespace aveng {
                 new_handles.push_back(kInvalidTextureHandle);
             }
 
-            TextureHandle handle = m_textureSystem.createTexture(reqs[i]);
+            TextureHandle handle = m_textureSystem.createTexture(reqs[i], frameIndex);
 
             m_assetToHandle[key] = handle;
             new_handles.push_back(handle);
