@@ -22,38 +22,49 @@ namespace aveng {
         Failed
     };
 
-    // While loading models we create these to detect and pass along embedded textures.
-    struct GltfImageRef {
-        bool embedded = false;  // False will fallback to load from filesystem
-        std::string uri;                     // normalized external path if not embedded
-        std::vector<std::byte> embeddedData; // compressed bytes if embedded
-        std::string debugName;
-        bool srgb = true;
-    };
+    // Extra - While loading models we create these to detect and pass along embedded textures.
+    //struct GltfImageRef {
+    //    bool embedded = false;  // False will fallback to load from filesystem
+    //    std::string uri;                     // normalized external path if not embedded
+    //    std::vector<std::byte> embeddedData; // compressed bytes if embedded
+    //    std::string debugName;
+    //    bool srgb = true;
+    //};
 
     struct TextureAssetKey {
         std::string value;
+
+        TextureAssetKey() = default;
+        TextureAssetKey(std::string v) : value(std::move(v)) {} // Let's us construct in place
 
         bool operator==(const TextureAssetKey& other) const noexcept {
             return value == other.value;
         }
     };
 
+    struct TextureAssetKeyHash {
+        std::size_t operator()(const TextureAssetKey& k) const noexcept {
+            return std::hash<std::string>{}(k.value);
+        }
+    };
+
     struct TextureSlot {
         TextureHandle handle = kInvalidTextureHandle;
         TextureAssetKey assetKey;
-
+        
         uint32_t bindlessIndex = k_invalid_index;
 
         uint32_t width = 0;
         uint32_t height = 0;
-        uint32_t mipCount = 0;
+        uint64_t size = 0;
+        uint32_t mipLevels = 0;
         VkFormat format = VK_FORMAT_UNDEFINED;
         bool srgb = false;
 
         VkImage image = VK_NULL_HANDLE;
         VkImageView imageView = VK_NULL_HANDLE;
         VkSampler sampler = VK_NULL_HANDLE;
+        VmaAllocation imageAlloc = nullptr;
 
         TextureState state = TextureState::Unloaded;
         std::string debugName;
@@ -70,6 +81,8 @@ namespace aveng {
         VkSamplerAddressMode addressU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         VkSamplerAddressMode addressV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         VkSamplerAddressMode addressW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VkBool32 anisotropyAvailable = false;
+        float maxAnisotropy = 0.0f;
     };
 
     struct MipSlice {
@@ -87,15 +100,17 @@ namespace aveng {
 
         uint32_t width = 0;
         uint32_t height = 0;
-        uint32_t mipCount = 1;
+        uint64_t size = 0;
+        uint32_t mipLevels = 1;
         VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
         VkImageType imageType = VK_IMAGE_TYPE_2D;
         bool srgb = false;
 
-        aiTexel* assimp_data;
+        // When using assimp
+        aiTexel* assimp_data = nullptr;
         MSamplerInfo samplerInfo{};
 
-        std::span<const std::byte> pixelBlob;
+        unsigned char* pixelBlob;
         std::vector<MipSlice> mipSlices;
     };
 

@@ -3,7 +3,8 @@
 namespace aveng {
 
 	struct TextureFilesystemSource : public ITextureSource {
-		bool loadTexture(TextureAssetID assetId, TextureCreateRequest& outReq) override;
+		bool loadTexture(const TextureAssetKey& assetId, TextureCreateRequest& outReq) override;
+		void destroyTexture(unsigned char* pixelBlob) override;
 	};
 
 }

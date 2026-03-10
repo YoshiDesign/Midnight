@@ -181,8 +181,12 @@
     <ClCompile Include="CoreVK\LightPipeline.cpp" />
     <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
-    <ClCompile Include="CoreVK\Resources\MTexture.cpp" />
     <ClCompile Include="Core\Camera\aveng_camera.cpp" />
+    <ClCompile Include="Core\Imaging\MidnightTextureSystem.cpp" />
+    <ClCompile Include="Core\Imaging\TextureFilesystemSource.cpp" />
+    <ClCompile Include="Core\Imaging\TextureGltfSource.cpp" />
+    <ClCompile Include="Core\Imaging\TexturePakSource.cpp" />
+    <ClCompile Include="Core\Imaging\TextureRegistry.cpp" />
     <ClCompile Include="Core\Input\InputSystem.cpp" />
     <ClCompile Include="Core\Midnight.cpp" />
     <ClCompile Include="Core\Modeling\AvengInstance.cpp" />
@@ -208,7 +212,6 @@
     <ClCompile Include="Core\Renderer\AvengFrame.cpp" />
     <ClCompile Include="Core\Renderer\FramePacketBuilder.cpp" />
     <ClCompile Include="Core\Renderer\ModelLibrary.cpp" />
-    <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp" />
     <ClCompile Include="Core\Renderer\Renderer.cpp" />
     <ClCompile Include="Core\Texture.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
@@ -249,10 +252,15 @@
     <ClInclude Include="CoreVK\LightPipeline.h" />
     <ClInclude Include="CoreVK\LinePipeline.h" />
     <ClInclude Include="CoreVK\PipelineLayout.h" />
-    <ClInclude Include="CoreVK\Resources\gpu_resources.h" />
     <ClInclude Include="CoreVK\Resources\graphics_enums.h" />
     <ClInclude Include="CoreVK\Resources\MTexture.h" />
     <ClInclude Include="CoreVK\Resources\platform.h" />
+    <ClInclude Include="Core\Imaging\ITextureSource.h" />
+    <ClInclude Include="Core\Imaging\MidnightTextureSystem.h" />
+    <ClInclude Include="Core\Imaging\TextureFilesystemSource.h" />
+    <ClInclude Include="Core\Imaging\TextureGltfSource.h" />
+    <ClInclude Include="Core\Imaging\TexturePakSource.h" />
+    <ClInclude Include="Core\Imaging\TextureRegistry.h" />
     <ClInclude Include="Core\Math\quantize.h" />
     <ClInclude Include="Core\Math\wyhash.h" />
     <ClInclude Include="CoreVK\Shader.h" />
@@ -260,7 +268,6 @@
     <ClInclude Include="CoreVK\SyncObjects.h" />
     <ClInclude Include="CoreVK\VertexBuffer.h" />
     <ClInclude Include="Core\Camera\aveng_camera.h" />
-    <ClInclude Include="Core\gltf.h" />
     <ClInclude Include="Core\Input\EventPayloads.h" />
     <ClInclude Include="Core\Input\IInputHandler.h" />
     <ClInclude Include="Core\Input\InputState.h" />
@@ -294,9 +301,7 @@
     <ClInclude Include="Core\Renderer\AvengFrame.h" />
     <ClInclude Include="Core\Renderer\FramePacketBuilder.h" />
     <ClInclude Include="Core\Renderer\ModelLibrary.h" />
-    <ClInclude Include="Core\Renderer\PipelineConfigManager.h" />
     <ClInclude Include="Core\Renderer\Renderer.h" />
-    <ClInclude Include="Core\Renderer\TextureStreamingManager.h" />
     <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\UUID.h" />
     <ClInclude Include="Module\Procgen\Delaunay.h" />
@@ -670,7 +675,6 @@
     <ClInclude Include="vendor\tiny_obj_loader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Core\Renderer\PipelineConfig.json" />
     <None Include="shaders\ff.frag" />
     <None Include="shaders\ff.frag.spv" />
     <None Include="shaders\point_light.frag" />

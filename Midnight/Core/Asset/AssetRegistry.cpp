@@ -17,6 +17,11 @@ namespace aveng {
 	// IModelAnimQuery
 	bool ModelRegistryData::tryGetClipMeta(ModelId id, uint32_t clipIndex, AnimationMeta& out) const {
 
+		/* 
+		 *	TODO - This an others: Once we remove the necessity for a unique ptr to a model, in favor
+		 *	of storing its data directly in each ModelEntry, we'll need to update our queries.
+		 */
+
 		const ModelEntry* e = get(id);
 		if (!e || e->id == NullModelId || e->model == nullptr || !e->isAnimated) return false;
 

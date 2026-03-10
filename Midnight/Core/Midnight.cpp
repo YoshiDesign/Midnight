@@ -32,8 +32,7 @@ namespace aveng {
 			engineDevice,
 			aveng_window,
 			cameraManager, 
-			sceneFacade_
-		)
+			sceneFacade_)
 		}
 		, editorInput_( std::make_unique<EditorInput>(editor_.get()) )
 		, gameInput_( std::make_unique<GameInput>() )

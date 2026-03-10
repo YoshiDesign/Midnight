@@ -7,7 +7,6 @@
 #include <vulkan/vulkan_core.h>
 #include <AMD/vk_mem_alloc.h>
 #include <assimp/texture.h>
-#include "CoreVK/Resources/gpu_resources.h"
 #include "CoreVK/VkRenderData.h"
 
 namespace aveng {

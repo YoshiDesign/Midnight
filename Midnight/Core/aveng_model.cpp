@@ -105,10 +105,11 @@ namespace aveng {
 		const AssetKey& key,                // keep for debug + extension hint
 		std::span<const std::byte> bytes,   // data from IAssetSource
 		unsigned int extraImportFlags,		// Assimp flags
-		const std::string& modelBaseDir,    // for model-owned refs
-		const std::string& contentRoot,     // Texture root. for engine-owned defaults
 		TextureRegistry& texReg,		// I'm new here - Register textures globally
-		const int frameIndex
+		const int frameIndex,
+		const std::string& modelBaseDir,    // for model-owned refs
+		const std::string& contentRoot     // Texture root. for engine-owned defaults
+
 	) {
 
 		TextureGltfSource gltfSrc{};

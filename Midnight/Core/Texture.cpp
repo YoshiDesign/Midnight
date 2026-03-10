@@ -1,6 +1,5 @@
 #include <cstring>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
+
 #include "Texture.h"
 #include "CoreVK/EngineDevice.h"
 
@@ -8,70 +7,70 @@ namespace aveng {
     /* This signature is used if we're loading a texture from a file */
     bool Texture::loadTexture(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData, std::string textureFilename,
         bool generateMipmaps, bool flipImage) {
-        // Check if texture is already loaded (defensive check to prevent double-loading)
-        if (texData.image != VK_NULL_HANDLE) {
-            std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureFilename.c_str());
-            return true;
-        }
+        //// Check if texture is already loaded (defensive check to prevent double-loading)
+        //if (texData.image != VK_NULL_HANDLE) {
+        //    std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureFilename.c_str());
+        //    return true;
+        //}
 
-        int texWidth;
-        int texHeight;
-        int numberOfChannels;
-        uint32_t mipmapLevels = 1;
+        //int texWidth;
+        //int texHeight;
+        //int numberOfChannels;
+        //uint32_t mipmapLevels = 1;
 
-        stbi_set_flip_vertically_on_load(flipImage);
-        /* always load as RGBA */
-        unsigned char* textureData = stbi_load(textureFilename.c_str(), &texWidth, &texHeight, &numberOfChannels, STBI_rgb_alpha);
+        //stbi_set_flip_vertically_on_load(flipImage);
+        ///* always load as RGBA */
+        //unsigned char* textureData = stbi_load(textureFilename.c_str(), &texWidth, &texHeight, &numberOfChannels, STBI_rgb_alpha);
 
-        if (!textureData) {
-            std::printf("%s error: could not load file '%s'\n", __FUNCTION__, textureFilename.c_str());
-            stbi_image_free(textureData);
-            return false;
-        }
+        //if (!textureData) {
+        //    std::printf("%s error: could not load file '%s'\n", __FUNCTION__, textureFilename.c_str());
+        //    stbi_image_free(textureData);
+        //    return false;
+        //}
 
-        if (generateMipmaps) {
-            mipmapLevels += static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight))));
-        }
+        //if (generateMipmaps) {
+        //    mipmapLevels += static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight))));
+        //}
 
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        //VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-        /* staging buffer */
-        VkBufferCreateInfo stagingBufferInfo{};
-        stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        stagingBufferInfo.size = imageSize;
-        stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        ///* staging buffer */
+        //VkBufferCreateInfo stagingBufferInfo{};
+        //stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        //stagingBufferInfo.size = imageSize;
+        //stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-        VkBuffer stagingBuffer;
-        VmaAllocation stagingBufferAlloc;
+        //VkBuffer stagingBuffer;
+        //VmaAllocation stagingBufferAlloc;
 
-        VmaAllocationCreateInfo stagingAllocInfo{};
-        stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        //VmaAllocationCreateInfo stagingAllocInfo{};
+        //stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-        VkResult result = vmaCreateBuffer(engineDevice.allocator(), &stagingBufferInfo, &stagingAllocInfo, &stagingBuffer, &stagingBufferAlloc, nullptr);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not allocate texture staging buffer via VMA (error: %i)\n", __FUNCTION__, result);
-            return false;
-        }
+        //VkResult result = vmaCreateBuffer(engineDevice.allocator(), &stagingBufferInfo, &stagingAllocInfo, &stagingBuffer, &stagingBufferAlloc, nullptr);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not allocate texture staging buffer via VMA (error: %i)\n", __FUNCTION__, result);
+        //    return false;
+        //}
 
-        void* uploadData;
-        result = vmaMapMemory(engineDevice.allocator(), stagingBufferAlloc, &uploadData);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not map texture memory (error: %i)\n", __FUNCTION__, result);
-            return false;
-        }
+        //void* uploadData;
+        //result = vmaMapMemory(engineDevice.allocator(), stagingBufferAlloc, &uploadData);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not map texture memory (error: %i)\n", __FUNCTION__, result);
+        //    return false;
+        //}
 
-        std::memcpy(uploadData, textureData, imageSize);
-        vmaUnmapMemory(engineDevice.allocator(), stagingBufferAlloc);
-        vmaFlushAllocation(engineDevice.allocator(), stagingBufferAlloc, 0, imageSize);
+        //std::memcpy(uploadData, textureData, imageSize);
+        //vmaUnmapMemory(engineDevice.allocator(), stagingBufferAlloc);
+        //vmaFlushAllocation(engineDevice.allocator(), stagingBufferAlloc, 0, imageSize);
 
-        stbi_image_free(textureData);
+        //stbi_image_free(textureData);
 
-        VkTextureStagingBuffer stagingData = { stagingBuffer, stagingBufferAlloc };
+        //VkTextureStagingBuffer stagingData = { stagingBuffer, stagingBufferAlloc };
 
-        if (!uploadToGPU(engineDevice, renderData, texData, stagingData, texWidth, texHeight, generateMipmaps, mipmapLevels)) {
-            std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, textureFilename.c_str());
-            return false;
-        }
+        //if (!uploadToGPU(engineDevice, renderData, texData, stagingData, texWidth, texHeight, generateMipmaps, mipmapLevels)) {
+        //    std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, textureFilename.c_str());
+        //    return false;
+        //}
 
         // std::printf("%s: texture '%s' loaded (%dx%d, %d channels)\n", __FUNCTION__, textureFilename.c_str(), texWidth, texHeight, numberOfChannels);
         return true;
@@ -82,81 +81,81 @@ namespace aveng {
         VkTextureData& texData, std::string textureName, aiTexel* textureData, 
         int width, int height, bool generateMipmaps, bool flipImage) 
     {
-        // Check if texture is already loaded (defensive check to prevent double-loading)
-        if (texData.image != VK_NULL_HANDLE) {
-            std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureName.c_str());
-            return true;
-        }
+        //// Check if texture is already loaded (defensive check to prevent double-loading)
+        //if (texData.image != VK_NULL_HANDLE) {
+        //    std::printf("%s warning: texture '%s' already loaded, skipping reload\n", __FUNCTION__, textureName.c_str());
+        //    return true;
+        //}
 
-        if (!textureData) {
-            std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, textureName.c_str());
-            return false;
-        }
+        //if (!textureData) {
+        //    std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, textureName.c_str());
+        //    return false;
+        //}
 
-        int texWidth;
-        int texHeight;
-        int numberOfChannels;
-        uint32_t mipmapLevels = 1;
+        //int texWidth;
+        //int texHeight;
+        //int numberOfChannels;
+        //uint32_t mipmapLevels = 1;
 
-        /* allow to flip the image, similar to file loaded from disk */
-        stbi_set_flip_vertically_on_load(flipImage);
+        ///* allow to flip the image, similar to file loaded from disk */
+        //stbi_set_flip_vertically_on_load(flipImage);
 
-        /* we use stbi to detect the in-memory format, but always request RGBA */
-        unsigned char* data = nullptr;
-        if (height == 0) {
-            data = stbi_load_from_memory(reinterpret_cast<unsigned char*>(textureData), width, &texWidth, &texHeight, &numberOfChannels, STBI_rgb_alpha);
-        }
-        else {
-            data = stbi_load_from_memory(reinterpret_cast<unsigned char*>(textureData), width * height, &texWidth, &texHeight, &numberOfChannels, STBI_rgb_alpha);
-        }
+        ///* we use stbi to detect the in-memory format, but always request RGBA */
+        //unsigned char* data = nullptr;
+        //if (height == 0) {
+        //    data = stbi_load_from_memory(reinterpret_cast<unsigned char*>(textureData), width, &texWidth, &texHeight, &numberOfChannels, STBI_rgb_alpha);
+        //}
+        //else {
+        //    data = stbi_load_from_memory(reinterpret_cast<unsigned char*>(textureData), width * height, &texWidth, &texHeight, &numberOfChannels, STBI_rgb_alpha);
+        //}
 
-        if (!data) {
-            std::printf("%s error: could not load file '%s'\n", __FUNCTION__, textureName.c_str());
-            stbi_image_free(data);
-            return false;
-        }
+        //if (!data) {
+        //    std::printf("%s error: could not load file '%s'\n", __FUNCTION__, textureName.c_str());
+        //    stbi_image_free(data);
+        //    return false;
+        //}
 
-        if (generateMipmaps) {
-            mipmapLevels += static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight))));
-        }
+        //if (generateMipmaps) {
+        //    mipmapLevels += static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight))));
+        //}
 
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        //VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-        /* staging buffer */
-        VkBufferCreateInfo stagingBufferInfo{};
-        stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        stagingBufferInfo.size = imageSize;
-        stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        ///* staging buffer */
+        //VkBufferCreateInfo stagingBufferInfo{};
+        //stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        //stagingBufferInfo.size = imageSize;
+        //stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-        VkBuffer stagingBuffer;
-        VmaAllocation stagingBufferAlloc;
+        //VkBuffer stagingBuffer;
+        //VmaAllocation stagingBufferAlloc;
 
-        VmaAllocationCreateInfo stagingAllocInfo{};
-        stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        //VmaAllocationCreateInfo stagingAllocInfo{};
+        //stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-        VkResult result = vmaCreateBuffer(engineDevice.allocator(), &stagingBufferInfo, &stagingAllocInfo, &stagingBuffer, &stagingBufferAlloc, nullptr);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not allocate texture staging buffer via VMA (error: %i)\n", __FUNCTION__, result);
-            return false;
-        }
+        //VkResult result = vmaCreateBuffer(engineDevice.allocator(), &stagingBufferInfo, &stagingAllocInfo, &stagingBuffer, &stagingBufferAlloc, nullptr);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not allocate texture staging buffer via VMA (error: %i)\n", __FUNCTION__, result);
+        //    return false;
+        //}
 
-        void* uploadData;
-        result = vmaMapMemory(engineDevice.allocator(), stagingBufferAlloc, &uploadData);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not map texture memory (error: %i)\n", __FUNCTION__, result);
-            return false;
-        }
-        std::memcpy(uploadData, data, imageSize);
-        vmaUnmapMemory(engineDevice.allocator(), stagingBufferAlloc);
-        vmaFlushAllocation(engineDevice.allocator(), stagingBufferAlloc, 0, imageSize);
+        //void* uploadData;
+        //result = vmaMapMemory(engineDevice.allocator(), stagingBufferAlloc, &uploadData);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not map texture memory (error: %i)\n", __FUNCTION__, result);
+        //    return false;
+        //}
+        //std::memcpy(uploadData, data, imageSize);
+        //vmaUnmapMemory(engineDevice.allocator(), stagingBufferAlloc);
+        //vmaFlushAllocation(engineDevice.allocator(), stagingBufferAlloc, 0, imageSize);
 
-        stbi_image_free(data);
+        //stbi_image_free(data);
 
-        VkTextureStagingBuffer stagingData = { stagingBuffer, stagingBufferAlloc };
-        if (!uploadToGPU(engineDevice, renderData, texData, stagingData, texWidth, texHeight, generateMipmaps, mipmapLevels)) {
-            std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, textureName.c_str());
-            return false;
-        }
+        //VkTextureStagingBuffer stagingData = { stagingBuffer, stagingBufferAlloc };
+        //if (!uploadToGPU(engineDevice, renderData, texData, stagingData, texWidth, texHeight, generateMipmaps, mipmapLevels)) {
+        //    std::printf("%s error: could not load texture '%s'\n", __FUNCTION__, textureName.c_str());
+        //    return false;
+        //}
 
         //std::printf("%s: texture '%s' loaded (%dx%d, %d channels)\n", __FUNCTION__, textureName.c_str(), texWidth, texHeight, numberOfChannels);
         return true;
@@ -165,258 +164,263 @@ namespace aveng {
     bool Texture::uploadToGPU(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData, VkTextureStagingBuffer& stagingData,
         uint32_t width, uint32_t height, bool generateMipmaps, uint32_t mipmapLevels) {
         /* upload */
-        VkCommandBuffer uploadCommandBuffer = engineDevice.createSingleShotBuffer();
+        //VkCommandBuffer uploadCommandBuffer = engineDevice.createSingleShotBuffer();
 
-        VkImageCreateInfo imageInfo{};
-        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = width;
-        imageInfo.extent.height = height;
-        imageInfo.extent.depth = 1;
-        imageInfo.mipLevels = mipmapLevels;
-        imageInfo.arrayLayers = 1;
-        imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
-        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        //VkImageCreateInfo imageInfo{};
+        //imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        //imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        //imageInfo.extent.width = width;
+        //imageInfo.extent.height = height;
+        //imageInfo.extent.depth = 1;
+        //imageInfo.mipLevels = mipmapLevels;
+        //imageInfo.arrayLayers = 1;
+        //imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+        //imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        //imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        //imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        //imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        //imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-        VmaAllocationCreateInfo imageAllocInfo{};
-        imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        //VmaAllocationCreateInfo imageAllocInfo{};
+        //imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-        VkResult result = vmaCreateImage(engineDevice.allocator(), &imageInfo, &imageAllocInfo, &texData.image, &texData.imageAlloc, nullptr);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not allocate texture image via VMA (error: %i)\n", __FUNCTION__, result);
-            return false;
-        }
+        //VkResult result = vmaCreateImage(engineDevice.allocator(), &imageInfo, &imageAllocInfo, &texData.image, &texData.imageAlloc, nullptr);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not allocate texture image via VMA (error: %i)\n", __FUNCTION__, result);
+        //    return false;
+        //}
 
-        VkImageSubresourceRange stagingBufferRange{};
-        stagingBufferRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        stagingBufferRange.baseMipLevel = 0;
-        stagingBufferRange.levelCount = mipmapLevels;
-        stagingBufferRange.baseArrayLayer = 0;
-        stagingBufferRange.layerCount = 1;
 
-        /* 1st barrier, undefined to transfer optimal */
-        VkImageMemoryBarrier stagingBufferTransferBarrier{};
-        stagingBufferTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        stagingBufferTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // HmMmmmMmMm
-        stagingBufferTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        stagingBufferTransferBarrier.image = texData.image;
-        stagingBufferTransferBarrier.subresourceRange = stagingBufferRange;
-        stagingBufferTransferBarrier.srcAccessMask = 0;
-        stagingBufferTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-        VkExtent3D textureExtent{};
-        textureExtent.width = width;
-        textureExtent.height = height;
-        textureExtent.depth = 1;
 
-        VkBufferImageCopy stagingBufferCopy{};
-        stagingBufferCopy.bufferOffset = 0;
-        stagingBufferCopy.bufferRowLength = 0;
-        stagingBufferCopy.bufferImageHeight = 0;
-        stagingBufferCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        stagingBufferCopy.imageSubresource.mipLevel = 0;
-        stagingBufferCopy.imageSubresource.baseArrayLayer = 0;
-        stagingBufferCopy.imageSubresource.layerCount = 1;
-        stagingBufferCopy.imageExtent = textureExtent;
 
-        /* 2nd barrier, transfer optimal to shader optimal */
-        VkImageMemoryBarrier stagingBufferShaderBarrier{};
-        stagingBufferShaderBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        stagingBufferShaderBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        if (mipmapLevels > 1) {
-            /* VkCmdBlit() requires the original image to be in TRANSFER_DST_OPTIMAL format */
-            stagingBufferShaderBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        }
-        else {
-            stagingBufferShaderBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        }
-        stagingBufferShaderBarrier.image = texData.image;
-        stagingBufferShaderBarrier.subresourceRange = stagingBufferRange;
-        stagingBufferShaderBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        stagingBufferShaderBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &stagingBufferTransferBarrier);
-        vkCmdCopyBufferToImage(uploadCommandBuffer, stagingData.stagingBuffer, texData.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &stagingBufferCopy);
-        vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &stagingBufferShaderBarrier);
+        //VkImageSubresourceRange stagingBufferRange{};
+        //stagingBufferRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        //stagingBufferRange.baseMipLevel = 0;
+        //stagingBufferRange.levelCount = mipmapLevels;
+        //stagingBufferRange.baseArrayLayer = 0;
+        //stagingBufferRange.layerCount = 1;
 
-        /* generate mipmap blit commands */
-        if (generateMipmaps && mipmapLevels > 1) {
-            VkImageSubresourceRange blitRange{};
-            blitRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            blitRange.baseMipLevel = 0;
-            blitRange.levelCount = 1;
-            blitRange.baseArrayLayer = 0;
-            blitRange.layerCount = 1;
+        ///* 1st barrier, undefined to transfer optimal */
+        //VkImageMemoryBarrier stagingBufferTransferBarrier{};
+        //stagingBufferTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        //stagingBufferTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // HmMmmmMmMm
+        //stagingBufferTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        //stagingBufferTransferBarrier.image = texData.image;
+        //stagingBufferTransferBarrier.subresourceRange = stagingBufferRange;
+        //stagingBufferTransferBarrier.srcAccessMask = 0;
+        //stagingBufferTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-            /* 1st barrier, we need to transfer to src optimal for the blit */
-            VkImageMemoryBarrier firstBarrier{};
-            firstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            firstBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            firstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            firstBarrier.image = texData.image;
-            firstBarrier.subresourceRange = blitRange;
-            firstBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            firstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        //VkExtent3D textureExtent{};
+        //textureExtent.width = width;
+        //textureExtent.height = height;
+        //textureExtent.depth = 1;
 
-            /* 2nd barrier -> transfer to shader optimal */
-            VkImageMemoryBarrier secondBarrier{};
-            secondBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            secondBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            secondBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            secondBarrier.image = texData.image;
-            secondBarrier.subresourceRange = blitRange;
-            secondBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            secondBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        //VkBufferImageCopy stagingBufferCopy{};
+        //stagingBufferCopy.bufferOffset = 0;
+        //stagingBufferCopy.bufferRowLength = 0;
+        //stagingBufferCopy.bufferImageHeight = 0;
+        //stagingBufferCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        //stagingBufferCopy.imageSubresource.mipLevel = 0;
+        //stagingBufferCopy.imageSubresource.baseArrayLayer = 0;
+        //stagingBufferCopy.imageSubresource.layerCount = 1;
+        //stagingBufferCopy.imageExtent = textureExtent;
 
-            VkImageBlit mipBlit{};
-            mipBlit.srcOffsets[0] = { 0, 0, 0 };
-            mipBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            mipBlit.srcSubresource.baseArrayLayer = 0;
-            mipBlit.srcSubresource.layerCount = 1;
+        ///* 2nd barrier, transfer optimal to shader optimal */
+        //VkImageMemoryBarrier stagingBufferShaderBarrier{};
+        //stagingBufferShaderBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        //stagingBufferShaderBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        //if (mipmapLevels > 1) {
+        //    /* VkCmdBlit() requires the original image to be in TRANSFER_DST_OPTIMAL format */
+        //    stagingBufferShaderBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        //}
+        //else {
+        //    stagingBufferShaderBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        //}
+        //stagingBufferShaderBarrier.image = texData.image;
+        //stagingBufferShaderBarrier.subresourceRange = stagingBufferRange;
+        //stagingBufferShaderBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //stagingBufferShaderBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-            mipBlit.dstOffsets[0] = { 0, 0, 0 };
-            mipBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            mipBlit.dstSubresource.baseArrayLayer = 0;
-            mipBlit.dstSubresource.layerCount = 1;
+        //vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &stagingBufferTransferBarrier);
+        //vkCmdCopyBufferToImage(uploadCommandBuffer, stagingData.stagingBuffer, texData.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &stagingBufferCopy);
+        //vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &stagingBufferShaderBarrier);
 
-            int32_t mipWidth = width;
-            int32_t mipHeight = height;
-            for (int i = 1; i < mipmapLevels; ++i) {
-                mipBlit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
-                mipBlit.srcSubresource.mipLevel = i - 1;
+        ///* generate mipmap blit commands */
+        //if (generateMipmaps && mipmapLevels > 1) {
+        //    VkImageSubresourceRange blitRange{};
+        //    blitRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        //    blitRange.baseMipLevel = 0;
+        //    blitRange.levelCount = 1;
+        //    blitRange.baseArrayLayer = 0;
+        //    blitRange.layerCount = 1;
 
-                mipBlit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
-                mipBlit.dstSubresource.mipLevel = i;
+        //    /* 1st barrier, we need to transfer to src optimal for the blit */
+        //    VkImageMemoryBarrier firstBarrier{};
+        //    firstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        //    firstBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        //    firstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        //    firstBarrier.image = texData.image;
+        //    firstBarrier.subresourceRange = blitRange;
+        //    firstBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //    firstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-                firstBarrier.subresourceRange.baseMipLevel = i - 1;
-                vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    0, 0, nullptr, 0, nullptr, 1, &firstBarrier);
+        //    /* 2nd barrier -> transfer to shader optimal */
+        //    VkImageMemoryBarrier secondBarrier{};
+        //    secondBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        //    secondBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        //    secondBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        //    secondBarrier.image = texData.image;
+        //    secondBarrier.subresourceRange = blitRange;
+        //    secondBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        //    secondBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-                vkCmdBlitImage(uploadCommandBuffer,
-                    texData.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    texData.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    1, &mipBlit, VK_FILTER_LINEAR);
+        //    VkImageBlit mipBlit{};
+        //    mipBlit.srcOffsets[0] = { 0, 0, 0 };
+        //    mipBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        //    mipBlit.srcSubresource.baseArrayLayer = 0;
+        //    mipBlit.srcSubresource.layerCount = 1;
 
-                secondBarrier.subresourceRange.baseMipLevel = i - 1;
-                vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                    0, 0, nullptr, 0, nullptr, 1, &secondBarrier);
+        //    mipBlit.dstOffsets[0] = { 0, 0, 0 };
+        //    mipBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        //    mipBlit.dstSubresource.baseArrayLayer = 0;
+        //    mipBlit.dstSubresource.layerCount = 1;
 
-                if (mipWidth > 1) {
-                    mipWidth /= 2;
-                }
-                if (mipHeight > 1) {
-                    mipHeight /= 2;
-                }
+        //    int32_t mipWidth = width;
+        //    int32_t mipHeight = height;
+        //    for (int i = 1; i < mipmapLevels; ++i) {
+        //        mipBlit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+        //        mipBlit.srcSubresource.mipLevel = i - 1;
 
-                // std::printf("%s: created level %i with width %i and height %i\n", __FUNCTION__, i, mipWidth, mipHeight);
-            }
+        //        mipBlit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+        //        mipBlit.dstSubresource.mipLevel = i;
 
-            VkImageMemoryBarrier lastBarrier{};
-            lastBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            lastBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            lastBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            lastBarrier.image = texData.image;
-            lastBarrier.subresourceRange = blitRange;
-            lastBarrier.subresourceRange.baseMipLevel = mipmapLevels - 1;
-            lastBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            lastBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        //        firstBarrier.subresourceRange.baseMipLevel = i - 1;
+        //        vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        //            0, 0, nullptr, 0, nullptr, 1, &firstBarrier);
 
-            vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                0, 0, nullptr, 0, nullptr, 1, &lastBarrier);
-        }
+        //        vkCmdBlitImage(uploadCommandBuffer,
+        //            texData.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        //            texData.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        //            1, &mipBlit, VK_FILTER_LINEAR);
 
-        bool commandResult = engineDevice.submitSingleShotBuffer(uploadCommandBuffer);
-        vmaDestroyBuffer(engineDevice.allocator(), stagingData.stagingBuffer, stagingData.stagingBufferAlloc);
+        //        secondBarrier.subresourceRange.baseMipLevel = i - 1;
+        //        vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        //            0, 0, nullptr, 0, nullptr, 1, &secondBarrier);
 
-        if (!commandResult) {
-            std::printf("%s error: could not submit texture transfer commands\n", __FUNCTION__);
-            return false;
-        }
+        //        if (mipWidth > 1) {
+        //            mipWidth /= 2;
+        //        }
+        //        if (mipHeight > 1) {
+        //            mipHeight /= 2;
+        //        }
 
-        /* image view and sampler */
-        VkImageViewCreateInfo texViewInfo{};
-        texViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        texViewInfo.image = texData.image;
-        texViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        texViewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
-        texViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        texViewInfo.subresourceRange.baseMipLevel = 0;
-        texViewInfo.subresourceRange.levelCount = mipmapLevels;
-        texViewInfo.subresourceRange.baseArrayLayer = 0;
-        texViewInfo.subresourceRange.layerCount = 1;
+        //        // std::printf("%s: created level %i with width %i and height %i\n", __FUNCTION__, i, mipWidth, mipHeight);
+        //    }
 
-        result = vkCreateImageView(engineDevice.device(), &texViewInfo, nullptr, &texData.imageView);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not create image view for texture\n", __FUNCTION__);
-            return false;
-        }
+        //    VkImageMemoryBarrier lastBarrier{};
+        //    lastBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        //    lastBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        //    lastBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        //    lastBarrier.image = texData.image;
+        //    lastBarrier.subresourceRange = blitRange;
+        //    lastBarrier.subresourceRange.baseMipLevel = mipmapLevels - 1;
+        //    lastBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //    lastBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        VkPhysicalDeviceFeatures supportedFeatures{};
-        vkGetPhysicalDeviceFeatures(engineDevice.physicalDevice(), &supportedFeatures);
-        //std::printf("%s: anisotropy supported: %s\n", __FUNCTION__, supportedFeatures.samplerAnisotropy ? "yes" : "no");
-        const VkBool32 anisotropyAvailable = supportedFeatures.samplerAnisotropy;
+        //    vkCmdPipelineBarrier(uploadCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        //        0, 0, nullptr, 0, nullptr, 1, &lastBarrier);
+        //}
 
-        VkPhysicalDeviceProperties physProperties{};
-        vkGetPhysicalDeviceProperties(engineDevice.physicalDevice(), &physProperties);
-        const float maxAnisotropy = physProperties.limits.maxSamplerAnisotropy;
-        //std::printf("%s: device supports max anisotropy of %f\n", __FUNCTION__, maxAnisotropy);
+        //bool commandResult = engineDevice.submitSingleShotBuffer(uploadCommandBuffer);
+        //vmaDestroyBuffer(engineDevice.allocator(), stagingData.stagingBuffer, stagingData.stagingBufferAlloc);
 
-        VkSamplerCreateInfo texSamplerInfo{};
-        texSamplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        texSamplerInfo.magFilter = VK_FILTER_LINEAR;
-        texSamplerInfo.minFilter = VK_FILTER_LINEAR;
-        texSamplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        texSamplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        texSamplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        texSamplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        texSamplerInfo.unnormalizedCoordinates = VK_FALSE;
-        texSamplerInfo.compareEnable = VK_FALSE;
-        texSamplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        texSamplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        texSamplerInfo.mipLodBias = 0.0f;
-        texSamplerInfo.minLod = 0.0f;
-        texSamplerInfo.maxLod = static_cast<float>(mipmapLevels);
-        texSamplerInfo.anisotropyEnable = anisotropyAvailable;
-        texSamplerInfo.maxAnisotropy = maxAnisotropy;
+        //if (!commandResult) {
+        //    std::printf("%s error: could not submit texture transfer commands\n", __FUNCTION__);
+        //    return false;
+        //}
 
-        result = vkCreateSampler(engineDevice.device(), &texSamplerInfo, nullptr, &texData.sampler);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not create sampler for texture (error: %i)\n", __FUNCTION__, result);
-            return false;
-        }
+        ///* image view and sampler */
+        //VkImageViewCreateInfo texViewInfo{};
+        //texViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        //texViewInfo.image = texData.image;
+        //texViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        //texViewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+        //texViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        //texViewInfo.subresourceRange.baseMipLevel = 0;
+        //texViewInfo.subresourceRange.levelCount = mipmapLevels;
+        //texViewInfo.subresourceRange.baseArrayLayer = 0;
+        //texViewInfo.subresourceRange.layerCount = 1;
 
-        VkDescriptorSetLayout layout = renderData.rdAvengTextureDescriptorLayout;
+        //result = vkCreateImageView(engineDevice.device(), &texViewInfo, nullptr, &texData.imageView);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not create image view for texture\n", __FUNCTION__);
+        //    return false;
+        //}
 
-        VkDescriptorSetAllocateInfo descriptorAllocateInfo{};
-        descriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        descriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
-        descriptorAllocateInfo.descriptorSetCount = 1;
-        descriptorAllocateInfo.pSetLayouts = &layout;
+        //VkPhysicalDeviceFeatures supportedFeatures{};
+        //vkGetPhysicalDeviceFeatures(engineDevice.physicalDevice(), &supportedFeatures);
+        ////std::printf("%s: anisotropy supported: %s\n", __FUNCTION__, supportedFeatures.samplerAnisotropy ? "yes" : "no");
+        //const VkBool32 anisotropyAvailable = supportedFeatures.samplerAnisotropy;
 
-        result = vkAllocateDescriptorSets(engineDevice.device(), &descriptorAllocateInfo, &texData.descriptorSet);
-        if (result != VK_SUCCESS) {
-            std::printf("%s error: could not allocate descriptor set (error: %i)\n", __FUNCTION__, result);
-            return false;
-        }
+        //VkPhysicalDeviceProperties physProperties{};
+        //vkGetPhysicalDeviceProperties(engineDevice.physicalDevice(), &physProperties);
+        //const float maxAnisotropy = physProperties.limits.maxSamplerAnisotropy;
+        ////std::printf("%s: device supports max anisotropy of %f\n", __FUNCTION__, maxAnisotropy);
 
-        VkDescriptorImageInfo descriptorImageInfo{};
-        descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        descriptorImageInfo.imageView = texData.imageView;
-        descriptorImageInfo.sampler = texData.sampler;
+        //VkSamplerCreateInfo texSamplerInfo{};
+        //texSamplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        //texSamplerInfo.magFilter = VK_FILTER_LINEAR;
+        //texSamplerInfo.minFilter = VK_FILTER_LINEAR;
+        //texSamplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        //texSamplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        //texSamplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        //texSamplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        //texSamplerInfo.unnormalizedCoordinates = VK_FALSE;
+        //texSamplerInfo.compareEnable = VK_FALSE;
+        //texSamplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        //texSamplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        //texSamplerInfo.mipLodBias = 0.0f;
+        //texSamplerInfo.minLod = 0.0f;
+        //texSamplerInfo.maxLod = static_cast<float>(mipmapLevels);
+        //texSamplerInfo.anisotropyEnable = anisotropyAvailable;
+        //texSamplerInfo.maxAnisotropy = maxAnisotropy;
 
-        VkWriteDescriptorSet writeDescriptorSet{};
-        writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        writeDescriptorSet.dstSet = texData.descriptorSet;
-        writeDescriptorSet.dstBinding = 0;
-        writeDescriptorSet.descriptorCount = 1;
-        writeDescriptorSet.pImageInfo = &descriptorImageInfo;
+        //result = vkCreateSampler(engineDevice.device(), &texSamplerInfo, nullptr, &texData.sampler);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not create sampler for texture (error: %i)\n", __FUNCTION__, result);
+        //    return false;
+        //}
 
-        vkUpdateDescriptorSets(engineDevice.device(), 1, &writeDescriptorSet, 0, nullptr);
+        //VkDescriptorSetLayout layout = renderData.rdAvengTextureDescriptorLayout;
+
+        //VkDescriptorSetAllocateInfo descriptorAllocateInfo{};
+        //descriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        //descriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
+        //descriptorAllocateInfo.descriptorSetCount = 1;
+        //descriptorAllocateInfo.pSetLayouts = &layout;
+
+        //result = vkAllocateDescriptorSets(engineDevice.device(), &descriptorAllocateInfo, &texData.descriptorSet);
+        //if (result != VK_SUCCESS) {
+        //    std::printf("%s error: could not allocate descriptor set (error: %i)\n", __FUNCTION__, result);
+        //    return false;
+        //}
+
+        //VkDescriptorImageInfo descriptorImageInfo{};
+        //descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        //descriptorImageInfo.imageView = texData.imageView;
+        //descriptorImageInfo.sampler = texData.sampler;
+
+        //VkWriteDescriptorSet writeDescriptorSet{};
+        //writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        //writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        //writeDescriptorSet.dstSet = texData.descriptorSet;
+        //writeDescriptorSet.dstBinding = 0;
+        //writeDescriptorSet.descriptorCount = 1;
+        //writeDescriptorSet.pImageInfo = &descriptorImageInfo;
+
+        //vkUpdateDescriptorSets(engineDevice.device(), 1, &writeDescriptorSet, 0, nullptr);
 
         return true;
     }

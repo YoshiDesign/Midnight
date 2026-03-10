@@ -62,10 +62,8 @@ namespace aveng {
 		const IModelQuery& modelQuery() const override;
 
 		/* Just a sane reminder that pools include instance data, not (directly) models */
-		FramePacketBuilder::PoolInputs<StaticTag, AvengInstance>
-			staticPoolInputs() override { return staticMgr_.poolInputs(); }
-		FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance>
-			animatedPoolInputs() override { return animatedMgr_.poolInputs(); }
+		FramePacketBuilder::PoolInputs<StaticTag, AvengInstance> staticPoolInputs() override { return staticMgr_.poolInputs(); }
+		FramePacketBuilder::PoolInputs<AnimatedTag, AssimpInstance> animatedPoolInputs() override { return animatedMgr_.poolInputs(); }
 
 		/* IInstanceQuery overrides - Just for the editor. Not a performance friendly way to go about things, but simple */
 		const IInstanceQuery& instanceQuery() const noexcept { return *this; }
@@ -82,6 +80,7 @@ namespace aveng {
 		/* Instance Op's - 1 overload for each kind of data an instance can consume - Static vs Animated becomes implicit */
 		AnyInstanceHandle spawn(ModelRef modelRef, const TransformSettings& s);
 		AnyInstanceHandle spawn(ModelRef modelRef, const AnimatedCreateSettings& s);
+
 		/// Spawn many instances. `settings.size()` can be 1 (repeat) or N (cycled/repeated).
 		std::vector<AnyInstanceHandle> spawnMany(ModelRef modelRef,
 			std::span<const TransformSettings> settings,
@@ -99,17 +98,20 @@ namespace aveng {
 		void destroyMany(std::span<const AnyInstanceHandle> handles);
 		void destroyAllInstancesForModel(ModelId id); /* This is also a callback registered on the ModelLibrary */
 
-		
 		/// TODO bool purgeAllInstancesForModel(ModelId id);
 
 		/* Transform Ops */
+		/* TransformSettings - legacy, more of a request struct */
 		void setTransforms(
 			std::span<const AnyInstanceHandle> handles,
 			std::span<const TransformSettings> transforms);
 		
+		/* InstanceTransform - Direct copy of instance's transform */
 		void setTransforms(
 			std::span<const AnyInstanceHandle> handles,
 			std::span<const InstanceTransform> transforms);
+
+		void setMaterial(); // TODO
 
 		/// Call this when you *know* a model became invalid in this scene (e.g., after unload).
 		/// If you always go through SceneFacade::unloadModel, it will call this for you.

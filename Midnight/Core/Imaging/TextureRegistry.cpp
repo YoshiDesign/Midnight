@@ -1,64 +1,64 @@
+#include <cassert>
 #include "TextureRegistry.h"
 
 namespace aveng {
 
-    /* TODO */
+    //
+    std::vector<TextureHandle> TextureRegistry::getOrCreateMany(std::vector<TextureAssetKey>& keys, std::vector<TextureCreateRequest>& reqs, ITextureSource& source, const int frameIndex) {
 
-    std::vector<TextureHandle> TextureRegistry::getOrCreateMany(std::vector<const TextureAssetKey>& keys, ITextureSource& source, const int frameIndex) {
-    
-        for (const auto& key : keys) {
-            auto it = m_assetToHandle.find(key);
-            if (it != m_assetToHandle.end()) {
-                return {}; // TODO - Not caring right now.
-            }
+        // Expect parallel arrays
+        if (keys.size() != reqs.size()) {
+            assert(false && "vector sizes are not equivalent");
+            return {};
         }
 
-        std::vector<TextureCreateRequest> reqs{};
         std::vector<TextureHandle> new_handles{};
-        reqs.reserve(keys.size());
-        new_handles.reserve(keys.size());
 
-        for (auto& key : keys) {
-            static int i = 0;
-            if (!source.loadTexture(key, reqs[i])) {
-                new_handles.push_back(kInvalidTextureHandle);
+        for (size_t i = 0; i < keys.size(); ++i) {
+            const auto& key = keys[i];
+
+            auto it = m_assetToHandle.find(key);
+            if (it != m_assetToHandle.end()) {
+                continue;
             }
 
-            TextureHandle handle = m_textureSystem.createTexture(reqs[i], frameIndex);
-
-            m_assetToHandle[key] = handle;
-            new_handles.push_back(handle);
+            TextureHandle h = getOrCreate(keys[i], source, reqs[i], frameIndex);
+            new_handles.push_back(h);
         }
 
         return new_handles;
     }
 
+    //
     TextureHandle TextureRegistry::getOrCreate(const TextureAssetKey& key, ITextureSource& source, TextureCreateRequest& req, const int frameIndex) {
         auto it = m_assetToHandle.find(key);
         if (it != m_assetToHandle.end()) {
             return it->second;
         }
 
-        // Complete request struct - load bytes into req.pixelBlob
+        // Load bytes (pixelBlob) and determine mip levels
         if (!source.loadTexture(key, req)) {
             return kInvalidTextureHandle;
         }
 
-        // Upload to GPU
-        TextureHandle handle = m_textureSystem.createTexture(req, frameIndex);
+        // Bookkeeping
+        uint32_t next_descriptor_index = m_assetToHandle.size();
 
-        m_assetToHandle[key] = handle;
+        // Upload to GPU
+        TextureHandle handle = m_textureSystem.createTexture(source, req, next_descriptor_index, frameIndex);
+
+        m_assetToHandle.emplace(key, handle);
         
         return handle;
     }
 
     // Correctness for `const TextureRegistry`
     const TextureSlot* TextureRegistry::get(TextureHandle handle) const {
-    
+        return m_textureSystem.getSlot(handle);
     }
 
     TextureSlot* TextureRegistry::get(TextureHandle handle) {
-    
+        return m_textureSystem.getSlot(handle);
     }
 
 }

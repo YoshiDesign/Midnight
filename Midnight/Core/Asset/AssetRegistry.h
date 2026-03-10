@@ -19,7 +19,11 @@ namespace aveng {
 
 	// This is private to the model registry mechanics.
 	struct ModelEntry {
-		std::unique_ptr<AvengModel> model;
+		std::unique_ptr<AvengModel> model; // We could do away with this entirely by replacing it with each model's "guts", and abandoning an explicit unique_ptr to it.
+		// e.g. : 
+		// Vertex data
+		// Indices
+		// etc...
 		ModelId id;                 // runtime identity
 		AssetKey key;               // external identity
 		bool isAnimated = false;		// Model Constant

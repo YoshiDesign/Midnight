@@ -7,6 +7,7 @@ namespace aveng {
     struct ITextureSource {
         virtual ~ITextureSource() = default;
         virtual bool loadTexture(const TextureAssetKey& key, TextureCreateRequest& outReq) = 0;
+        virtual void destroyTexture(unsigned char* pixelBlob) = 0;
     };
 
 }

@@ -4,6 +4,13 @@
 #include "Core/Modeling/ModelAndInstanceData.h"
 #include "Editor/Utils/selection_utils.h"
 
+/* 
+ * I don't think this interface is strictly necessary at the moment
+ * considering how we inject the sceneFacade into the SceneEditAPI
+ * This would make more sense if it didn't mirror the SceneFacade nearly 1:1
+ * which it might in the future. hmm...
+ */
+
 namespace aveng {
 
     // Forward declarations (adjust includes/types to match your project)

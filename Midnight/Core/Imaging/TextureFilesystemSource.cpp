@@ -1,7 +1,14 @@
 #include "TextureFilesystemSource.h"
 
 namespace aveng {
-	bool loadTexture(TextureAssetID assetId, TextureCreateRequest& outReq) {
-	
+
+	bool TextureFilesystemSource::loadTexture(const TextureAssetKey& assetId, TextureCreateRequest& outReq)
+	{
+		return false;
 	}
+
+	void TextureFilesystemSource::destroyTexture(unsigned char* pixelBlob)
+	{
+	}
+
 }

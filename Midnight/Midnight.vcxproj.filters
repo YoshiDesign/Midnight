@@ -48,9 +48,6 @@
     <ClCompile Include="Core\PointLightSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Renderer\PipelineConfigManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CoreVK\ComputePipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -207,7 +204,19 @@
     <ClCompile Include="Module\Procgen\Rendering\TerrainPipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CoreVK\Resources\MTexture.cpp">
+    <ClCompile Include="Core\Imaging\TextureRegistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Imaging\MidnightTextureSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Imaging\TextureGltfSource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Imaging\TexturePakSource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Imaging\TextureFilesystemSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1238,12 +1247,6 @@
     <ClInclude Include="Core\PointLightSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Renderer\PipelineConfigManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Renderer\TextureStreamingManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="CoreVK\ComputePipeline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1487,12 +1490,6 @@
     <ClInclude Include="CoreVK\Resources\graphics_enums.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreVK\Resources\gpu_resources.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\gltf.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Math\wyhash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1503,6 +1500,24 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CoreVK\Resources\MTexture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Imaging\ITextureSource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Imaging\TextureRegistry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Imaging\MidnightTextureSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Imaging\TextureGltfSource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Imaging\TexturePakSource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Imaging\TextureFilesystemSource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -1937,7 +1952,6 @@
     <None Include="shaders\simple_shader2.vert" />
     <None Include="shaders\simple_shader2.vert.spv" />
     <None Include="shaders\vv.vert" />
-    <None Include="Core\Renderer\PipelineConfig.json" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="textures\grid.png">

@@ -2,6 +2,7 @@
 #include <cstdint>
 
 #include "CoreVK/Resources/MTexture.h"
+#include "Core/Imaging/ITextureSource.h"
 
 /* Primary Vulkan/Backend resource orchestrator */
 
@@ -15,15 +16,14 @@ namespace aveng {
 
 		explicit MidnightTextureSystem(EngineDevice& _engineDevice, VkRenderData _renderData);
 
-		TextureHandle createTexture(const TextureCreateRequest& req, const int frameIndex);
+		TextureHandle createTexture(ITextureSource& source, TextureCreateRequest& req, uint32_t next_descriptor_index, const int frameIndex);
 		const TextureSlot* getSlot(TextureHandle handle) const;
 		TextureSlot* getSlot(TextureHandle handle);
 
-		uint32_t allocateBindlessSlot();
-		VkSampler getOrCreateSampler(const MSamplerInfo& desc);
+		bool uploadToGPU(TextureSlot& slot, ITextureSource& source, unsigned char* pixelBlob);
+		void getOrCreateSampler(const MSamplerInfo& desc, TextureSlot& slot);
 
-		void uploadTexturePixels(const TextureCreateRequest& req, TextureSlot& rec);
-		void updateBindlessDescriptor(uint32_t bindlessIndex, const TextureSlot& rec, const int frameIndex);
+		void updateBindlessDescriptor(uint32_t bindlessIndex, const TextureSlot& slot, const int frameIndex);
 
 		EngineDevice& engineDevice_;
 		VkRenderData& renderData_;

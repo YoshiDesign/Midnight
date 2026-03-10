@@ -12,20 +12,22 @@ namespace aveng {
         }
 
         std::vector<TextureHandle> getOrCreateMany(
-            std::vector<const TextureAssetKey>& keys, 
+            std::vector<TextureAssetKey>& keys, 
+            std::vector<TextureCreateRequest>& reqs,
             ITextureSource& source, 
             const int frameIndex);
 
         TextureHandle getOrCreate(const TextureAssetKey& key, ITextureSource& source, TextureCreateRequest& req, const int frameIndex);
 
+        // Fetch slots from the MidnightTextureSystem
         const TextureSlot* get(TextureHandle handle) const;
         TextureSlot* get(TextureHandle handle);
 
     private:
 
         MidnightTextureSystem& m_textureSystem;
-        std::unordered_map<TextureAssetKey, TextureHandle> m_assetToHandle; // Look up the handle to retrieve the slot
-        std::vector<TextureSlot> m_records; // index by handle-1 if you like
+        std::unordered_map <TextureAssetKey, TextureHandle, TextureAssetKeyHash> m_assetToHandle; // Look up the handle to retrieve the slot
+        // std::vector<TextureSlot> m_records; // MidnightTextureSystem owns this instead. Registry just does bookkeeping
 
 	};
 }

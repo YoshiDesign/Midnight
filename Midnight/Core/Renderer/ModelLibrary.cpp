@@ -345,10 +345,10 @@ namespace aveng {
 			key,
 			bytes,
 			extraImportFlags,
+			textureRegistry_, // To register textures as they appear embedded in models
+			frameIndex,
 			modelBaseDir,
-			engineTextureDir,
-			textureRegistry_,
-			frameIndex
+			engineTextureDir
 		);
 
 		if (!ok) {
