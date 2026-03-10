@@ -30,7 +30,7 @@ namespace aveng {
 		Midnight(GameData& _gamedata);
 		~Midnight() = default;
 
-		const GameServices& gameServices() const noexcept { return gs_; };
+		const GameServices& gameServices() const noexcept { return gameServices_; };
 
 		void initialize();
 		void initializeDependencies();
@@ -72,22 +72,20 @@ namespace aveng {
 	private:
 		float aspect = 0.0f; // ?
 
-		// ---- External state
+		// Primary Threadpool
+		ThreadPoolTaskSystem taskSystem_;
+
+		// Data
 		GameData& game_data;
-		GameServices gs_;
-		CameraManager cameraManager;
+		VkRenderData renderData{};
+
+		// State
 		AvengWindow  aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
 		EngineDevice engineDevice{ aveng_window };
-		VkRenderData renderData{};
+		CameraManager cameraManager;
+		ModelLibrary modelLib_;
+		SceneFacade sceneFacade_;
 		Renderer renderer;
-
-		std::unique_ptr<AvengFrame>  frame_;
-
-		// Model source (how assets load) lifetime owned by Midnight, passed into Renderer
-		std::unique_ptr<IAssetSource> assetSource_;
-
-		std::unique_ptr<GameInput> gameInput_;
-		std::unique_ptr<InputSystem> inputSystem_;
 
 #ifdef ENABLE_EDITOR
 		// Prefer pointers/optional to avoid duplicating big member-init lists
@@ -96,17 +94,23 @@ namespace aveng {
 		std::unique_ptr<EditorGameRouter> inputRouter_; // Used when toggling between game/editor modes
 #endif
 
-		// Primary Threadpool
-		ThreadPoolTaskSystem taskSystem_;
+		//
+		std::unique_ptr<AvengFrame>  frame_;
 
 		// ---- Internal APIs
 		ChunkManager chunkManager_;
 		TerrainController terrain_;
 		DebugController debug_;
-		ModelLibrary modelLib_;
-		SceneFacade sceneFacade_;
-		MidnightTextureSystem textureSystem_;
+		GameServices gameServices_;
+		MidnightTextureSystem textureSystem_; // Injected into modelLibrary - owned/composed by Midnight
 
+		// Model source (how assets load) lifetime owned by Midnight, passed into Renderer
+		std::unique_ptr<IAssetSource> assetSource_;
+
+		//
+		std::unique_ptr<GameInput> gameInput_;
+		std::unique_ptr<InputSystem> inputSystem_;
+		
 		/*
 		* Note to self:
 		* Stack allocate when 

@@ -98,9 +98,10 @@ namespace aveng {
         TextureAssetKey assetKey;
         std::string debugName;
 
-        uint32_t width = 0;
-        uint32_t height = 0;
+        int width = 0;
+        int height = 0;
         uint64_t size = 0;
+        int numChannels = 0;
         uint32_t mipLevels = 1;
         VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
         VkImageType imageType = VK_IMAGE_TYPE_2D;
@@ -110,7 +111,7 @@ namespace aveng {
         aiTexel* assimp_data = nullptr;
         MSamplerInfo samplerInfo{};
 
-        unsigned char* pixelBlob;
+        unsigned char* pixelBlob = nullptr;
         std::vector<MipSlice> mipSlices;
     };
 

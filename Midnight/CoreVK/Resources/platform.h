@@ -8,7 +8,7 @@ namespace aveng {
 
 	static constexpr uint32_t k_invalid_index = 0xffffffff;
 	const uint32_t MAX_BINDLESS_TEXTURES = 500;
-	const uint32_t MAX_BINDLESS_BUFFERS = 10000;
+	const uint32_t MAX_BINDLESS_BUFFERS = 1000;
 	const uint32_t MAX_BINDLESS_TEXEL_BUFFERS = 1000;
 
 }

@@ -16,7 +16,7 @@ namespace aveng {
 		, textureSystem_(engineDevice, renderData)
 		, modelLib_(engineDevice, renderData, textureSystem_)
 		, sceneFacade_(modelLib_, modelLib_.query()) // intentionally injecting registry as a separate interface (query())
-		, gs_{ terrain_, debug_, sceneFacade_ }
+		, gameServices_{ terrain_, debug_, sceneFacade_ }
 		, renderer(
 			engineDevice, 
 			aveng_window, 

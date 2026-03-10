@@ -26,8 +26,6 @@ namespace aveng {
 		, pEditor{ editor }
 		, modelLib__{ modelLibrary } // TODO ...?
 	{
-		mFrameTimer.start();
-
 		/* framePacketBuilder_ dependencies */
 		framePacketBuilder_.setModelQuery(&modelLib__.query());
 		framePacketBuilder_.setAnimQuery(&modelLib__.animQuery());

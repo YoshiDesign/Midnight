@@ -1,5 +1,8 @@
 #include "AssimpMesh.h"
 #include "Utils/AssetResolution.h"
+#include "CoreVK/Resources/MTexture.h"
+#include "Core/Imaging/TextureRegistry.h"
+#include "Core/Imaging/TextureGltfSource.h"
 #include <iostream>
 
 #include "Tools.h"
@@ -10,29 +13,33 @@ namespace aveng {
         EngineDevice& engineDevice, 
         aiMesh* mesh, 
         const aiScene* scene, 
-        /*std::string assetDirectory*/const std::string modelBaseDir,
+        const std::string modelBaseDir,
         const std::string contentRoot, 
-        std::unordered_map<std::string, VkTextureData>& textures
+        std::unordered_map<std::string, VkTextureData>& textures,
+        TextureRegistry& texReg,
+        TextureGltfSource& gltfSrc, // No need to use the abstract base here
+        int frameIndex
     ) {
         mMeshName = mesh->mName.C_Str();
-        // std::cout << "--------------- Processign Mesh " << mMeshName << std::endl;
         mTriangleCount = mesh->mNumFaces;
         mVertexCount = mesh->mNumVertices;
 
-        // std::printf("%s: -- mesh '%s' has %i faces (%i vertices)\n", __FUNCTION__, mMeshName.c_str(), mTriangleCount, mVertexCount);
-        for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_COLOR_SETS; ++i) {
-            if (mesh->HasVertexColors(i)) {
-                // std::printf("%s: --- mesh has vertex colors in set %i\n", __FUNCTION__, i);
-            }
-        }
-        if (mesh->HasNormals()) {
-            // std::printf("%s: --- mesh has normals\n", __FUNCTION__);
-        }
-        for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_TEXTURECOORDS; ++i) {
-            if (mesh->HasTextureCoords(i)) {
-                // std::printf("%s: --- mesh has texture coords in set %i\n", __FUNCTION__, i);
-            }
-        }
+
+        /* Other Checks I should probably make use of in the future*/
+        
+        //for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_COLOR_SETS; ++i) {
+        //    if (mesh->HasVertexColors(i)) {
+        //        // std::printf("%s: --- mesh has vertex colors in set %i\n", __FUNCTION__, i);
+        //    }
+        //}
+        //if (mesh->HasNormals()) {
+        //    // std::printf("%s: --- mesh has normals\n", __FUNCTION__);
+        //}
+        //for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_TEXTURECOORDS; ++i) {
+        //    if (mesh->HasTextureCoords(i)) {
+        //        // std::printf("%s: --- mesh has texture coords in set %i\n", __FUNCTION__, i);
+        //    }
+        //}
 
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         if (material) {
@@ -48,41 +55,27 @@ namespace aveng {
                     if (textureCount > 0) {
                         
                         for (unsigned int i = 0; i < textureCount; ++i) {
+
                             aiString textureName;
                             material->GetTexture(texType, i, &textureName);
                         
-
                             std::string texName = textureName.C_Str();
-                            mMesh.textures.insert({ texType, texName });
-                            texturesFound = true;;
-
-                            /* skip already loaded textures */
-                            if (textures.count(texName) > 0) {
-                                
-                                continue;
-                            }
 
                             // external textures referenced by materials (NOT embedded "*0")
                             if (!texName.empty() && texName.rfind("*", 0) != 0) {
 
                                 // Resolve relative references robustly
                                 std::string texPath = resolveModelTexturePath(modelBaseDir, contentRoot, texName);
-                                std::cout << "Resolved Internal Texture: " << texPath << std::endl;
-                                VkTextureData newTex{};
-                                if (!Texture::loadTexture(engineDevice, renderData, newTex, texPath)) {
-                                    // Optional: log once while you’re learning what Assimp returns
-                                    // std::printf("[AvengModel] Failed to load texture ref='%s' resolved='%s'\n",
-                                    //     texName.c_str(), texPath.c_str());
 
-                                    Texture::cleanup(engineDevice, renderData, newTex);
-                                    continue;
-                                }
+                                TextureAssetKey newKey{ texPath };
+                                TextureCreateRequest t_req;
+                                t_req.assetKey = newKey;
+                                t_req.debugName = "[Mesh Reference]" + newKey.value;
+                                t_req.assimp_data = nullptr;
 
-                                // IMPORTANT: keep the map key as the ORIGINAL texName Assimp returns,
-                                // because materials will refer to it by that string.
-                                textures.insert({ texName, newTex });
+                                texReg.getOrCreate(newKey, gltfSrc, t_req, frameIndex);
+
                             }
-
                         }
                     }
                 }

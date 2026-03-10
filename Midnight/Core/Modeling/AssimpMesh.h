@@ -12,6 +12,10 @@
 #include "Core/Modeling/AssimpBone.h"
 
 namespace aveng {
+
+    struct TextureRegistry;
+    struct TextureGltfSource;
+
     class AssimpMesh {
     public:
         
@@ -20,9 +24,12 @@ namespace aveng {
             EngineDevice& engineDevice,
             aiMesh* mesh, 
             const aiScene* scene,
-           /* std::string assetDirectory,*/
             const std::string modelBaseDir, const std::string contentRoot,
-            std::unordered_map<std::string, VkTextureData>& textures);
+            std::unordered_map<std::string, VkTextureData>& textures,
+            TextureRegistry& texReg,
+            TextureGltfSource& gltfSource,
+            int frameIndex
+            );
 
         std::string getMeshName();
         unsigned int getTriangleCount();

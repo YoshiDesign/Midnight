@@ -1873,12 +1873,16 @@ namespace aveng {
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mModelMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
-		
+
+			// TODO Material Buffers
+
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeTransformDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
+
+			vkFreeDescriptorSets(engineDevice.device(), renderData.avengBindlessDescriptorPool, 1, &renderData.rdAvengBindlessDescriptorSets[i]);
 
 		}
 
@@ -1890,7 +1894,13 @@ namespace aveng {
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeBasicTerrainDescriptorLayout, nullptr);
 
+		// Bindless
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdBindlessDescriptorLayout, nullptr);
+
 		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
+
+		// Bindless
+		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengBindlessDescriptorPool, nullptr);
 
 		std::printf("%s: Vulkan renderer destroyed\n", __FUNCTION__);
 	}
@@ -1968,8 +1978,9 @@ namespace aveng {
 
 	bool Renderer::createBindlessDescriptorLayouts() {
 	
-		VkDescriptorSetLayoutBinding bindless_bindings[7];
+		VkDescriptorSetLayoutBinding bindless_bindings[8];
 
+		// Texture array
 		VkDescriptorSetLayoutBinding& sampler_binding = bindless_bindings[0];
 		sampler_binding.binding = BINDLESS_TEXTURE_BINDING_0;
 		sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1977,6 +1988,7 @@ namespace aveng {
 		sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		sampler_binding.pImmutableSamplers = nullptr;
 
+		// Texel image
 		VkDescriptorSetLayoutBinding& storage_image_binding = bindless_bindings[1];
 		storage_image_binding.binding = 1;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -1984,6 +1996,7 @@ namespace aveng {
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
+		// NodeTransformBuffers - Compute Stage 1 input
 		VkDescriptorSetLayoutBinding& ssbo1_binding = bindless_bindings[2];
 		storage_image_binding.binding = 2;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1991,6 +2004,7 @@ namespace aveng {
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
+		// mShaderTrsMatrixBuffers - Compute Stage 2 input
 		VkDescriptorSetLayoutBinding& ssbo2_binding = bindless_bindings[3];
 		storage_image_binding.binding = 3;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1998,6 +2012,7 @@ namespace aveng {
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
+		// mShaderBoneMatrixBuffers - Compute Stage 2 output
 		VkDescriptorSetLayoutBinding& ssbo3_binding = bindless_bindings[4];
 		storage_image_binding.binding = 4;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -2005,6 +2020,7 @@ namespace aveng {
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
+		// ModelMatrices
 		VkDescriptorSetLayoutBinding& ubo1_binding = bindless_bindings[5];
 		storage_image_binding.binding = 5;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -2012,9 +2028,18 @@ namespace aveng {
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
+		// Lights
 		VkDescriptorSetLayoutBinding& ubo2_binding = bindless_bindings[6];
 		storage_image_binding.binding = 6;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.pImmutableSamplers = nullptr;
+
+		// Materials
+		VkDescriptorSetLayoutBinding& ssbo4_binding = bindless_bindings[7];
+		storage_image_binding.binding = 7;
+		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
 		storage_image_binding.pImmutableSamplers = nullptr;

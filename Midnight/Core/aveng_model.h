@@ -83,7 +83,9 @@ namespace aveng {
 			const aiScene* scene, 
 			const std::string modelBaseDir, 
 			const std::string contentRoot, // Texture root
-			TextureRegistry& texReg
+			TextureRegistry& texReg,
+			TextureGltfSource& gltfSrc, // No need to use the abstract base here
+			int frameIndex
 		/* std::string assetDirectory*/);
 
 		std::string getModelFileName();
