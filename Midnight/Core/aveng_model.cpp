@@ -398,6 +398,22 @@ namespace aveng {
 		}
 	}
 
+	void AvengModel::drawInstancedV3(
+		VkCommandBuffer graphicsCommandBuffer,
+		VkPipelineLayout bindlessLayout,
+		uint32_t instanceCount,
+		int frameIndex) const
+	{
+		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
+			const VkMesh& mesh = mModelMeshes.at(i);
+
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(graphicsCommandBuffer, 0, 1, &mVertexBuffers.at(i).buffer, &offset);
+			vkCmdBindIndexBuffer(graphicsCommandBuffer, mIndexBuffers.at(i).buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(graphicsCommandBuffer, static_cast<uint32_t>(mesh.indices.size()), instanceCount, 0, 0, 0);
+		}
+	}
+	
 	void AvengModel::drawInstancedV2(
 		VkCommandBuffer graphicsCommandBuffer,
 		VkPipelineLayout pipelineLayout,

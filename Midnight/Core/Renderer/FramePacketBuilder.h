@@ -61,9 +61,6 @@ namespace aveng {
         uint32_t instanceCount{ 0 };
         uint32_t drawListOffset{ 0 };
 
-        // Optional (for editor picking): pickId = basePickId + gl_InstanceIndex
-        uint32_t basePickId{ 0 };
-
         uint32_t boneCount = 0;             // 0 for static
         uint32_t alignedInstanceCount = 0;  // for animated: ceil(n/32)*32
         uint32_t boneBaseOffset = 0;        // running prefix sum in bone matrices
@@ -104,9 +101,8 @@ namespace aveng {
         // - instancesPerModel groups by model first (order within model = vector order)
         bool preferInstancesInOrder = false;
 
-        // If true, assigns basePickId per batch (1..N). If false, basePickId=0.
         bool assignPickIds = false;
-        uint32_t pickIdStart = 1; // Skip the null instance
+        uint32_t pickIdStart = 1;
     };
 
     class FramePacketBuilder final {
@@ -225,7 +221,6 @@ namespace aveng {
                         batch.modelId = mid;
                         batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                         batch.instanceCount = 0;
-                        batch.basePickId = nextPickId;
                     }
 
                     pkt.drawList.emplace_back(h);
@@ -265,7 +260,6 @@ namespace aveng {
                     batch.modelId = mid;
                     batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                     batch.instanceCount = 0;
-                    batch.basePickId = nextPickId;
 
                     for (const StaticHandle& h : vec) {
                         if (!isHandleAlive(statSlots, h)) continue;
@@ -328,7 +322,6 @@ namespace aveng {
                         batch.modelId = mid;
                         batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                         batch.instanceCount = 0;
-                        batch.basePickId = nextPickId;
                     }
 
                     pkt.drawList.emplace_back(h);
@@ -369,7 +362,6 @@ namespace aveng {
                     batch.modelId = mid;
                     batch.drawListOffset = static_cast<uint32_t>(pkt.drawList.size());
                     batch.instanceCount = 0;
-                    batch.basePickId = nextPickId;
 
                     for (const AnimatedHandle& h : vec) {
                         if (!isHandleAlive(animSlots, h)) continue;
@@ -475,14 +467,7 @@ namespace aveng {
                 }
             }
 
-            // This now happens by default
-            /*if (opt.assignPickIds) {
-                uint32_t next = opt.pickIdStart;
-                for (auto& b : pkt.batches) {
-                    b.basePickId = next;
-                    next += b.instanceCount;
-                }
-            }*/
+            
 #ifdef M_DEBUG
             renderData.rdFramePacketTime = mFramePacketTimer.stop();
 #endif

@@ -52,10 +52,11 @@ namespace aveng {
 		// Define buffer vec's that are managed by the Renderer
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mPointLightUBOBuffers			 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mModelMatrixBuffers	 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mModelMatrixBuffers				 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mNodeTransformBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderTrsMatrixBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderBoneMatrixBuffers		 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		mMaterialBuffers				 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT); // This one can be used as needed by the renderer and the editor.
 
 		// Define descriptor set vec's
@@ -950,6 +951,30 @@ namespace aveng {
 
 	bool Renderer::createPipelineLayouts() {
 
+		/* Bindless Pipeline Layout - Combined resources to support all shader stages in 1 pipeline */
+		std::vector<VkDescriptorSetLayout> layouts = { renderData.rdBindlessDescriptorLayout };
+
+		std::vector<VkPushConstantRange> pushConstants = { 
+			// Note: these stage flags must match stageFlags arg of vkCmdPushConstants
+			{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) },
+			{ VK_SHADER_STAGE_COMPUTE_BIT, sizeof(VkPushConstants), sizeof(VkComputePushConstants) }
+		
+		};
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdAvengBindlessPipelineLayout, layouts, pushConstants)) {
+			std::printf("%s error: could not init Assimp pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+
+
+
+
+
+
+
+
+
+
 		/* non-animated model */
 		std::vector<VkDescriptorSetLayout> layouts = {
 		  renderData.rdAvengTextureDescriptorLayout, renderData.rdAvengDescriptorLayout};
@@ -1010,10 +1035,10 @@ namespace aveng {
 
 		VkRenderPass renderPass = aveng_swapchain->getRenderPass();
 
-		// Note: The non-animated shaders are utilized by the Animation pipeline
+		// Basic Pipeline
 		std::string vertexShaderFile = "shaders/assimp.vert.spv";
 		std::string fragmentShaderFile = "shaders/assimp.frag.spv";
-		if (!SkinningPipeline::init(engineDevice, renderData.rdAvengPipelineLayout,
+		if (!SkinningPipeline::init(engineDevice, renderData.rdAvengBindlessPipelineLayout,
 			renderData.rdAvengPipeline, renderPass, 1, vertexShaderFile, fragmentShaderFile)) {
 			std::printf("%s error: could not init Assimp shader pipeline\n", __FUNCTION__);
 			return false;
@@ -1022,23 +1047,23 @@ namespace aveng {
 		// Animation Pipeline
 		vertexShaderFile = "shaders/assimp_skinning.vert.spv";
 		fragmentShaderFile = "shaders/assimp_skinning.frag.spv";
-		if (!SkinningPipeline::init(engineDevice,  renderData.rdAvengAnimationPipelineLayout,
+		if (!SkinningPipeline::init(engineDevice,  renderData.rdAvengBindlessPipelineLayout,
 			renderData.rdAvengAnimationPipeline, renderPass, 1, vertexShaderFile, fragmentShaderFile)) {
 			std::printf("%s error: could not init Assimp Skinning shader pipeline\n", __FUNCTION__);
 			return false;
 		}
 
-		// Compute Pipeline - Calculates bone transformations throughout animation (writes the updated TRS matrix)
+		// Animation Compute Input Pipeline
 		std::string computeShaderFile = "shaders/assimp_instance_transform.comp.spv";
-		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout,
+		if (!ComputePipeline::init(engineDevice, renderData.rdAvengBindlessPipelineLayout,
 			renderData.rdAvengComputeTransformPipeline, computeShaderFile)) {
 			std::printf("%s error: could not init Assimp Transform compute shader pipeline\n", __FUNCTION__);
 			return false;
 		}
 
-		// Compute Pipeline - multiplies the TRS matrix by each bone to compute their next position
+		// Animation Compute Output Pipeline - WHY IS THIS A 2ND PIPELINE YOU FOOL
 		computeShaderFile = "shaders/assimp_instance_matrix_mult.comp.spv";
-		if (!ComputePipeline::init(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout,
+		if (!ComputePipeline::init(engineDevice, renderData.rdAvengBindlessPipelineLayout,
 			renderData.rdAvengComputeMatrixMultPipeline, computeShaderFile)) {
 			std::printf("%s error: could not init Assimp Matrix Mult compute shader pipeline\n", __FUNCTION__);
 			return false;
@@ -1489,10 +1514,9 @@ namespace aveng {
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 			if (!model) continue;
 
-			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
-			mModelPushConst.pkModelBoneStride = 0; // static - unused
-			mModelPushConst.pkSkinMatOffset = 0; // static - unused
-			mModelPushConst.pkBasePickId = b.basePickId; // if basePickId + gl_InstanceIndex == SelectedPickId, the instance is selected
+			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset;
+			mModelPushConst.pkModelBoneStride = 0;
+			mModelPushConst.pkSkinMatOffset = 0;
 			mModelPushConst.pkPickId = renderData.selectedPickId;
 			vkCmdPushConstants(commandBuffer, basicLayout,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
@@ -1513,10 +1537,9 @@ namespace aveng {
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 			if (!model) continue;
 
-			mModelPushConst.pkWorldPosOffset = b.drawListOffset; // instance offset
-			mModelPushConst.pkModelBoneStride = b.boneCount;	// stride per model
-			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;	// 
-			mModelPushConst.pkBasePickId = b.basePickId;
+			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset;
+			mModelPushConst.pkModelBoneStride = b.boneCount;
+			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;
 			mModelPushConst.pkPickId = renderData.selectedPickId;
 			vkCmdPushConstants(commandBuffer, animationLayout,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
@@ -1533,36 +1556,35 @@ namespace aveng {
 		VkCommandBuffer commandBuffer,
 		VkPipeline basicPipeline,
 		VkPipeline animationPipeline,
-		VkPipelineLayout basicLayout,
-		VkPipelineLayout animationLayout,
-		//VkDescriptorSet basicDescriptorSet,
-		//VkDescriptorSet animationDescriptorSet,
 		int frameIndex)
 	{
 
 		// ========== STATIC PASS ==========
 		// Bind static pipeline once, then draw all static batches
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
-		//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		//	basicLayout, 1, 1, &basicDescriptorSet, 0, nullptr);
+
+		mModelPushConst.pkModelBoneStride = 0;
+		mModelPushConst.pkSkinMatOffset = 0;
+		mModelPushConst.pkPickId = renderData.selectedPickId;
 
 		for (uint32_t i = 0; i < pkt.staticBatchCount; ++i) {
 			const DrawBatch& b = pkt.batches[i];
-			if (b.instanceCount == 0) continue;
+			if (b.instanceCount == 0){ continue; }
 
 			// Pointer here? Really?
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
-			if (!model) continue;
+			if (!model){ continue; }
 
-			mModelPushConst.pkWorldPosOffset = b.drawListOffset;
-			mModelPushConst.pkModelBoneStride = 0; // static - unused
-			mModelPushConst.pkSkinMatOffset = 0; // static - unused
-			mModelPushConst.pkBasePickId = b.basePickId; // if basePickId + gl_InstanceIndex == SelectedPickId, the instance is selected
-			mModelPushConst.pkPickId = renderData.selectedPickId;
-			vkCmdPushConstants(commandBuffer, basicLayout,
-				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
-
-			model->drawInstancedV2(commandBuffer, basicLayout, b.instanceCount, frameIndex);
+			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset;
+			vkCmdPushConstants(
+				commandBuffer,
+				renderData.rdAvengBindlessPipelineLayout, // or your unified layout, whichever created basicPipeline
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				0,
+				sizeof(VkPushConstants),
+				&mModelPushConst
+			);
+			model->drawInstancedV3(commandBuffer, renderData.rdAvengBindlessPipelineLayout, b.instanceCount, frameIndex);
 		}
 
 		// ========== ANIMATED PASS ==========
@@ -1573,20 +1595,24 @@ namespace aveng {
 
 		for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
 			const DrawBatch& b = pkt.batches[i];
-			if (b.instanceCount == 0) continue;
+			if (b.instanceCount == 0){ continue; }
 
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
-			if (!model) continue;
+			if (!model){ continue; }
 
-			mModelPushConst.pkWorldPosOffset = b.drawListOffset; // instance offset
-			mModelPushConst.pkModelBoneStride = b.boneCount;	// stride per model
-			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;	// 
-			mModelPushConst.pkBasePickId = b.basePickId;
+			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset;
+			mModelPushConst.pkModelBoneStride = b.boneCount;
+			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;
 			mModelPushConst.pkPickId = renderData.selectedPickId;
-			vkCmdPushConstants(commandBuffer, animationLayout,
-				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
-
-			model->drawInstancedV2(commandBuffer, animationLayout, b.instanceCount, frameIndex);
+			vkCmdPushConstants(
+				commandBuffer,
+				renderData.rdAvengBindlessPipelineLayout, // or your unified layout, whichever created basicPipeline
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				0,
+				sizeof(VkPushConstants),
+				&mModelPushConst
+			);
+			model->drawInstancedV3(commandBuffer, renderData.rdAvengBindlessPipelineLayout, b.instanceCount, frameIndex);
 		}
 
 		return true;
@@ -1969,16 +1995,15 @@ namespace aveng {
 		createBindlessDescriptorLayouts();
 		createBindlessDescriptorSets();
 
-		// We do this every time we upload a texture
-		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-		//	updateBindlessDescriptorSets(i, TextureSlot, SlotIdx);
-		//}
+		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+			updateBindlessDescriptorSets(i);
+		}
 
 	}
 
 	bool Renderer::createBindlessDescriptorLayouts() {
 	
-		VkDescriptorSetLayoutBinding bindless_bindings[8];
+		VkDescriptorSetLayoutBinding bindless_bindings[9];
 
 		// Texture array
 		VkDescriptorSetLayoutBinding& sampler_binding = bindless_bindings[0];
@@ -1993,56 +2018,64 @@ namespace aveng {
 		storage_image_binding.binding = 1;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		storage_image_binding.descriptorCount = MAX_BINDLESS_TEXEL_BUFFERS;
-		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
+		storage_image_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
-		// NodeTransformBuffers - Compute Stage 1 input
+		// NodeTransformBuffers Compute stage 1 - input
 		VkDescriptorSetLayoutBinding& ssbo1_binding = bindless_bindings[2];
-		storage_image_binding.binding = 2;
-		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
-		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
-		storage_image_binding.pImmutableSamplers = nullptr;
+		ssbo1_binding.binding = 2;
+		ssbo1_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		ssbo1_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo1_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		ssbo1_binding.pImmutableSamplers = nullptr;
 
 		// mShaderTrsMatrixBuffers - Compute Stage 2 input
 		VkDescriptorSetLayoutBinding& ssbo2_binding = bindless_bindings[3];
-		storage_image_binding.binding = 3;
-		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
-		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
-		storage_image_binding.pImmutableSamplers = nullptr;
+		ssbo2_binding.binding = 3;
+		ssbo2_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		ssbo2_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo2_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		ssbo2_binding.pImmutableSamplers = nullptr;
 
 		// mShaderBoneMatrixBuffers - Compute Stage 2 output
 		VkDescriptorSetLayoutBinding& ssbo3_binding = bindless_bindings[4];
-		storage_image_binding.binding = 4;
-		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
-		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
-		storage_image_binding.pImmutableSamplers = nullptr;
+		ssbo3_binding.binding = 4;
+		ssbo3_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		ssbo3_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo3_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT;
+		ssbo3_binding.pImmutableSamplers = nullptr;
 
-		// ModelMatrices
+		// Model Matrices - aligned
 		VkDescriptorSetLayoutBinding& ubo1_binding = bindless_bindings[5];
-		storage_image_binding.binding = 5;
-		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
-		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
-		storage_image_binding.pImmutableSamplers = nullptr;
+		ubo1_binding.binding = 5;
+		ubo1_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		ubo1_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ubo1_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		ubo1_binding.pImmutableSamplers = nullptr;
 
-		// Lights
+		// Light Data
 		VkDescriptorSetLayoutBinding& ubo2_binding = bindless_bindings[6];
-		storage_image_binding.binding = 6;
-		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
-		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
-		storage_image_binding.pImmutableSamplers = nullptr;
+		ubo2_binding.binding = 6;
+		ubo2_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		ubo2_binding.descriptorCount = 1;
+		ubo2_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		ubo2_binding.pImmutableSamplers = nullptr;
 
 		// Materials
 		VkDescriptorSetLayoutBinding& ssbo4_binding = bindless_bindings[7];
-		storage_image_binding.binding = 7;
-		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
-		storage_image_binding.stageFlags = VK_SHADER_STAGE_ALL;
-		storage_image_binding.pImmutableSamplers = nullptr;
+		ssbo4_binding.binding = 7;
+		ssbo4_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		ssbo4_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo4_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		ssbo4_binding.pImmutableSamplers = nullptr;
+
+		// View, Proj mats
+		VkDescriptorSetLayoutBinding& viewProj_binding = bindless_bindings[8];
+		viewProj_binding.binding = 8;
+		viewProj_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		viewProj_binding.descriptorCount = 1;
+		viewProj_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		viewProj_binding.pImmutableSamplers = nullptr;
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo{
 			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
@@ -2112,6 +2145,152 @@ namespace aveng {
 		return true;
 	}
 
+	bool Renderer::updateBindlessDescriptorSets(int frameIndex) {
+
+		// Binding 8
+		VkDescriptorBufferInfo viewProjInfo{};
+		viewProjInfo.buffer = mPerspectiveViewMatrixUBOBuffers[frameIndex].buffer;
+		viewProjInfo.offset = 0;
+		viewProjInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 7
+		VkDescriptorBufferInfo materialsInfo{};
+		materialsInfo.buffer = mMaterialBuffers[frameIndex].buffer;
+		materialsInfo.offset = 0;
+		materialsInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 6
+		VkDescriptorBufferInfo lightsInfo{};
+		lightsInfo.buffer = mPointLightUBOBuffers[frameIndex].buffer;
+		lightsInfo.offset = 0;
+		lightsInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 5
+		VkDescriptorBufferInfo modelMatsInfo{};
+		modelMatsInfo.buffer = mModelMatrixBuffers[frameIndex].buffer;
+		modelMatsInfo.offset = 0;
+		modelMatsInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 4 - Compute skinning stage 2 output to vertex shader read
+		VkDescriptorBufferInfo comp2OutSkinMatInfo{};
+		comp2OutSkinMatInfo.buffer = mShaderBoneMatrixBuffers[frameIndex].buffer;
+		comp2OutSkinMatInfo.offset = 0;
+		comp2OutSkinMatInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 3 - Compute skinning stage 2 input from stage 1
+		VkDescriptorBufferInfo comp2InTRSInfo{};
+		comp2InTRSInfo.buffer = mShaderTrsMatrixBuffers[frameIndex].buffer;
+		comp2InTRSInfo.offset = 0;	
+		comp2InTRSInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 2 - Compute skinning stage 1 input
+		VkDescriptorBufferInfo comp1InSkinMatInfo{};
+		comp1InSkinMatInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
+		comp1InSkinMatInfo.offset = 0;
+		comp1InSkinMatInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 1 - Not sure we have a use for this but we certainly can find a job for it
+		VkDescriptorBufferInfo storageImageInfo{};
+		storageImageInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
+		storageImageInfo.offset = 0;
+		storageImageInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 0 - Texture sampler array
+		VkDescriptorBufferInfo texArrayInfo{};
+		texArrayInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
+		texArrayInfo.offset = 0;
+		texArrayInfo.range = VK_WHOLE_SIZE;
+
+		VkWriteDescriptorSet viewProjWriteDescriptorSet{};
+		viewProjWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		viewProjWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		viewProjWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		viewProjWriteDescriptorSet.dstBinding = 8;
+		viewProjWriteDescriptorSet.descriptorCount = 1;
+		viewProjWriteDescriptorSet.pBufferInfo = &viewProjInfo;
+
+		VkWriteDescriptorSet materialWriteDescriptorSet{};
+		materialWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		materialWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		materialWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		materialWriteDescriptorSet.dstBinding = 7;
+		materialWriteDescriptorSet.descriptorCount = 1;
+		materialWriteDescriptorSet.pBufferInfo = &materialsInfo;
+
+		VkWriteDescriptorSet lightWriteDescriptorSet{};
+		lightWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		lightWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		lightWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		lightWriteDescriptorSet.dstBinding = 6;
+		lightWriteDescriptorSet.descriptorCount = 1;
+		lightWriteDescriptorSet.pBufferInfo = &lightsInfo;
+
+		VkWriteDescriptorSet modelMatDescriptorSet{};
+		modelMatDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		modelMatDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		modelMatDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		modelMatDescriptorSet.dstBinding = 5;
+		modelMatDescriptorSet.descriptorCount = 1;
+		modelMatDescriptorSet.pBufferInfo = &modelMatsInfo;
+
+		VkWriteDescriptorSet boneMatDescriptorSet{};
+		boneMatDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		boneMatDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		boneMatDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		boneMatDescriptorSet.dstBinding = 4;
+		boneMatDescriptorSet.descriptorCount = 1;
+		boneMatDescriptorSet.pBufferInfo = &comp2OutSkinMatInfo;
+
+		VkWriteDescriptorSet trsWriteDescriptorSet{};
+		trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		trsWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		trsWriteDescriptorSet.dstBinding = 3;
+		trsWriteDescriptorSet.descriptorCount = 1;
+		trsWriteDescriptorSet.pBufferInfo = &comp2InTRSInfo;
+
+		VkWriteDescriptorSet nodeTransformDescriptorSet{};
+		nodeTransformDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		nodeTransformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		nodeTransformDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		nodeTransformDescriptorSet.dstBinding = 2;
+		nodeTransformDescriptorSet.descriptorCount = 1;
+		nodeTransformDescriptorSet.pBufferInfo = &comp1InSkinMatInfo;
+
+		VkWriteDescriptorSet texelDescriptorSet{};
+		texelDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		texelDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		texelDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		texelDescriptorSet.dstBinding = 1;
+		texelDescriptorSet.descriptorCount = 1;
+		texelDescriptorSet.pBufferInfo = &storageImageInfo;
+
+		VkWriteDescriptorSet textureArrayDescriptorSet{};
+		textureArrayDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		textureArrayDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		textureArrayDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		textureArrayDescriptorSet.dstBinding = 0;
+		textureArrayDescriptorSet.descriptorCount = 1;
+		textureArrayDescriptorSet.pBufferInfo = &texArrayInfo;
+
+		std::vector<VkWriteDescriptorSet> writeDescriptorSets = 
+		{
+			viewProjWriteDescriptorSet,
+			materialWriteDescriptorSet,
+			lightWriteDescriptorSet,
+			modelMatDescriptorSet,
+			boneMatDescriptorSet,
+			trsWriteDescriptorSet,
+			nodeTransformDescriptorSet,
+			texelDescriptorSet,
+			textureArrayDescriptorSet
+		};
+
+		vkUpdateDescriptorSets(engineDevice.device(), static_cast<uint32_t>(writeDescriptorSets.size()),
+			writeDescriptorSets.data(), 0, nullptr);
+
+	}
+
 	bool Renderer::createSSBOs() {
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
@@ -2135,6 +2314,11 @@ namespace aveng {
 				return false;
 			}
 
+			if (!ShaderStorageBuffer::init(engineDevice, mMaterialBuffers[i], MapMode::Persistent)) { // CPU Resident
+				Logger::log(1, "%s error: could not create node transform SSBO\n", __FUNCTION__);
+				return false;
+			}
+
 		}
 
 		// Populate the shared view for the editor - for when it needs to update its descriptor sets
@@ -2142,9 +2326,15 @@ namespace aveng {
 			mModelMatrixBuffers.data(),
 			mModelMatrixBuffers.size()
 		};
+
 		renderData.matrixBuffersView.boneMatSSBOs = {
 			mShaderBoneMatrixBuffers.data(),
 			mShaderBoneMatrixBuffers.size()
+		};
+
+		renderData.matrixBuffersView.materialSSBOs = {
+			mMaterialBuffers.data(),
+			mMaterialBuffers.size()
 		};
 
 		return true;

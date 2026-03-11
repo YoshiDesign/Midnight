@@ -12,9 +12,8 @@ layout (set = 0, binding = 0) uniform sampler2D tex;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
-  uint worldPosOffset;  // The index of each model's first instance
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
-  uint basePickId;
   uint pickId;
 };
 
@@ -40,7 +39,8 @@ vec3 sRGB(vec3 c) {
 
 void main() {
 
-    bool selected = (pickId == basePickId + vInstanceIndex);
+    uint instanceId = vInstanceIndex + instanceBaseIndex;
+    bool selected = (pickId == instanceId + 1);
 
     float ambientStrength = u_Lights.ambientLightColor.w;
     vec3 ambient = ambientStrength * u_Lights.ambientLightColor.rgb;
@@ -81,5 +81,5 @@ void main() {
     }
 
     /* fill the second color attachment with the ID of our model */
-    SelectedInstance = basePickId + vInstanceIndex;
+    SelectedInstance = instanceId + 1;
 }

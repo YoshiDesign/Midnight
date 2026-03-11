@@ -9,10 +9,9 @@ layout (location = 0) out vec4 FragColor;
 layout (set = 0, binding = 0) uniform sampler2D tex;
 
 layout (push_constant) uniform Constants {
-  uint modelStride;
-  uint worldPosOffset;  // The index of each model's first instance
+  uint modelStride; // Model bone stride
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
-  uint basePickId;
   uint pickId;
 };
 

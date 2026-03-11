@@ -13,9 +13,8 @@ layout (location = 4) flat out uint vInstanceIndex;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
-  uint worldPosOffset;
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
-  uint basePickId;
   uint pickId;
 };
 
@@ -30,9 +29,10 @@ layout (std430, set = 1, binding = 1) readonly restrict buffer WorldPosMatrices 
 
 void main() {
   
-  bool selected = (pickId == basePickId + gl_InstanceIndex);
+  uint instanceId = gl_InstanceIndex + instanceBaseIndex;
+  bool selected = (pickId == instanceId + 1);
 
-  mat4 modelMat = worldPosMat[gl_InstanceIndex + worldPosOffset];
+  mat4 modelMat = worldPosMat[instanceId];
   gl_Position = projection * view * modelMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 
   color = aColor;

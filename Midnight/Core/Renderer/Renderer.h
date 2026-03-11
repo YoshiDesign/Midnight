@@ -77,6 +77,7 @@ namespace aveng {
 		void updateDescriptorSets(int frameIndex);
 		void updateComputeDescriptorSets(int frameIndex);
 		void updateLightingDescriptorSets(int frameIndex);
+		bool updateBindlessDescriptorSets(int frameIndex);
 
 		bool updateBindlessDescriptorSets(int frameIndex, TextureSlot tex, size_t slotIdx);
 
@@ -137,10 +138,6 @@ namespace aveng {
 			VkCommandBuffer commandBuffer,
 			VkPipeline basicPipeline,
 			VkPipeline animationPipeline,
-			VkPipelineLayout basicLayout,
-			VkPipelineLayout animationLayout,
-			//VkDescriptorSet basicDescriptorSet,
-			//VkDescriptorSet animationDescriptorSet,
 			int frameIndex);
 
 		void reset_timers();
@@ -221,13 +218,15 @@ namespace aveng {
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
 		std::vector<VkUniformBufferData> mPointLightUBOBuffers;
 		std::vector<VkShaderStorageBufferData> mModelMatrixBuffers;
+		std::vector<VkShaderStorageBufferData> mMaterialBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderTrsMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;
-
 		std::vector<PendingBufferDestroy> buffer_trash;
 
+		// Perspective, View
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
+
 		VkPushConstants mModelPushConst{};
 
 		// Ugh...

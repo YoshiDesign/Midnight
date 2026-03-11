@@ -15,7 +15,7 @@ layout(location = 13) in int instanceTextureIndex;    // location 13
 
 layout (push_constant) uniform Constants {
   uint modelStride;
-  uint worldPosOffset;
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
 };
 
@@ -52,7 +52,7 @@ void main() {
 		aBoneWeight.z * boneMat[aBoneNum.z + skinMatOffset] +
 		aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
 
-	mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + worldPosOffset] * skinMat;
+	mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + instanceBaseIndex] * skinMat;
 	vec4 fragPosWorld = worldPosSkinMat * vec4(position.xyz, 1.0);
 	gl_Position = ubo.projection * ubo.view * worldPosSkinMat * vec4(position.x, position.y, position.z, 1.0);
 

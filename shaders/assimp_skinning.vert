@@ -12,9 +12,8 @@ layout (location = 3) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
   uint modelStride; // model bone stride
-  uint worldPosOffset;
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
-  uint basePickId;
   uint pickId;
 };
 
@@ -40,7 +39,7 @@ void main() {
     aBoneWeight.z * boneMat[aBoneNum.z + skinMatOffset] +
     aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
 
-    mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + worldPosOffset] * skinMat;
+    mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + instanceBaseIndex] * skinMat;
     gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
     vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0); // Skinned model matrix * position
 

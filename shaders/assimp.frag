@@ -10,9 +10,8 @@ layout (set = 0, binding = 0) uniform sampler2D tex;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
-  uint worldPosOffset;  // The index of each model's first instance
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
-  uint basePickId;
   uint pickId;
 };
 

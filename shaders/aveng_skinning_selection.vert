@@ -14,9 +14,8 @@ layout (location = 5) flat out uint vInstanceIndex;
 
 layout (push_constant) uniform Constants {
   uint modelBoneStride;
-  uint worldPosOffset;  // The index of each model's first instance
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
-  uint basePickId;
   uint pickId;
 };
 
@@ -35,7 +34,8 @@ layout (std430, set = 1, binding = 2) readonly restrict buffer WorldPosMatrices 
 
 void main() {
 
-  bool selected = (pickId == basePickId + gl_InstanceIndex);
+  uint instanceId = gl_InstanceIndex + instanceBaseIndex;
+  bool selected = (pickId == instanceId + 1);
 
   uint skinMatOffset = gl_InstanceIndex * modelBoneStride + skinMatrixOffset;
   mat4 skinMat = 
@@ -44,7 +44,7 @@ void main() {
     aBoneWeight.z * boneMat[aBoneNum.z + skinMatOffset] +
     aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
 
-  mat4 worldPosSkinMat = worldPos[gl_InstanceIndex + worldPosOffset] * skinMat;
+  mat4 worldPosSkinMat = worldPos[instanceId] * skinMat;
   vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0f);
   gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 

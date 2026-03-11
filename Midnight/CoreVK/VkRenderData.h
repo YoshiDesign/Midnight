@@ -109,7 +109,7 @@ namespace aveng {
 	struct VkMesh {
 		std::vector<VkVertex> vertices{};
 		std::vector<uint32_t> indices{};
-		std::unordered_map<aiTextureType, std::string> textures{};
+		std::unordered_map<aiTextureType, std::string> textures{}; // TODO: No longer necessary with bindless
 		bool usesPBRColors = false;
 	};
 
@@ -118,7 +118,11 @@ namespace aveng {
 		glm::mat4 view;
 	};
 
-/* data format to be uploaded to compute shader */
+	struct MnMaterial {
+		uint32_t albedoTexIndex;
+	};
+
+	/* data format to be uploaded to compute shader */
 	struct NodeTransformData {
 		glm::vec4 translation = glm::vec4(0.0f);
 		glm::vec4 scale = glm::vec4(1.0f);
@@ -139,16 +143,13 @@ namespace aveng {
 
 	struct VkPushConstants {
 		uint32_t pkModelBoneStride;
-		uint32_t pkWorldPosOffset;
+		uint32_t pkInstanceBaseIndex;
 		uint32_t pkSkinMatOffset;
-		uint32_t pkBasePickId;
 		uint32_t pkPickId;
 	};
 
-	struct MnPushConstant {
-		uint32_t boneOffset;
-		uint32_t nBones;
-		uint32_t instanceOffset;
+	struct VkComputePushConstants {
+		uint32_t pkModelOffset;
 	};
 
 	struct InstanceMaterial {
@@ -172,10 +173,6 @@ namespace aveng {
 	//	uint32_t numVertices;
 	//	uint32_t numTriangles;
 	//};
-
-	struct VkComputePushConstants {
-		uint32_t pkModelOffset;
-	};
 
 	struct VkBasicTerrainComputePushConstants {
 		uint32_t baseVertex;
@@ -204,10 +201,12 @@ namespace aveng {
 
 
 	// For shared usage (editor) - Add more if/when necessary - Warning: DO NOT cause these data members to reallocate. We're not detecting/protecting against that
+	// TODO: Rename this, it's for more than mat's
 	struct MatrixBuffersView {
 		Span<VkUniformBufferData>       viewProjUBOs;
 		Span<VkShaderStorageBufferData> modelRootSSBOs;
 		Span<VkShaderStorageBufferData> boneMatSSBOs;
+		Span<VkShaderStorageBufferData> materialSSBOs;
 	};
 
 	struct LightingBuffersView {
@@ -325,6 +324,7 @@ namespace aveng {
 		VkPipelineLayout rdDebugPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdDebugAnimatedPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengBindlessPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengSelectionPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengAnimationSelectionPipelineLayout = VK_NULL_HANDLE;
@@ -336,6 +336,7 @@ namespace aveng {
 		VkPipeline rdDebugPipeline = VK_NULL_HANDLE;
 		VkPipeline rdDebugAnimatedPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengBindlessPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengAnimationPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengSelectionPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengAnimationSelectionPipeline = VK_NULL_HANDLE;
@@ -351,7 +352,7 @@ namespace aveng {
 	*/
 	instanceEditMode rdInstanceEditMode = instanceEditMode::move;
 
-	MatrixBuffersView matrixBuffersView; // Proxy for editor
+	MatrixBuffersView matrixBuffersView; // Proxy for editor. TODO - Rename it
 	LightingBuffersView pointLightBufferView;
 
 	std::vector<VkImage> rdSelectionImages;

@@ -108,6 +108,7 @@ namespace aveng {
 		unsigned int getTriangleCount() const;
 
 		void drawInstancedV2(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout pipelineLayout, uint32_t instanceCount, int frameIndex) const;
+		void drawInstancedV3(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout bindlessLayout, uint32_t instanceCount, int frameIndex) const;
 
 		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData);
 	

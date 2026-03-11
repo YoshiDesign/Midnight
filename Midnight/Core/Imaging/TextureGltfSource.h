@@ -8,6 +8,13 @@
 
 namespace aveng {
 
+    /*
+    * @Note
+    * For glTF imports, Assimp often maps glTF baseColorTexture -> aiTextureType_DIFFUSE
+    * for compatibility with older code paths. Later, Assimp added a dedicated texture
+    * type aiTextureType_BASE_COLOR specifically to represent glTF's baseColor without pretending it's "diffuse"
+    */
+
     //struct GltfImageRef {
     //    bool embedded = false;
     //    std::string uri;                     // normalized external path or URI

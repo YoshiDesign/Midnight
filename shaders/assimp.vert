@@ -12,9 +12,8 @@ layout (location = 3) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
   uint modelStride;
-  uint worldPosOffset;
+  uint instanceBaseIndex;
   uint skinMatrixOffset;
-  uint basePickId;
   uint pickId;
 };
 
@@ -28,7 +27,7 @@ layout (std430, set = 1, binding = 1) readonly buffer WorldPosMatrices {
 };
 
 void main() {
-  mat4 modelMat = worldPosMat[gl_InstanceIndex + worldPosOffset];
+  mat4 modelMat = worldPosMat[gl_InstanceIndex + instanceBaseIndex];
   vec4 positionWorld = modelMat * vec4(aPos.xyz, 1.0);
 
   gl_Position = projection * view * positionWorld;
