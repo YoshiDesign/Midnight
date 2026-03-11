@@ -85,7 +85,7 @@ namespace aveng {
         uint32_t animatedBatchCount = 0;
 
         // Instance data
-        std::vector<glm::mat4> worldMatrices; // Each Model Matrix of this packet's draw list
+        std::vector<glm::mat4> modelMats; // Each Model Matrix of this packet's draw list
         std::vector<NodeTransformData> nodeTransformData;  // Already padded to aligned counts
 
         std::span<const uint32_t> dirtyStaticSlots{};
@@ -159,7 +159,7 @@ namespace aveng {
             // Clear previous frame data - we could alternatively clean this up after each frame is completed in a GC step
             pkt.drawList.clear();
             pkt.batches.clear();    /// TODO can we reserve this too? - Only if you can determine batches in advance
-            pkt.worldMatrices.clear();
+            pkt.modelMats.clear();
             pkt.frameIndex = frameIndex;
             pkt.frameNumber = frameNumber;
             pkt.staticInstanceCount = 0;
@@ -228,7 +228,7 @@ namespace aveng {
                     pkt.pickToHandle[nextPickId] = h;
                     ++nextPickId;
 
-                    pkt.worldMatrices.push_back(statSlots[h.index].instance->common.modelMatrix());
+                    pkt.modelMats.push_back(statSlots[h.index].instance->common.modelMatrix());
                     batch.instanceCount++;
                 }
 
@@ -269,7 +269,7 @@ namespace aveng {
                         pkt.pickToHandle[nextPickId] = h;
                         ++nextPickId;
 
-                        pkt.worldMatrices.push_back(statSlots[h.index].instance->common.modelMatrix());
+                        pkt.modelMats.push_back(statSlots[h.index].instance->common.modelMatrix());
                         batch.instanceCount++;
                     }
 
@@ -329,7 +329,7 @@ namespace aveng {
                     pkt.pickToHandle[nextPickId] = h;
                     ++nextPickId;
 
-                    pkt.worldMatrices.push_back(animSlots[h.index].instance->common.modelMatrix());
+                    pkt.modelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
 
                     batch.instanceCount++;
                 }
@@ -371,7 +371,7 @@ namespace aveng {
                         pkt.pickToHandle[nextPickId] = h;
                         ++nextPickId;
 
-                        pkt.worldMatrices.push_back(animSlots[h.index].instance->common.modelMatrix());
+                        pkt.modelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
                         batch.instanceCount++;
                     }
 

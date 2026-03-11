@@ -457,6 +457,7 @@ namespace aveng {
 			frameIndex);
 	}
 
+	// So... I don't think this is even being used
 	void Editor::updateStorageBuffers()
 	{
 
@@ -483,7 +484,7 @@ namespace aveng {
 			
 			std::cout << "[Editor] StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
 			// updateDescriptorSets(currentFrameIndex);
-			renderer.updateDescriptorSets(currentFrameIndex);
+			renderer.updateBindlessDescriptorSets(currentFrameIndex);
 		}
 
 	}

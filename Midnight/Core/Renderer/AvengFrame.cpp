@@ -163,7 +163,7 @@ namespace aveng {
 				// bcause we're updating both descriptors in one go while there could be 
 				// another cmd buffer executing in the background. This loop should only update
 				// One frame's descriptor set(s) at a time
-				pEditor->updateDescriptorSets(currentFrameIndex);
+				// pEditor->updateDescriptorSets(currentFrameIndex);
 			//}
 
 			/**

@@ -63,23 +63,17 @@ namespace aveng {
 		VkFramebuffer getCurrentFramebuffer() { return aveng_swapchain->getFrameBuffer(currentImageIndex); }
 		VkFramebuffer getCurrentSelectionFramebuffer() { return aveng_swapchain->getSelectionFrameBuffer(currentImageIndex); }
 
-		bool setupDescriptors();
 		bool createPipelineLayouts();
 		bool createPipelines();
 		bool createSSBOs();
 		bool createMatrixUBO();
 		bool createLightsUBO();
-		bool createDescriptorLayouts();
-		bool createDescriptorSets();
+
 		bool createBindlessDescriptors();
 		bool createBindlessDescriptorLayouts();
 		bool createBindlessDescriptorSets();
-		void updateDescriptorSets(int frameIndex);
-		void updateComputeDescriptorSets(int frameIndex);
-		void updateLightingDescriptorSets(int frameIndex);
-		bool updateBindlessDescriptorSets(int frameIndex);
 
-		bool updateBindlessDescriptorSets(int frameIndex, TextureSlot tex, size_t slotIdx);
+		void updateBindlessDescriptorSets(int frameIndex);
 
 		void updateLights();
 

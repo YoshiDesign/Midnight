@@ -694,8 +694,7 @@ namespace aveng {
 		boneMatrixBufferSize = pkt.nodeTransformData.size();
 
 		/* resize SSBO if needed - Both of these are written by the compute shaders so we just make sure they're the right size (hence only using checkForResize) */
-		
-		// These two are also only for animations
+
 		// Compute stage 2 read (stage 1 out)
 		bool trsResized = ShaderStorageBuffer::checkForResize(engineDevice, mShaderTrsMatrixBuffers.at(currentFrameIndex), boneMatrixBufferSize * sizeof(glm::mat4));
 		// Compute stage 2 write (vertex in)
@@ -703,8 +702,6 @@ namespace aveng {
 
 		if (trsResized || boneResized) {
 
-			std::cout << "TRSMat | BoneMat Buffers Resized" << std::endl;
-			
 			// TRS and BoneMat buffers are very similar, as you can tell from this size derivation - TODO - Just give each their own...
 			size_t newBufferSize = std::max(boneMatrixBufferSize * sizeof(glm::mat4), mShaderTrsMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
@@ -741,22 +738,9 @@ namespace aveng {
 				newBufferSize // New buffer size - these buffers are very similar
 			);
 
-			/* Note that we're not performing another SSBO Upload. 
-			That's because these two buffers are written by the compute shader */
+			std::cout << "Compute Buffers TRSMat | BoneMat Buffers Resized" << std::endl;
 
 		}
-
-		bufferResized |= trsResized;
-		bufferResized |= boneResized;
-
-		if (bufferResized)
-		{
-			std::cout << "StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
-			updateBindlessDescriptorSets(currentFrameIndex);
-			// updateComputeDescriptorSets(currentFrameIndex);
-		}
-
-		// Every upload from here on is for any model type
 
 		// Timer
 		/* we need to update descriptors after the upload if buffer size changed */
@@ -767,10 +751,11 @@ namespace aveng {
 
 		// Timer
 		mUploadToSSBO2Timer.start();
+		bool modelMatsResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.modelMats);
 		// Upload the model mat's
-		if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
-			Logger::log(1, "[2] mModelMatrixBuffers resized!!\n");
-			size_t newBufferSize = std::max(pkt.worldMatrices.size() * sizeof glm::mat4, mModelMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
+		if (modelMatsResized) {
+			
+			size_t newBufferSize = std::max(pkt.modelMats.size() * sizeof glm::mat4, mModelMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
 			buffer_trash.push_back(
 				PendingBufferDestroy{
@@ -788,14 +773,23 @@ namespace aveng {
 				newBufferSize // New buffer size
 			);
 
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.worldMatrices)) {
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.modelMats)) {
 				std::printf("[2] Failed to accommodate resized buffer.\n");
 				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
 			}
 
-			std::cout << "Model Root SSBO Resized - Updating Descriptor Sets" << std::endl;
-			updateDescriptorSets(currentFrameIndex);
-			updateComputeDescriptorSets(currentFrameIndex);
+			std::cout << "Model Mats SSBO Resized..." << std::endl;
+			
+		}
+
+		bufferResized |= trsResized;
+		bufferResized |= boneResized;
+		bufferResized |= modelMatsResized;
+
+		if (bufferResized)
+		{
+			std::cout << "Updating Descriptor Sets" << std::endl;
+			updateBindlessDescriptorSets(currentFrameIndex);
 		}
 
 		// Timer
@@ -1215,9 +1209,9 @@ namespace aveng {
 		VkDescriptorPoolSize b_poolSizes[] =
 		{
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_TEXTURES },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_BINDLESS_TEXEL_BUFFERS * 2},
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_BINDLESS_BUFFERS * 5},
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_BINDLESS_BUFFERS * 3}
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  MAX_BINDLESS_TEXEL_BUFFERS },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_BINDLESS_BUFFERS },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_BINDLESS_BUFFERS }
 		};
 
 		VkDescriptorPoolCreateInfo b_poolInfo{};
@@ -1258,7 +1252,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding& storage_image_binding = bindless_bindings[1];
 		storage_image_binding.binding = 1;
 		storage_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		storage_image_binding.descriptorCount = MAX_BINDLESS_TEXEL_BUFFERS;
+		storage_image_binding.descriptorCount = 1; // MAX_BINDLESS_TEXEL_BUFFERS; TBD!
 		storage_image_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 		storage_image_binding.pImmutableSamplers = nullptr;
 
@@ -1266,7 +1260,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding& ssbo1_binding = bindless_bindings[2];
 		ssbo1_binding.binding = 2;
 		ssbo1_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		ssbo1_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo1_binding.descriptorCount = 1;
 		ssbo1_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 		ssbo1_binding.pImmutableSamplers = nullptr;
 
@@ -1274,7 +1268,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding& ssbo2_binding = bindless_bindings[3];
 		ssbo2_binding.binding = 3;
 		ssbo2_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		ssbo2_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo2_binding.descriptorCount = 1;
 		ssbo2_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 		ssbo2_binding.pImmutableSamplers = nullptr;
 
@@ -1282,7 +1276,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding& ssbo3_binding = bindless_bindings[4];
 		ssbo3_binding.binding = 4;
 		ssbo3_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		ssbo3_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo3_binding.descriptorCount = 1;
 		ssbo3_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 		ssbo3_binding.pImmutableSamplers = nullptr;
 
@@ -1290,7 +1284,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding& ubo1_binding = bindless_bindings[5];
 		ubo1_binding.binding = 5;
 		ubo1_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		ubo1_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ubo1_binding.descriptorCount = 1;
 		ubo1_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		ubo1_binding.pImmutableSamplers = nullptr;
 
@@ -1306,7 +1300,7 @@ namespace aveng {
 		VkDescriptorSetLayoutBinding& ssbo4_binding = bindless_bindings[7];
 		ssbo4_binding.binding = 7;
 		ssbo4_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		ssbo4_binding.descriptorCount = MAX_BINDLESS_BUFFERS;
+		ssbo4_binding.descriptorCount = 1;
 		ssbo4_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		ssbo4_binding.pImmutableSamplers = nullptr;
 
@@ -1384,7 +1378,7 @@ namespace aveng {
 		return true;
 	}
 
-	bool Renderer::updateBindlessDescriptorSets(int frameIndex) {
+	void Renderer::updateBindlessDescriptorSets(int frameIndex) {
 
 		// Binding 8
 		VkDescriptorBufferInfo viewProjInfo{};
