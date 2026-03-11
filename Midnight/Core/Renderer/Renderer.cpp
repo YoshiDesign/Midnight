@@ -33,13 +33,13 @@ namespace aveng {
 	Renderer::Renderer(
 		EngineDevice& engineDevice, 
 		AvengWindow& window,
-		VkRenderData& renderData, 
+		VkRenderData& _renderData, 
 		CameraManager& _cameraManager,
 		const IModelQuery& mq,
 		IModelAnimQuery& aq)
 		:   engineDevice	{ engineDevice }, 
 			aveng_window	{ window }, 
-			renderData		{ renderData }, 
+			renderData		{ _renderData }, 
 			cameraManager	{ _cameraManager },
 			modelQuery_		{ mq },
 			animQuery_		{ aq }
@@ -60,10 +60,10 @@ namespace aveng {
 		renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT); // This one can be used as needed by the renderer and the editor.
 
 		// Define descriptor set vec's
-		renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		renderData.rdAvengAnimationDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// renderData.rdAvengAnimationDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengComputeBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.basicLightingDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
@@ -451,7 +451,6 @@ namespace aveng {
 
 	void Renderer::clearLights()
 	{
-
 		mPointLightData.numLights = 0;
 		// Zero out the light arrays for clean state
 		memset(mPointLightData.positions, 0, sizeof(mPointLightData.positions));
@@ -1145,10 +1144,10 @@ namespace aveng {
 
 			// TODO Material Buffers
 
-			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
-			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);
-			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeTransformDescriptorSets[i]);
-			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
+			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
+			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);
+			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeTransformDescriptorSets[i]);
+			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
 
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengBindlessDescriptorPool, 1, &renderData.rdAvengBindlessDescriptorSets[i]);
@@ -1535,6 +1534,7 @@ namespace aveng {
 	}
 
 	bool Renderer::createSSBOs() {
+
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
 			if (!ShaderStorageBuffer::init(engineDevice, mShaderTrsMatrixBuffers[i], MapMode::GpuOnly, ResidentMode::GPU)) {
@@ -1562,6 +1562,11 @@ namespace aveng {
 				return false;
 			}
 
+			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers[i], MapMode::Persistent, ResidentMode::CPU)) {
+				Logger::log(1, "%s error: could not create selection SSBO\n", __FUNCTION__);
+				return false;
+			}
+			
 		}
 
 		// Populate the shared view for the editor - for when it needs to update its descriptor sets
@@ -1614,5 +1619,4 @@ namespace aveng {
 		return;
 	}
 
-	
-} // NS
+}

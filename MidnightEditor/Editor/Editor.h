@@ -64,7 +64,7 @@ namespace aveng {
 		void cleanup();
 		void destroyTrash();
 		void recreateFrameBuffers(SwapChain* swapchain);
-		void initializePointLights();
+
 		const EditorData& data() const	{ return editorData; }
 		EditorData& data()				{ return editorData; }
 
@@ -77,8 +77,6 @@ namespace aveng {
 		}
 
 		void readPixelDataPos(const FramePacket& pkt);
-		void setupSelectionHighlight(float dt);
-		void setSelectedInstance();
 		bool drawInstanceGizmo();
 		float getAspectRatio();
 
@@ -91,12 +89,7 @@ namespace aveng {
 
 		const glm::vec2 mouseXY() { return { editorData.eMouseXPos, editorData.eMouseYPos }; }
 
-		bool createDescriptorLayouts();
-		bool createDescriptorSets();
 		bool createCommandBuffers();
-		bool createPipelineLayouts();
-		bool createSSBOs();
-		void updateDescriptorSets(int frameIndex);
 
 		void endSwapChainLineRenderPass(VkCommandBuffer commandBuffer);
 
