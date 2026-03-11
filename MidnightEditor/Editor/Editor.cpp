@@ -38,7 +38,7 @@ namespace aveng {
 		, cameraManager{ _cameraManager }
 		, sceneEdit_{ _sceneFacade } // Composition root
 		, aveng_imgui{ renderData, sceneEdit_, editorData, window, engineDevice} 
-		, pointLightSystem{ engineDevice, renderData }
+		// , pointLightSystem{ engineDevice, renderData }
 	{
 
 		// Register a camera
@@ -153,13 +153,13 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
-	void Editor::initializePointLights()
-	{
+	//void Editor::initializePointLights()
+	//{
 
-		pointLightSystem.initialize(renderData.rdSelectionRenderpass, 1, false);
-		std::cout << "(Editor) PointLightSystem initialized" << std::endl;
+	//	pointLightSystem.initialize(renderData.rdSelectionRenderpass, 1, false);
+	//	std::cout << "(Editor) PointLightSystem initialized" << std::endl;
 
-	}
+	//}
 
 	void Editor::readPixelDataPos(const FramePacket& pkt)
 	{
@@ -307,14 +307,14 @@ namespace aveng {
 			swapchain->imageCount()
 		);
 
-		pointLightSystem.initialize(
-			renderData.rdSelectionRenderpass, 
-			2, true);
+		//pointLightSystem.initialize(
+		//	renderData.rdSelectionRenderpass, 
+		//	2, true);
 	}
 
-	void Editor::updateLights()
+	void Editor::renderLights()
 	{
-		renderer.renderLights(pointLightSystem.getPipeline(), pointLightSystem.getPipelineLayout());
+		renderer.renderLights();
 	}
 	
 	bool Editor::createPipelineLayouts() {

@@ -59,7 +59,7 @@ namespace aveng {
 		void initialize(SwapChain* swapchain);
 		void update(float frameTime, unsigned int frameIndex);
 		void renderGUI(float frameTime);
-		void updateLights();
+		void renderLights();
 		void drawModels(const IModelLibrary& modelLib, const FramePacket& pkt, int frameIndex);
 		void cleanup();
 		void destroyTrash();
@@ -129,12 +129,12 @@ namespace aveng {
 		std::vector<PendingBufferDestroy> buffer_trash;
 
 		/* color hightlight for selection etc */
-		std::vector<glm::vec2> mSelectedInstance{};
-		std::vector<VkShaderStorageBufferData> mSelectedInstanceBuffers{};
+		// std::vector<glm::vec2> mSelectedInstance{};
+		// std::vector<VkShaderStorageBufferData> mSelectedInstanceBuffers{};
 		VkVertexBufferData mLineVertexBuffer{};
 
-		bool mHighlightSelectedInstance = false;
-		float mSelectedInstanceHighlightValue = 1.0f;
+		// bool mHighlightSelectedInstance = false;
+		// float mSelectedInstanceHighlightValue = 1.0f;
 
 		// Gizmo Arrows
 		CoordArrowsModel mCoordArrowsModel{};
@@ -159,7 +159,7 @@ namespace aveng {
 
 		EditorData editorData;
 		AvengImgui aveng_imgui;
-		PointLightSystem pointLightSystem;	// Light stuff
+		// PointLightSystem pointLightSystem;	// Light stuff
 	};
 
 }

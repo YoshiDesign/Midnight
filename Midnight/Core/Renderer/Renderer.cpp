@@ -85,7 +85,8 @@ namespace aveng {
 		}
 
 		// Initialize our descriptor layouts & sets, map buffers to device memory.
-		setupDescriptors();
+		// setupDescriptors();
+		createBindlessDescriptors();
 
 		// Create pipelines now that descriptor layouts are ready
 		if (!createPipelineLayouts()) {
@@ -417,252 +418,252 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer); 
 	}
 	 
-	bool Renderer::setupDescriptors()
-	{
+//	bool Renderer::setupDescriptors()
+//	{
+//
+//		std::vector<VkDescriptorPoolSize> poolSizes =
+//		{
+//		  { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+//		  { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+//		  { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+//		  { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+//		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+////		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+//		};
+//
+//		VkDescriptorPoolCreateInfo poolInfo{};
+//		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+//		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+//		poolInfo.maxSets = 10000;
+//		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+//		poolInfo.pPoolSizes = poolSizes.data();
+//
+//		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &poolInfo, nullptr, &renderData.avengDescriptorPool);
+//		if (result != VK_SUCCESS) {
+//			Logger::log(1, "%s error: could not init descriptor pool (error: %i)\n", __FUNCTION__, result);
+//			return false;
+//		}
+//
+//		createDescriptorLayouts();
+//		createDescriptorSets();
+//		
+//		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+//			updateDescriptorSets(i);
+//			updateComputeDescriptorSets(i);
+//			// TODO
+//			// updateLightingDescriptorSets(i);
+//		}
+//	
+//	}
 
-		std::vector<VkDescriptorPoolSize> poolSizes =
-		{
-		  { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-		  { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-		  { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-		  { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-//		  { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-		};
+	//bool Renderer::createDescriptorLayouts() {
 
-		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		poolInfo.maxSets = 10000;
-		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-		poolInfo.pPoolSizes = poolSizes.data();
+	//	{
+	//		 /* texture */
+	//		VkDescriptorSetLayoutBinding assimpTextureBind{};
+	//		assimpTextureBind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	//		assimpTextureBind.binding = 0;
+	//		assimpTextureBind.descriptorCount = 1;
+	//		assimpTextureBind.pImmutableSamplers = nullptr;
+	//		assimpTextureBind.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &poolInfo, nullptr, &renderData.avengDescriptorPool);
-		if (result != VK_SUCCESS) {
-			Logger::log(1, "%s error: could not init descriptor pool (error: %i)\n", __FUNCTION__, result);
-			return false;
-		}
+	//		std::vector<VkDescriptorSetLayoutBinding> assimpTexBindings = { assimpTextureBind };
 
-		createDescriptorLayouts();
-		createDescriptorSets();
-		
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-			updateDescriptorSets(i);
-			updateComputeDescriptorSets(i);
-			// TODO
-			// updateLightingDescriptorSets(i);
-		}
-	
-	}
+	//		VkDescriptorSetLayoutCreateInfo assimpTextureCreateInfo{};
+	//		assimpTextureCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	//		assimpTextureCreateInfo.bindingCount = static_cast<uint32_t>(assimpTexBindings.size());
+	//		assimpTextureCreateInfo.pBindings = assimpTexBindings.data();
 
-	bool Renderer::createDescriptorLayouts() {
+	//		result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpTextureCreateInfo,
+	//			nullptr, &renderData.rdAvengTextureDescriptorLayout);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not create Assimp texture descriptor set layout (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
+	//	}
 
-		{
-			 /* texture */
-			VkDescriptorSetLayoutBinding assimpTextureBind{};
-			assimpTextureBind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			assimpTextureBind.binding = 0;
-			assimpTextureBind.descriptorCount = 1;
-			assimpTextureBind.pImmutableSamplers = nullptr;
-			assimpTextureBind.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	//	{
+	//		/* non-animated shader */
+	//		VkDescriptorSetLayoutBinding assimpUboBind{};
+	//		assimpUboBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // V/P Mats
+	//		assimpUboBind.binding = 0;
+	//		assimpUboBind.descriptorCount = 1;
+	//		assimpUboBind.pImmutableSamplers = nullptr;
+	//		assimpUboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpTexBindings = { assimpTextureBind };
+	//		VkDescriptorSetLayoutBinding assimpSsboBind{};
+	//		assimpSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // WorldPosMatricess
+	//		assimpSsboBind.binding = 1;
+	//		assimpSsboBind.descriptorCount = 1;
+	//		assimpSsboBind.pImmutableSamplers = nullptr;
+	//		assimpSsboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			VkDescriptorSetLayoutCreateInfo assimpTextureCreateInfo{};
-			assimpTextureCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			assimpTextureCreateInfo.bindingCount = static_cast<uint32_t>(assimpTexBindings.size());
-			assimpTextureCreateInfo.pBindings = assimpTexBindings.data();
+	//		VkDescriptorSetLayoutBinding assimpSsboBind2{};
+	//		assimpSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Point Lights
+	//		assimpSsboBind2.binding = 2;
+	//		assimpSsboBind2.descriptorCount = 1;
+	//		assimpSsboBind2.pImmutableSamplers = nullptr;
+	//		assimpSsboBind2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpTextureCreateInfo,
-				nullptr, &renderData.rdAvengTextureDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp texture descriptor set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+	//		std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpUboBind, assimpSsboBind, assimpSsboBind2  };
 
-		{
-			/* non-animated shader */
-			VkDescriptorSetLayoutBinding assimpUboBind{};
-			assimpUboBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // V/P Mats
-			assimpUboBind.binding = 0;
-			assimpUboBind.descriptorCount = 1;
-			assimpUboBind.pImmutableSamplers = nullptr;
-			assimpUboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	//		VkDescriptorSetLayoutCreateInfo assimpCreateInfo{};
+	//		assimpCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	//		assimpCreateInfo.bindingCount = static_cast<uint32_t>(assimpBindings.size());
+	//		assimpCreateInfo.pBindings = assimpBindings.data();
 
-			VkDescriptorSetLayoutBinding assimpSsboBind{};
-			assimpSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // WorldPosMatricess
-			assimpSsboBind.binding = 1;
-			assimpSsboBind.descriptorCount = 1;
-			assimpSsboBind.pImmutableSamplers = nullptr;
-			assimpSsboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	//		result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpCreateInfo,
+	//			nullptr, &renderData.rdAvengDescriptorLayout);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not create Assimp buffer descriptor \
+	//				set layout (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
+	//	}
 
-			VkDescriptorSetLayoutBinding assimpSsboBind2{};
-			assimpSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Point Lights
-			assimpSsboBind2.binding = 2;
-			assimpSsboBind2.descriptorCount = 1;
-			assimpSsboBind2.pImmutableSamplers = nullptr;
-			assimpSsboBind2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
+	//	{
+	//		/* animated shader */
+	//		VkDescriptorSetLayoutBinding assimpUboBind{};
+	//		assimpUboBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//		assimpUboBind.binding = 0;
+	//		assimpUboBind.descriptorCount = 1;
+	//		assimpUboBind.pImmutableSamplers = nullptr;
+	//		assimpUboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpBindings = { assimpUboBind, assimpSsboBind, assimpSsboBind2  };
+	//		VkDescriptorSetLayoutBinding assimpSkinningSsboBind{};
+	//		assimpSkinningSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	//		assimpSkinningSsboBind.binding = 1;
+	//		assimpSkinningSsboBind.descriptorCount = 1;
+	//		assimpSkinningSsboBind.pImmutableSamplers = nullptr;
+	//		assimpSkinningSsboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			VkDescriptorSetLayoutCreateInfo assimpCreateInfo{};
-			assimpCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			assimpCreateInfo.bindingCount = static_cast<uint32_t>(assimpBindings.size());
-			assimpCreateInfo.pBindings = assimpBindings.data();
+	//		VkDescriptorSetLayoutBinding assimpSkinningSsboBind2{};
+	//		assimpSkinningSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	//		assimpSkinningSsboBind2.binding = 2;
+	//		assimpSkinningSsboBind2.descriptorCount = 1;
+	//		assimpSkinningSsboBind2.pImmutableSamplers = nullptr;
+	//		assimpSkinningSsboBind2.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpCreateInfo,
-				nullptr, &renderData.rdAvengDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp buffer descriptor \
-					set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+	//		// Lighting Uniform - Point Lights
+	//		VkDescriptorSetLayoutBinding assimpSkinningSsboBind3{};
+	//		assimpSkinningSsboBind3.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//		assimpSkinningSsboBind3.binding = 3;
+	//		assimpSkinningSsboBind3.descriptorCount = 1;
+	//		assimpSkinningSsboBind3.pImmutableSamplers = nullptr;
+	//		assimpSkinningSsboBind3.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		{
-			/* animated shader */
-			VkDescriptorSetLayoutBinding assimpUboBind{};
-			assimpUboBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			assimpUboBind.binding = 0;
-			assimpUboBind.descriptorCount = 1;
-			assimpUboBind.pImmutableSamplers = nullptr;
-			assimpUboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	//		std::vector<VkDescriptorSetLayoutBinding> assimpSkinningBindings = { assimpUboBind, assimpSkinningSsboBind, assimpSkinningSsboBind2, assimpSkinningSsboBind3 };
 
-			VkDescriptorSetLayoutBinding assimpSkinningSsboBind{};
-			assimpSkinningSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			assimpSkinningSsboBind.binding = 1;
-			assimpSkinningSsboBind.descriptorCount = 1;
-			assimpSkinningSsboBind.pImmutableSamplers = nullptr;
-			assimpSkinningSsboBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	//		VkDescriptorSetLayoutCreateInfo assimpSkinningCreateInfo{};
+	//		assimpSkinningCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	//		assimpSkinningCreateInfo.bindingCount = static_cast<uint32_t>(assimpSkinningBindings.size());
+	//		assimpSkinningCreateInfo.pBindings = assimpSkinningBindings.data();
 
-			VkDescriptorSetLayoutBinding assimpSkinningSsboBind2{};
-			assimpSkinningSsboBind2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			assimpSkinningSsboBind2.binding = 2;
-			assimpSkinningSsboBind2.descriptorCount = 1;
-			assimpSkinningSsboBind2.pImmutableSamplers = nullptr;
-			assimpSkinningSsboBind2.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	//		result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpSkinningCreateInfo,
+	//			nullptr, &renderData.rdAvengAnimationDescriptorLayout);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not create Assimp skinning buffer descriptor \
+	//				set layout (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
+	//	}
 
-			// Lighting Uniform - Point Lights
-			VkDescriptorSetLayoutBinding assimpSkinningSsboBind3{};
-			assimpSkinningSsboBind3.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			assimpSkinningSsboBind3.binding = 3;
-			assimpSkinningSsboBind3.descriptorCount = 1;
-			assimpSkinningSsboBind3.pImmutableSamplers = nullptr;
-			assimpSkinningSsboBind3.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	//	{
+	//		/* compute transformation shader */
+	//		VkDescriptorSetLayoutBinding assimpTransformSsboBind{};
+	//		assimpTransformSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // NodeTransformBuffers
+	//		assimpTransformSsboBind.binding = 0;
+	//		assimpTransformSsboBind.descriptorCount = 1;
+	//		assimpTransformSsboBind.pImmutableSamplers = nullptr;
+	//		assimpTransformSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpSkinningBindings = { assimpUboBind, assimpSkinningSsboBind, assimpSkinningSsboBind2, assimpSkinningSsboBind3 };
+	//		VkDescriptorSetLayoutBinding assimpTrsSsboBind{};
+	//		assimpTrsSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	//		assimpTrsSsboBind.binding = 1;
+	//		assimpTrsSsboBind.descriptorCount = 1;
+	//		assimpTrsSsboBind.pImmutableSamplers = nullptr;
+	//		assimpTrsSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			VkDescriptorSetLayoutCreateInfo assimpSkinningCreateInfo{};
-			assimpSkinningCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			assimpSkinningCreateInfo.bindingCount = static_cast<uint32_t>(assimpSkinningBindings.size());
-			assimpSkinningCreateInfo.pBindings = assimpSkinningBindings.data();
+	//		std::vector<VkDescriptorSetLayoutBinding> assimpTransformBindings = { assimpTransformSsboBind, assimpTrsSsboBind };
 
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpSkinningCreateInfo,
-				nullptr, &renderData.rdAvengAnimationDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp skinning buffer descriptor \
-					set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+	//		VkDescriptorSetLayoutCreateInfo assimpTransformCreateInfo{};
+	//		assimpTransformCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	//		assimpTransformCreateInfo.bindingCount = static_cast<uint32_t>(assimpTransformBindings.size());
+	//		assimpTransformCreateInfo.pBindings = assimpTransformBindings.data();
 
-		{
-			/* compute transformation shader */
-			VkDescriptorSetLayoutBinding assimpTransformSsboBind{};
-			assimpTransformSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // NodeTransformBuffers
-			assimpTransformSsboBind.binding = 0;
-			assimpTransformSsboBind.descriptorCount = 1;
-			assimpTransformSsboBind.pImmutableSamplers = nullptr;
-			assimpTransformSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	//		result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpTransformCreateInfo,
+	//			nullptr, &renderData.rdAvengComputeTransformDescriptorLayout);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not create Assimp transform compute \
+	//				buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
+	//	}
 
-			VkDescriptorSetLayoutBinding assimpTrsSsboBind{};
-			assimpTrsSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			assimpTrsSsboBind.binding = 1;
-			assimpTrsSsboBind.descriptorCount = 1;
-			assimpTrsSsboBind.pImmutableSamplers = nullptr;
-			assimpTrsSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	//	{
+	//		/* compute matrix multiplication shader, global data */
+	//		VkDescriptorSetLayoutBinding assimpTrsSsboBind{};
+	//		assimpTrsSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	//		assimpTrsSsboBind.binding = 0;
+	//		assimpTrsSsboBind.descriptorCount = 1;
+	//		assimpTrsSsboBind.pImmutableSamplers = nullptr;
+	//		assimpTrsSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpTransformBindings = { assimpTransformSsboBind, assimpTrsSsboBind };
+	//		VkDescriptorSetLayoutBinding assimpNodeMatricesSsboBind{};
+	//		assimpNodeMatricesSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	//		assimpNodeMatricesSsboBind.binding = 1;
+	//		assimpNodeMatricesSsboBind.descriptorCount = 1;
+	//		assimpNodeMatricesSsboBind.pImmutableSamplers = nullptr;
+	//		assimpNodeMatricesSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			VkDescriptorSetLayoutCreateInfo assimpTransformCreateInfo{};
-			assimpTransformCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			assimpTransformCreateInfo.bindingCount = static_cast<uint32_t>(assimpTransformBindings.size());
-			assimpTransformCreateInfo.pBindings = assimpTransformBindings.data();
+	//		std::vector<VkDescriptorSetLayoutBinding> assimpMatMultBindings =
+	//		{ assimpTrsSsboBind,assimpNodeMatricesSsboBind };
 
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpTransformCreateInfo,
-				nullptr, &renderData.rdAvengComputeTransformDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp transform compute \
-					buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+	//		VkDescriptorSetLayoutCreateInfo assimpMatrixMultCreateInfo{};
+	//		assimpMatrixMultCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	//		assimpMatrixMultCreateInfo.bindingCount = static_cast<uint32_t>(assimpMatMultBindings.size());
+	//		assimpMatrixMultCreateInfo.pBindings = assimpMatMultBindings.data();
 
-		{
-			/* compute matrix multiplication shader, global data */
-			VkDescriptorSetLayoutBinding assimpTrsSsboBind{};
-			assimpTrsSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			assimpTrsSsboBind.binding = 0;
-			assimpTrsSsboBind.descriptorCount = 1;
-			assimpTrsSsboBind.pImmutableSamplers = nullptr;
-			assimpTrsSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	//		result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpMatrixMultCreateInfo,
+	//			nullptr, &renderData.rdAvengComputeMatrixMultDescriptorLayout);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not create Assimp matrix multiplication \
+	//				global compute buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
+	//	}
 
-			VkDescriptorSetLayoutBinding assimpNodeMatricesSsboBind{};
-			assimpNodeMatricesSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			assimpNodeMatricesSsboBind.binding = 1;
-			assimpNodeMatricesSsboBind.descriptorCount = 1;
-			assimpNodeMatricesSsboBind.pImmutableSamplers = nullptr;
-			assimpNodeMatricesSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	//	{
+	//		/* compute matrix multiplication shader, per-model data */
+	//		VkDescriptorSetLayoutBinding assimpParentMatrixSsboBind{};
+	//		assimpParentMatrixSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	//		assimpParentMatrixSsboBind.binding = 0;
+	//		assimpParentMatrixSsboBind.descriptorCount = 1;
+	//		assimpParentMatrixSsboBind.pImmutableSamplers = nullptr;
+	//		assimpParentMatrixSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			std::vector<VkDescriptorSetLayoutBinding> assimpMatMultBindings =
-			{ assimpTrsSsboBind,assimpNodeMatricesSsboBind };
+	//		VkDescriptorSetLayoutBinding assimpBoneOffsetSsboBind{};
+	//		assimpBoneOffsetSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	//		assimpBoneOffsetSsboBind.binding = 1;
+	//		assimpBoneOffsetSsboBind.descriptorCount = 1;
+	//		assimpBoneOffsetSsboBind.pImmutableSamplers = nullptr;
+	//		assimpBoneOffsetSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-			VkDescriptorSetLayoutCreateInfo assimpMatrixMultCreateInfo{};
-			assimpMatrixMultCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			assimpMatrixMultCreateInfo.bindingCount = static_cast<uint32_t>(assimpMatMultBindings.size());
-			assimpMatrixMultCreateInfo.pBindings = assimpMatMultBindings.data();
+	//		std::vector<VkDescriptorSetLayoutBinding> assimpMatMultPerModelBindings =
+	//		{ assimpParentMatrixSsboBind, assimpBoneOffsetSsboBind };
 
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpMatrixMultCreateInfo,
-				nullptr, &renderData.rdAvengComputeMatrixMultDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp matrix multiplication \
-					global compute buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+	//		VkDescriptorSetLayoutCreateInfo assimpMatrixMultPerModelCreateInfo{};
+	//		assimpMatrixMultPerModelCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	//		assimpMatrixMultPerModelCreateInfo.bindingCount = static_cast<uint32_t>(assimpMatMultPerModelBindings.size());
+	//		assimpMatrixMultPerModelCreateInfo.pBindings = assimpMatMultPerModelBindings.data();
 
-		{
-			/* compute matrix multiplication shader, per-model data */
-			VkDescriptorSetLayoutBinding assimpParentMatrixSsboBind{};
-			assimpParentMatrixSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			assimpParentMatrixSsboBind.binding = 0;
-			assimpParentMatrixSsboBind.descriptorCount = 1;
-			assimpParentMatrixSsboBind.pImmutableSamplers = nullptr;
-			assimpParentMatrixSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			VkDescriptorSetLayoutBinding assimpBoneOffsetSsboBind{};
-			assimpBoneOffsetSsboBind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			assimpBoneOffsetSsboBind.binding = 1;
-			assimpBoneOffsetSsboBind.descriptorCount = 1;
-			assimpBoneOffsetSsboBind.pImmutableSamplers = nullptr;
-			assimpBoneOffsetSsboBind.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			std::vector<VkDescriptorSetLayoutBinding> assimpMatMultPerModelBindings =
-			{ assimpParentMatrixSsboBind, assimpBoneOffsetSsboBind };
-
-			VkDescriptorSetLayoutCreateInfo assimpMatrixMultPerModelCreateInfo{};
-			assimpMatrixMultPerModelCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			assimpMatrixMultPerModelCreateInfo.bindingCount = static_cast<uint32_t>(assimpMatMultPerModelBindings.size());
-			assimpMatrixMultPerModelCreateInfo.pBindings = assimpMatMultPerModelBindings.data();
-
-			result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpMatrixMultPerModelCreateInfo,
-				nullptr, &renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not create Assimp matrix multiplication per model compute buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-		}
+	//		result = vkCreateDescriptorSetLayout(engineDevice.device(), &assimpMatrixMultPerModelCreateInfo,
+	//			nullptr, &renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not create Assimp matrix multiplication per model compute buffer descriptor set layout (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
+	//	}
 
 		///* 
 		// * Terrain - Basic Vertex & Fragment Shader support (currently terrain_1.vert and terrain-triplanar_1.frag)
@@ -786,102 +787,102 @@ namespace aveng {
 		//		return false;
 		//	}
 		//}
-		return true;
-	}
+	// 	return true;
+	// }
 
-	bool Renderer::createDescriptorSets() {
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-		
-			/* non-animated models */
-			VkDescriptorSetAllocateInfo descriptorAllocateInfo{};
-			descriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			descriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
-			descriptorAllocateInfo.descriptorSetCount = 1;
-			descriptorAllocateInfo.pSetLayouts = &renderData.rdAvengDescriptorLayout;
+	//bool Renderer::createDescriptorSets() {
+	//	for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+	//	
+	//		/* non-animated models */
+	//		VkDescriptorSetAllocateInfo descriptorAllocateInfo{};
+	//		descriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	//		descriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
+	//		descriptorAllocateInfo.descriptorSetCount = 1;
+	//		descriptorAllocateInfo.pSetLayouts = &renderData.rdAvengDescriptorLayout;
 
-			VkResult result = vkAllocateDescriptorSets(engineDevice.device(), &descriptorAllocateInfo,
-				&renderData.rdAvengDescriptorSets[i]);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not allocate Assimp descriptor set (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
-			
-			/* animated models */
-			VkDescriptorSetAllocateInfo skinningDescriptorAllocateInfo{};
-			skinningDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			skinningDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
-			skinningDescriptorAllocateInfo.descriptorSetCount = 1;
-			skinningDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengAnimationDescriptorLayout;
+	//		VkResult result = vkAllocateDescriptorSets(engineDevice.device(), &descriptorAllocateInfo,
+	//			&renderData.rdAvengDescriptorSets[i]);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not allocate Assimp descriptor set (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
+	//		
+	//		/* animated models */
+	//		VkDescriptorSetAllocateInfo skinningDescriptorAllocateInfo{};
+	//		skinningDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	//		skinningDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
+	//		skinningDescriptorAllocateInfo.descriptorSetCount = 1;
+	//		skinningDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengAnimationDescriptorLayout;
 
-			result = vkAllocateDescriptorSets(engineDevice.device(), &skinningDescriptorAllocateInfo,
-				&renderData.rdAvengAnimationDescriptorSets[i]);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not allocate Assimp Skinning descriptor set (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
+	//		result = vkAllocateDescriptorSets(engineDevice.device(), &skinningDescriptorAllocateInfo,
+	//			&renderData.rdAvengAnimationDescriptorSets[i]);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not allocate Assimp Skinning descriptor set (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
 
-			/* compute transform */
-			VkDescriptorSetAllocateInfo computeTransformDescriptorAllocateInfo{};
-			computeTransformDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			computeTransformDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
-			computeTransformDescriptorAllocateInfo.descriptorSetCount = 1;
-			computeTransformDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeTransformDescriptorLayout;
+	//		/* compute transform */
+	//		VkDescriptorSetAllocateInfo computeTransformDescriptorAllocateInfo{};
+	//		computeTransformDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	//		computeTransformDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
+	//		computeTransformDescriptorAllocateInfo.descriptorSetCount = 1;
+	//		computeTransformDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeTransformDescriptorLayout;
 
-			result = vkAllocateDescriptorSets(engineDevice.device(), &computeTransformDescriptorAllocateInfo,
-				&renderData.rdAvengComputeTransformDescriptorSets[i]);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not allocate Assimp Transform Compute descriptor set (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
+	//		result = vkAllocateDescriptorSets(engineDevice.device(), &computeTransformDescriptorAllocateInfo,
+	//			&renderData.rdAvengComputeTransformDescriptorSets[i]);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not allocate Assimp Transform Compute descriptor set (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
 
-			/* matrix multiplication, global data */
-			VkDescriptorSetAllocateInfo computeMatrixMultDescriptorAllocateInfo{};
-			computeMatrixMultDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			computeMatrixMultDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
-			computeMatrixMultDescriptorAllocateInfo.descriptorSetCount = 1;
-			computeMatrixMultDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeMatrixMultDescriptorLayout;
+	//		/* matrix multiplication, global data */
+	//		VkDescriptorSetAllocateInfo computeMatrixMultDescriptorAllocateInfo{};
+	//		computeMatrixMultDescriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	//		computeMatrixMultDescriptorAllocateInfo.descriptorPool = renderData.avengDescriptorPool;
+	//		computeMatrixMultDescriptorAllocateInfo.descriptorSetCount = 1;
+	//		computeMatrixMultDescriptorAllocateInfo.pSetLayouts = &renderData.rdAvengComputeMatrixMultDescriptorLayout;
 
-			result = vkAllocateDescriptorSets(engineDevice.device(), &computeMatrixMultDescriptorAllocateInfo,
-				&renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
-			if (result != VK_SUCCESS) {
-				Logger::log(1, "%s error: could not allocate Assimp Matrix Mult Compute descriptor set (error: %i)\n", __FUNCTION__, result);
-				return false;
-			}
+	//		result = vkAllocateDescriptorSets(engineDevice.device(), &computeMatrixMultDescriptorAllocateInfo,
+	//			&renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
+	//		if (result != VK_SUCCESS) {
+	//			Logger::log(1, "%s error: could not allocate Assimp Matrix Mult Compute descriptor set (error: %i)\n", __FUNCTION__, result);
+	//			return false;
+	//		}
 
-			///* Basic Terrain */
-			//VkDescriptorSetAllocateInfo basicTerrainInfo{};
-			//basicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			//basicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
-			//basicTerrainInfo.descriptorSetCount = 1;
-			//basicTerrainInfo.pSetLayouts = &renderData.rdTerrainBasicDescriptorLayout;
+	//		///* Basic Terrain */
+	//		//VkDescriptorSetAllocateInfo basicTerrainInfo{};
+	//		//basicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	//		//basicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
+	//		//basicTerrainInfo.descriptorSetCount = 1;
+	//		//basicTerrainInfo.pSetLayouts = &renderData.rdTerrainBasicDescriptorLayout;
 
-			//result = vkAllocateDescriptorSets(engineDevice.device(), &basicTerrainInfo,
-			//	&renderData.rdAvengBasicTerrainDescriptorSets[i]);
-			//if (result != VK_SUCCESS) {
-			//	Logger::log(1, "%s error: could not allocate Basic \
-			//		Terrain descriptor set (error: %i)\n", __FUNCTION__, result);
-			//	return false;
-			//}
+	//		//result = vkAllocateDescriptorSets(engineDevice.device(), &basicTerrainInfo,
+	//		//	&renderData.rdAvengBasicTerrainDescriptorSets[i]);
+	//		//if (result != VK_SUCCESS) {
+	//		//	Logger::log(1, "%s error: could not allocate Basic \
+	//		//		Terrain descriptor set (error: %i)\n", __FUNCTION__, result);
+	//		//	return false;
+	//		//}
 
-			///* Basic Terrain Compute */
-			//VkDescriptorSetAllocateInfo computeBasicTerrainInfo{};
-			//computeBasicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			//computeBasicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
-			//computeBasicTerrainInfo.descriptorSetCount = 1;
-			//computeBasicTerrainInfo.pSetLayouts = &renderData.rdAvengComputeBasicTerrainDescriptorLayout;
+	//		///* Basic Terrain Compute */
+	//		//VkDescriptorSetAllocateInfo computeBasicTerrainInfo{};
+	//		//computeBasicTerrainInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	//		//computeBasicTerrainInfo.descriptorPool = renderData.avengDescriptorPool;
+	//		//computeBasicTerrainInfo.descriptorSetCount = 1;
+	//		//computeBasicTerrainInfo.pSetLayouts = &renderData.rdAvengComputeBasicTerrainDescriptorLayout;
 
-			//result = vkAllocateDescriptorSets(engineDevice.device(), &computeBasicTerrainInfo,
-			//	&renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
-			//if (result != VK_SUCCESS) {
-			//	Logger::log(1, "%s error: could not allocate Basic Terrain \
-			//		Compute descriptor set (error: %i)\n", __FUNCTION__, result);
-			//	return false;
-			//}
+	//		//result = vkAllocateDescriptorSets(engineDevice.device(), &computeBasicTerrainInfo,
+	//		//	&renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
+	//		//if (result != VK_SUCCESS) {
+	//		//	Logger::log(1, "%s error: could not allocate Basic Terrain \
+	//		//		Compute descriptor set (error: %i)\n", __FUNCTION__, result);
+	//		//	return false;
+	//		//}
 
-		}
+	//	}
 
-		return true;
-	}
+	//	return true;
+	//}
 
 	void Renderer::initializePointLights()
 	{
@@ -893,8 +894,9 @@ namespace aveng {
 	}
 
 	/* Render the lighting billboards */
-	void Renderer::renderLights(const VkPipeline& pipeline, const VkPipelineLayout& layout)
+	void Renderer::renderLights()
 	{
+		
 		if (mPointLightData.numLights <= 0) {
 			return; // Nothing to render
 		}
@@ -902,19 +904,7 @@ namespace aveng {
 			&& "Point Light system is using the wrong command buffer");
 
 		// This might not be necessary
-		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-		// Bind both descriptor sets
-		VkDescriptorSet descriptorSets[1] = { renderData.rdAvengDescriptorSets.at(currentFrameIndex) };
-		vkCmdBindDescriptorSets(
-			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			layout,
-			0,
-			1, // binding 1 descriptor set
-			descriptorSets,
-			0,
-			nullptr);
+		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pointLightSystem.getPipeline());
 
 		// Use instanced rendering: 6 vertices per light, numLights instances
 		vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, mPointLightData.numLights, 0, 0);
@@ -975,46 +965,46 @@ namespace aveng {
 
 
 
-		/* non-animated model */
-		std::vector<VkDescriptorSetLayout> layouts = {
-		  renderData.rdAvengTextureDescriptorLayout, renderData.rdAvengDescriptorLayout};
+		///* non-animated model */
+		//std::vector<VkDescriptorSetLayout> layouts = {
+		//  renderData.rdAvengTextureDescriptorLayout, renderData.rdAvengDescriptorLayout};
 
-		std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) } };
+		//std::vector<VkPushConstantRange> pushConstants = { { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) } };
 
-		if (!PipelineLayout::init(engineDevice, renderData.rdAvengPipelineLayout, layouts, pushConstants)) {
-			std::printf("%s error: could not init Assimp pipeline layout\n", __FUNCTION__);
-			return false;
-		}
+		//if (!PipelineLayout::init(engineDevice, renderData.rdAvengPipelineLayout, layouts, pushConstants)) {
+		//	std::printf("%s error: could not init Assimp pipeline layout\n", __FUNCTION__);
+		//	return false;
+		//}
 
-		/* animated model, needs push constant */
-		std::vector<VkDescriptorSetLayout> skinningLayouts = {
-		  renderData.rdAvengTextureDescriptorLayout, renderData.rdAvengAnimationDescriptorLayout };
+		///* animated model, needs push constant */
+		//std::vector<VkDescriptorSetLayout> skinningLayouts = {
+		//  renderData.rdAvengTextureDescriptorLayout, renderData.rdAvengAnimationDescriptorLayout };
 
-		if (!PipelineLayout::init(engineDevice, renderData.rdAvengAnimationPipelineLayout, skinningLayouts, pushConstants)) {
-			std::printf("%s error: could not init Assimp Skinning pipeline layout\n", __FUNCTION__);
-			return false;
-		}
+		//if (!PipelineLayout::init(engineDevice, renderData.rdAvengAnimationPipelineLayout, skinningLayouts, pushConstants)) {
+		//	std::printf("%s error: could not init Assimp Skinning pipeline layout\n", __FUNCTION__);
+		//	return false;
+		//}
 
-		/* Compute PCs */
-		std::vector<VkPushConstantRange> computePushConstants = { { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkComputePushConstants) } };
+		///* Compute PCs */
+		//std::vector<VkPushConstantRange> computePushConstants = { { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkComputePushConstants) } };
 
-		/* Animation Dispatch - transform compute */
-		std::vector<VkDescriptorSetLayout> transformLayouts = { renderData.rdAvengComputeTransformDescriptorLayout };
+		///* Animation Dispatch - transform compute */
+		//std::vector<VkDescriptorSetLayout> transformLayouts = { renderData.rdAvengComputeTransformDescriptorLayout };
 
-		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout, transformLayouts, computePushConstants)) {
-			std::printf("%s error: could not init Assimp transform compute pipeline layout\n", __FUNCTION__);
-			return false;
-		}
+		//if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeTransformPipelineLayout, transformLayouts, computePushConstants)) {
+		//	std::printf("%s error: could not init Assimp transform compute pipeline layout\n", __FUNCTION__);
+		//	return false;
+		//}
 
-		/* Animation Dispatch - matrix mult compute - Descriptor Layouts */
-		std::vector<VkDescriptorSetLayout> matrixMultLayouts = {
-		  renderData.rdAvengComputeMatrixMultDescriptorLayout, renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout};
+		///* Animation Dispatch - matrix mult compute - Descriptor Layouts */
+		//std::vector<VkDescriptorSetLayout> matrixMultLayouts = {
+		//  renderData.rdAvengComputeMatrixMultDescriptorLayout, renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout};
 
-		// Pipeline
-		if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout, matrixMultLayouts, computePushConstants)) {
-			std::printf("%s error: could not init Assimp matrix multiplication compute pipeline layout\n", __FUNCTION__);
-			return false;
-		}
+		//// Pipeline
+		//if (!PipelineLayout::init(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout, matrixMultLayouts, computePushConstants)) {
+		//	std::printf("%s error: could not init Assimp matrix multiplication compute pipeline layout\n", __FUNCTION__);
+		//	return false;
+		//}
 
 		///* Terrain Compute - PCs */
 		//std::vector<VkPushConstantRange> terrainComputePushConstant = { {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkBasicTerrainComputePushConstants)} };
@@ -1093,17 +1083,14 @@ namespace aveng {
 
 		/*
 		* Potential for optimization:
-		* Use the same pipeline layout for both pipelines (trs and skin-mat) (same set layouts / push constants), so descriptor sets stay compatible.
-		* Ideally, use one descriptor set that contains both buffers, and just dispatch twice (you'll still bind pipelines, 
-		* but you may not need to rebind sets if they're unchanged). So, still 2 pipeline binds, but no rebinding descriptors / pc's
-		* 
-		* However... If the trs -> skin mat compute is a strict chain, we can just combine them into 1 compute shader.
-		* This only works as long as skinning reads from only identical invocations.
+		* Use Combine these two shaders into 1 uber shader. They're linearly dependent so separating 
+		* these animation compute stages might not be 100% necessary.
+		* This only works as long as skinning reads from only identical invocations. I need to learn more about how invocations/warps work.
 		* 
 		* Or, VK_EXT_shader_object and redesign the whole lot (might not be relevant to this particular renderer)
 		* 
 		* Moderninzing:
-		* Since we support Vulkan 1.3+, refer vkCmdPipelineBarrier2 with VkBufferMemoryBarrier2 and explicit stage/access masks.
+		* TODO: Since we support Vulkan 1.3+, refer vkCmdPipelineBarrier2 with VkBufferMemoryBarrier2 and explicit stage/access masks.
 		*/
 
 		/*
@@ -1114,21 +1101,30 @@ namespace aveng {
 		* This is why we use a semaphore to signal 
 		*/
 
+		mComputeTimer.start();
+		mComputeModelData.pkModelOffset = modelOffset; // Identical to the VkPushConstants::pkInstanceBaseIndex
+
+		VkDescriptorSet computeSets[1] = { renderData.rdAvengBindlessDescriptorSets[currentFrameIndex] };
+
+		// Bind once on VK_PIPELINE_BIND_POINT_COMPUTE
+		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
+			renderData.rdAvengBindlessPipelineLayout, 0, ArraySize(computeSets), computeSets, 0, 0);
+
 		// VkCommandBuffer computeCommandBuffer = getCurrentCommandBufferCompute();
 		uint32_t groupsY = (numInstances + 31) / 32;
+
 		/* node transformation */
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeTransformPipeline);
 
-		// std::cout << "Check [0]" << std::endl;
-		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
-			renderData.rdAvengComputeTransformPipelineLayout, 0, 1, &renderData.rdAvengComputeTransformDescriptorSets.at(currentFrameIndex), 0, 0);
-
-		mUploadToUBOTimer.start();
-		mComputeModelData.pkModelOffset = modelOffset;
-		vkCmdPushConstants(renderData.rdCommandBuffersCompute.at(currentFrameIndex), renderData.rdAvengComputeTransformPipelineLayout,
-			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
-		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+		vkCmdPushConstants(
+			renderData.rdCommandBuffersCompute.at(currentFrameIndex),
+			renderData.rdAvengBindlessPipelineLayout, // Unified bindless layout
+			VK_SHADER_STAGE_COMPUTE_BIT,
+			sizeof(VkPushConstants), // Offset into pc range
+			sizeof(VkComputePushConstants),
+			&mComputeModelData
+		);
 
 		vkCmdDispatch(renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, groupsY, 1);
 
@@ -1152,17 +1148,6 @@ namespace aveng {
 		vkCmdBindPipeline(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
 			renderData.rdAvengComputeMatrixMultPipeline);
 
-		VkDescriptorSet modelDescriptorSet = model->getMatrixMultDescriptorSet(currentFrameIndex);
-		std::vector<VkDescriptorSet> computeSets = { renderData.rdAvengComputeMatrixMultDescriptorSets.at(currentFrameIndex), modelDescriptorSet }; 
-		vkCmdBindDescriptorSets(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_COMPUTE,
-			renderData.rdAvengComputeMatrixMultPipelineLayout, 0, static_cast<uint32_t>(computeSets.size()), computeSets.data(), 0, 0);
-
-		mUploadToUBOTimer.start();
-		mComputeModelData.pkModelOffset = modelOffset;
-		vkCmdPushConstants(renderData.rdCommandBuffersCompute.at(currentFrameIndex), renderData.rdAvengComputeMatrixMultPipelineLayout,
-			VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(sizeof(VkComputePushConstants)), &mComputeModelData);
-		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
-
 		vkCmdDispatch (renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, groupsY, 1);
 
 		/* memory barrier after compute shader
@@ -1180,6 +1165,9 @@ namespace aveng {
 		vkCmdPipelineBarrier(renderData.rdCommandBuffersCompute.at(currentFrameIndex), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, // TODO - Inspect the dstStageMask usage
 			&boneMatrixBufferBarrier, 0, nullptr);
+
+		renderData.rdComputeTime += mComputeTimer.stop();
+
 	}
 
 	/**
@@ -1484,7 +1472,7 @@ namespace aveng {
 
 	void Renderer::updateLights() {
 		// Renderer lighting
-		renderLights(pointLightSystem.getPipeline(), pointLightSystem.getPipelineLayout());
+		renderLights();
 	}
 
 	bool Renderer::drawModels(
@@ -1899,6 +1887,7 @@ namespace aveng {
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mModelMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, mMaterialBuffers[i]);
 
 			// TODO Material Buffers
 
@@ -1919,10 +1908,9 @@ namespace aveng {
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeBasicTerrainDescriptorLayout, nullptr);
-
-		// Bindless
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdBindlessDescriptorLayout, nullptr);
 
+		//
 		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
 
 		// Bindless
@@ -1945,7 +1933,7 @@ namespace aveng {
 			mPerspectiveViewMatrixUBOBuffers.data(),
 			mPerspectiveViewMatrixUBOBuffers.size()
 		};
-			
+
 		return true;
 	}
 
@@ -1984,7 +1972,7 @@ namespace aveng {
 		b_poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 		b_poolInfo.poolSizeCount = static_cast<uint32_t>(ArraySize(b_poolSizes));
 		b_poolInfo.pPoolSizes = b_poolSizes;
-		b_poolInfo.maxSets = 1;
+		b_poolInfo.maxSets = 3;
 
 		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &b_poolInfo, nullptr, &renderData.avengBindlessDescriptorPool);
 		if (result != VK_SUCCESS) {
@@ -2127,9 +2115,7 @@ namespace aveng {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
-			VkDescriptorSetAllocateInfo allocInfo{
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
-			};
+			VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 			allocInfo.descriptorPool = renderData.avengBindlessDescriptorPool;
 			allocInfo.descriptorSetCount = 1;
 			allocInfo.pSetLayouts = &renderData.rdBindlessDescriptorLayout;
@@ -2279,9 +2265,9 @@ namespace aveng {
 			materialWriteDescriptorSet,
 			lightWriteDescriptorSet,
 			modelMatDescriptorSet,
-			boneMatDescriptorSet,
-			trsWriteDescriptorSet,
-			nodeTransformDescriptorSet,
+			boneMatDescriptorSet,			// Compute
+			trsWriteDescriptorSet,			// Compute
+			nodeTransformDescriptorSet,		// Compute
 			texelDescriptorSet,
 			textureArrayDescriptorSet
 		};

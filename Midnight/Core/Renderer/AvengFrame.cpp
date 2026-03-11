@@ -207,7 +207,7 @@ namespace aveng {
 		if (gameData.currentAppMode == AppMode::Editor) {
 
 			// Editor takes over lighting
-			pEditor->updateLights();
+			pEditor->renderLights();
 
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
 			pEditor->drawModels(modelLib__, pkt, currentFrameIndex); 
@@ -216,7 +216,7 @@ namespace aveng {
 		else {
 #endif
 
-			renderer.updateLights();
+			renderer.renderLights();
 
 			renderer.drawModels(
 				framePacketBuilder_.getFramePacket(currentFrameIndex),

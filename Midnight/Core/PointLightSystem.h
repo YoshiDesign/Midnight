@@ -14,12 +14,13 @@ namespace aveng {
 		PointLightSystem() = delete;
 		PointLightSystem(EngineDevice& device, VkRenderData& renderData);
 		~PointLightSystem();
+
 		void initialize(VkRenderPass renderPass, int nColorAttachments, bool colorMask);
-		// void createDescriptorLayouts();
 		PointLightSystem(const PointLightSystem&) = delete;
 		PointLightSystem& operator=(const PointLightSystem&) = delete;
-		void render(int frameIndex, VkCommandBuffer commandBuffer, int numLights);
-		VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
+
+		// void createDescriptorLayouts();
+		// VkPipelineLayout getPipelineLayout() { return pipelineLayout; }
 		const VkPipeline& getPipeline() { return pipeline; }
 
 	private:
@@ -28,7 +29,7 @@ namespace aveng {
 
 		EngineDevice& engineDevice;
 
-		VkPipelineLayout pipelineLayout;
+		//VkPipelineLayout pipelineLayout;
 		VkPipeline pipeline;
 		VkRenderData& renderData;
 

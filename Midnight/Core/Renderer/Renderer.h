@@ -153,7 +153,7 @@ namespace aveng {
 		void runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t numberOfBones);
 		
 		void initializePointLights();
-		void renderLights(const VkPipeline& pipeline, const VkPipelineLayout& layout);
+		void renderLights();
 		int getLightCount() const { return mPointLightData.numLights; }
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();

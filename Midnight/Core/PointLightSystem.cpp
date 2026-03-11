@@ -16,34 +16,23 @@ namespace aveng {
 	// Initialize point light system using existing descriptor set layouts
 	void PointLightSystem::initialize(VkRenderPass renderPass, int nColorAttachments, bool colorMask)
 	{
-		// Important: Using rdAvengDescriptorLayout here which means 
-		std::vector<VkDescriptorSetLayout> layouts = { renderData.rdAvengDescriptorLayout };
-		PipelineLayout::init(engineDevice, pipelineLayout, layouts);
 		createPipeline(renderPass, nColorAttachments, colorMask);
 	}
 
-	PointLightSystem::~PointLightSystem()
-	{
-		vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr);
-		vkDestroyPipeline(engineDevice.device(), pipeline, nullptr);
-	}
+	PointLightSystem::~PointLightSystem() {	}
 
+	/* Piggy-backing our bindlessPipeline for now */
 	void PointLightSystem::createPipeline(VkRenderPass renderPass, int nColorAttachments, bool colorMask)
 	{
 		std::string vertexShaderFile = "shaders/point_light.vert.spv";
 		std::string fragmentShaderFile = "shaders/point_light.frag.spv";
 
-		if (!LightPipeline::init(engineDevice, pipelineLayout, pipeline, renderPass, 
+		if (!LightPipeline::init(engineDevice, renderData.rdAvengBindlessPipelineLayout, pipeline, renderPass, 
 			nColorAttachments, colorMask, vertexShaderFile, fragmentShaderFile)) 
 		{
 			Logger::log(1, "%s error: could not init aveng point light shader pipeline\n", __FUNCTION__);
 			throw std::runtime_error("point light system fail 1");
 		}
-	}
-
-	void PointLightSystem::render(int frameIndex, VkCommandBuffer commandBuffer, int numLights)
-	{
-
 	}
 
 } 
