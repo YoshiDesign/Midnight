@@ -301,6 +301,7 @@ namespace aveng {
 			// Update the ModelSkinMeta buffer
 
 
+
 			if (entry.isAnimated) {
 				std::cout << entry.key << " has " << entry.boneMeta.boneCount << " bones.\n";
 			}

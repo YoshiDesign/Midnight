@@ -52,12 +52,16 @@ namespace aveng {
 		// Define buffer vec's that are managed by the Renderer
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mPointLightUBOBuffers			 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdBoneMetaBuffers	 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mModelMatrixBuffers				 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mNodeTransformBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderTrsMatrixBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderBoneMatrixBuffers		 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mMaterialBuffers				 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		renderData.rdSelectedInstanceBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT); // This one can be used as needed by the renderer and the editor.
+		renderData.rdSelectedInstanceBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT); // This one can be used as needed by the renderer and the editor.
+		renderData.rdShaderBoneMatrixOffsetBuffers  = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdBoneParentNodeIndexBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
 
 		// Define descriptor set vec's
 		// renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
@@ -1135,6 +1139,9 @@ namespace aveng {
 
 			UniformBuffer::cleanup(engineDevice, mPerspectiveViewMatrixUBOBuffers[i]);
 			UniformBuffer::cleanup(engineDevice, mPointLightUBOBuffers[i]);
+			UniformBuffer::cleanup(engineDevice, renderData.rdBoneMetaBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdShaderBoneMatrixOffsetBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdBoneParentNodeIndexBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderTrsMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mModelMatrixBuffers[i]);
@@ -1160,6 +1167,8 @@ namespace aveng {
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeBasicTerrainDescriptorLayout, nullptr);
+
+		//
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdBindlessDescriptorLayout, nullptr);
 
 		//

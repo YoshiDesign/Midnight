@@ -370,7 +370,7 @@ namespace aveng {
 		std::vector<int32_t> globalBoneParentIndexList{};							// Data - Reserved/Resized during model loading
 
 		std::vector<VkUniformBufferData> rdBoneMetaBuffers;				// Uniform Buffer
-		std::vector<ModelSkinMeta> rdBoneMetaBufferData;				// Data
+		std::vector<ModelSkinMeta> rdBoneMetaBufferData{};				// Data
 
 		/*
 		 * Editor Data
