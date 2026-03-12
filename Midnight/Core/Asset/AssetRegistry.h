@@ -17,6 +17,13 @@ namespace aveng {
 	using AssetKey = std::string; // Identifies a model - Used to request a model that hasn't been loaded into memory yet
 	using ModelId = uint32_t; // Used internally by renderer / instance managers for fast lookups
 
+	struct ModelBoneMeta {
+		uint32_t boneOffsetBase;   // index into global mat4 buffer
+		uint32_t boneParentBase;   // index into global parent index buffer
+		uint32_t boneCount;
+		uint32_t pad;
+	};
+
 	// This is private to the model registry mechanics.
 	struct ModelEntry {
 		std::unique_ptr<AvengModel> model; // We could do away with this entirely by replacing it with each model's "guts", and abandoning an explicit unique_ptr to it.
@@ -27,8 +34,9 @@ namespace aveng {
 		ModelId id;                 // runtime identity
 		AssetKey key;               // external identity
 		bool isAnimated = false;		// Model Constant
-		uint32_t boneCount;				// Model Constant
 		glm::mat4 rootTransform{1.f};	// Model Constant
+		ModelBoneMeta boneMeta;
+		uint32_t skinMetaIndex{ 0 };	// This models index in the `ModelSkinMeta` vector (UBO Data)
 
 		ModelEntry() = default;
 
@@ -64,6 +72,7 @@ namespace aveng {
 		ModelId id;
 		glm::mat4 root;          // model-space -> engine-space correction created at model load
 		uint32_t  boneCount = 0; // 0 for static models
+		uint32_t skinMetaIndex = 0; // Not for static models
 		bool      animated = false;
 	};
 

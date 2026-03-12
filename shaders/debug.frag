@@ -17,15 +17,12 @@ layout (push_constant) uniform Constants {
   uint pickId;
 };
 
-layout(set = 1, binding = 3) uniform LightsUbo {
+layout(set = 0, binding = 6) uniform LightsUbo {
     vec4 ambientLightColor;
     vec4 lightPositions[200];  // w component is radius
     vec4 lightColors[200];     // w component is intensity
     uint numLights;
 } u_Lights;
-
-vec3 lightPos = vec3(4.0, 3.0, 6.0);
-vec3 lightColor = vec3(1.0, 1.0, 1.0);
 
 float toSRGB(float x) {
 if (x <= 0.0031308)

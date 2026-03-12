@@ -141,6 +141,14 @@ namespace aveng {
 		alignas(16) glm::mat4 projectionMatrix{};
 	};
 
+	// Uniform scalars, ezpz
+	struct alignas(16) ModelSkinMeta {
+		uint32_t boneOffsetBase;
+		uint32_t boneParentBase;
+		uint32_t boneCount;
+		uint32_t pad;
+	};
+
 	struct VkPushConstants {
 		uint32_t pkModelBoneStride;
 		uint32_t pkInstanceBaseIndex;
@@ -150,6 +158,7 @@ namespace aveng {
 
 	struct VkComputePushConstants {
 		uint32_t pkModelOffset;
+		uint32_t skinMetaIndex;
 	};
 
 	struct InstanceMaterial {
@@ -213,6 +222,11 @@ namespace aveng {
 		Span<VkUniformBufferData>       viewPointLightUBOs;
 	};
 
+	struct GlobalSkeletonBufferState {
+		uint32_t nextBoneOffsetMatIdx = 0; // index into bone offset matrices
+		uint32_t nextBoneParentIdxIdx = 0; // index of a bone's node's parent-node index
+	};
+
 	struct VkRenderData {
 
 		/**
@@ -258,6 +272,9 @@ namespace aveng {
 		float rdViewAzimuth = 330.0f;
 		float rdViewElevation = -20.0f;
 		glm::vec3 rdCameraWorldPosition = glm::vec3(2.0f, 5.0f, 7.0f);
+
+		/* "Allocator-like" Animation Data */
+		GlobalSkeletonBufferState skinState{0,0};
 
 		/**
 		* Command buffers
@@ -332,7 +349,7 @@ namespace aveng {
 		VkPipelineLayout rdAvengComputeBasicTerrainPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
 		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
-
+		   
 		VkPipeline rdDebugPipeline = VK_NULL_HANDLE;
 		VkPipeline rdDebugAnimatedPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
@@ -344,20 +361,29 @@ namespace aveng {
 		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
 
-		//VkDescriptorPool rdImguiDescriptorPool = VK_NULL_HANDLE;
-		std::vector<VkShaderStorageBufferData> rdSelectedInstanceBuffers; // Storage Buffer
+		std::vector<VkShaderStorageBufferData> rdSelectedInstanceBuffers;		// Storage Buffer
 
-	/*
-	* Editor Data
-	*/
-	instanceEditMode rdInstanceEditMode = instanceEditMode::move;
+		std::vector<VkShaderStorageBufferData> rdShaderBoneMatrixOffsetBuffers;	// Storage Buffer
+		std::vector<glm::mat4> globalBoneOffsetMatricesList{};					// Data - Reserved/Resized during model loading
 
-	MatrixBuffersView matrixBuffersView; // Proxy for editor. TODO - Rename it
-	LightingBuffersView pointLightBufferView;
+		std::vector<VkShaderStorageBufferData> rdBoneParentNodeIndexBuffers;		// Storage Buffer
+		std::vector<int32_t> globalBoneParentIndexList{};							// Data - Reserved/Resized during model loading
 
-	std::vector<VkImage> rdSelectionImages;
-	std::vector<VkImageView> rdSelectionImageViews;
-	VkFormat rdSelectionFormat = VK_FORMAT_UNDEFINED;
-	std::vector<VmaAllocation> rdSelectionImageAllocs;
+		std::vector<VkUniformBufferData> rdBoneMetaBuffers;				// Uniform Buffer
+		std::vector<ModelSkinMeta> rdBoneMetaBufferData;				// Data
+
+		/*
+		 * Editor Data
+		 */
+		instanceEditMode rdInstanceEditMode = instanceEditMode::move;
+
+		MatrixBuffersView matrixBuffersView; // Proxy for editor. TODO - Rename it
+		LightingBuffersView pointLightBufferView;
+
+		std::vector<VkImage> rdSelectionImages;
+		std::vector<VkImageView> rdSelectionImageViews;
+		VkFormat rdSelectionFormat = VK_FORMAT_UNDEFINED;
+		std::vector<VmaAllocation> rdSelectionImageAllocs;
+
 	};
 }

@@ -37,7 +37,7 @@ namespace aveng {
 		entry.key = "null/";
 		entry.model = nullptr;
 		entry.isAnimated = false;
-		entry.boneCount = 0;
+		entry.boneMeta.boneCount = 0;
 
 		registry_.models.emplace_back(std::move(entry));
 		registry_.idByKey.emplace("null", NullModelId);
@@ -263,13 +263,14 @@ namespace aveng {
 			// 1) Read
 			std::vector<std::byte> modelBytes = assetSource_->readModelBytes(key);
 
+			uint32_t nextBoneOffset = renderData_.skinState.nextBoneOffsetMatIdx;
+			uint32_t nextParentOffset = renderData_.skinState.nextBoneParentIdxIdx;
+
 			// 2) Build/import
 			std::unique_ptr<AvengModel> model = buildModelFromSource(key, modelBytes, frameIndex);
 			if (!model) {
 				ejectModel(registry_.idByKey[key], key);
 				std::printf("[ModelLibrary] Failed to load model: %s\n", key.c_str());
-				// Policy: do NOT requeue automatically (avoid infinite spam).
-				// If you want retry-once, you can push_back(key) here conditionally.
 				continue;
 			}
 
@@ -277,24 +278,41 @@ namespace aveng {
 			entry.rootTransform = model->getRootTranformationMatrix();
 			entry.model = std::move(model);
 			entry.isAnimated = entry.model->hasAnimations();
+
+			const uint32_t boneCount = static_cast<uint32_t>(entry.model->getBoneList().size());
+			assert(entry.model->nParentNodeIndices == boneCount);
+
+			entry.boneMeta.boneOffsetBase = nextBoneOffset;
+			entry.boneMeta.boneParentBase = nextParentOffset;
+			entry.boneMeta.boneCount = boneCount;
+
+			// [IMPORTANT] Sensitive data - these are globally determining the next model's offset
+			// VERY	MUCH NOT THREAD SAFE TO MULTITHREAD THE PENDING MODEL LOADS FOR THIS REASON
+			renderData_.skinState.nextBoneOffsetMatIdx += boneCount;
+			renderData_.skinState.nextBoneParentIdxIdx += boneCount;
+
+			ModelSkinMeta ms{
+				renderData_.skinState.nextBoneOffsetMatIdx,
+				renderData_.skinState.nextBoneParentIdxIdx,
+				boneCount,
+				0xBEEEEEEF // there it is (std140)
+			};
+
+			// Update the ModelSkinMeta buffer
+
+
 			if (entry.isAnimated) {
-				entry.boneCount = entry.model->getBoneList().size();
-				std::cout << entry.key << " has " << entry.boneCount << " bones.\n";
+				std::cout << entry.key << " has " << entry.boneMeta.boneCount << " bones.\n";
 			}
 
 			anyLoaded = true;
 			lastLoadedId = entry.id;
 
-			//std::printf("[ModelLibrary] Loaded model id=%u key=%s animated=%s\n",
-			//	entry.id, entry.key.c_str(), entry.isAnimated ? "true" : "false"
-			//);
-
-			// Optional: if you have GPU upload steps, do them HERE (still between frames)
-			// uploadModelToGpu(entry);
 		}
 
 		// Arbitrary
 		if (anyLoaded && lastLoadedId != NullModelId) {
+			// TODO - Why is this occurring here?
 			// After uploading latest model, make it the editor's currently selected model
 			registry_.selectedModel = lastLoadedId;
 		}

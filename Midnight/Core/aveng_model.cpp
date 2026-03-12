@@ -1,3 +1,5 @@
+#include <iterator>
+#include <algorithm>
 #include "aveng_model.h"
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/IndexBuffer.h"
@@ -102,7 +104,7 @@ namespace aveng {
 
 	/* */
 	bool AvengModel::loadModelV3( // Quick n' dirty for the new texture system. TODO: V4
-		const VkRenderData& renderData,
+		VkRenderData& renderData,
 		const AssetKey& key,                // keep for debug + extension hint
 		std::span<const std::byte> bytes,   // data from IAssetSource
 		unsigned int extraImportFlags,		// Assimp flags
@@ -201,28 +203,69 @@ namespace aveng {
 
 	/* */
 	bool AvengModel::build(
-		const VkRenderData& renderData,
+		VkRenderData& renderData,
 		const AssetKey& key, // Not strictly needed
 		const aiScene* scene,
 		aiNode* rootNode,
 		const int frameIndex
 	) {
-	
-		std::vector<glm::mat4> boneOffsetMatricesList{};
-		std::vector<int32_t> boneParentIndexList{};
+
 		std::cout << "Model Loading: " << key << "\n";
+
+		/*	
+		 *	Note: Parent lookup is currently O(n²) over bones. 
+		 *	Fine for now if skeletons are small, but later you may want a bone name -> index map 
+		 */
+
 		for (const auto& bone : mBoneList) {
+
+			// Push the offsetMatrix
 			boneOffsetMatricesList.emplace_back(bone->getOffsetMatrix());
 
+			// Node name of this bone's node's parent node
 			std::string parentNodeName = mNodeMap.at(bone->getBoneName())->getParentNodeName();
-			const auto boneIter = std::find_if(mBoneList.begin(), mBoneList.end(), [parentNodeName](std::shared_ptr<AssimpBone>& bone) { return bone->getBoneName() == parentNodeName; });
+
+			// Iterate the entire bone list to find the node of the current bone's node's parent node
+			const auto boneIter = std::find_if(mBoneList.begin(), mBoneList.end(), 
+				[parentNodeName](const std::shared_ptr<AssimpBone>& bone) { // Shared ptr fun
+					return bone->getBoneName() == parentNodeName; 
+				}
+			);
+
+			// This implies the current bone is attached directly to the root node
 			if (boneIter == mBoneList.end()) {
+				nParentNodeIndices++;
 				boneParentIndexList.emplace_back(-1); // root node gets a -1 to identify
 			}
+			// Append the index of our current bone's node's parent node
 			else {
+				nParentNodeIndices++;
 				boneParentIndexList.emplace_back(std::distance(mBoneList.begin(), boneIter));
 			}
 		}
+
+		renderData.globalBoneOffsetMatricesList.reserve(
+			renderData.globalBoneOffsetMatricesList.size() + boneOffsetMatricesList.size()
+		);
+
+		renderData.globalBoneParentIndexList.reserve(
+			renderData.globalBoneParentIndexList.size() + boneParentIndexList.size()
+		);
+
+		// Append to the global bone data buffer
+		renderData.globalBoneOffsetMatricesList.insert(
+			renderData.globalBoneOffsetMatricesList.end(),
+			boneOffsetMatricesList.begin(),
+			boneOffsetMatricesList.end()
+		);
+
+		renderData.globalBoneParentIndexList.insert(
+			renderData.globalBoneParentIndexList.end(),
+			boneParentIndexList.begin(),
+			boneParentIndexList.end()
+		);
+
+		// TODO - Memory pressure tracking in GUI
 
 		/* create vertex buffers for the meshes */
 		for (const auto& mesh : mModelMeshes) {
@@ -238,28 +281,28 @@ namespace aveng {
 		}
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-
+			// TODO
 			size_t boneMatBufferSize = boneOffsetMatricesList.size() * sizeof(glm::mat4);
 			size_t boneParentBufferSize = boneParentIndexList.size() * sizeof(int32_t);
 
-			ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
-			ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
+			// ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
+			// ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
 
 			/* SSBOs uploaded once and forgotten about. No need to persistently map */
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mShaderBoneMatrixOffsetBuffers[i], boneOffsetMatricesList))
 			{
 				throw std::runtime_error("model buffer allocation size was incorrect");
-			};
+			}
 
 			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mBoneParentMatrixBuffers[i], boneParentIndexList))
 			{
 				throw std::runtime_error("model buffer allocation size was incorrect");
-			};
+			}
 
 		}
 
 		/* create descriptor set (for each available frame in flight) for per-model data */
-		createDescriptorSet(renderData);
+		// createDescriptorSet(renderData);
 
 		/* animations */
 		unsigned int numAnims = scene->mNumAnimations;
@@ -281,9 +324,9 @@ namespace aveng {
 
 		mRootTransformMatrix = local_engine;
 
-		Logger::log(1, "%s: - model has a total of %i texture%s\n", __FUNCTION__, mTextures.size(), mTextures.size() == 1 ? "" : "s");
-		std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
-		std::printf("%s: - model has a total of %zi animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
+		//Logger::log(1, "%s: - model has a total of %i texture%s\n", __FUNCTION__, mTextures.size(), mTextures.size() == 1 ? "" : "s");
+		//std::printf("%s: - model has a total of %zi bone%s\n", __FUNCTION__, mBoneList.size(), mBoneList.size() == 1 ? "" : "s");
+		//std::printf("%s: - model has a total of %zi animation%s\n", __FUNCTION__, numAnims, numAnims == 1 ? "" : "s");
 		// std::printf("%s: successfully loaded model '%s' (%s)\n", __FUNCTION__, filepath.c_str(), mModelFilename.c_str());
 		return true;
 

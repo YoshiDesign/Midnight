@@ -144,7 +144,7 @@ namespace aveng {
 		// New methods for descriptor/buffer management
 		void updateCamera();
 
-		void runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t numberOfBones);
+		void runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t skinMetaOffset, uint32_t numberOfBones);
 		
 		void initializePointLights();
 		void renderLights();

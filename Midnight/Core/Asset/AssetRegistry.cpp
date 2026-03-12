@@ -31,7 +31,7 @@ namespace aveng {
 		out.durationTicks = clips[clipIndex]->getClipDuration();
 		out.ticksPerSecond = clips[clipIndex]->getClipTicksPerSecond();
 		out.animChannels = clips[clipIndex]->getChannels();
-		out.boneCount = e->boneCount;
+		out.boneCount = e->boneMeta.boneCount;
 		return true;
 	}
 
@@ -40,35 +40,38 @@ namespace aveng {
 		return models.size();
 	}
 
-	bool ModelRegistryData::isModelAnimated(ModelId id, ModelMeta& out) const {
+	bool ModelRegistryData::isModelAnimated(ModelId id, ModelMeta& out) const {			// These are identical....
 		const ModelEntry* e = get(id); // Micro-Optimization - quit early if nullModelId
 		if (!e || e->id == NullModelId || e->model == nullptr) return false;
 		out.id = e->id;
 		out.animated = e->isAnimated;
-		out.boneCount = e->boneCount;
+		out.boneCount = e->boneMeta.boneCount;
 		out.root = e->rootTransform;
+		out.skinMetaIndex = e->skinMetaIndex;
 		return e->isAnimated;
 	}
 
 	// IModelQuery
-	bool ModelRegistryData::isModelLoaded(ModelId id, ModelMeta& out) const {
+	bool ModelRegistryData::isModelLoaded(ModelId id, ModelMeta& out) const {			// These are identical....
 		const ModelEntry* e = get(id);
-		if (!e || e->id == NullModelId || e->model == nullptr) return false;
+		if (!e || e->id == NullModelId || e->model == nullptr) { return false; }
 		out.id = e->id;
 		out.animated = e->isAnimated;
-		out.boneCount = e->boneCount;
+		out.boneCount = e->boneMeta.boneCount;
 		out.root = e->rootTransform;
+		out.skinMetaIndex = e->skinMetaIndex;
 		return true;
 	}
 
 	// IModelQuery
-	bool ModelRegistryData::tryGetModelMeta(ModelId id, ModelMeta& out) const {
+	bool ModelRegistryData::tryGetModelMeta(ModelId id, ModelMeta& out) const {			// These are identical....
 		const ModelEntry* e = get(id);
-		if (!e || e->id == NullModelId || e->model == nullptr) return false;
+		if (!e || e->id == NullModelId || e->model == nullptr) { return false; }
 		out.id = e->id;
-		out.root = e->rootTransform;
-		out.boneCount = e->boneCount;
 		out.animated = e->isAnimated;
+		out.boneCount = e->boneMeta.boneCount;
+		out.root = e->rootTransform;
+		out.skinMetaIndex = e->skinMetaIndex;
 		return true;
 	}
 

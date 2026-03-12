@@ -39,7 +39,7 @@ namespace aveng {
 		~AvengModel() = default;
 
 		bool loadModelV3( // TODO - V4
-			const VkRenderData& renderData,
+			VkRenderData& renderData,
 			const AssetKey& key,                // keep for debug + extension hint
 			std::span<const std::byte> bytes,   // data from IAssetSource
 			unsigned int extraImportFlags,		// Assimp flags
@@ -50,7 +50,7 @@ namespace aveng {
 		);
 
 		bool build(
-			const VkRenderData& renderData,
+			VkRenderData& renderData,
 			const AssetKey& key, // Not strictly needed
 			const aiScene* scene,
 			aiNode* rootNode,
@@ -107,6 +107,9 @@ namespace aveng {
 		unsigned int getTriangleCount();
 		unsigned int getTriangleCount() const;
 
+		std::vector<glm::mat4> getBoneOffsetMatricesList() { return boneOffsetMatricesList; }
+		std::vector<int32_t> getBoneParentIndexList() { return boneParentIndexList; }
+
 		void drawInstancedV2(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout pipelineLayout, uint32_t instanceCount, int frameIndex) const;
 		void drawInstancedV3(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout bindlessLayout, uint32_t instanceCount, int frameIndex) const;
 
@@ -116,27 +119,39 @@ namespace aveng {
 
 		const VkShaderStorageBufferData& getMatOffBuffer(int findex) const { return mShaderBoneMatrixOffsetBuffers[findex]; }
 
+		// Important indices. Might want to relocate these, or otherwise avoid copying them carelessly to other destinations
+		uint32_t nParentNodeIndices = 0;
+
 	private:
 
 		EngineDevice& engineDevice;
 		bool hasIndexBuffer = false;
 
 		// map textures to external or internal texture names
-		std::unordered_map<std::string, VkTextureData> mTextures{};
-		VkTextureData mPlaceholderTexture{};
-		VkTextureData mWhiteTexture{};
+		std::unordered_map<std::string, VkTextureData> mTextures{}; // deprecated
+		VkTextureData mPlaceholderTexture{}; // deprecated
+		VkTextureData mWhiteTexture{}; // deprecated
 
+		// GPU Data
 		std::vector<VkMesh> mModelMeshes{};
+
+		// GPU resource members
 		std::vector<VkVertexBufferData> mVertexBuffers{};
 		std::vector<VkIndexBufferData> mIndexBuffers{};
+
+		// Compute data members - NOTE - These are ephemeral and will be destroyed after the model is loaded.
+		// Their contents go to global buffers in VkRenderData
+		std::vector<glm::mat4> boneOffsetMatricesList{};
+		std::vector<int32_t> boneParentIndexList{};
+
 		unsigned int mTriangleCount = 0;
 		unsigned int mVertexCount = 0;
 
 		/* store the root node for direct access */
 		std::shared_ptr<AssimpNode> mRootNode = nullptr;
 
-		std::vector<VkShaderStorageBufferData> mBoneParentMatrixBuffers;
-		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixOffsetBuffers;
+		std::vector<VkShaderStorageBufferData> mBoneParentMatrixBuffers; // DEPRECATED
+		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixOffsetBuffers; // DEPRECATED
 
 		/* a map to find the node by name */
 		std::unordered_map<std::string, std::shared_ptr<AssimpNode>> mNodeMap{}; // Shared ptr nonsense
@@ -163,8 +178,8 @@ namespace aveng {
 
 		glm::mat4 mRootTransformMatrix = glm::mat4(1.0f);
 
-		std::vector<VkDescriptorSet> mMatrixMultPerModelDescriptorSets;
-		VkDescriptorSetLayout mComputeMatrixMultPerModelDescriptorSetLayout;
+		std::vector<VkDescriptorSet> mMatrixMultPerModelDescriptorSets; // DEPRECATED
+		VkDescriptorSetLayout mComputeMatrixMultPerModelDescriptorSetLayout; // DEPRECATED
 
 		std::string mModelFilenamePath{"nullpath"};
 		std::string mModelFilename{"nullname"}; // Deprecatee this, or let the null instantiation set this name, not default to it

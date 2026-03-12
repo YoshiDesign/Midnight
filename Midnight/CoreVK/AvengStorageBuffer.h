@@ -1,22 +1,32 @@
 #pragma once
-
-#include <vulkan/vulkan.h>
-#include "Utils/glm_includes.h"
+#include <cstddef>
+#include <span>
+#include <cstdint>
+#include <vulkan/vulkan_core.h>
+#include <AMD/vk_mem_alloc.h>
 #include "Utils/Logger.h"
-#include "CoreVK/VkRenderData.h"
 #include "CoreVK/EngineDevice.h"
-#include "CoreVK/aveng_buffer.h"
-#include "avpch.h"
+#include "CoreVK/VkRenderData.h"
 
+/* 
+ * Things to consider/study: 
+ *   - staging uploads into device-local buffers should writes become more frequent (which they already do!)
+ */
 
 namespace aveng {
     class ShaderStorageBuffer {
     public:
         /* set an arbitraty buffer size as default */
-        static bool init(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, MapMode mode, ResidentMode resMode=ResidentMode::CPU, size_t bufferSize=1024);
+        static bool init(
+            EngineDevice& engineDevice, 
+            VkShaderStorageBufferData& SSBOData, 
+            MapMode mode, 
+            ResidentMode resMode=ResidentMode::CPU, 
+            size_t bufferSize=5120
+        );
 
         template <typename T>
-        static bool uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::vector<T> bufferData) {
+        static bool uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const T> bufferData) {
             if (bufferData.empty()) {
                 return false;
             }
@@ -33,17 +43,17 @@ namespace aveng {
                 return false;
             }
             std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(T)));
-            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
 
             if (!SSBOData.isHostCoherent) {
                 vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
             }
 
-            return false;
+            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+            return true;
         }
 
         template <typename T>
-        static bool uploadSsboData(EngineDevice& engineDevice, const VkShaderStorageBufferData& SSBOData, std::vector<T> bufferData) {
+        static bool uploadSsboData(EngineDevice& engineDevice, const VkShaderStorageBufferData& SSBOData, std::span<const T> bufferData) {
             if (bufferData.empty()) {
                 return false;
             }
@@ -60,16 +70,68 @@ namespace aveng {
                 return false;
             }
             std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(T)));
-            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
 
             if (!SSBOData.isHostCoherent) {
                 vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
             }
 
-            return false;
+            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+            return true;
         }
+
         template <typename T>
-        static bool uploadPersistentSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::vector<T> bufferData) {
+        static bool uploadSsboDataRange(
+            EngineDevice& engineDevice,
+            VkShaderStorageBufferData& ssboData,
+            const std::span<const T> bufferData,
+            uint32_t offsetElements)
+        {
+            if (bufferData.empty()) {
+                return true;
+            }
+
+            const VkDeviceSize writeOffsetBytes = static_cast<VkDeviceSize>(offsetElements) * sizeof(T);
+            const VkDeviceSize writeSizeBytes = static_cast<VkDeviceSize>(bufferData.size()) * sizeof(T);
+
+            if ((writeOffsetBytes + writeSizeBytes) > ssboData.bufferSize) {
+                Logger::log(
+                    1,
+                    "%s: SSBO range out of bounds. Buffer %p, bufferSize=%zu, writeOffset=%zu, writeSize=%zu\n",
+                    __FUNCTION__,
+                    ssboData.buffer,
+                    static_cast<size_t>(ssboData.bufferSize),
+                    static_cast<size_t>(writeOffsetBytes),
+                    static_cast<size_t>(writeSizeBytes)
+                );
+                return false;
+            }
+
+            void* mapped = nullptr;
+            VkResult result = vmaMapMemory(engineDevice.allocator(), ssboData.bufferAlloc, &mapped);
+            if (result != VK_SUCCESS) {
+                Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+                return false;
+            }
+
+            auto* dst = static_cast<std::byte*>(mapped) + writeOffsetBytes;
+            std::memcpy(dst, bufferData.data(), static_cast<size_t>(writeSizeBytes));
+
+            if (!ssboData.isHostCoherent) {
+                vmaFlushAllocation(
+                    engineDevice.allocator(),
+                    ssboData.bufferAlloc,
+                    writeOffsetBytes,
+                    writeSizeBytes
+                );
+            }
+
+            vmaUnmapMemory(engineDevice.allocator(), ssboData.bufferAlloc);
+            return true;
+        }
+
+        // Persistent objects do not need to be unmapped
+        template <typename T>
+        static bool uploadPersistentSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const T> bufferData) {
 
             assert(SSBOData.mapped != nullptr && "Persistent SSBO has no mapped memory range.");
 
@@ -89,7 +151,7 @@ namespace aveng {
                 vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
             }
 
-            return false;
+            return true;
         }
         
         static bool checkForResize(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData,

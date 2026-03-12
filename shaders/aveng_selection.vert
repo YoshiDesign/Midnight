@@ -18,12 +18,12 @@ layout (push_constant) uniform Constants {
   uint pickId;
 };
 
-layout (std140, set = 1, binding = 0) uniform Matrices {
+layout (std140, set = 0, binding = 8) uniform Matrices {
   mat4 view;
   mat4 projection;
 };
 
-layout (std430, set = 1, binding = 1) readonly restrict buffer WorldPosMatrices {
+layout (std430, set = 0, binding = 5) readonly restrict buffer WorldPosMatrices {
   mat4 worldPosMat[];
 };
 

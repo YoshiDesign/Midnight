@@ -536,7 +536,7 @@ namespace aveng {
 		return 0;
 	}
 
-	void Renderer::runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t numberOfBones) {
+	void Renderer::runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t skinMetaOffset, uint32_t numberOfBones) {
 
 		/*
 		* Potential for optimization:
@@ -559,7 +559,8 @@ namespace aveng {
 		*/
 
 		mComputeTimer.start();
-		mComputeModelData.pkModelOffset = modelOffset; // Identical to the VkPushConstants::pkInstanceBaseIndex
+		mComputeModelData.pkModelOffset = modelOffset; // Identical to the VkPushConstants::pkInstanceBaseIndex - for parallel instance data (base)
+		mComputeModelData.skinMetaIndex = skinMetaOffset;
 
 		VkDescriptorSet computeSets[1] = { renderData.rdAvengBindlessDescriptorSets[currentFrameIndex] };
 
@@ -832,7 +833,7 @@ namespace aveng {
 				if (!model) continue;
 				//std::vector<glm::mat4> debugBoneMat(model->getMatOffBuffer(currentFrameIndex).bufferSize, glm::mat4(1.0f));
 				//ShaderStorageBuffer::uploadSsboData(engineDevice, model->getMatOffBuffer(currentFrameIndex), debugBoneMat);
-				runComputeShaders(model, b.alignedInstanceCount, b.boneBaseOffset, b.boneCount);
+				runComputeShaders(model, b.alignedInstanceCount, b.boneBaseOffset, b.skinMetaOffset, b.boneCount);
 			}
 
 			// End command recording for Compute Queue
@@ -953,9 +954,9 @@ namespace aveng {
 			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
 			if (!model) continue;
 
-			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset;
-			mModelPushConst.pkModelBoneStride = 0;
-			mModelPushConst.pkSkinMatOffset = 0;
+			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset; // first instance index in global buffers
+			mModelPushConst.pkModelBoneStride = 0;	// Unused for static batches
+			mModelPushConst.pkSkinMatOffset = 0;	// Unused for static batches
 			mModelPushConst.pkPickId = renderData.selectedPickId;
 			vkCmdPushConstants(commandBuffer, basicLayout,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
@@ -1050,6 +1051,10 @@ namespace aveng {
 				sizeof(VkPushConstants),
 				&mModelPushConst
 			);
+
+			// We can get rid of this indirection if we implement vertex pulling, 
+			// or simply store each model's verts/indices in an external registry.
+			// Also needs the model's VkMesh data. Getting there!
 			model->drawInstancedV3(commandBuffer, renderData.rdAvengBindlessPipelineLayout, b.instanceCount, frameIndex);
 		}
 
@@ -1173,6 +1178,12 @@ namespace aveng {
 				Logger::log(1, "%s error: could not create matrix uniform buffers\n", __FUNCTION__);
 				return false;
 			}
+
+			// New - The SkinMeta UBO (bindless binding 11)
+			if (!UniformBuffer::init(engineDevice, renderData.rdBoneMetaBuffers[i], 5120, MapMode::OnDemand)) {
+				Logger::log(1, "%s error: could not create matrix uniform buffers\n", __FUNCTION__);
+				return false;
+			}
 		}
 
 		// Populate the shared view for the editor - for when it needs to update descriptor sets on behalf of its shaders
@@ -1238,7 +1249,7 @@ namespace aveng {
 
 	bool Renderer::createBindlessDescriptorLayouts() {
 	
-		VkDescriptorSetLayoutBinding bindless_bindings[9];
+		VkDescriptorSetLayoutBinding bindless_bindings[11];
 
 		// Texture array
 		VkDescriptorSetLayoutBinding& sampler_binding = bindless_bindings[0];
@@ -1312,6 +1323,30 @@ namespace aveng {
 		viewProj_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		viewProj_binding.pImmutableSamplers = nullptr;
 
+		// BoneOffsets
+		VkDescriptorSetLayoutBinding& boneOffset_binding = bindless_bindings[9];
+		boneOffset_binding.binding = 9;
+		boneOffset_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		boneOffset_binding.descriptorCount = 1;
+		boneOffset_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		boneOffset_binding.pImmutableSamplers = nullptr;
+
+		// ParentMatrixIndices
+		VkDescriptorSetLayoutBinding& boneParentIndices_binding = bindless_bindings[10];
+		boneParentIndices_binding.binding = 10;
+		boneParentIndices_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		boneParentIndices_binding.descriptorCount = 1;
+		boneParentIndices_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		boneParentIndices_binding.pImmutableSamplers = nullptr;
+
+		// ModelSkinMeta
+		VkDescriptorSetLayoutBinding& boneMeta_binding = bindless_bindings[11];
+		boneMeta_binding.binding = 11;
+		boneMeta_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		boneMeta_binding.descriptorCount = 1;
+		boneMeta_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		boneMeta_binding.pImmutableSamplers = nullptr;
+
 		VkDescriptorSetLayoutCreateInfo layoutInfo{
 			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
 		};
@@ -1319,7 +1354,7 @@ namespace aveng {
 		layoutInfo.bindingCount = ArraySize(bindless_bindings);
 		layoutInfo.pBindings = bindless_bindings;
 
-		// TODO - Query device support for update after bind
+		// TODO - Query device support for these bits!!
 		VkDescriptorBindingFlags flags =
 			// This enables us to treat descriptors like they're indexable (I think)
 			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | 
@@ -1333,7 +1368,7 @@ namespace aveng {
 			ArraySize(bindless_bindings),
 			&flags
 		};
-	
+		
 		VkDescriptorBindingFlags bindless_flags[2];
 		bindless_flags[0] = flags; // Both of these bindings will have the same flags
 		bindless_flags[1] = flags; // Both of these bindings will have the same flags
@@ -1379,6 +1414,24 @@ namespace aveng {
 	}
 
 	void Renderer::updateBindlessDescriptorSets(int frameIndex) {
+
+		// Binding 11 - compute - ModelSkinMeta (BoneMetaBuffer)
+		VkDescriptorBufferInfo boneMetaInfo{};
+		boneMetaInfo.buffer = renderData.rdBoneMetaBuffers[frameIndex].buffer;
+		boneMetaInfo.offset = 0;
+		boneMetaInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 10 - compute - ParentMatrixIndices
+		VkDescriptorBufferInfo parentNodeInfo{};
+		parentNodeInfo.buffer = renderData.rdBoneParentNodeIndexBuffers[frameIndex].buffer;
+		parentNodeInfo.offset = 0;
+		parentNodeInfo.range = VK_WHOLE_SIZE;
+
+		// Binding 9 - compute - BoneOffsets
+		VkDescriptorBufferInfo boneOffsetInfo{};
+		boneOffsetInfo.buffer = renderData.rdShaderBoneMatrixOffsetBuffers[frameIndex].buffer;
+		boneOffsetInfo.offset = 0;
+		boneOffsetInfo.range = VK_WHOLE_SIZE;
 
 		// Binding 8
 		VkDescriptorBufferInfo viewProjInfo{};
@@ -1433,6 +1486,30 @@ namespace aveng {
 		texArrayInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
 		texArrayInfo.offset = 0;
 		texArrayInfo.range = VK_WHOLE_SIZE;
+
+		VkWriteDescriptorSet boneMetaWriteDescriptorSet{};
+		boneMetaWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		boneMetaWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		boneMetaWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		boneMetaWriteDescriptorSet.dstBinding = 11;
+		boneMetaWriteDescriptorSet.descriptorCount = 1;
+		boneMetaWriteDescriptorSet.pBufferInfo = &boneMetaInfo;
+
+		VkWriteDescriptorSet parentNodeWriteDescriptorSet{};
+		parentNodeWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		parentNodeWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		parentNodeWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		parentNodeWriteDescriptorSet.dstBinding = 10;
+		parentNodeWriteDescriptorSet.descriptorCount = 1;
+		parentNodeWriteDescriptorSet.pBufferInfo = &parentNodeInfo;
+
+		VkWriteDescriptorSet boneOffsetWriteDescriptorSet{};
+		boneOffsetWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		boneOffsetWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		boneOffsetWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		boneOffsetWriteDescriptorSet.dstBinding = 9;
+		boneOffsetWriteDescriptorSet.descriptorCount = 1;
+		boneOffsetWriteDescriptorSet.pBufferInfo = &boneOffsetInfo;
 
 		VkWriteDescriptorSet viewProjWriteDescriptorSet{};
 		viewProjWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1506,7 +1583,7 @@ namespace aveng {
 		textureArrayDescriptorSet.descriptorCount = 1;
 		textureArrayDescriptorSet.pBufferInfo = &texArrayInfo;
 
-		VkWriteDescriptorSet writeDescriptorSets[9] = {
+		VkWriteDescriptorSet writeDescriptorSets[11] = {
 			viewProjWriteDescriptorSet,
 			materialWriteDescriptorSet,
 			lightWriteDescriptorSet,
@@ -1515,7 +1592,9 @@ namespace aveng {
 			trsWriteDescriptorSet,			// Compute
 			nodeTransformDescriptorSet,		// Compute
 			texelDescriptorSet,
-			textureArrayDescriptorSet
+			textureArrayDescriptorSet,
+			parentNodeWriteDescriptorSet,
+			boneOffsetWriteDescriptorSet
 		};
 
 		vkUpdateDescriptorSets(
@@ -1542,7 +1621,7 @@ namespace aveng {
 			}
 
 			if (!ShaderStorageBuffer::init(engineDevice, mModelMatrixBuffers[i], MapMode::Persistent)) { // CPU Resident
-				Logger::log(1, "%s error: could not create nodel root position SSBO\n", __FUNCTION__);
+				Logger::log(1, "%s error: could not create model root position SSBO\n", __FUNCTION__);
 				return false;
 			}
 
@@ -1552,12 +1631,24 @@ namespace aveng {
 			}
 
 			if (!ShaderStorageBuffer::init(engineDevice, mMaterialBuffers[i], MapMode::Persistent)) { // CPU Resident
-				Logger::log(1, "%s error: could not create node transform SSBO\n", __FUNCTION__);
+				Logger::log(1, "%s error: could not create mMaterialBuffers SSBO\n", __FUNCTION__);
 				return false;
 			}
 
 			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers[i], MapMode::Persistent, ResidentMode::CPU)) {
-				Logger::log(1, "%s error: could not create selection SSBO\n", __FUNCTION__);
+				Logger::log(1, "%s error: could not create rdSelectedInstanceBuffers SSBO\n", __FUNCTION__);
+				return false;
+			}
+
+			// ToDo - Verify Residency
+			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU)) {
+				Logger::log(1, "%s error: could not create rdShaderBoneMatrixOffsetBuffer SSBO\n", __FUNCTION__);
+				return false;
+			}
+			
+			// ToDo - Verify Residency
+			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdBoneParentNodeIndexBuffers[i], MapMode::OnDemand, ResidentMode::CPU)) {
+				Logger::log(1, "%s error: could not create rdBoneParentMatrixBuffer SSBO\n", __FUNCTION__);
 				return false;
 			}
 			

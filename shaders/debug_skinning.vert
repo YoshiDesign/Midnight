@@ -19,17 +19,17 @@ layout (push_constant) uniform Constants {
   uint pickId;
 };
 
-layout (std140, set = 1, binding = 0) uniform Matrices {
+layout (std140, set = 0, binding = 8) uniform Matrices {
   mat4 view;
   mat4 projection;
 };
 
-layout (std430, set = 1,  binding = 1) readonly restrict buffer BoneMatrices {
+layout (std430, set = 0,  binding = 4) readonly restrict buffer BoneMatrices {
   mat4 boneMat[];
 };
 
-layout (std430, set = 1, binding = 2) readonly restrict buffer WorldPosMatrices {
-  mat4 worldPos[];
+layout (std430, set = 0, binding = 5) readonly restrict buffer ModelMatrices {
+  mat4 modelMat[];
 };
 
 void main() {
@@ -44,7 +44,7 @@ void main() {
     aBoneWeight.z * boneMat[aBoneNum.z + skinMatOffset] +
     aBoneWeight.w * boneMat[aBoneNum.w + skinMatOffset];
 
-  mat4 worldPosSkinMat = worldPos[instanceId] * skinMat;
+  mat4 worldPosSkinMat = modelMat[instanceId] * skinMat;
   vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0f);
   gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 

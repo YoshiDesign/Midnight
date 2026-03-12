@@ -27,6 +27,7 @@ namespace aveng {
             return true;
         }
 
+        // TODO - THIS IS IN A HOT PATH (FramePacketBuilder)
         template<class Tag, class InstanceT>
         ModelId modelIdFromHandle(
             const std::vector<InstanceSlot<InstanceT>>& slots,
@@ -60,6 +61,7 @@ namespace aveng {
 
         uint32_t instanceCount{ 0 };
         uint32_t drawListOffset{ 0 };
+        uint32_t skinMetaOffset{ 0 };
 
         uint32_t boneCount = 0;             // 0 for static
         uint32_t alignedInstanceCount = 0;  // for animated: ceil(n/32)*32
@@ -204,10 +206,10 @@ namespace aveng {
                 batch.flavor = DrawFlavor::Static;
 
                 for (const StaticHandle& h : orderedHandles) {
-                    if (!isHandleAlive(statSlots, h)) continue;
+                    if (!isHandleAlive(statSlots, h)) { continue; }
 
                     const ModelId mid = modelIdFromHandle(statSlots, h);
-                    if (!modelIsDrawable(mid)) continue;
+                    if (!modelIsDrawable(mid)) { continue; }
 
                     // Ensures we create a different batch for each model.
                     if (!haveBatch || mid != currentModel) {
@@ -249,11 +251,11 @@ namespace aveng {
 
                 for (ModelId mid : model_ids) {
                     auto it = perModelMap.find(mid);
-                    if (it == perModelMap.end()) continue; // insanity check - more useful when sorting deterministicBatches
-                    if (!modelIsDrawable(mid)) continue;
+                    if (it == perModelMap.end()) { continue; } // insanity check - more useful when sorting deterministicBatches
+                    if (!modelIsDrawable(mid)) { continue; }
 
                     const auto& vec = it->second;
-                    if (vec.empty()) continue;
+                    if (vec.empty()) { continue; }
 
                     DrawBatch batch{};
                     batch.flavor = DrawFlavor::Static;
@@ -262,7 +264,7 @@ namespace aveng {
                     batch.instanceCount = 0;
 
                     for (const StaticHandle& h : vec) {
-                        if (!isHandleAlive(statSlots, h)) continue;
+                        if (!isHandleAlive(statSlots, h)) { continue; }
 
                         pkt.drawList.emplace_back(h);
                         pkt.pickIds.push_back(nextPickId);
@@ -306,10 +308,10 @@ namespace aveng {
                 batch.flavor = DrawFlavor::Animated;
 
                 for (const AnimatedHandle& h : orderedHandles) {
-                    if (!isHandleAlive(animSlots, h)) continue;
+                    if (!isHandleAlive(animSlots, h)) { continue; }
 
                     const ModelId mid = modelIdFromHandle(animSlots, h);
-                    if (!modelIsDrawable(mid)) continue;
+                    if (!modelIsDrawable(mid)) { continue; }
 
                     if (!haveBatch || mid != currentModel) {
                         if (haveBatch) {
@@ -351,11 +353,11 @@ namespace aveng {
 
                 for (ModelId mid : keys) {
                     auto it = perModelMap.find(mid);
-                    if (it == perModelMap.end()) continue;
-                    if (!modelIsDrawable(mid)) continue;
+                    if (it == perModelMap.end()) { continue; }
+                    if (!modelIsDrawable(mid)) { continue; }
 
                     const auto& vec = it->second;
-                    if (vec.empty()) continue;
+                    if (vec.empty()) { continue; }
 
                     DrawBatch batch{};
                     batch.flavor = DrawFlavor::Animated;
@@ -364,7 +366,7 @@ namespace aveng {
                     batch.instanceCount = 0;
 
                     for (const AnimatedHandle& h : vec) {
-                        if (!isHandleAlive(animSlots, h)) continue;
+                        if (!isHandleAlive(animSlots, h)) { continue; }
 
                         pkt.drawList.emplace_back(h);
                         pkt.pickIds.push_back(nextPickId);
@@ -398,24 +400,29 @@ namespace aveng {
             pkt.animatedInstanceCount = static_cast<uint32_t>(pkt.drawList.size()) - pkt.staticInstanceCount;
             pkt.animatedBatchCount = static_cast<uint32_t>(pkt.batches.size()) - pkt.staticBatchCount;
             
-
             // ========== POST-PROCESSING ==========
             /*
                 Data Layout:
                 batch[instance[nBones], instance[nBones], padding[nBones] ...32-1]
             */
 
-            // Add bone information for animated batches (starting at staticBatchCount)
+            // Add bone information for animated batches (starting from last static batch offset)
             uint32_t boneBase = 0;
             for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
                 auto& b = pkt.batches[i];
                 ModelMeta meta{};
                 
-                // TODO - modelQ_ is a perf hit. Find a way to inline
+                // TODO - modelQ_ is a perf hit. Find a way to inline or use (const) ref without inheritance
                 if (modelQ_->isModelLoaded(b.modelId, meta) && meta.boneCount > 0) {
+
+                    /* These values are used to populate the graphics push constant */
                     b.boneCount = meta.boneCount;
-                    b.alignedInstanceCount = ((b.instanceCount + 31) / 32) * 32; // ensure ceiling
+                    b.alignedInstanceCount = ((b.instanceCount + 31) / 32) * 32; // ensure ceiling & matches compute invocation x
                     b.boneBaseOffset = boneBase;
+
+                    /* This value is used with the compute push constant */
+                    b.skinMetaOffset = meta.skinMetaIndex;
+
                     boneBase += b.boneCount * b.alignedInstanceCount;
                 }
 
@@ -427,7 +434,7 @@ namespace aveng {
             // Copy node transforms for each animated batch
             for (uint32_t batchIdx = pkt.staticBatchCount; batchIdx < pkt.batches.size(); ++batchIdx) {
                 DrawBatch& b = pkt.batches[batchIdx];
-                if (b.boneCount == 0) continue;
+                if (b.boneCount == 0) { continue; }
 
                 // Copy each instance's node transforms
                 for (uint32_t i = 0; i < b.instanceCount; ++i) {
@@ -438,12 +445,8 @@ namespace aveng {
                     std::vector<NodeTransformData> boneSpan = animSlots[h.index].instance->getNodeTransformData();
 
 #ifdef M_DEBUG
-                    if (boneSpan.size() != b.boneCount) {
-                        std::cout << "[FPB: BONE MISMATCH] Instance has " << boneSpan.size()
-                            << " bones, expected " << b.boneCount << "\n";
-                    }
+                    assert(boneSpan.size() == b.boneCount && "[FramepacketBuilder:BONE MISMATCH]");
 #endif
-
                     std::copy(
                         boneSpan.begin(),
                         boneSpan.end(),
@@ -467,7 +470,6 @@ namespace aveng {
                 }
             }
 
-            
 #ifdef M_DEBUG
             renderData.rdFramePacketTime = mFramePacketTimer.stop();
 #endif

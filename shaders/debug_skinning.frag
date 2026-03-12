@@ -18,7 +18,7 @@ layout (push_constant) uniform Constants {
   uint pickId;
 };
 
-layout(set = 1, binding = 4) uniform LightsUbo {
+layout(set = 0, binding = 6) uniform LightsUbo {
     vec4 ambientLightColor;    // w component is intensity 
     vec4 lightPositions[200];  // w component is radius
     vec4 lightColors[200];     // w component is intensity

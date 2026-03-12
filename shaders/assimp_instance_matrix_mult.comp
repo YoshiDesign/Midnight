@@ -1,49 +1,66 @@
 #version 460 core
+
+const uint MAX_MODELS = 123; // This only applies to animated models
+
 layout(local_size_x = 1, local_size_y = 32, local_size_z = 1) in;
 
-layout (push_constant) uniform Constants {
-  uint modelOffset;
+struct ModelSkinMeta {
+    uint boneOffsetBase;
+    uint boneParentBase;
+    uint boneCount;
+    uint pad;
 };
 
-layout (std430, set = 0, binding = 0) readonly restrict buffer TRSMatrix {
-  mat4 trsMat[];
+layout(push_constant) uniform Constants {
+    uint modelOffset;     // base into per-instance arrays
+    uint skinMetaIndex;   // sequential model index into relative base indices since they're heterogenous
 };
 
-layout (std430, set = 0, binding = 1) writeonly restrict buffer NodeMatrices {
-  mat4 nodeMat[];
+// Per instance
+layout(std430, set = 0, binding = 3) readonly restrict buffer TRSMatrix {
+    mat4 trsMat[];
 };
 
-layout (std430, set = 1, binding = 0) readonly restrict buffer ParentMatrixIndices {
-  int parentIndex[];
+// Per instance
+layout(std430, set = 0, binding = 4) writeonly restrict buffer NodeMatrices {
+    mat4 nodeMat[];
 };
 
-layout (std430, set = 1, binding = 1) readonly restrict buffer BoneOffsets {
-  mat4 boneOff[];
+// Per model
+layout(std430, set = 0, binding = 10) readonly restrict buffer ParentMatrixIndices {
+    int parentIndex[];
+};
+
+// Per model
+layout(std140, set = 0, binding = 11) uniform BoneMetaBuffer {
+    ModelSkinMeta skinMeta[MAX_MODELS];
+};
+
+// Per model
+layout(std430, set = 0, binding = 9) readonly restrict buffer BoneOffsets {
+    mat4 boneOff[];
 };
 
 void main() {
-  uint node = gl_GlobalInvocationID.x;
-  uint instance = gl_GlobalInvocationID.y;
+    uint localBone = gl_GlobalInvocationID.x;
+    uint instance  = gl_GlobalInvocationID.y;
 
-  /* X work group size is number of bones */
-  uint numberOfBones = gl_NumWorkGroups.x;
+    ModelSkinMeta meta = skinMeta[skinMetaIndex];
+    if (localBone >= meta.boneCount) {
+        return;
+    }
 
-  uint index = node + numberOfBones * instance + modelOffset;
+    uint index = modelOffset + instance * meta.boneCount + localBone;
 
-  /* get node matrix, always valid */
-  mat4 nodeMatrix = trsMat[index];
+    mat4 nodeMatrix = trsMat[index];
 
-  uint parent = 0;
+    int parentNode = parentIndex[meta.boneParentBase + localBone];
 
-  int parentNode = parentIndex[node];
-  while (parentNode >= 0) { // Because all root nodes are explicitly -1
-    parent = parentNode + numberOfBones * instance + modelOffset;
-    nodeMatrix = trsMat[parent] * nodeMatrix;
-    parentNode = parentIndex[parentNode];
-  }
+    while (parentNode >= 0) {
+        uint parentGlobalIndex = modelOffset + instance * meta.boneCount + uint(parentNode);
+        nodeMatrix = trsMat[parentGlobalIndex] * nodeMatrix;
+        parentNode = parentIndex[meta.boneParentBase + uint(parentNode)];
+    }
 
-  /* root node has index -1 */
-  if (parentNode == -1) {
-    nodeMat[index] = nodeMatrix * boneOff[node];
-  }
+    nodeMat[index] = nodeMatrix * boneOff[meta.boneOffsetBase + localBone];
 }

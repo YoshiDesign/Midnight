@@ -12,12 +12,12 @@ const vec2 OFFSETS[6] = vec2[](
 layout (location = 0) out vec2 fragOffset;
 layout (location = 1) out vec4 lightColor;
 
-layout (std140, set = 0, binding = 0) uniform Matrices {
+layout (std140, set = 0, binding = 8) uniform Matrices {
   mat4 view;
   mat4 projection;
 };
 
-layout(set = 0, binding = 2) uniform LightsUbo {
+layout(set = 0, binding = 6) uniform LightsUbo {
     vec4 ambientLightColor;
     vec4 lightPositions[200];  // w component is radius
     vec4 lightColors[200];     // w component is intensity
