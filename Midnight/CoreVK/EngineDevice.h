@@ -115,6 +115,8 @@ namespace aveng {
         bool endCommandBuffer(VkCommandBuffer& commandBuffer);
         void cleanupCommandBuffer(VkCommandPool& pool, VkCommandBuffer& commandBuffer);
 
+        bool endSingleShotBuffer(VkCommandBuffer commandBuffer, VkQueue queue);
+
         // VMA-based image creation
         void createImageWithVMA(
             const VkImageCreateInfo &imageInfo,

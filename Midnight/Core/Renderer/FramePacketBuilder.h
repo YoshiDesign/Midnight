@@ -87,8 +87,8 @@ namespace aveng {
         uint32_t animatedBatchCount = 0;
 
         // Instance data
-        std::vector<glm::mat4> modelMats; // Each Model Matrix of this packet's draw list
-        std::vector<NodeTransformData> nodeTransformData;  // Already padded to aligned counts
+        std::vector<glm::mat4> modelMats; // Each Model Matrix of this packet's draw list (all instances)
+        std::vector<NodeTransformData> nodeTransformData;  // (bone transforms) Already padded to aligned counts
 
         std::span<const uint32_t> dirtyStaticSlots{};
         std::span<const uint32_t> dirtyAnimatedSlots{};
@@ -278,9 +278,10 @@ namespace aveng {
                     if (batch.instanceCount > 0) {
                         pkt.batches.push_back(batch);
                     }
-                }
-            };
 
+                }
+
+            };
             
             // Build static portion
             if (opt.preferInstancesInOrder) {

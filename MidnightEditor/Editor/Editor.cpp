@@ -104,9 +104,10 @@ namespace aveng {
 			cameraManager.setActive(editor_camera_id);
 		}
 
-		//setupSelectionHighlight(frameTime);
-		//setSelectedInstance();
-		updateStorageBuffers();
+		// setupSelectionHighlight(frameTime);
+		// setSelectedInstance();
+		// updateStorageBuffers();
+		renderer.updateBufferViews();
 	}
 
 	void Editor::beginGUICommands(int frameIdx)
@@ -457,38 +458,6 @@ namespace aveng {
 			frameIndex);
 	}
 
-	// So... I don't think this is even being used
-	void Editor::updateStorageBuffers()
-	{
-
-		renderer.updateBufferViews(); // TODO: Remove this once stable
-
-		// If one frame's buffer resized, resize ALL frames to keep them synchronized
-		if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), editorData.eSelectedInstance)) {
-
-			buffer_trash.push_back(PendingBufferDestroy {
-					renderData.rdSelectedInstanceBuffers.at(currentFrameIndex).buffer,
-					renderData.rdSelectedInstanceBuffers.at(currentFrameIndex).bufferAlloc
-				}
-			);
-
-			size_t newBufferSize = std::max(editorData.eSelectedInstance.size() * (sizeof glm::vec2), renderData.rdSelectedInstanceBuffers.at(currentFrameIndex).bufferSize * 2);
-			
-			ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), MapMode::Persistent, ResidentMode::CPU, newBufferSize);
-
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdSelectedInstanceBuffers.at(currentFrameIndex), editorData.eSelectedInstance))
-			{
-				std::cout << "[3] Unable to resize SSBO" << std::endl;
-				throw std::runtime_error("[3] Unable to resize SSBO");
-			}
-			
-			std::cout << "[Editor] StorageBuffer Resized - Updating Descriptor Sets" << std::endl;
-			// updateDescriptorSets(currentFrameIndex);
-			renderer.updateBindlessDescriptorSets(currentFrameIndex);
-		}
-
-	}
-
 	void Editor::cleanup()
 	{
 
@@ -514,27 +483,25 @@ namespace aveng {
 		VertexBuffer::cleanup(engineDevice, mLineVertexBuffer);
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-
-			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdSelectedInstanceBuffers[i]);
-			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengSelectionDescriptorSets[i]);
-			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengAnimationSelectionDescriptorSets[i]);
+			//vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengSelectionDescriptorSets[i]);
+			//vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengAnimationSelectionDescriptorSets[i]);
 			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdLineDescriptorSets[i]);
 		}
 		
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengSelectionDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengSelectionDescriptorLayout, nullptr);
+		//vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionDescriptorLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdLineDescriptorLayout, nullptr);
 
-		vkDestroyPipeline(engineDevice.device(), renderData.rdDebugPipeline, nullptr);
-		vkDestroyPipeline(engineDevice.device(), renderData.rdDebugAnimatedPipeline, nullptr);
-		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
-		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
+		//vkDestroyPipeline(engineDevice.device(), renderData.rdDebugPipeline, nullptr);
+		//vkDestroyPipeline(engineDevice.device(), renderData.rdDebugAnimatedPipeline, nullptr);
+		//vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
+		//vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
 
-		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugPipelineLayout, nullptr);
-		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugAnimatedPipelineLayout, nullptr);
-		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengSelectionPipelineLayout, nullptr);
-		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionPipelineLayout, nullptr);
+		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugPipelineLayout, nullptr);
+		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugAnimatedPipelineLayout, nullptr);
+		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengSelectionPipelineLayout, nullptr);
+		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionPipelineLayout, nullptr);
 		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdLinePipelineLayout, nullptr);
 
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdLineRenderpass, nullptr);

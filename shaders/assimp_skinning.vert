@@ -11,9 +11,9 @@ layout (location = 2) out vec2 texCoord;
 layout (location = 3) out vec3 fragPosWorld;
 
 layout (push_constant) uniform Constants {
-  uint modelStride; // model bone stride
-  uint instanceBaseIndex;
-  uint skinMatrixOffset;
+  uint modelBoneStride; // model bone stride
+  uint instanceBaseIndex; // first index where this model's instances begin
+  uint skinMatrixOffset;    // Offset into  
   uint pickId;
 };
 
@@ -31,7 +31,7 @@ layout (std430, set = 0, binding = 5) readonly restrict buffer WorldPosMatrices 
 };
 
 void main() {
-  uint skinMatOffset = gl_InstanceIndex * modelStride + skinMatrixOffset;
+  uint skinMatOffset = gl_InstanceIndex * modelBoneStride + skinMatrixOffset;
 
   mat4 skinMat =
     aBoneWeight.x * boneMat[aBoneNum.x + skinMatOffset] +

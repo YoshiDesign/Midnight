@@ -42,10 +42,14 @@ namespace aveng {
         VkFramebuffer   getFrameBuffer(int index) { return mSwapChainFramebuffers[index]; } // SwapChain
         VkFramebuffer   getSelectionFrameBuffer(int index) { return mSelectionFramebuffers[index]; } // SwapChain
 
+        /* These implementations range from learning -> tutorial -> I kinda get it now. */
+
         VkImageView     createImageView(VkImage image, VkFormat format);
-        void            createSelectionImageView(size_t index);
         VkImage&        getImage(int index) { return swapChainImages[index]; }
         size_t          swapChainImagesSize() { return swapChainImages.size(); }
+
+        void            createSelectionImageView(size_t index);
+        bool            createProceduralStorageImage(VkFormat format, size_t imgCount, uint32_t _width=0, uint32_t _height=0);
 
         /*
         * Read the value of a pixel which contains the selected instance ID
@@ -68,6 +72,8 @@ namespace aveng {
         }
 
         bool createEditorSelectionFramebuffers();
+
+        bool transitionProceduralStorageImageToGeneral();
 
     private:
         void init();

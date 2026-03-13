@@ -68,12 +68,14 @@ namespace aveng {
 		bool createSSBOs();
 		bool createMatrixUBO();
 		bool createLightsUBO();
+		bool createDefaultSamplers();
 
 		bool createBindlessDescriptors();
 		bool createBindlessDescriptorLayouts();
 		bool createBindlessDescriptorSets();
 
 		void updateBindlessDescriptorSets(int frameIndex);
+		void updateTextureArrayDescriptorSet(TextureHandle handle, VkImageView view, VkSampler sampler, int frameIndex);
 
 		void updateLights();
 
@@ -169,7 +171,7 @@ namespace aveng {
 		TextureRef new_texture(EngineDevice& engineDevice, TextureRef& ref, bool generateMipmaps, bool flipImage);
 		bool gpu_upload_texture(EngineDevice& engineDevice, VkTextureStagingBuffer stagingData, uint32_t width, uint32_t height, 
 								bool generateMipmaps, uint32_t mipmapLevels);
-
+		void updatePGStorageImageDescriptor(int frameIndex);
 	private:
 
 		void createCommandBuffers();
@@ -222,14 +224,8 @@ namespace aveng {
 		VkUploadMatrices mMatrices{ glm::mat4(1.0f), glm::mat4(1.0f) };
 
 		VkPushConstants mModelPushConst{};
-
-		// Ugh...
 		VkComputePushConstants mComputeModelData{};
 
-		/* for animated and non-animated models */
-
-		std::vector<glm::mat4> mWorldPosMatrices{};
-		std::vector<NodeTransformData> mNodeTransFormData{};
 		PointLightData mPointLightData{};
 
 	};

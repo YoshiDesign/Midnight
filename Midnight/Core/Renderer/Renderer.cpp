@@ -49,7 +49,7 @@ namespace aveng {
 		//mWorldPosMatrices.clear();
 		//mNodeTransFormData.clear();
 
-		// Define buffer vec's that are managed by the Renderer
+		// Buffered by frames-in-flight (single, double or triple)
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mPointLightUBOBuffers			 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdBoneMetaBuffers	 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
@@ -58,10 +58,9 @@ namespace aveng {
 		mShaderTrsMatrixBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderBoneMatrixBuffers		 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mMaterialBuffers				 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		renderData.rdSelectedInstanceBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT); // This one can be used as needed by the renderer and the editor.
+		renderData.rdInstanceMaterialBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdShaderBoneMatrixOffsetBuffers  = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdBoneParentNodeIndexBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-
 
 		// Define descriptor set vec's
 		// renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
@@ -69,6 +68,7 @@ namespace aveng {
 		// renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		renderData.rdAvengBindlessDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengComputeBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.basicLightingDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 
@@ -88,8 +88,10 @@ namespace aveng {
 			throw std::runtime_error("Failed to create Lighting UBOs");
 		}
 
-		// Initialize our descriptor layouts & sets, map buffers to device memory.
-		// setupDescriptors();
+		//
+		createDefaultSamplers();
+
+		/* Init Bindless Resources - TODO cleanup */
 		createBindlessDescriptors();
 
 		// Create pipelines now that descriptor layouts are ready
@@ -131,6 +133,67 @@ namespace aveng {
 
 		std::printf("Vulkan renderer initialized!\n");
 
+	}
+
+	bool Renderer::createDefaultSamplers() {
+		auto createSampler = [&](VkFilter filter,
+			VkSamplerAddressMode addressMode,
+			VkSampler* outSampler) -> bool {
+			VkSamplerCreateInfo samplerInfo{};
+			samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			samplerInfo.magFilter = filter;
+			samplerInfo.minFilter = filter;
+			samplerInfo.mipmapMode = (filter == VK_FILTER_LINEAR)
+				? VK_SAMPLER_MIPMAP_MODE_LINEAR
+				: VK_SAMPLER_MIPMAP_MODE_NEAREST;
+
+			samplerInfo.addressModeU = addressMode;
+			samplerInfo.addressModeV = addressMode;
+			samplerInfo.addressModeW = addressMode;
+
+			samplerInfo.mipLodBias = 0.0f;
+			samplerInfo.anisotropyEnable = VK_FALSE;     // turn on later if desired
+			samplerInfo.maxAnisotropy = 1.0f;
+			samplerInfo.compareEnable = VK_FALSE;
+			samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+			samplerInfo.minLod = 0.0f;
+			samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
+
+			samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+			samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+			VkResult result = vkCreateSampler(
+				engineDevice.device(),
+				&samplerInfo,
+				nullptr,
+				outSampler
+			);
+
+			if (result != VK_SUCCESS) {
+				Logger::log(1, "%s error: vkCreateSampler failed (%d)\n", __FUNCTION__, result);
+				return false;
+			}
+
+			return true;
+		};
+
+		if (!createSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+			&renderData.default_samplers.linearRepeat)) {
+			return false;
+		}
+
+		if (!createSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			&renderData.default_samplers.linearClamp)) {
+			return false;
+		}
+
+		if (!createSampler(VK_FILTER_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+			&renderData.default_samplers.nearestRepeat)) {
+			return false;
+		}
+
+		return true;
 	}
 
 	void Renderer::initialize() {
@@ -469,8 +532,13 @@ namespace aveng {
 		std::vector<VkPushConstantRange> pushConstants = { 
 			// Note: these stage flags must match stageFlags arg of vkCmdPushConstants
 			{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) },
-			{ VK_SHADER_STAGE_COMPUTE_BIT, sizeof(VkPushConstants), sizeof(VkComputePushConstants) }
-		
+			{ VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkComputePushConstants) }
+			// Note that if stages overlapped on usage across different pc's then we couldn't start both offsets at 0
+			// E.g.
+			/*layout(push_constant) uniform Constants {
+				layout(offset = 16) uint modelOffset;
+				layout(offset = 20) uint skinMetaIndex;
+			} pc;*/
 		};
 
 		if (!PipelineLayout::init(engineDevice, renderData.rdAvengBindlessPipelineLayout, layouts, pushConstants)) {
@@ -583,7 +651,7 @@ namespace aveng {
 			renderData.rdCommandBuffersCompute.at(currentFrameIndex),
 			renderData.rdAvengBindlessPipelineLayout, // Unified bindless layout
 			VK_SHADER_STAGE_COMPUTE_BIT,
-			sizeof(VkPushConstants), // Offset into pc range
+			0,
 			sizeof(VkComputePushConstants),
 			&mComputeModelData
 		);
@@ -748,15 +816,18 @@ namespace aveng {
 		}
 
 		// Timer
-		/* we need to update descriptors after the upload if buffer size changed */
+		/* we need to update descriptors after the upload if buffer size changed - These 2 ubo's won't resize under normal circumstances */
 		mUploadToUBOTimer.start();
 		UniformBuffer::uploadPersistentData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices); // View/Proj Matrices
 		UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
-		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();
+		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();	
 
 		// Timer
 		mUploadToSSBO2Timer.start();
+
+		// Each instance's model matrix - TODO - Audit persistence
 		bool modelMatsResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.modelMats);
+
 		// Upload the model mat's
 		if (modelMatsResized) {
 			
@@ -1228,10 +1299,10 @@ namespace aveng {
 
 		VkDescriptorPoolSize b_poolSizes[] =
 		{
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_TEXTURES },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  MAX_BINDLESS_TEXEL_BUFFERS },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_BINDLESS_BUFFERS },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_BINDLESS_BUFFERS }
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SwapChain::MAX_FRAMES_IN_FLIGHT * MAX_BINDLESS_TEXTURES },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,			 SwapChain::MAX_FRAMES_IN_FLIGHT * MAX_BINDLESS_TEXEL_BUFFERS },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,		 SwapChain::MAX_FRAMES_IN_FLIGHT * MAX_BINDLESS_BUFFERS },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,		 SwapChain::MAX_FRAMES_IN_FLIGHT * MAX_BINDLESS_BUFFERS }
 		};
 
 		VkDescriptorPoolCreateInfo b_poolInfo{};
@@ -1239,7 +1310,7 @@ namespace aveng {
 		b_poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 		b_poolInfo.poolSizeCount = static_cast<uint32_t>(ArraySize(b_poolSizes));
 		b_poolInfo.pPoolSizes = b_poolSizes;
-		b_poolInfo.maxSets = 3;
+		b_poolInfo.maxSets = SwapChain::MAX_FRAMES_IN_FLIGHT;
 
 		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &b_poolInfo, nullptr, &renderData.avengBindlessDescriptorPool);
 		if (result != VK_SUCCESS) {
@@ -1252,13 +1323,14 @@ namespace aveng {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 			updateBindlessDescriptorSets(i);
+			updatePGStorageImageDescriptor(i);
 		}
 
 	}
 
 	bool Renderer::createBindlessDescriptorLayouts() {
 	
-		VkDescriptorSetLayoutBinding bindless_bindings[11];
+		VkDescriptorSetLayoutBinding bindless_bindings[12];
 
 		// Texture array
 		VkDescriptorSetLayoutBinding& sampler_binding = bindless_bindings[0];
@@ -1303,7 +1375,7 @@ namespace aveng {
 		// Model Matrices - aligned
 		VkDescriptorSetLayoutBinding& ubo1_binding = bindless_bindings[5];
 		ubo1_binding.binding = 5;
-		ubo1_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		ubo1_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		ubo1_binding.descriptorCount = 1;
 		ubo1_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		ubo1_binding.pImmutableSamplers = nullptr;
@@ -1356,33 +1428,23 @@ namespace aveng {
 		boneMeta_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 		boneMeta_binding.pImmutableSamplers = nullptr;
 
-		VkDescriptorSetLayoutCreateInfo layoutInfo{
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
-		};
+		// TODO - Query device support for these bits!! (Enabled in EngineDevice `indexingFeatures`)
+		// This means that bindings that are not dynamically used (same index across invocations) 
+		// do not need to contain valid descriptors.
+		VkDescriptorBindingFlags bindless_flags[12]{};
+		bindless_flags[0] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
 
+		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo{};
+		flagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+		flagsInfo.bindingCount = ArraySize(bindless_bindings);
+		flagsInfo.pBindingFlags = bindless_flags;
+		
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		layoutInfo.bindingCount = ArraySize(bindless_bindings);
 		layoutInfo.pBindings = bindless_bindings;
-
-		// TODO - Query device support for these bits!!
-		VkDescriptorBindingFlags flags =
-			// This enables us to treat descriptors like they're indexable (I think)
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | 
-			// This allows us to update descriptor bindings after they've already been bound
-			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT; 
-
-		// Required to designate flags on this layout
-		VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo {
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-			nullptr,
-			ArraySize(bindless_bindings),
-			&flags
-		};
-		
-		VkDescriptorBindingFlags bindless_flags[2];
-		bindless_flags[0] = flags; // Both of these bindings will have the same flags
-		bindless_flags[1] = flags; // Both of these bindings will have the same flags
-
-		layoutInfo.pNext = &flagsInfo; // First usage of pNext. Not bad!
+		layoutInfo.pNext = &flagsInfo;
+		layoutInfo.flags = 0; // keep 0 until we begin using UPDATE_AFTER_BIND (although from another layout, most likely)
 
 		/*
 		 *	Binding Flags are part of Vulkan Core as of 1.2. They allow the use of:
@@ -1420,6 +1482,47 @@ namespace aveng {
 		}
 
 		return true;
+	}
+
+	// Call this upon loading a texture. Good luck
+	void Renderer::updateTextureArrayDescriptorSet(TextureHandle handle, VkImageView view, VkSampler sampler, int frameIndex) {
+
+		// Binding 0 - Texture sampler array
+		VkDescriptorImageInfo texArrayInfo{};
+		texArrayInfo.sampler = sampler;
+		texArrayInfo.imageView = view;
+		texArrayInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkWriteDescriptorSet writeTextureArray{};
+		writeTextureArray.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeTextureArray.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writeTextureArray.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		writeTextureArray.dstBinding = 0;
+		writeTextureArray.descriptorCount = 1;
+		writeTextureArray.pImageInfo = &texArrayInfo;
+		writeTextureArray.dstArrayElement = static_cast<uint32_t>(handle);
+
+		vkUpdateDescriptorSets(engineDevice.device(), 1, &writeTextureArray, 0, nullptr);
+
+	}
+
+	void Renderer::updatePGStorageImageDescriptor(int frameIndex) {
+
+		VkDescriptorImageInfo storageImageInfo{};
+		storageImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		storageImageInfo.imageView = renderData.pgStorageImage[frameIndex].view;
+		storageImageInfo.sampler = VK_NULL_HANDLE; // storage images do not use samplers
+
+		VkWriteDescriptorSet write{};
+		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		write.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
+		write.dstBinding = 1;
+		write.dstArrayElement = 0;
+		write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		write.descriptorCount = 1;
+		write.pImageInfo = &storageImageInfo;
+
+		vkUpdateDescriptorSets(engineDevice.device(), 1, &write, 0, nullptr);
 	}
 
 	void Renderer::updateBindlessDescriptorSets(int frameIndex) {
@@ -1484,17 +1587,11 @@ namespace aveng {
 		comp1InSkinMatInfo.offset = 0;
 		comp1InSkinMatInfo.range = VK_WHOLE_SIZE;
 
-		// Binding 1 - Not sure we have a use for this but we certainly can find a job for it
-		VkDescriptorBufferInfo storageImageInfo{};
-		storageImageInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
-		storageImageInfo.offset = 0;
-		storageImageInfo.range = VK_WHOLE_SIZE;
-
-		// Binding 0 - Texture sampler array
-		VkDescriptorBufferInfo texArrayInfo{};
-		texArrayInfo.buffer = mNodeTransformBuffers[frameIndex].buffer;
-		texArrayInfo.offset = 0;
-		texArrayInfo.range = VK_WHOLE_SIZE;
+		// Binding 1 - Procedural Generation uses this
+		VkDescriptorImageInfo storageImageInfo{};
+		storageImageInfo.sampler = VK_NULL_HANDLE;
+		storageImageInfo.imageView = renderData.pgStorageImage[frameIndex].view;
+		storageImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 		VkWriteDescriptorSet boneMetaWriteDescriptorSet{};
 		boneMetaWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1546,7 +1643,7 @@ namespace aveng {
 
 		VkWriteDescriptorSet modelMatDescriptorSet{};
 		modelMatDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		modelMatDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		modelMatDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		modelMatDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
 		modelMatDescriptorSet.dstBinding = 5;
 		modelMatDescriptorSet.descriptorCount = 1;
@@ -1554,7 +1651,7 @@ namespace aveng {
 
 		VkWriteDescriptorSet boneMatDescriptorSet{};
 		boneMatDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		boneMatDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		boneMatDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		boneMatDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
 		boneMatDescriptorSet.dstBinding = 4;
 		boneMatDescriptorSet.descriptorCount = 1;
@@ -1562,7 +1659,7 @@ namespace aveng {
 
 		VkWriteDescriptorSet trsWriteDescriptorSet{};
 		trsWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		trsWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		trsWriteDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
 		trsWriteDescriptorSet.dstBinding = 3;
 		trsWriteDescriptorSet.descriptorCount = 1;
@@ -1570,7 +1667,7 @@ namespace aveng {
 
 		VkWriteDescriptorSet nodeTransformDescriptorSet{};
 		nodeTransformDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		nodeTransformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		nodeTransformDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		nodeTransformDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
 		nodeTransformDescriptorSet.dstBinding = 2;
 		nodeTransformDescriptorSet.descriptorCount = 1;
@@ -1582,15 +1679,7 @@ namespace aveng {
 		texelDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
 		texelDescriptorSet.dstBinding = 1;
 		texelDescriptorSet.descriptorCount = 1;
-		texelDescriptorSet.pBufferInfo = &storageImageInfo;
-
-		VkWriteDescriptorSet textureArrayDescriptorSet{};
-		textureArrayDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		textureArrayDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		textureArrayDescriptorSet.dstSet = renderData.rdAvengBindlessDescriptorSets[frameIndex];
-		textureArrayDescriptorSet.dstBinding = 0;
-		textureArrayDescriptorSet.descriptorCount = 1;
-		textureArrayDescriptorSet.pBufferInfo = &texArrayInfo;
+		texelDescriptorSet.pImageInfo = &storageImageInfo;
 
 		VkWriteDescriptorSet writeDescriptorSets[11] = {
 			viewProjWriteDescriptorSet,
@@ -1601,9 +1690,9 @@ namespace aveng {
 			trsWriteDescriptorSet,			// Compute
 			nodeTransformDescriptorSet,		// Compute
 			texelDescriptorSet,
-			textureArrayDescriptorSet,
 			parentNodeWriteDescriptorSet,
-			boneOffsetWriteDescriptorSet
+			boneOffsetWriteDescriptorSet,
+			boneMetaWriteDescriptorSet
 		};
 
 		vkUpdateDescriptorSets(
@@ -1641,11 +1730,6 @@ namespace aveng {
 
 			if (!ShaderStorageBuffer::init(engineDevice, mMaterialBuffers[i], MapMode::Persistent)) { // CPU Resident
 				Logger::log(1, "%s error: could not create mMaterialBuffers SSBO\n", __FUNCTION__);
-				return false;
-			}
-
-			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdSelectedInstanceBuffers[i], MapMode::Persistent, ResidentMode::CPU)) {
-				Logger::log(1, "%s error: could not create rdSelectedInstanceBuffers SSBO\n", __FUNCTION__);
 				return false;
 			}
 

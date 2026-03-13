@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
 #include <AMD/vk_mem_alloc.h>
+#include "Utils/glm_includes.h"
 #include "Utils/Logger.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/VkRenderData.h"
@@ -52,32 +53,32 @@ namespace aveng {
             return true;
         }
 
-        template <typename T>
-        static bool uploadSsboData(EngineDevice& engineDevice, const VkShaderStorageBufferData& SSBOData, std::span<const T> bufferData) {
-            if (bufferData.empty()) {
-                return false;
-            }
+        /* Specified signatures for hot uploads - prevent type deduction step */
 
-            if ((bufferData.size() * sizeof(T)) > SSBOData.bufferSize) {
-                Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(T)));
-                return true;
-            }
+        static bool uploadSsboData(
+            EngineDevice& engineDevice,
+            VkShaderStorageBufferData& SSBOData,
+            std::span<const glm::mat4> bufferData);
 
-            void* data;
-            VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
-            if (result != VK_SUCCESS) {
-                Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
-                return false;
-            }
-            std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(T)));
+        static bool uploadSsboData(
+            EngineDevice& engineDevice,
+            VkShaderStorageBufferData& SSBOData,
+            std::span<const glm::vec2> bufferData);
+        
+        static bool uploadSsboData(
+            EngineDevice& engineDevice,
+            VkShaderStorageBufferData& SSBOData,
+            std::span<const int32_t> bufferData);
 
-            if (!SSBOData.isHostCoherent) {
-                vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
-            }
+        static bool uploadPersistentSsboData(
+            EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData,
+            std::span<const NodeTransformData> bufferData
+        );
 
-            vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
-            return true;
-        }
+        static bool uploadPersistentSsboData(
+            EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData,
+            std::span<const glm::mat4> bufferData
+        );
 
         template <typename T>
         static bool uploadSsboDataRange(

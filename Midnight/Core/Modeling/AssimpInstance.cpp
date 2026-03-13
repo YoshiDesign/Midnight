@@ -15,15 +15,6 @@ namespace aveng {
         common.init(id, meta.root, t);
         anim = as;
 
-        //mNodeTransformData.resize(meta.boneCount);
-
-        //const NodeTransformData identity{
-        //    glm::vec4(0,0,0,0),
-        //    glm::vec4(1,1,1,0),
-        //    glm::vec4(0,0,0,1),
-        //};
-
-        //std::fill(mNodeTransformData.begin(), mNodeTransformData.end(), identity);
         resizeNodeTransformData(meta.boneCount);
 
 #ifdef M_DEBUG
@@ -31,30 +22,6 @@ namespace aveng {
         ensurePoseStorage(meta.boneCount);
 #endif
     }
-
-    //void AssimpInstance::updateModelRootMatrix() {
-    //    mLocalScaleMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(mInstanceSettings.isScale));
-
-    //    if (mInstanceSettings.isSwapYZAxis) {
-    //        glm::mat4 flipMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    //        mLocalSwapAxisMatrix = glm::rotate(flipMatrix, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    //    }
-    //    else {
-    //        mLocalSwapAxisMatrix = glm::mat4(1.0f);
-    //    }
-
-    //    // Update Root Rotation
-    //    mLocalRotationMatrix = glm::mat4_cast(glm::quat(glm::radians(mInstanceSettings.isWorldRotation)));
-
-    //    // Update Root Translation
-    //    mLocalTranslationMatrix = glm::translate(glm::mat4(1.0f), mInstanceSettings.isWorldPosition);
-
-    //    // Do the math
-    //    mLocalTransformMatrix = mLocalTranslationMatrix * mLocalRotationMatrix * mLocalSwapAxisMatrix * mLocalScaleMatrix;
-
-    //    // Final answer
-    //    mInstanceRootMatrix = mLocalTransformMatrix * mModelRootMatrix;
-    //}
 
     void AssimpInstance::ensurePoseStorage(size_t boneCount) {
         if (mNodeTransformData.size() != boneCount) {
@@ -87,7 +54,6 @@ namespace aveng {
 
             This gets called every update because the animation clipNr could change to begin a different animation.
 
-            REMINDER: THIS METHOD IS NOT BEING CALLED ANYWHERE RIGHT NOW
         */
 
         if(!animQ.tryGetClipMeta(modelId_, anim.clipNr, animationMeta))

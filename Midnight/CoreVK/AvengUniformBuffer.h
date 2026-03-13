@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 #include "CoreVK/VkRenderData.h"
 #include "CoreVK/aveng_buffer.h"
+#include "Utils/Logger.h"
 
 namespace aveng {
     class UniformBuffer{

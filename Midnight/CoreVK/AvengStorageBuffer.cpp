@@ -4,7 +4,7 @@ namespace aveng {
     bool ShaderStorageBuffer::init(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, MapMode mode, ResidentMode resMode, size_t bufferSize) {
         /* avoid errors with zero sized buffers */
         if (bufferSize == 0) {
-            bufferSize = 1024;
+            bufferSize = 5120;
         }
 
         assert((mode == MapMode::Persistent && resMode == ResidentMode::GPU) == false && "SSBO was initialized with misconfigured options.");
@@ -49,6 +49,139 @@ namespace aveng {
 
         if (resMode == ResidentMode::GPU) Logger::log(1, "--- Created GPU-ONLY Resident!\n");
         //Logger::log(1, "%s: created SSBO of size %i\nResident of:\t%d\nCoherence:\t%d\n", __FUNCTION__, bufferSize, resMode, SSBOData.isHostCoherent);
+
+        return true;
+    }
+
+    /* NOTE: The template was only ever used to determin the size. We can wrap most of this function's implementation to somewhat reduce duplication of the core logic */
+
+    bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const glm::mat4> bufferData)
+    {
+        if (bufferData.empty()) {
+            return false;
+        }
+
+        if ((bufferData.size() * sizeof(glm::mat4)) > SSBOData.bufferSize) {
+            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::mat4)));
+            return true;
+        }
+
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(glm::mat4)));
+
+        if (!SSBOData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+        }
+
+        vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+        return true;
+    }
+
+    bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const int32_t> bufferData)
+    {
+        if (bufferData.empty()) {
+            return false;
+        }
+
+        if ((bufferData.size() * sizeof(int32_t)) > SSBOData.bufferSize) {
+            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(int32_t)));
+            return true;
+        }
+
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(int32_t)));
+
+        if (!SSBOData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+        }
+
+        vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+        return true;
+    }
+
+    bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const glm::vec2> bufferData)
+    {
+        if (bufferData.empty()) {
+            return false;
+        }
+
+        if ((bufferData.size() * sizeof(glm::vec2)) > SSBOData.bufferSize) {
+            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::vec2)));
+            return true;
+        }
+
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(glm::vec2)));
+
+        if (!SSBOData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+        }
+
+        vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+        return true;
+    }
+
+    // NodeTransformData - persistent
+    bool ShaderStorageBuffer::uploadPersistentSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const NodeTransformData> bufferData)
+    {
+
+        assert(SSBOData.mapped != nullptr && "Persistent SSBO has no mapped memory range.");
+
+        // This might be a silly invariant to keep up with
+        if (bufferData.empty()) {
+            return false;
+        }
+
+        if ((bufferData.size() * sizeof(NodeTransformData)) > SSBOData.bufferSize) {
+            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(NodeTransformData)));
+            return true;
+        }
+
+        std::memcpy(SSBOData.mapped, bufferData.data(), (bufferData.size() * sizeof(NodeTransformData)));
+
+        if (!SSBOData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+        }
+
+        return true;
+    }
+
+    // mat4 persistent
+    bool ShaderStorageBuffer::uploadPersistentSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const glm::mat4> bufferData)
+    {
+
+        assert(SSBOData.mapped != nullptr && "Persistent SSBO has no mapped memory range.");
+
+        // This might be a silly invariant to keep up with
+        if (bufferData.empty()) {
+            return false;
+        }
+
+        if ((bufferData.size() * sizeof(glm::mat4)) > SSBOData.bufferSize) {
+            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::mat4)));
+            return true;
+        }
+
+        std::memcpy(SSBOData.mapped, bufferData.data(), (bufferData.size() * sizeof(glm::mat4)));
+
+        if (!SSBOData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+        }
 
         return true;
     }

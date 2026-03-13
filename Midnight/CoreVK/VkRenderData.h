@@ -118,10 +118,6 @@ namespace aveng {
 		glm::mat4 view;
 	};
 
-	struct MnMaterial {
-		uint32_t albedoTexIndex;
-	};
-
 	/* data format to be uploaded to compute shader */
 	struct NodeTransformData {
 		glm::vec4 translation = glm::vec4(0.0f);
@@ -168,10 +164,10 @@ namespace aveng {
 		//uint32_t normalTex;
 		//uint32_t ormTex;
 		//uint32_t emissiveTex;
-		uint32_t b_index; // Link to larger mat struct that not every model may need
+		uint32_t b_index; // Index into a larger struct of materials (InstanceMaterialB) if needed.
 	};
 
-	struct InstanceMaterialB {
+	struct  {
 		uint32_t data_3;
 		uint32_t data_4;
 	};
@@ -225,6 +221,21 @@ namespace aveng {
 	struct GlobalSkeletonBufferState {
 		uint32_t nextBoneOffsetMatIdx = 0; // index into bone offset matrices
 		uint32_t nextBoneParentIdxIdx = 0; // index of a bone's node's parent-node index
+	};
+
+	struct DefaultSamplers {
+		VkSampler linearRepeat = VK_NULL_HANDLE;
+		VkSampler linearClamp = VK_NULL_HANDLE;
+		VkSampler nearestRepeat = VK_NULL_HANDLE;
+	};
+
+	struct StorageImageResource {
+		VkImage image = VK_NULL_HANDLE;
+		VmaAllocation allocation = VK_NULL_HANDLE;
+		VkImageView view = VK_NULL_HANDLE;
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		uint32_t width = 0;
+		uint32_t height = 0;
 	};
 
 	struct VkRenderData {
@@ -289,6 +300,10 @@ namespace aveng {
 		VkRenderPass rdLineRenderpass = VK_NULL_HANDLE;			// x			// EDITOR
 		VkRenderPass rdSelectionRenderpass = VK_NULL_HANDLE;	// x						// EDITOR
 		VkRenderPass rdImguiRenderpass = VK_NULL_HANDLE;		// x					// EDITOR
+		
+		DefaultSamplers default_samplers;
+
+		std::vector<StorageImageResource> pgStorageImage{};
 
 		/**
 		* Sync
@@ -361,8 +376,6 @@ namespace aveng {
 		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
 
-		std::vector<VkShaderStorageBufferData> rdSelectedInstanceBuffers;		// Storage Buffer
-
 		std::vector<VkShaderStorageBufferData> rdShaderBoneMatrixOffsetBuffers;	// Storage Buffer
 		std::vector<glm::mat4> globalBoneOffsetMatricesList{};					// Data - Reserved/Resized during model loading
 
@@ -370,7 +383,10 @@ namespace aveng {
 		std::vector<int32_t> globalBoneParentIndexList{};							// Data - Reserved/Resized during model loading
 
 		std::vector<VkUniformBufferData> rdBoneMetaBuffers;				// Uniform Buffer
-		std::vector<ModelSkinMeta> rdBoneMetaBufferData{};				// Data
+		std::vector<ModelSkinMeta> rdBoneMetaBufferData{};				// Data - Note: this buffer is either appended to or cleared. Never updated arbitrarily
+
+		std::vector<VkShaderStorageBufferData> rdInstanceMaterialBuffers;
+		std::vector<InstanceMaterial> rdMaterialData{};
 
 		/*
 		 * Editor Data

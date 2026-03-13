@@ -298,11 +298,25 @@ namespace aveng {
         deviceFeatures.independentBlend = VK_TRUE;
 #endif
 
+        // Partially bound descriptor support - Note this is a less exhaustive struct from Vulkan but fits the current bill
+        VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
+        indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+        indexingFeatures.pNext = nullptr;
+        indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+
+        // I'm currently applying a constant "MAX_SIZE" so these are unnecessary
+        indexingFeatures.descriptorBindingVariableDescriptorCount = VK_FALSE; 
+        indexingFeatures.runtimeDescriptorArray = VK_FALSE;
+
+        // We plan to have divergent indexing patterns
+        indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+
         // Config - Core
         VkDeviceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
+        createInfo.pNext = &indexingFeatures;
 
         // Enable features and extensions
         createInfo.pEnabledFeatures = &deviceFeatures;
@@ -886,30 +900,6 @@ namespace aveng {
         return commandBuffer;
     }
 
-    // For reference
-    // void EngineDevice::endSingleTimeCommands(VkCommandBuffer& commandBuffer) 
-    // {
-        //VkFence fence{};
-        //VkFenceCreateInfo fi{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-        //vkCreateFence(_device, &fi, nullptr, &fence);
-
-        //vkEndCommandBuffer(commandBuffer);
-
-        //VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
-        //submitInfo.commandBufferCount = 1;
-        //submitInfo.pCommandBuffers = &commandBuffer;
-
-        //vkQueueSubmit(_graphicsQueue, 1, &submitInfo, fence);
-        //vkWaitForFences(_device, 1, &fence, VK_TRUE, UINT64_MAX);
-
-        //// Reuse instead of free:
-        //vkResetCommandBuffer(commandBuffer, 0);
-        //// or: vkResetCommandPool(_device, _commandPoolGraphics, 0);
-
-        //vkDestroyFence(_device, fence, nullptr);
-
-    // }
-
     bool EngineDevice::initCommandBuffers(std::vector<VkCommandBuffer>& commandBuffers, const char* type)
     {
         VkCommandBufferAllocateInfo allocInfo{};
@@ -992,6 +982,32 @@ namespace aveng {
         return true;
     }
 
+    // New implementation - Does not use fences
+    bool EngineDevice::endSingleShotBuffer(VkCommandBuffer commandBuffer, VkQueue queue) {
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+            vkFreeCommandBuffers(_device, _commandPoolGraphics, 1, &commandBuffer);
+            return false;
+        }
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        if (vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+            vkFreeCommandBuffers(_device, _commandPoolGraphics, 1, &commandBuffer);
+            return false;
+        }
+
+        if (vkQueueWaitIdle(queue) != VK_SUCCESS) {
+            vkFreeCommandBuffers(_device, _commandPoolGraphics, 1, &commandBuffer);
+            return false;
+        }
+
+        vkFreeCommandBuffers(_device, _commandPoolGraphics, 1, &commandBuffer);
+        return true;
+    }
+
     bool EngineDevice::submitRuntimeCmdBuffer(VkCommandBuffer commandBuffer) {
         return false;
     }
@@ -1020,7 +1036,7 @@ namespace aveng {
     {
         VkResult result = vkEndCommandBuffer(commandBuffer);
         if (result != VK_SUCCESS) {
-            std::printf("%s error: could not end render pass (error: %i)\n", __FUNCTION__, result);
+            std::printf("%s error: could not end cmd buffer (error: %i)\n", __FUNCTION__, result);
             return false;
         }
         return true;

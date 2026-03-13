@@ -295,12 +295,11 @@ namespace aveng {
 				renderData_.skinState.nextBoneOffsetMatIdx,
 				renderData_.skinState.nextBoneParentIdxIdx,
 				boneCount,
-				0xBEEEEEEF // there it is (std140)
+				0xBEEEEEEF // there it is (std140 compliance)
 			};
 
-			// Update the ModelSkinMeta buffer
-
-
+			// Update the ModelSkinMeta buffer - Note: this buffer is either appended to or cleared. Never updated arbitrarily
+			renderData_.rdBoneMetaBufferData.push_back(ms);
 
 			if (entry.isAnimated) {
 				std::cout << entry.key << " has " << entry.boneMeta.boneCount << " bones.\n";

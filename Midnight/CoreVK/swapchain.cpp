@@ -38,6 +38,16 @@ namespace aveng {
         createDepthResources();
         createFramebuffers();
         // createEditorSelectionFramebuffers();
+
+
+
+        // PG Image
+        size_t imageCount = swapChainImages.size();    
+        renderData.pgStorageImage.resize(imageCount);
+        
+        createProceduralStorageImage(VK_FORMAT_R16G16B16A16_SFLOAT, imageCount, 1024, 1024);
+        transitionProceduralStorageImageToGeneral();
+        //
     }
 
     SwapChain::~SwapChain() {
@@ -273,6 +283,7 @@ namespace aveng {
         }
 
         // /* Transition newly created image from UNDEFINED to COLOR_ATTACHMENT_OPTIMAL */
+        // This can actually happen outside of the loop
          VkCommandBuffer transitionCmd = device.createSingleShotBuffer();
 
          VkImageSubresourceRange range{};
@@ -307,6 +318,146 @@ namespace aveng {
              Logger::log(1, "%s error: could not transition selection image %zu to COLOR_ATTACHMENT_OPTIMAL\n", __FUNCTION__, index);
              throw std::runtime_error("Failed to transition selection image layout");
          }
+    }
+
+    // [1] Create the image and image view
+    bool SwapChain::createProceduralStorageImage(VkFormat format, size_t imgCount, uint32_t _width, uint32_t _height)
+    {
+
+        for (int i = 0; i < imgCount; i++) {
+        
+            VkExtent3D selectionImageExtent;
+
+            if (_width == 0 || _height == 0) {
+
+                renderData.pgStorageImage[i].width = width();
+                renderData.pgStorageImage[i].height = height();
+                renderData.pgStorageImage[i].format = format;
+
+                selectionImageExtent = {
+                    width(),
+                    height(),
+                    1   // depth
+                };
+            }
+            else {
+
+                renderData.pgStorageImage[i].width = _width;
+                renderData.pgStorageImage[i].height = _height;
+                renderData.pgStorageImage[i].format = format;
+
+                selectionImageExtent = {
+                    _width,
+                    _height,
+                    1   // depth
+                };
+            }
+
+            VkImageCreateInfo imageInfo{};
+            imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent.width = selectionImageExtent.width;
+            imageInfo.extent.height = selectionImageExtent.height;
+            imageInfo.extent.depth = 1;
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.format = format;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageInfo.usage =
+                VK_IMAGE_USAGE_STORAGE_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT |         // optional but often useful
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+            VmaAllocationCreateInfo allocInfo{};
+            allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+            VkResult result = vmaCreateImage(
+                device.allocator(),
+                &imageInfo,
+                &allocInfo,
+                &renderData.pgStorageImage[i].image,
+                &renderData.pgStorageImage[i].allocation,
+                nullptr
+            );
+
+            if (result != VK_SUCCESS) {
+                Logger::log(1, "%s error: vmaCreateImage failed (%d)\n", __FUNCTION__, result);
+                return false;
+            }
+
+            VkImageViewCreateInfo viewInfo{};
+            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image = renderData.pgStorageImage[i].image;
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = format;
+            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            viewInfo.subresourceRange.baseMipLevel = 0;
+            viewInfo.subresourceRange.levelCount = 1;
+            viewInfo.subresourceRange.baseArrayLayer = 0;
+            viewInfo.subresourceRange.layerCount = 1;
+
+            result = vkCreateImageView(
+                device.device(),
+                &viewInfo,
+                nullptr,
+                &renderData.pgStorageImage[i].view
+            );
+
+            if (result != VK_SUCCESS) {
+                Logger::log(1, "%s error: vkCreateImageView failed (%d)\n", __FUNCTION__, result);
+                return false;
+            }
+        
+        }
+
+        return true;
+    }
+
+    // [2] Transition to the layout we'll be using in our shaders
+    bool SwapChain::transitionProceduralStorageImageToGeneral() {
+        
+        VkCommandBuffer cmd = device.createSingleShotBuffer();
+
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+
+
+            VkImageMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = renderData.pgStorageImage[i].image;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+
+            vkCmdPipelineBarrier(
+                cmd,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier
+            );
+
+        }
+
+        if (!device.endSingleShotBuffer(cmd, device.graphicsQueue())) {
+            throw std::runtime_error("failed to submit cmd: transitionProceduralStorageImageToGeneral\n");
+        }
+
+        return true;
     }
 
     /**
