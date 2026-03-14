@@ -111,7 +111,9 @@ namespace aveng {
 			std::span<const AnyInstanceHandle> handles,
 			std::span<const InstanceTransform> transforms);
 
-		void setMaterial(); // TODO
+		/* Material */
+		void setMaterials(std::span<const AnyInstanceHandle> handles, std::span<MnMaterial> mats, std::span<MnMaterialExt> matsExt);
+		void setMaterials(std::span<const AnyInstanceHandle> handles, std::span<MnMaterial> mats);
 
 		/// Call this when you *know* a model became invalid in this scene (e.g., after unload).
 		/// If you always go through SceneFacade::unloadModel, it will call this for you.
@@ -168,11 +170,18 @@ namespace aveng {
 		const IModelQuery& modelQuery_;
 		Config cfg_{};
 
+		/* Instance Stat Updates */
 		std::vector<StaticHandle>   tmpStaticHandles_;
-		std::vector<InstanceTransform> tmpStaticXforms_;
-
 		std::vector<AnimatedHandle> tmpAnimatedHandles_;
+
+		std::vector<InstanceTransform> tmpStaticXforms_;
 		std::vector<InstanceTransform> tmpAnimatedXforms_;
+
+		std::vector<MnMaterial> tmpStaticMats_;
+		std::vector<MnMaterial> tmpAnimMats_;
+		std::vector<MnMaterialExt> tmpStaticMatsExt_;
+		std::vector<MnMaterialExt> tmpAnimMatsExt_;
+		/* */
 
 		// Instance pools owned by the SceneFacade
 		InstanceManager<StaticTag>   staticMgr_{ modelQuery_ };

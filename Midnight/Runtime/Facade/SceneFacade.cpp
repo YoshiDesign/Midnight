@@ -625,7 +625,7 @@ namespace aveng {
                     tmpAnimatedXforms_.push_back(transforms[i]);
                 }
                 else {
-                    if (!cfg_.failSoft) assert(false && "Unhandled handle alternative");
+                    if (!cfg_.failSoft) { assert(false && "Unhandled handle alternative"); }
                 }
             }, handles[i]);
         }
@@ -636,6 +636,133 @@ namespace aveng {
         if (!tmpAnimatedHandles_.empty()) {
             animatedMgr_.setTransforms(tmpAnimatedHandles_, tmpAnimatedXforms_);
         }
+    }
+
+    // TODO - make one of these methods for each handle type
+    void SceneFacade::setMaterials(
+        std::span<const AnyInstanceHandle> handles, 
+        std::span<MnMaterial> mats, 
+        std::span<MnMaterialExt> matsExt)
+    {
+        // Exts are optional
+        if (handles.size() != mats.size()) {
+            if (cfg_.failSoft) { return; }
+            assert(false && "handles/mats size mismatch");
+            return;
+        }
+
+        // Clear scratch (keep capacity)
+        tmpStaticHandles_.clear();
+        tmpAnimatedHandles_.clear();
+
+        tmpStaticMats_.clear();
+        tmpStaticMats_.clear();
+        tmpAnimMats_.clear();
+        tmpAnimMats_.clear();
+
+        // Reserve once (best-effort; avoids growth)
+        tmpStaticHandles_.reserve(handles.size());
+        tmpAnimatedHandles_.reserve(handles.size());
+
+        tmpStaticMats_.reserve(handles.size());
+        tmpStaticMatsExt_.reserve(handles.size());
+        tmpAnimMats_.reserve(handles.size());
+        tmpAnimMatsExt_.reserve(handles.size());
+
+        for (size_t i = 0; i < handles.size(); ++i) {
+
+            std::visit([&](auto&& h) {
+                using H = std::decay_t<decltype(h)>;
+
+                if constexpr (std::is_same_v<H, std::monostate>) {
+                    // skip
+                }
+                else if constexpr (std::is_same_v<H, StaticHandle>) {
+                    tmpStaticHandles_.push_back(h);
+                    tmpStaticMats_.push_back(tmpStaticMats_[i]);
+                    tmpStaticMatsExt_.push_back(tmpStaticMatsExt_[i]);
+                }
+                else if constexpr (std::is_same_v<H, AnimatedHandle>) {
+                    tmpAnimatedHandles_.push_back(h);
+                    tmpAnimMats_.push_back(tmpAnimMats_[i]);
+                    tmpAnimMatsExt_.push_back(tmpAnimMatsExt_[i]);
+                }
+                else {
+                    if (!cfg_.failSoft) { assert(false && "Unhandled handle alternative"); }
+                }
+            }, handles[i]);
+        }
+
+        if (!tmpStaticHandles_.empty()) {
+            staticMgr_.setMats(tmpStaticHandles_, tmpStaticMats_);
+        }
+        if (!tmpAnimatedHandles_.empty()) {
+            animatedMgr_.setMats(tmpAnimatedHandles_, tmpAnimMats_);
+        }
+
+    }
+    
+    // TODO - make one of these methods for each handle type
+    void SceneFacade::setMaterials(
+        std::span<const AnyInstanceHandle> handles, 
+        std::span<MnMaterial> mats)
+    {
+        // Exts are optional
+        if (handles.size() != mats.size()) {
+            if (cfg_.failSoft) { return; }
+            assert(false && "handles/mats size mismatch");
+            return;
+        }
+
+        bool addExt = false;
+
+        // Clear scratch (keep capacity)
+        tmpStaticHandles_.clear();
+        tmpAnimatedHandles_.clear();
+
+        tmpStaticMats_.clear();
+        tmpStaticMats_.clear();
+        tmpAnimMats_.clear();
+        tmpAnimMats_.clear();
+
+        // Reserve once (best-effort; avoids growth)
+        tmpStaticHandles_.reserve(handles.size());
+        tmpAnimatedHandles_.reserve(handles.size());
+
+        tmpStaticMats_.reserve(handles.size());
+        tmpStaticMatsExt_.reserve(handles.size());
+        tmpAnimMats_.reserve(handles.size());
+        tmpAnimMatsExt_.reserve(handles.size());
+
+        for (size_t i = 0; i < handles.size(); ++i) {
+
+            std::visit([&](auto&& h) {
+                using H = std::decay_t<decltype(h)>;
+
+                if constexpr (std::is_same_v<H, std::monostate>) {
+                    // skip
+                }
+                else if constexpr (std::is_same_v<H, StaticHandle>) {
+                    tmpStaticHandles_.push_back(h);
+                    tmpStaticMats_.push_back(tmpStaticMats_[i]);
+                }
+                else if constexpr (std::is_same_v<H, AnimatedHandle>) {
+                    tmpAnimatedHandles_.push_back(h);
+                    tmpAnimMats_.push_back(tmpAnimMats_[i]);
+                }
+                else {
+                    if (!cfg_.failSoft) { assert(false && "Unhandled handle alternative"); }
+                }
+            }, handles[i]);
+        }
+
+        if (!tmpStaticHandles_.empty()) {
+            staticMgr_.setMats(tmpStaticHandles_, tmpStaticMats_, tmpStaticMatsExt_);
+        }
+        if (!tmpAnimatedHandles_.empty()) {
+            animatedMgr_.setMats(tmpAnimatedHandles_, tmpAnimMats_, tmpAnimMatsExt_);
+        }
+
     }
 
     const IModelQuery& SceneFacade::modelQuery() const { return modelQuery_; }
@@ -653,12 +780,27 @@ namespace aveng {
         No changes to gameplay code that already uses typed handles.
     */
 
-    /// TODO - with typed handles
+    /// TODO TODO TODO TODO and do them for materials toodoo
     //void SceneFacade::setTransform(StaticHandle h, const InstanceTransform& it) {
     //    staticMgr_.setTransform(h, it);
     //}
 
     //void SceneFacade::setTransform(AnimatedHandle h, const InstanceTransform& it) {
+    //    animatedMgr_.setTransform(h, it);
+    //}
+    
+    //void SceneFacade::setMat(AnimatedHandle h, const InstanceTransform& it) {
+    //    animatedMgr_.setTransform(h, it);
+    //}
+    // 
+    //void SceneFacade::setMat(AnimatedHandle h, const MnMaterial& mat, const MnMaterialExt matExt) {
+    //    animatedMgr_.setTransform(h, it);
+    //}
+    //void SceneFacade::setMat(StaticHandle h, const InstanceTransform& it) {
+    //    animatedMgr_.setTransform(h, it);
+    //}
+    // 
+    //void SceneFacade::setMat(StaticHandle h, const MnMaterial& mat, const MnMaterialExt matExt) {
     //    animatedMgr_.setTransform(h, it);
     //}
 

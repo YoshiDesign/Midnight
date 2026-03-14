@@ -1,5 +1,5 @@
 #pragma once
-#include "avpch.h"
+#include "Utils/glm_includes.h"
 #include "Core/Modeling/InstanceSettings.h"
 #include "Core/Asset/AssetRegistry.h"
 
@@ -10,6 +10,8 @@ namespace aveng {
     struct InstanceCommon {
         ModelId   modelId{ 0 };
         glm::mat4 modelRoot{ 1.f };        // meta.root, set at creation
+        MnMaterial mat{};
+        MnMaterialExt matx{};
         InstanceTransform xf{};
 
         // Cached final matrix; recompute only when dirty
@@ -23,7 +25,8 @@ namespace aveng {
             dirty = true;
         }
 
-        // Mark dirty when transform changes
+        // Mark dirty when transform changes - I don't think we're using this currently
+        // We opt to just making xf publicly writable. TODO
         void setPos(glm::vec3 p) { xf.pos = p; dirty = true; }
         void setRot(glm::vec3 r) { xf.rotEuler = r; dirty = true; }
         void setScale(float s) { xf.scale = s; dirty = true; }

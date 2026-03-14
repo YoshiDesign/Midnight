@@ -45,7 +45,7 @@ namespace aveng {
         }
 
         /* Current method for determining if transforms are dirty - epsilon compare would be safer but more expensive... */
-        inline bool equalExact(const InstanceTransform& a, const InstanceTransform& b) {
+        inline bool equalXFExact(const InstanceTransform& a, const InstanceTransform& b) {
             return a.pos == b.pos
                 && a.rotEuler == b.rotEuler
                 && a.scale == b.scale;
@@ -441,18 +441,18 @@ namespace aveng {
 
         bool setTransform(const Handle& h, const InstanceTransform& it)
         {
-            if (!h) return false;
-            if (h.index >= instanceData_.slots.size()) return false;
+            if (!h) { return false; }
+            if (h.index >= instanceData_.slots.size()) { return false; }
 
             Slot& slot = instanceData_.slots[h.index];
-            if (!slot.alive) return false;
-            if (slot.generation != h.generation) return false;
-            if (!slot.instance.has_value()) return false;
+            if (!slot.alive) { return false; }
+            if (slot.generation != h.generation) { return false; }
+            if (!slot.instance.has_value()) { return false; }
 
             Instance& inst = *slot.instance;
 
             // Ignore no-op updates:
-            if (equalExact(inst.common.xf, it)) {
+            if (equalXFExact(inst.common.xf, it)) {
                 return true; // treat as success, but not dirty
             }
             // if (equalEps(inst.common.xf, it)) return true; // epsilon compare
@@ -470,11 +470,11 @@ namespace aveng {
             std::span<const Handle> handles,
             std::span<const InstanceTransform> transforms)
         {
-            //std::cout << "[InstanceManager] Setting transforms!\n";
-            if (handles.size() != transforms.size()) {
-                std::cout << "[InstanceManager] Transform/Handle spans were not the same size!\n";
-                return;
-            }
+            ////std::cout << "[InstanceManager] Setting transforms!\n";
+            //if (handles.size() != transforms.size()) {
+            //    std::cout << "[InstanceManager] Transform/Handle spans were not the same size!\n";
+            //    return;
+            //}
 #ifdef M_DEBUG
             // This should never resize here
             if (instanceData_.dirtyGpu.size() != instanceData_.slots.size()) {
@@ -484,9 +484,94 @@ namespace aveng {
 #endif
             for (size_t i = 0; i < handles.size(); ++i) {
                 // Inline the work if you want slightly better perf,
-                // but calling setTransform is fine for now because it�s O(1) and branchy anyway.
+                // but calling setTransform is fine for now because it's O(1) and branchy anyway.
                 setTransform(handles[i], transforms[i]);
             }
+        }
+
+        void setMats(
+            std::span<const Handle> handles,
+            std::span<const MnMaterial> mats
+        ) {
+
+            for (size_t i = 0; i < handles.size(); ++i) {
+                setMat(handles[i], mats[i]);
+            }
+            
+        }
+
+        void setMats(
+            std::span<const Handle> handles,
+            std::span<const MnMaterial> mats,
+            std::span<const MnMaterialExt> matsExt
+        ) {
+            for (size_t i = 0; i < handles.size(); ++i) {
+                setMat(handles[i], mats[i], matsExt[i]);
+            }
+
+        }
+
+        bool setMat(
+            const Handle h,
+            const MnMaterial mat
+        ) {
+
+            if (!h) { return false; }
+            if (h.index >= instanceData_.slots.size()) { return false; }
+
+            Slot& slot = instanceData_.slots[h.index];
+            if (!slot.alive) { return false; }
+            if (slot.generation != h.generation) { return false; }
+            if (!slot.instance.has_value()) { return false; }
+
+            Instance& inst = *slot.instance;
+
+            // TODO - maybe - Ignore no-op updates:
+            //if (equalMatExact(inst.common.mat, mat)) {
+            //    return true; // treat as success, but not dirty
+            //}
+            // if (equalEps(inst.common.mat, mat)) return true; // epsilon compare
+
+            inst.common.mat = mat;
+            inst.common.dirty = true;
+
+            // Mark dirty
+            markGpuDirty(h.index);
+
+            return true;
+            
+        }
+
+        bool setMat(
+            const Handle h,
+            const MnMaterial mat,
+            const MnMaterialExt matExt
+        ) {
+
+            if (!h) { return false; }
+            if (h.index >= instanceData_.slots.size()) { return false; }
+
+            Slot& slot = instanceData_.slots[h.index];
+            if (!slot.alive) { return false; }
+            if (slot.generation != h.generation) { return false; }
+            if (!slot.instance.has_value()) { return false; }
+
+            Instance& inst = *slot.instance;
+
+            // TODO - maybe - Ignore no-op updates:
+            //if (equalMatExact(inst.common.mat, mat)) {
+            //    return true; // treat as success, but not dirty
+            //}
+            // if (equalEps(inst.common.mat, mat)) return true; // epsilon compare
+
+            inst.common.mat = mat;
+            inst.common.matx = matExt;
+            inst.common.dirty = true;
+
+            // Mark dirty
+            markGpuDirty(h.index);
+
+            return true;
         }
 
         void deleteAllInstancesForModel(ModelId mid)

@@ -1,4 +1,5 @@
 #include "AvengStorageBuffer.h"
+#include "Core/Modeling/InstanceSettings.h"
 
 namespace aveng {
     bool ShaderStorageBuffer::init(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, MapMode mode, ResidentMode resMode, size_t bufferSize) {
@@ -53,8 +54,9 @@ namespace aveng {
         return true;
     }
 
-    /* NOTE: The template was only ever used to determin the size. We can wrap most of this function's implementation to somewhat reduce duplication of the core logic */
+    /* NOTE: I'm duplicating a lotta logic here... the type is only ever needed to determine its size ya dingus */
 
+    /* glm::mat4 */
     bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const glm::mat4> bufferData)
     {
         if (bufferData.empty()) {
@@ -70,7 +72,7 @@ namespace aveng {
         VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
         if (result != VK_SUCCESS) {
             Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
-            return false;
+            return true;
         }
         std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(glm::mat4)));
 
@@ -79,9 +81,66 @@ namespace aveng {
         }
 
         vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
-        return true;
+        return false;
     }
 
+    /* MnMaterial */
+    bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const MnMaterial> bufferData)
+    {
+        if (bufferData.empty()) {
+            return false;
+        }
+
+        if ((bufferData.size() * sizeof(MnMaterial)) > SSBOData.bufferSize) {
+            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(MnMaterial)));
+            return true;
+        }
+
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+            return true;
+        }
+        std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(MnMaterial)));
+
+        if (!SSBOData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+        }
+
+        vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+        return false;
+    }
+
+    /* MnMaterialExt */
+    bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const MnMaterialExt> bufferData)
+    {
+        if (bufferData.empty()) {
+            return false;
+        }
+
+        if ((bufferData.size() * sizeof(MnMaterialExt)) > SSBOData.bufferSize) {
+            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(MnMaterialExt)));
+            return true;
+        }
+
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), SSBOData.bufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map SSBO memory (error: %i)\n", __FUNCTION__, result);
+            return true;
+        }
+        std::memcpy(data, bufferData.data(), (bufferData.size() * sizeof(MnMaterialExt)));
+
+        if (!SSBOData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
+        }
+
+        vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
+        return false;
+    }
+
+    /* uint */
     bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const int32_t> bufferData)
     {
         if (bufferData.empty()) {
@@ -106,9 +165,10 @@ namespace aveng {
         }
 
         vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
-        return true;
+        return false;
     }
 
+    /* vec2 */
     bool ShaderStorageBuffer::uploadSsboData(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, std::span<const glm::vec2> bufferData)
     {
         if (bufferData.empty()) {
@@ -133,7 +193,7 @@ namespace aveng {
         }
 
         vmaUnmapMemory(engineDevice.allocator(), SSBOData.bufferAlloc);
-        return true;
+        return false;
     }
 
     // NodeTransformData - persistent
@@ -158,7 +218,7 @@ namespace aveng {
             vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
         }
 
-        return true;
+        return false;
     }
 
     // mat4 persistent
@@ -183,7 +243,7 @@ namespace aveng {
             vmaFlushAllocation(engineDevice.allocator(), SSBOData.bufferAlloc, 0, SSBOData.bufferSize);
         }
 
-        return true;
+        return false;
     }
 
     bool ShaderStorageBuffer::checkForResize(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize) {

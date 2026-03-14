@@ -22,8 +22,8 @@ namespace aveng {
     }
 
     struct AnimSettings {
-        size_t animClipSize = 0;
-        uint32_t clipNr{ 0 };
+        size_t animClipSize{0};
+        uint32_t clipNr{0};
         float    playTime{ 0.f }; // Somewhere between 0 and duration
         float    speed{ 1.f };
     };
@@ -42,18 +42,19 @@ namespace aveng {
         AnimSettings      anim;
     };
 
-	//struct InstanceSettings {
-	//	glm::vec3 isWorldPosition = glm::vec3(0.0f);
-	//	glm::vec3 isWorldRotation = glm::vec3(0.0f);
-	//	float isScale = 1.0f;
-	//	bool isSwapYZAxis = false;
+    struct MnMaterial {
+        uint32_t baseTex{ 0 };
+        uint32_t data_1{ 0 };
+        uint32_t data_2{ 0 };
+        //uint32_t normalTex;
+        //uint32_t ormTex;
+        //uint32_t emissiveTex;
+        uint32_t ext_index{ 999 }; // Index into a larger struct of materials (InstanceMaterialB) if needed.
+    };
 
-	//	int isInstanceIndexPosition = -1;
-
-	//	size_t isAnimClipSize = 0;
-	//	unsigned int isAnimClipNr = 0;
-	//	float isAnimPlayTimePos = 0.0f;
-	//	float isAnimSpeedFactor = 1.0f;
-	//};
+    struct MnMaterialExt {
+        uint32_t data_3{ 0 };
+        uint32_t data_4{ 0 };
+    };
 
 }

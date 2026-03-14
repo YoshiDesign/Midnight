@@ -428,9 +428,9 @@ namespace aveng {
     void Texture::cleanup(EngineDevice& engineDevice, const VkRenderData& renderData, VkTextureData& texData) {
         // Note: stylistically, for handle-like things it is simpler to make getPool() return by value
         // e.g. VkDescriptorPool getPool() const { return mPool; }
-        vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &texData.descriptorSet);
-        vkDestroySampler(engineDevice.device(), texData.sampler, nullptr);
-        vkDestroyImageView(engineDevice.device(), texData.imageView, nullptr);
-        vmaDestroyImage(engineDevice.allocator(), texData.image, texData.imageAlloc);
+        //vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &texData.descriptorSet);
+        //vkDestroySampler(engineDevice.device(), texData.sampler, nullptr);
+        //vkDestroyImageView(engineDevice.device(), texData.imageView, nullptr);
+        //vmaDestroyImage(engineDevice.allocator(), texData.image, texData.imageAlloc);
     }
 }

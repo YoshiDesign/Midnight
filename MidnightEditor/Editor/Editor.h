@@ -101,6 +101,8 @@ namespace aveng {
 
 		void updateInputState(const InputState& state);
 
+		const VkPipeline pointLightPipeline() { return pointLightSystem.getPipeline(); }
+
 		//template<class Tag>
 		//void updateSelectionForPool(
 		//	aveng::InstanceManager<Tag>& mgr,
@@ -152,7 +154,7 @@ namespace aveng {
 
 		EditorData editorData;
 		AvengImgui aveng_imgui;
-		// PointLightSystem pointLightSystem;	// Light stuff
+		PointLightSystem pointLightSystem;	// Editor requires its own PLS because it uses its own renderpass
 	};
 
 }

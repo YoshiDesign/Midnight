@@ -38,7 +38,7 @@ namespace aveng {
 		, cameraManager{ _cameraManager }
 		, sceneEdit_{ _sceneFacade } // Composition root
 		, aveng_imgui{ renderData, sceneEdit_, editorData, window, engineDevice} 
-		// , pointLightSystem{ engineDevice, renderData }
+		, pointLightSystem{ engineDevice, renderData }
 	{
 
 		// Register a camera
@@ -296,14 +296,14 @@ namespace aveng {
 			swapchain->imageCount()
 		);
 
-		//pointLightSystem.initialize(
-		//	renderData.rdSelectionRenderpass, 
-		//	2, true);
+		pointLightSystem.initialize(
+			renderData.rdSelectionRenderpass, 
+			2, true); 
 	}
 
 	void Editor::renderLights()
 	{
-		renderer.renderLights();
+		renderer.renderLights(pointLightSystem.getPipeline());
 	}
 
 	bool Editor::createCommandBuffers()
@@ -442,19 +442,16 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
+	[[ deprecated("This assumes non-bindless descriptor sets. Which need to be reimplemented to use.") ]]
 	void Editor::drawModels(const IModelLibrary& modelLib, const FramePacket& pkt, int frameIndex)
 	{
 
-		renderer.drawModels(
+		renderer.drawModelsBindless(
 			pkt,
 			modelLib,
 			renderData.rdCommandBuffersGraphics[frameIndex],
 			renderData.rdDebugPipeline,
 			renderData.rdDebugAnimatedPipeline,
-			renderData.rdDebugPipelineLayout,
-			renderData.rdDebugAnimatedPipelineLayout,
-			renderData.rdAvengSelectionDescriptorSets[frameIndex],
-			renderData.rdAvengAnimationSelectionDescriptorSets[frameIndex],
 			frameIndex);
 	}
 
@@ -482,33 +479,29 @@ namespace aveng {
 
 		VertexBuffer::cleanup(engineDevice, mLineVertexBuffer);
 
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+		//for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 			//vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengSelectionDescriptorSets[i]);
 			//vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdAvengAnimationSelectionDescriptorSets[i]);
-			vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdLineDescriptorSets[i]);
-		}
+			// vkFreeDescriptorSets(engineDevice.device(), renderData.editorDescriptorPool, 1, &renderData.rdLineDescriptorSets[i]);
+		//}
 		
 		//vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengSelectionDescriptorLayout, nullptr);
 		//vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdLineDescriptorLayout, nullptr);
+		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdLineDescriptorLayout, nullptr);
 
-		//vkDestroyPipeline(engineDevice.device(), renderData.rdDebugPipeline, nullptr);
-		//vkDestroyPipeline(engineDevice.device(), renderData.rdDebugAnimatedPipeline, nullptr);
-		//vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
-		//vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
 
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugPipelineLayout, nullptr);
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugAnimatedPipelineLayout, nullptr);
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengSelectionPipelineLayout, nullptr);
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionPipelineLayout, nullptr);
-		vkDestroyPipelineLayout(engineDevice.device(), renderData.rdLinePipelineLayout, nullptr);
+		// vkDestroyPipelineLayout(engineDevice.device(), renderData.rdLinePipelineLayout, nullptr);
 
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdLineRenderpass, nullptr);
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdSelectionRenderpass, nullptr);
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdImguiRenderpass, nullptr);
 
-		vkDestroyDescriptorPool(engineDevice.device(), renderData.editorDescriptorPool, nullptr);
+		// vkDestroyDescriptorPool(engineDevice.device(), renderData.editorDescriptorPool, nullptr);
 	}
 
 	/* Check the destruction queue for impending doom */

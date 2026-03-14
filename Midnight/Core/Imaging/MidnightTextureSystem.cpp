@@ -1,6 +1,7 @@
 #include "MidnightTextureSystem.h"
 #include "CoreVK/VkRenderData.h"
 #include "CoreVK/EngineDevice.h"
+#include "Utils/Logger.h"
 
 namespace aveng {
     MidnightTextureSystem::MidnightTextureSystem(EngineDevice& _engineDevice, VkRenderData _renderData)
@@ -337,6 +338,7 @@ namespace aveng {
     /* TODO : Now would be a great time to simply keep the frameIndex updated in one place (VkRenderData) */
     void MidnightTextureSystem::updateBindlessDescriptor(uint32_t slotIdx, const TextureSlot& slot, const int frameIndex)
     {
+        Logger::log(3, "Loading texture into slot %d\n", slotIdx);
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = slot.imageView;

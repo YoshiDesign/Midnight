@@ -157,21 +157,6 @@ namespace aveng {
 		uint32_t skinMetaIndex;
 	};
 
-	struct InstanceMaterial {
-		uint32_t baseTex;
-		uint32_t data_1;
-		uint32_t data_2;
-		//uint32_t normalTex;
-		//uint32_t ormTex;
-		//uint32_t emissiveTex;
-		uint32_t b_index; // Index into a larger struct of materials (InstanceMaterialB) if needed.
-	};
-
-	struct  {
-		uint32_t data_3;
-		uint32_t data_4;
-	};
-
 	//struct PK {
 	//	uint32_t baseVertex;
 	//	uint32_t baseTriangle;
@@ -212,6 +197,7 @@ namespace aveng {
 		Span<VkShaderStorageBufferData> modelRootSSBOs;
 		Span<VkShaderStorageBufferData> boneMatSSBOs;
 		Span<VkShaderStorageBufferData> materialSSBOs;
+		Span<VkShaderStorageBufferData> materialExtSSBOs;
 	};
 
 	struct LightingBuffersView {
@@ -321,22 +307,24 @@ namespace aveng {
 		/*
 		* Descriptors
 		*/
-		VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
-		VkDescriptorPool editorDescriptorPool = VK_NULL_HANDLE;
+		// VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
+		// VkDescriptorPool editorDescriptorPool = VK_NULL_HANDLE;
 		VkDescriptorPool avengBindlessDescriptorPool = VK_NULL_HANDLE;
 
 		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;				// Static
-		VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
-		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;		// Texture
+		// VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
 		VkDescriptorSetLayout rdBindlessDescriptorLayout = VK_NULL_HANDLE;		// Texture
-		VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;		// Animation
-		VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			 // Animation
-		VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;		 // Animation
-		VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE; // Animation
-		VkDescriptorSetLayout rdAvengComputeBasicTerrainDescriptorLayout = VK_NULL_HANDLE;  // Terrain
-		VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE;			// EDITOR
-		VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE;	// EDITOR
-		VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE;						// EDITOR
+
+		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;		// Terrain
+		VkDescriptorSetLayout rdAvengComputeBasicTerrainDescriptorLayout = VK_NULL_HANDLE;  // Terrain TODO
+
+		// VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;		// Animation
+		// VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			 // Animation
+		//VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;		 // Animation
+		//VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE; // Animation
+		// VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE;			// EDITOR
+		// VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE;	// EDITOR
+		// VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE;						// EDITOR
 		VkDescriptorSetLayout rdPointLightDescriptorLayout = VK_NULL_HANDLE;				// EDITOR
 
 		std::vector<VkDescriptorSet> rdAvengDescriptorSets;					// Static
@@ -368,7 +356,6 @@ namespace aveng {
 		VkPipeline rdDebugPipeline = VK_NULL_HANDLE;
 		VkPipeline rdDebugAnimatedPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengPipeline = VK_NULL_HANDLE;
-		VkPipeline rdAvengBindlessPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengAnimationPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengSelectionPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengAnimationSelectionPipeline = VK_NULL_HANDLE;
@@ -386,7 +373,7 @@ namespace aveng {
 		std::vector<ModelSkinMeta> rdBoneMetaBufferData{};				// Data - Note: this buffer is either appended to or cleared. Never updated arbitrarily
 
 		std::vector<VkShaderStorageBufferData> rdInstanceMaterialBuffers;
-		std::vector<InstanceMaterial> rdMaterialData{};
+		std::vector<VkShaderStorageBufferData> rdInstanceMaterialExtBuffers;
 
 		/*
 		 * Editor Data

@@ -77,8 +77,6 @@ namespace aveng {
 		void updateBindlessDescriptorSets(int frameIndex);
 		void updateTextureArrayDescriptorSet(TextureHandle handle, VkImageView view, VkSampler sampler, int frameIndex);
 
-		void updateLights();
-
 		int dispatchCompute(const IModelLibrary& modelLib, const FramePacket& pkt);
 
 		/* ProcGen - TODO */
@@ -149,7 +147,7 @@ namespace aveng {
 		void runComputeShaders(const AvengModel* model, int numInstances, uint32_t modelOffset, uint32_t skinMetaOffset, uint32_t numberOfBones);
 		
 		void initializePointLights();
-		void renderLights();
+		void renderLights(const VkPipeline pipeline);
 		int getLightCount() const { return mPointLightData.numLights; }
 		void addLight(const glm::vec3& position, const glm::vec3& color, float intensity, float radius);
 		void clearLights();
@@ -159,6 +157,8 @@ namespace aveng {
 		void endGraphicsCommands(int currentFrameIndex);
 		void recreateSwapChain();
 		bool isRecreatingSwapChain() { return recreatingSwapchain; }
+
+		const VkPipeline pointLightPipeline() { return pointLightSystem.getPipeline(); }
 		
 		void destroyTrash();
 		void cleanup();
@@ -214,7 +214,6 @@ namespace aveng {
 		std::vector<VkUniformBufferData> mPerspectiveViewMatrixUBOBuffers;
 		std::vector<VkUniformBufferData> mPointLightUBOBuffers;
 		std::vector<VkShaderStorageBufferData> mModelMatrixBuffers;
-		std::vector<VkShaderStorageBufferData> mMaterialBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderBoneMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mShaderTrsMatrixBuffers;
 		std::vector<VkShaderStorageBufferData> mNodeTransformBuffers;

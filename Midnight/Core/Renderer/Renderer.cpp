@@ -52,12 +52,13 @@ namespace aveng {
 		// Buffered by frames-in-flight (single, double or triple)
 		mPerspectiveViewMatrixUBOBuffers = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mPointLightUBOBuffers			 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		renderData.rdBoneMetaBuffers	 = std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mModelMatrixBuffers				 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mNodeTransformBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderTrsMatrixBuffers			 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		mShaderBoneMatrixBuffers		 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
-		mMaterialBuffers				 = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdInstanceMaterialBuffers	= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		// renderData.rdInstanceMaterialExtBuffers = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
+		renderData.rdBoneMetaBuffers			= std::vector<VkUniformBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdInstanceMaterialBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdShaderBoneMatrixOffsetBuffers  = std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 		renderData.rdBoneParentNodeIndexBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
@@ -67,9 +68,9 @@ namespace aveng {
 		// renderData.rdAvengAnimationDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		renderData.rdAvengBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// renderData.rdAvengBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		renderData.rdAvengBindlessDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		renderData.rdAvengComputeBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		// renderData.rdAvengComputeBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.basicLightingDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 
 		recreateSwapChain();
@@ -197,8 +198,8 @@ namespace aveng {
 	}
 
 	void Renderer::initialize() {
-		initializePointLights();
 
+		initializePointLights();
 
 		addLight(
 			glm::vec3(20.0f, 0.0f, 20.0f),
@@ -480,7 +481,7 @@ namespace aveng {
 	}
 
 	/* Render the lighting billboards */
-	void Renderer::renderLights()
+	void Renderer::renderLights(const VkPipeline pipeline)
 	{
 		
 		if (mPointLightData.numLights <= 0) {
@@ -490,7 +491,7 @@ namespace aveng {
 			&& "Point Light system is using the wrong command buffer");
 
 		// This might not be necessary
-		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pointLightSystem.getPipeline());
+		vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
 		// Use instanced rendering: 6 vertices per light, numLights instances
 		vkCmdDraw(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), 6, mPointLightData.numLights, 0, 0);
@@ -826,12 +827,14 @@ namespace aveng {
 		mUploadToSSBO2Timer.start();
 
 		// Each instance's model matrix - TODO - Audit persistence
-		bool modelMatsResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.modelMats);
+		bool modelMatsResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.instModelMats);
+		bool instMaterialResized = ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdInstanceMaterialBuffers.at(currentFrameIndex), pkt.instMaterials);
+		// bool instMaterialExtResized = ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdInstanceMaterialExtBuffers.at(currentFrameIndex), pkt.instMaterialExts);
 
 		// Upload the model mat's
 		if (modelMatsResized) {
 			
-			size_t newBufferSize = std::max(pkt.modelMats.size() * sizeof glm::mat4, mModelMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
+			size_t newBufferSize = std::max(pkt.instModelMats.size() * sizeof glm::mat4, mModelMatrixBuffers.at(currentFrameIndex).bufferSize * 2);
 
 			buffer_trash.push_back(
 				PendingBufferDestroy{
@@ -849,7 +852,7 @@ namespace aveng {
 				newBufferSize // New buffer size
 			);
 
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.modelMats)) {
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.instModelMats)) {
 				std::printf("[2] Failed to accommodate resized buffer.\n");
 				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
 			}
@@ -858,9 +861,71 @@ namespace aveng {
 			
 		}
 
+		// Upload the model materials
+		if (instMaterialResized) {
+			
+			size_t newBufferSize = std::max(pkt.instMaterials.size() * sizeof MnMaterial, renderData.rdInstanceMaterialBuffers.at(currentFrameIndex).bufferSize * 2);
+
+			buffer_trash.push_back(
+				PendingBufferDestroy{
+					renderData.rdInstanceMaterialBuffers.at(currentFrameIndex).buffer,
+					renderData.rdInstanceMaterialBuffers.at(currentFrameIndex).bufferAlloc,
+				}
+			);
+
+			// Reinitialize MnMaterial buffers
+			ShaderStorageBuffer::init(
+				engineDevice,
+				renderData.rdInstanceMaterialBuffers.at(currentFrameIndex),
+				MapMode::Persistent,
+				ResidentMode::CPU,
+				newBufferSize // New buffer size
+			);
+
+			if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdInstanceMaterialBuffers.at(currentFrameIndex), pkt.instMaterials)) {
+				std::printf("[2] Failed to accommodate resized buffer.\n");
+				throw std::runtime_error("[2] Failed to accommodate resized buffer.");
+			}
+
+			std::cout << "Model Mats SSBO Resized..." << std::endl;
+			
+		}
+
+		//// Upload the materialExtension
+		//if (instMaterialExtResized) {
+		//	
+		//	size_t newBufferSize = std::max(pkt.instMaterialExts.size() * sizeof MnMaterialExt, renderData.rdInstanceMaterialExtBuffers.at(currentFrameIndex).bufferSize * 2);
+
+		//	buffer_trash.push_back(
+		//		PendingBufferDestroy{
+		//			renderData.rdInstanceMaterialExtBuffers.at(currentFrameIndex).buffer,
+		//			renderData.rdInstanceMaterialExtBuffers.at(currentFrameIndex).bufferAlloc,
+		//		}
+		//	);
+
+		//	// Reinitialize TrsMat buffers
+		//	ShaderStorageBuffer::init(
+		//		engineDevice,
+		//		renderData.rdInstanceMaterialExtBuffers.at(currentFrameIndex),
+		//		MapMode::Persistent,
+		//		ResidentMode::CPU,
+		//		newBufferSize // New buffer size
+		//	);
+
+		//	if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdInstanceMaterialExtBuffers.at(currentFrameIndex), pkt.instMaterialExts)) {
+		//		std::printf("[2] Failed to accommodate resized buffer.\n");
+		//		throw std::runtime_error("[2] Failed to accommodate resized buffer.");
+		//	}
+
+		//	std::cout << "Model Mats SSBO Resized..." << std::endl;
+		//	
+		//}
+
 		bufferResized |= trsResized;
 		bufferResized |= boneResized;
 		bufferResized |= modelMatsResized;
+		bufferResized |= instMaterialResized;
+		// bufferResized |= instMaterialExtResized;
 
 		if (bufferResized)
 		{
@@ -997,11 +1062,6 @@ namespace aveng {
 
 	}
 
-	void Renderer::updateLights() {
-		// Renderer lighting
-		renderLights();
-	}
-
 	bool Renderer::drawModels(
 		const FramePacket& pkt,
 		const IModelLibrary& modelLib,
@@ -1075,9 +1135,9 @@ namespace aveng {
 	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
 
-		VkDescriptorSet renderSets[1] = { renderData.rdAvengBindlessDescriptorSets[currentFrameIndex] };
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			renderData.rdAvengBindlessPipelineLayout, 1, 1, renderSets, 0, nullptr);
+		//VkDescriptorSet renderSets[1] = { renderData.rdAvengBindlessDescriptorSets[currentFrameIndex] };
+		//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		//	renderData.rdAvengBindlessPipelineLayout, 0, 1, renderSets, 0, nullptr);
 
 		mModelPushConst.pkModelBoneStride = 0;
 		mModelPushConst.pkSkinMatOffset = 0;
@@ -1195,16 +1255,22 @@ namespace aveng {
 
 		SyncObjects::cleanup(engineDevice, renderData, SwapChain::MAX_FRAMES_IN_FLIGHT);
 
+		// Graphics Pipelines
 		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengPipeline);
 		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengAnimationPipeline);
 		ComputePipeline::cleanup(engineDevice, renderData.rdAvengComputeTransformPipeline);
 		ComputePipeline::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipeline);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdDebugPipeline, nullptr);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdDebugAnimatedPipeline, nullptr);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
 
-		PipelineLayout::cleanup(engineDevice, renderData.rdAvengPipelineLayout);
-		PipelineLayout::cleanup(engineDevice, renderData.rdAvengAnimationPipelineLayout);
-		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformPipelineLayout);
-		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout);
-		PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeBasicTerrainPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengBindlessPipelineLayout);
+		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengPipelineLayout);
+		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengAnimationPipelineLayout);
+		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformPipelineLayout);
+		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeMatrixMultPipelineLayout);
+		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeBasicTerrainPipelineLayout);
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 
@@ -1217,7 +1283,8 @@ namespace aveng {
 			ShaderStorageBuffer::cleanup(engineDevice, mNodeTransformBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mModelMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
-			ShaderStorageBuffer::cleanup(engineDevice, mMaterialBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdInstanceMaterialBuffers[i]);
+			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdInstanceMaterialExtBuffers[i]);
 
 			// TODO Material Buffers
 
@@ -1225,25 +1292,26 @@ namespace aveng {
 			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);
 			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeTransformDescriptorSets[i]);
 			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
-			vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
+			// TERRAIN vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
 
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengBindlessDescriptorPool, 1, &renderData.rdAvengBindlessDescriptorSets[i]);
 
 		}
 
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengTextureDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeTransformDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
-		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeBasicTerrainDescriptorLayout, nullptr);
+		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengDescriptorLayout, nullptr);
+		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationDescriptorLayout, nullptr);
+		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengTextureDescriptorLayout, nullptr);
+		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeTransformDescriptorLayout, nullptr);
+		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultDescriptorLayout, nullptr);
+		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
+
+		// TERRAIN vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeBasicTerrainDescriptorLayout, nullptr);
 
 		//
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdBindlessDescriptorLayout, nullptr);
 
 		//
-		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
+		// vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
 
 		// Bindless
 		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengBindlessDescriptorPool, nullptr);
@@ -1553,7 +1621,7 @@ namespace aveng {
 
 		// Binding 7
 		VkDescriptorBufferInfo materialsInfo{};
-		materialsInfo.buffer = mMaterialBuffers[frameIndex].buffer;
+		materialsInfo.buffer = renderData.rdInstanceMaterialBuffers[frameIndex].buffer;
 		materialsInfo.offset = 0;
 		materialsInfo.range = VK_WHOLE_SIZE;
 
@@ -1728,18 +1796,18 @@ namespace aveng {
 				return false;
 			}
 
-			if (!ShaderStorageBuffer::init(engineDevice, mMaterialBuffers[i], MapMode::Persistent)) { // CPU Resident
+			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdInstanceMaterialBuffers[i], MapMode::Persistent)) { // CPU Resident
 				Logger::log(1, "%s error: could not create mMaterialBuffers SSBO\n", __FUNCTION__);
 				return false;
 			}
 
-			// ToDo - Verify Residency
+			// ToDo - Verify Residency - expands upon loading models
 			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU)) {
 				Logger::log(1, "%s error: could not create rdShaderBoneMatrixOffsetBuffer SSBO\n", __FUNCTION__);
 				return false;
 			}
 			
-			// ToDo - Verify Residency
+			// ToDo - Verify Residency - expands upon loading models
 			if (!ShaderStorageBuffer::init(engineDevice, renderData.rdBoneParentNodeIndexBuffers[i], MapMode::OnDemand, ResidentMode::CPU)) {
 				Logger::log(1, "%s error: could not create rdBoneParentMatrixBuffer SSBO\n", __FUNCTION__);
 				return false;
@@ -1747,7 +1815,7 @@ namespace aveng {
 			
 		}
 
-		// Populate the shared view for the editor - for when it needs to update its descriptor sets
+		/// This is no longer necessary - Populate the shared view for the editor - for when it need(ed) to update its descriptor sets
 		renderData.matrixBuffersView.modelRootSSBOs = {
 			mModelMatrixBuffers.data(),
 			mModelMatrixBuffers.size()
@@ -1758,9 +1826,10 @@ namespace aveng {
 			mShaderBoneMatrixBuffers.size()
 		};
 
-		renderData.matrixBuffersView.materialSSBOs = {
-			mMaterialBuffers.data(),
-			mMaterialBuffers.size()
+		// TODO - Audit... why
+		renderData.pointLightBufferView.viewPointLightUBOs = {
+			mPointLightUBOBuffers.data(),
+			mPointLightUBOBuffers.size()
 		};
 
 		return true;
@@ -1782,6 +1851,7 @@ namespace aveng {
 			mPointLightUBOBuffers.data(),
 			mPointLightUBOBuffers.size()
 		};
+
 	}
 
 	/* Check the destruction queue for impending doom */

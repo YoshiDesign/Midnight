@@ -95,7 +95,6 @@ namespace aveng {
 		const std::vector<std::shared_ptr<AssimpBone>>& getBoneList() const;
 
 		const std::vector<std::shared_ptr<AssimpAnimClip>>& getAnimClips();
-		const std::vector<VkShaderStorageBufferData>& getBoneMatrixOffsetBuffers() const;
 		const std::vector<VkShaderStorageBufferData>& getBoneParentBuffers() const;
 
 		//std::vector<VkDescriptorSet>& getMatrixMultDescriptorSets();
@@ -116,8 +115,6 @@ namespace aveng {
 		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData);
 	
 		std::string path; 
-
-		const VkShaderStorageBufferData& getMatOffBuffer(int findex) const { return mShaderBoneMatrixOffsetBuffers[findex]; }
 
 		// Important indices. Might want to relocate these, or otherwise avoid copying them carelessly to other destinations
 		uint32_t nParentNodeIndices = 0;

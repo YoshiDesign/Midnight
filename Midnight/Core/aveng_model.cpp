@@ -171,6 +171,8 @@ namespace aveng {
 				TextureAssetKey newKey{ scene->mTextures[i]->mFilename.C_Str() };
 				// std::string texName = scene->mTextures[i]->mFilename.C_Str(); // @warn: Your real key is the "*<index>", this is fine for logging, but don’t depend on it being meaningful/unique. For embedded textures it can be empty or weird depending on importer/exporter.
 
+				Logger::log(3, "Loading [Embedded] texture\n");
+
 				TextureCreateRequest t_req;
 				t_req.assetKey = newKey;
 				t_req.debugName = "[Embedded]" + newKey.value;
@@ -265,8 +267,6 @@ namespace aveng {
 			boneParentIndexList.end()
 		);
 
-		// TODO - Memory pressure tracking in GUI
-
 		/* create vertex buffers for the meshes */
 		for (const auto& mesh : mModelMeshes) {
 			VkVertexBufferData vertexBuffer;
@@ -280,42 +280,46 @@ namespace aveng {
 			mIndexBuffers.emplace_back(indexBuffer);
 		}
 
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			
-			//size_t boneMatBufferSize = boneOffsetMatricesList.size() * sizeof(glm::mat4);
-			//size_t boneParentBufferSize = boneParentIndexList.size() * sizeof(int32_t);
-
-			// ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
-			// ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
-
-			/* SSBOs uploaded once and forgotten about. No need to persistently map */
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdShaderBoneMatrixOffsetBuffers[i], renderData.globalBoneOffsetMatricesList))
-			{
-				throw std::runtime_error("model buffer allocation size was incorrect");
-			}
-
-			if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdBoneParentNodeIndexBuffers[i], renderData.globalBoneParentIndexList))
-			{
-				throw std::runtime_error("model buffer allocation size was incorrect");
-			}
-
-		}
-
-		/* create descriptor set (for each available frame in flight) for per-model data */
-		// createDescriptorSet(renderData); Now in bindless flavor
-
 		/* animations */
 		unsigned int numAnims = scene->mNumAnimations;
-		for (unsigned int i = 0; i < numAnims; ++i) {
-			aiAnimation* animation = scene->mAnimations[i];
+		if (numAnims > 0) {
 
-			std::shared_ptr<AssimpAnimClip> animClip = std::make_shared<AssimpAnimClip>();
-			animClip->addChannels(animation, mBoneList);
-			if (animClip->getClipName().empty()) {
-				animClip->setClipName(std::to_string(i));
+			for (unsigned int i = 0; i < numAnims; ++i) {
+				aiAnimation* animation = scene->mAnimations[i];
+
+				std::shared_ptr<AssimpAnimClip> animClip = std::make_shared<AssimpAnimClip>();
+				animClip->addChannels(animation, mBoneList);
+				if (animClip->getClipName().empty()) {
+					animClip->setClipName(std::to_string(i));
+				}
+				mAnimClips.emplace_back(animClip);
 			}
-			mAnimClips.emplace_back(animClip);
+
+			// TODO - We're overwriting the entire buffer as an update. Use `uploadSsboDataRange` instead
+			for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+
+				//size_t boneMatBufferSize = boneOffsetMatricesList.size() * sizeof(glm::mat4);
+				//size_t boneParentBufferSize = boneParentIndexList.size() * sizeof(int32_t);
+
+				// ShaderStorageBuffer::init(engineDevice, mShaderBoneMatrixOffsetBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneMatBufferSize);
+				// ShaderStorageBuffer::init(engineDevice, mBoneParentMatrixBuffers[i], MapMode::OnDemand, ResidentMode::CPU, boneParentBufferSize);
+
+				/* SSBOs uploaded once and forgotten about. No need to persistently map */
+				if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdShaderBoneMatrixOffsetBuffers[i], renderData.globalBoneOffsetMatricesList))
+				{
+					throw std::runtime_error("model buffer allocation size was incorrect");
+				}
+
+				if (ShaderStorageBuffer::uploadSsboData(engineDevice, renderData.rdBoneParentNodeIndexBuffers[i], renderData.globalBoneParentIndexList))
+				{
+					throw std::runtime_error("model buffer allocation size was incorrect");
+				}
+
+			}
 		}
+		
+		/* create descriptor set (for each available frame in flight) for per-model data */
+		// createDescriptorSet(renderData); Now in bindless flavor
 
 		/* get root transformation matrix from model's root node */
 		glm::mat4 local_gltf = Tools::convertAiToGLM(rootNode->mTransformation);
@@ -532,10 +536,6 @@ namespace aveng {
 		return mTriangleCount;
 	}
 
-	const std::vector<VkShaderStorageBufferData>& AvengModel::getBoneMatrixOffsetBuffers() const {
-		return mShaderBoneMatrixOffsetBuffers;
-	}
-
 	const std::vector<VkShaderStorageBufferData>& AvengModel::getBoneParentBuffers() const {
 		return mBoneParentMatrixBuffers;
 	}
@@ -554,25 +554,6 @@ namespace aveng {
 
 	void AvengModel::cleanup(EngineDevice& engineDevice, VkRenderData& renderData) {
 
-		VkDescriptorPool pool = renderData.avengDescriptorPool;
-		
-		std::cout << "Model: self destruction sequence activated\n";
-		// This is identical to...
-		/*for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			vkFreeDescriptorSets(engineDevice.device(), pool, 1, &mMatrixMultPerModelDescriptorSets[i]);
-		}*/
-
-		// this... But just do
-		//for (const auto& set : mMatrixMultPerModelDescriptorSets) {
-		//	vkFreeDescriptorSets(engineDevice.device(), pool, 1, &set);
-		//}
-		/// ...this:
-		vkFreeDescriptorSets(
-			engineDevice.device(),
-			pool,
-			static_cast<uint32_t>(mMatrixMultPerModelDescriptorSets.size()),
-			mMatrixMultPerModelDescriptorSets.data()
-		);
 
 		for (auto buffer : mVertexBuffers) {
 			VertexBuffer::cleanup(engineDevice, buffer);
@@ -581,18 +562,6 @@ namespace aveng {
 			IndexBuffer::cleanup(engineDevice, buffer);
 		}
 
-		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixOffsetBuffers[i]);
-			ShaderStorageBuffer::cleanup(engineDevice, mBoneParentMatrixBuffers[i]);
-		}
-
-		for (auto& tex : mTextures) {
-			Texture::cleanup(engineDevice, renderData, tex.second);
-		}
-
-		Texture::cleanup(engineDevice, renderData, mPlaceholderTexture);
-		Texture::cleanup(engineDevice, renderData, mWhiteTexture);
 	}
-
 
 }

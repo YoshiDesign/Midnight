@@ -15,6 +15,10 @@
  */
 
 namespace aveng {
+
+    struct MnMaterial;
+    struct MnMaterialExt;
+
     class ShaderStorageBuffer {
     public:
         /* set an arbitraty buffer size as default */
@@ -59,6 +63,16 @@ namespace aveng {
             EngineDevice& engineDevice,
             VkShaderStorageBufferData& SSBOData,
             std::span<const glm::mat4> bufferData);
+
+        static bool uploadSsboData(
+            EngineDevice& engineDevice,
+            VkShaderStorageBufferData& SSBOData,
+            std::span<const MnMaterialExt> bufferData);
+
+        static bool uploadSsboData(
+            EngineDevice& engineDevice,
+            VkShaderStorageBufferData& SSBOData,
+            std::span<const MnMaterial> bufferData);
 
         static bool uploadSsboData(
             EngineDevice& engineDevice,

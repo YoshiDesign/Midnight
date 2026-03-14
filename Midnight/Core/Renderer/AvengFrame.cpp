@@ -179,6 +179,10 @@ namespace aveng {
 		// Start graphics command recording
 		renderer.beginGraphicsCommands(currentFrameIndex);
 
+		VkDescriptorSet renderSets[1] = { renderData.rdAvengBindlessDescriptorSets[currentFrameIndex] };
+		vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS,
+			renderData.rdAvengBindlessPipelineLayout, 0, 1, renderSets, 0, nullptr);
+
 #ifdef ENABLE_EDITOR
 		if (gameData.currentAppMode == AppMode::Editor)
 		{
@@ -190,10 +194,14 @@ namespace aveng {
 				renderer.getSelectionRenderPass(),
 				true);
 
+			renderer.renderLights(pEditor->pointLightPipeline());
+
+			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
+			pEditor->drawModels(modelLib__, pkt, currentFrameIndex);
+
 		}
 		else {
 #endif
-
 			// Begin the basic model rendering renderpass
 			renderer.beginSwapChainRenderPass(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
@@ -201,33 +209,14 @@ namespace aveng {
 				renderer.getSwapChainRenderPass()
 			);
 
-#ifdef ENABLE_EDITOR
-		}
+			renderer.renderLights(renderer.pointLightPipeline());
 
-		if (gameData.currentAppMode == AppMode::Editor) {
-
-			// Editor takes over lighting
-			pEditor->renderLights();
-
-			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
-			pEditor->drawModels(modelLib__, pkt, currentFrameIndex); 
-			
-		}
-		else {
-#endif
-
-			renderer.renderLights();
-
-			renderer.drawModels(
+			renderer.drawModelsBindless(
 				framePacketBuilder_.getFramePacket(currentFrameIndex),
 				modelLib__,
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
 				renderData.rdAvengAnimationPipeline,
-				renderData.rdAvengPipelineLayout,
-				renderData.rdAvengAnimationPipelineLayout,
-				renderData.rdAvengDescriptorSets.at(currentFrameIndex),
-				renderData.rdAvengAnimationDescriptorSets.at(currentFrameIndex),
 				currentFrameIndex);
 
 #ifdef ENABLE_EDITOR

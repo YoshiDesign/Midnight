@@ -1,9 +1,10 @@
 #pragma once
 #include "avpch.h"
 // #include "Core/Asset/AssetRegistry.h"
-#include "Utils/Timer.h"
-#include "Core/Modeling/ModelAndInstanceData.h"
 #include "CoreVK/VkRenderData.h"
+#include "Utils/Timer.h"
+#include "Core/Modeling/InstanceSettings.h"
+#include "Core/Modeling/ModelAndInstanceData.h"
 
 // [!] Do not include SceneFacade or InstanceManager in this header.
 
@@ -77,6 +78,12 @@ namespace aveng {
         std::vector<AnyInstanceHandle> drawList;
         std::vector<uint32_t> pickIds;
         std::vector<AnyInstanceHandle> pickToHandle;
+
+        // All instances have one of these
+        std::vector<glm::mat4> instModelMats; // Each Model Matrix of this packet's draw list (all instances)
+        std::vector<MnMaterial> instMaterials;  // Future consideration : Just make mats/matx vec4's
+        std::vector<MnMaterialExt> instMaterialExts;
+
         // Guaranteed ordering: [0, staticBatchCount) are static batches, [staticBatchCount, total) are animated
         std::vector<DrawBatch> batches;
 
@@ -86,8 +93,9 @@ namespace aveng {
         uint32_t staticBatchCount = 0;
         uint32_t animatedBatchCount = 0;
 
-        // Instance data
-        std::vector<glm::mat4> modelMats; // Each Model Matrix of this packet's draw list (all instances)
+
+
+        // Animated instances - length = numBones (see boneBase)
         std::vector<NodeTransformData> nodeTransformData;  // (bone transforms) Already padded to aligned counts
 
         std::span<const uint32_t> dirtyStaticSlots{};
@@ -161,7 +169,9 @@ namespace aveng {
             // Clear previous frame data - we could alternatively clean this up after each frame is completed in a GC step
             pkt.drawList.clear();
             pkt.batches.clear();    /// TODO can we reserve this too? - Only if you can determine batches in advance
-            pkt.modelMats.clear();
+            pkt.instModelMats.clear();
+            pkt.instMaterialExts.clear();
+            pkt.instMaterials.clear();
             pkt.frameIndex = frameIndex;
             pkt.frameNumber = frameNumber;
             pkt.staticInstanceCount = 0;
@@ -173,6 +183,9 @@ namespace aveng {
 
             maxInstances = stat.slots->size() + anim.slots->size();
             pkt.drawList.reserve(maxInstances);
+            pkt.instModelMats.resize(maxInstances);
+            pkt.instMaterialExts.resize(maxInstances);
+            pkt.instMaterials.resize(maxInstances);
             pkt.pickIds.resize(maxInstances);
             pkt.pickToHandle.resize(maxInstances + 1); // +1 because pickId 0 is NullInstance
 
@@ -230,7 +243,9 @@ namespace aveng {
                     pkt.pickToHandle[nextPickId] = h;
                     ++nextPickId;
 
-                    pkt.modelMats.push_back(statSlots[h.index].instance->common.modelMatrix());
+                    pkt.instModelMats.push_back(statSlots[h.index].instance->common.modelMatrix());
+                    pkt.instMaterialExts.push_back(statSlots[h.index].instance->common.matx);
+                    pkt.instMaterials.push_back(statSlots[h.index].instance->common.mat);
                     batch.instanceCount++;
                 }
 
@@ -271,7 +286,9 @@ namespace aveng {
                         pkt.pickToHandle[nextPickId] = h;
                         ++nextPickId;
 
-                        pkt.modelMats.push_back(statSlots[h.index].instance->common.modelMatrix());
+                        pkt.instModelMats.push_back(statSlots[h.index].instance->common.modelMatrix());
+                        pkt.instMaterialExts.push_back(statSlots[h.index].instance->common.matx);
+                        pkt.instMaterials.push_back(statSlots[h.index].instance->common.mat);
                         batch.instanceCount++;
                     }
 
@@ -332,7 +349,9 @@ namespace aveng {
                     pkt.pickToHandle[nextPickId] = h;
                     ++nextPickId;
 
-                    pkt.modelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
+                    pkt.instModelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
+                    pkt.instMaterialExts.push_back(statSlots[h.index].instance->common.matx);
+                    pkt.instMaterials.push_back(statSlots[h.index].instance->common.mat);
 
                     batch.instanceCount++;
                 }
@@ -374,7 +393,10 @@ namespace aveng {
                         pkt.pickToHandle[nextPickId] = h;
                         ++nextPickId;
 
-                        pkt.modelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
+                        pkt.instModelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
+                        pkt.instMaterialExts.push_back(statSlots[h.index].instance->common.matx);
+                        pkt.instMaterials.push_back(statSlots[h.index].instance->common.mat);
+
                         batch.instanceCount++;
                     }
 
@@ -383,7 +405,6 @@ namespace aveng {
                     }
                 }
             };
-
 
             // Build animated portion
             if (opt.preferInstancesInOrder) {
@@ -429,7 +450,7 @@ namespace aveng {
 
             }
 
-            // Resize and fill nodeTransformData (boneBase is the total size needed)
+            // Resize and fill nodeTransformData (boneBase happens to now be the total size needed)
             pkt.nodeTransformData.resize(boneBase);
 
             // Copy node transforms for each animated batch
