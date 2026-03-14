@@ -22,7 +22,7 @@ namespace aveng {
                 continue;
             }
 
-            TextureHandle h = getOrCreate(keys[i], source, reqs[i], frameIndex);
+            TextureHandle h = getOrCreate(keys[i], source, reqs[i]);
             new_handles.push_back(h);
         }
 
@@ -30,7 +30,7 @@ namespace aveng {
     }
 
     //
-    TextureHandle TextureRegistry::getOrCreate(const TextureAssetKey& key, ITextureSource& source, TextureCreateRequest& req, const int frameIndex) {
+    TextureHandle TextureRegistry::getOrCreate(const TextureAssetKey& key, ITextureSource& source, TextureCreateRequest& req) {
         auto it = m_assetToHandle.find(key);
         if (it != m_assetToHandle.end()) {
             return it->second;
@@ -41,18 +41,18 @@ namespace aveng {
             return kInvalidTextureHandle;
         }
 
-        // Bookkeeping
-        uint32_t next_descriptor_index = m_assetToHandle.size();
+        size_t nextIdx = nextTextureDescriptorIndex();
 
         // Upload to GPU
-        TextureHandle handle = m_textureSystem.createTexture(source, req, next_descriptor_index, frameIndex);
+        TextureHandle handle = m_textureSystem.createTexture(source, req, nextIdx);
 
+        // Lookup is handle -> slot -> descriptor_index. 
         m_assetToHandle.emplace(key, handle);
         
         return handle;
     }
 
-    // Correctness for `const TextureRegistry`
+    // Correctness for `const TextureRegistry
     const TextureSlot* TextureRegistry::get(TextureHandle handle) const {
         return m_textureSystem.getSlot(handle);
     }

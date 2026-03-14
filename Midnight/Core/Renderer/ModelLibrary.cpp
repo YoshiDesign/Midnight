@@ -278,30 +278,31 @@ namespace aveng {
 			entry.rootTransform = model->getRootTranformationMatrix();
 			entry.model = std::move(model);
 			entry.isAnimated = entry.model->hasAnimations();
-
-			const uint32_t boneCount = static_cast<uint32_t>(entry.model->getBoneList().size());
-			assert(entry.model->nParentNodeIndices == boneCount);
-
-			entry.boneMeta.boneOffsetBase = nextBoneOffset;
-			entry.boneMeta.boneParentBase = nextParentOffset;
-			entry.boneMeta.boneCount = boneCount;
-
-			// [IMPORTANT] Sensitive data - these are globally determining the next model's offset
-			// VERY	MUCH NOT THREAD SAFE TO MULTITHREAD THE PENDING MODEL LOADS FOR THIS REASON
-			renderData_.skinState.nextBoneOffsetMatIdx += boneCount;
-			renderData_.skinState.nextBoneParentIdxIdx += boneCount;
-
-			ModelSkinMeta ms{
-				renderData_.skinState.nextBoneOffsetMatIdx,
-				renderData_.skinState.nextBoneParentIdxIdx,
-				boneCount,
-				0xBEEEEEEF // there it is (std140 compliance)
-			};
-
-			// Update the ModelSkinMeta buffer - Note: this buffer is either appended to or cleared. Never updated arbitrarily
-			renderData_.rdBoneMetaBufferData.push_back(ms);
+			entry.model->setModelFileName(key);
 
 			if (entry.isAnimated) {
+			 
+				const uint32_t boneCount = static_cast<uint32_t>(entry.model->getBoneList().size());
+				assert(entry.model->nParentNodeIndices == boneCount);
+
+				entry.boneMeta.boneOffsetBase = nextBoneOffset;
+				entry.boneMeta.boneParentBase = nextParentOffset;
+				entry.boneMeta.boneCount = boneCount;
+
+				// [IMPORTANT] Sensitive data - these are globally determining the next model's offset
+				// VERY	MUCH NOT THREAD SAFE TO MULTITHREAD THE PENDING MODEL LOADS FOR THIS REASON
+				renderData_.skinState.nextBoneOffsetMatIdx += boneCount;
+				renderData_.skinState.nextBoneParentIdxIdx += boneCount;
+
+				ModelSkinMeta ms{
+					renderData_.skinState.nextBoneOffsetMatIdx,
+					renderData_.skinState.nextBoneParentIdxIdx,
+					boneCount,
+					0xBEEEEEEF // there it is (std140 compliance)
+				};
+
+				// Update the ModelSkinMeta buffer - Note: this buffer is either appended to or cleared. Never updated arbitrarily
+				renderData_.rdBoneMetaBufferData.push_back(ms);
 				std::cout << entry.key << " has " << entry.boneMeta.boneCount << " bones.\n";
 			}
 
@@ -310,12 +311,11 @@ namespace aveng {
 
 		}
 
-		// Arbitrary
 		if (anyLoaded && lastLoadedId != NullModelId) {
-			// TODO - Why is this occurring here?
 			// After uploading latest model, make it the editor's currently selected model
 			registry_.selectedModel = lastLoadedId;
 		}
+
 	}
 
 	// If you want: compute baseDir from the key (filesystem path today)

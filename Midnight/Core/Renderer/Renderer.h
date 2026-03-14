@@ -66,7 +66,7 @@ namespace aveng {
 		bool createPipelineLayouts();
 		bool createPipelines();
 		bool createSSBOs();
-		bool createMatrixUBO();
+		bool createUBOs();
 		bool createLightsUBO();
 		bool createDefaultSamplers();
 
@@ -131,8 +131,7 @@ namespace aveng {
 			const IModelLibrary& modelLib,
 			VkCommandBuffer commandBuffer,
 			VkPipeline basicPipeline,
-			VkPipeline animationPipeline,
-			int frameIndex);
+			VkPipeline animationPipeline);
 
 		void reset_timers();
 

@@ -47,7 +47,7 @@ void main() {
   mat4 worldPosSkinMat = worldPos[instanceId] * skinMat;
   vec4 positionWorld = worldPosSkinMat * vec4(aPos.xyz, 1.0f);
   gl_Position = projection * view * worldPosSkinMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
-
+  
   color = aColor;
 
   /* draw the instance always on top when highlighted, helps to find it better */

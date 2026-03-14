@@ -121,7 +121,7 @@ namespace aveng {
 
 	/* The ModelDB - Note: Don't ever template a class that inherits virtual interfaces */
 	struct ModelRegistryData final : public IModelAnimQuery, public IModelQuery {
-		std::vector<ModelEntry> models;
+		std::vector<ModelEntry> models; // Sentinel/NullModel is at [0]
 		std::unordered_map<AssetKey, ModelId> idByKey;
 		std::unordered_map<ModelId, size_t> indexById; // To look up the ModelEntry's index from models
 

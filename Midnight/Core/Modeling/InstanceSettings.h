@@ -52,6 +52,7 @@ namespace aveng {
         uint32_t ext_index{ 999 }; // Index into a larger struct of materials (InstanceMaterialB) if needed.
     };
 
+    // TODO - Implementation: Add these to shaders, instances, sceneFacade, etc.
     struct MnMaterialExt {
         uint32_t data_3{ 0 };
         uint32_t data_4{ 0 };

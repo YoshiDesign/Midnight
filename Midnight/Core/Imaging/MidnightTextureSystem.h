@@ -14,9 +14,11 @@ namespace aveng {
 	/* Owned by Midnight */
 	struct MidnightTextureSystem {
 
-		explicit MidnightTextureSystem(EngineDevice& _engineDevice, VkRenderData _renderData);
-
-		TextureHandle createTexture(ITextureSource& source, TextureCreateRequest& req, uint32_t next_descriptor_index, const int frameIndex);
+		explicit MidnightTextureSystem(EngineDevice& _engineDevice, VkRenderData& _renderData);
+		~MidnightTextureSystem() = default;
+		
+		void cleanup();
+		TextureHandle createTexture(ITextureSource& source, TextureCreateRequest& req, size_t next_descriptor_index);
 		const TextureSlot* getSlot(TextureHandle handle) const;
 		TextureSlot* getSlot(TextureHandle handle);
 
@@ -27,9 +29,9 @@ namespace aveng {
 
 		EngineDevice& engineDevice_;
 		VkRenderData& renderData_;
-		std::vector<TextureSlot> m_records;
+		std::vector<TextureSlot> m_records; // Complete slots parallel to descriptor indices
 		uint32_t m_nextHandle = 1;
-		uint32_t m_nextBindlessSlot = 0;
+		// uint32_t m_nextBindlessSlot = 0;
 
 	};
 

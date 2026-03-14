@@ -216,8 +216,7 @@ namespace aveng {
 				modelLib__,
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
-				renderData.rdAvengAnimationPipeline,
-				currentFrameIndex);
+				renderData.rdAvengAnimationPipeline);
 
 #ifdef ENABLE_EDITOR
 		}

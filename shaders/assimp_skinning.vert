@@ -9,6 +9,7 @@ layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normal;
 layout (location = 2) out vec2 texCoord;
 layout (location = 3) out vec3 fragPosWorld;
+layout (location = 4) flat out uint vInstanceIndex;
 
 layout (push_constant) uniform Constants {
   uint modelBoneStride; // model bone stride
@@ -47,4 +48,5 @@ void main() {
     normal = transpose(inverse(worldPosSkinMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
     texCoord = vec2(aPos.w, aNormal.w);
     fragPosWorld = positionWorld.xyz;
+    vInstanceIndex = gl_InstanceIndex;
 }

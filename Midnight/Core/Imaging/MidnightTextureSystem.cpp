@@ -4,17 +4,29 @@
 #include "Utils/Logger.h"
 
 namespace aveng {
-    MidnightTextureSystem::MidnightTextureSystem(EngineDevice& _engineDevice, VkRenderData _renderData)
+    MidnightTextureSystem::MidnightTextureSystem(EngineDevice& _engineDevice, VkRenderData& _renderData)
         : engineDevice_{ _engineDevice }, renderData_{ _renderData }
     {
-        
+        m_records.resize(1);
+        m_records.push_back({}); // Sentinel at index 0
     }
-    TextureHandle MidnightTextureSystem::createTexture(ITextureSource& source, TextureCreateRequest& req, uint32_t next_descriptor_index, const int frameIndex) {
+
+    void MidnightTextureSystem::cleanup()
+    {
+        // Note that we're also pushing the sentinel through here
+        for (auto& slot : m_records) {
+            vkDestroySampler(engineDevice_.device(), slot.sampler, nullptr);
+            vkDestroyImageView(engineDevice_.device(), slot.imageView, nullptr);
+            vmaDestroyImage(engineDevice_.allocator(), slot.image, slot.imageAlloc);
+        }
+    }
+
+    TextureHandle MidnightTextureSystem::createTexture(ITextureSource& source, TextureCreateRequest& req, size_t next_descriptor_index) {
 
         /* We have the image blob at this point req.pixelBlob */
 
         TextureSlot slot{};
-        slot.handle = m_nextHandle++;
+        slot.handle = m_nextHandle++; // 1-based
         slot.assetKey = req.assetKey;
         slot.width = req.width;
         slot.height = req.height;
@@ -38,24 +50,27 @@ namespace aveng {
 
         if (uploadToGPU(slot, source, req.pixelBlob)) {
 
+            // The index into the array of 2dsamplers
             slot.bindlessIndex = next_descriptor_index;
 
-            updateBindlessDescriptor(slot.bindlessIndex, slot, frameIndex);
-
+            for (size_t i = 0; i < renderData_.MAX_FRAMES_IN_FLIGHT; i++) {
+                updateBindlessDescriptor(slot.bindlessIndex, slot, i);
+            }
+            
             slot.state = TextureState::Resident;
 
-            // TODO - 
-            if (m_records.size() < slot.handle) {
-                m_records.resize(slot.handle); 
+            // TODO - Figure out a better allocation strategy for resizes
+            if (m_records.size() <= slot.handle) {
+                m_records.resize(slot.handle + 1); 
             }
 
-            m_records[slot.handle - 1] = slot;
+            m_records[slot.handle] = std::move(slot);
 
             return slot.handle;
 
         }
 
-        // Destroy the components
+        // Cleanup in the event of failure - might wanna try/catch this
         slot.state = TextureState::Failed;
         vkDestroySampler(engineDevice_.device(), slot.sampler, nullptr);
         vkDestroyImageView(engineDevice_.device(), slot.imageView, nullptr);
@@ -338,7 +353,7 @@ namespace aveng {
     /* TODO : Now would be a great time to simply keep the frameIndex updated in one place (VkRenderData) */
     void MidnightTextureSystem::updateBindlessDescriptor(uint32_t slotIdx, const TextureSlot& slot, const int frameIndex)
     {
-        Logger::log(3, "Loading texture into slot %d\n", slotIdx);
+        Logger::log(1, "Loading texture into descriptor %d\n", slotIdx);
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = slot.imageView;

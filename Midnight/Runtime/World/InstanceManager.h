@@ -330,7 +330,7 @@ namespace aveng {
             Slot& slot = instanceData_.slots[slotIndex];
             
             // Construct instance 
-            auto& inst = slot.instance.emplace(); // Note: emplace is only for reset/create paths - bc it destroys what was there prior.
+            auto& inst = slot.instance.emplace(); // Note: emplace is only for reset/create paths - bc it will destroy whatever was there prior.
             slot.alive = true;
 
             // Initialize instance's model constants

@@ -171,6 +171,7 @@ namespace aveng {
 		}
 
 		modelLib_.cleanup();
+		textureSystem_.cleanup();
 		renderer.cleanup();
 
 	}

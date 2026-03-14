@@ -45,6 +45,8 @@ namespace aveng {
 			animQuery_		{ aq }
 	{
 
+		_renderData.MAX_FRAMES_IN_FLIGHT = SwapChain::MAX_FRAMES_IN_FLIGHT;
+
 		buffer_trash.clear();
 		//mWorldPosMatrices.clear();
 		//mNodeTransFormData.clear();
@@ -64,12 +66,12 @@ namespace aveng {
 		renderData.rdBoneParentNodeIndexBuffers		= std::vector<VkShaderStorageBufferData>(SwapChain::MAX_FRAMES_IN_FLIGHT);
 
 		// Define descriptor set vec's
+		renderData.rdAvengBindlessDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengAnimationDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengComputeTransformDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengComputeMatrixMultDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-		renderData.rdAvengBindlessDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.rdAvengComputeBasicTerrainDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 		// renderData.basicLightingDescriptorSets = std::vector<VkDescriptorSet>(SwapChain::MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 
@@ -77,7 +79,7 @@ namespace aveng {
 
 		createCommandBuffers();
 
-		if (!createMatrixUBO()) {
+		if (!createUBOs()) {
 			throw std::runtime_error("Failed to create UBOs");
 		}
 
@@ -1130,14 +1132,13 @@ namespace aveng {
 		const IModelLibrary& modelLib,
 		VkCommandBuffer commandBuffer,
 		VkPipeline basicPipeline,
-		VkPipeline animationPipeline,
-		int frameIndex)
+		VkPipeline animationPipeline)
 	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
 
-		//VkDescriptorSet renderSets[1] = { renderData.rdAvengBindlessDescriptorSets[currentFrameIndex] };
-		//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		//	renderData.rdAvengBindlessPipelineLayout, 0, 1, renderSets, 0, nullptr);
+		VkDescriptorSet renderSets[1] = { renderData.rdAvengBindlessDescriptorSets[currentFrameIndex] };
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			renderData.rdAvengBindlessPipelineLayout, 0, 1, renderSets, 0, nullptr);
 
 		mModelPushConst.pkModelBoneStride = 0;
 		mModelPushConst.pkSkinMatOffset = 0;
@@ -1161,7 +1162,7 @@ namespace aveng {
 				sizeof(VkPushConstants),
 				&mModelPushConst
 			);
-			model->drawInstancedV3(commandBuffer, renderData.rdAvengBindlessPipelineLayout, b.instanceCount, frameIndex);
+			model->drawInstancedV3(commandBuffer, renderData.rdAvengBindlessPipelineLayout, b.instanceCount);
 		}
 
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, animationPipeline);
@@ -1190,7 +1191,7 @@ namespace aveng {
 			// We can get rid of this indirection if we implement vertex pulling, 
 			// or simply store each model's verts/indices in an external registry.
 			// Also needs the model's VkMesh data. Getting there!
-			model->drawInstancedV3(commandBuffer, renderData.rdAvengBindlessPipelineLayout, b.instanceCount, frameIndex);
+			model->drawInstancedV3(commandBuffer, renderData.rdAvengBindlessPipelineLayout, b.instanceCount);
 		}
 
 		return true;
@@ -1255,6 +1256,10 @@ namespace aveng {
 
 		SyncObjects::cleanup(engineDevice, renderData, SwapChain::MAX_FRAMES_IN_FLIGHT);
 
+		vkDestroySampler(engineDevice.device(), renderData.default_samplers.linearClamp, nullptr);
+		vkDestroySampler(engineDevice.device(), renderData.default_samplers.linearRepeat, nullptr);
+		vkDestroySampler(engineDevice.device(), renderData.default_samplers.nearestRepeat, nullptr);
+
 		// Graphics Pipelines
 		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengPipeline);
 		SkinningPipeline::cleanup(engineDevice, renderData.rdAvengAnimationPipeline);
@@ -1264,6 +1269,7 @@ namespace aveng {
 		vkDestroyPipeline(engineDevice.device(), renderData.rdDebugAnimatedPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
+		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
 
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengBindlessPipelineLayout);
 		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengPipelineLayout);
@@ -1284,7 +1290,7 @@ namespace aveng {
 			ShaderStorageBuffer::cleanup(engineDevice, mModelMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, mShaderBoneMatrixBuffers[i]);
 			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdInstanceMaterialBuffers[i]);
-			ShaderStorageBuffer::cleanup(engineDevice, renderData.rdInstanceMaterialExtBuffers[i]);
+			// ShaderStorageBuffer::cleanup(engineDevice, renderData.rdInstanceMaterialExtBuffers[i]);
 
 			// TODO Material Buffers
 
@@ -1313,13 +1319,18 @@ namespace aveng {
 		//
 		// vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
 
+		vkDestroyRenderPass(engineDevice.device(), renderData.rdLineRenderpass, nullptr);
+		vkDestroyRenderPass(engineDevice.device(), renderData.rdSelectionRenderpass, nullptr);
+		vkDestroyRenderPass(engineDevice.device(), renderData.rdImguiRenderpass, nullptr);
+
+
 		// Bindless
 		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengBindlessDescriptorPool, nullptr);
 
 		std::printf("%s: Vulkan renderer destroyed\n", __FUNCTION__);
 	}
 
-	bool Renderer::createMatrixUBO() {
+	bool Renderer::createUBOs() {
 
 		for (int i = 0; i < SwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
 			if (!UniformBuffer::init(engineDevice, mPerspectiveViewMatrixUBOBuffers[i], sizeof(VkUploadMatrices), MapMode::Persistent)) {

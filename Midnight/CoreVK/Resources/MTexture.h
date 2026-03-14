@@ -14,7 +14,7 @@ namespace aveng {
 
     using TextureHandle = uint32_t;		    // Primary lookup resource
     using TextureAssetID = uint64_t;	    // Content identity
-    static constexpr TextureHandle kInvalidTextureHandle = 0;
+    static constexpr TextureHandle kInvalidTextureHandle = 0xfffffffe;
 
     enum class TextureState : uint8_t {
         Unloaded,
@@ -32,7 +32,7 @@ namespace aveng {
     //};
 
     struct TextureAssetKey {
-        std::string value;
+        std::string value{"assetkey"};
 
         TextureAssetKey() = default;
         TextureAssetKey(std::string v) : value(std::move(v)) {} // Let's us construct in place
@@ -67,7 +67,7 @@ namespace aveng {
         VmaAllocation imageAlloc = nullptr;
 
         TextureState state = TextureState::Unloaded;
-        std::string debugName;
+        std::string debugName{"bugger"};
     };
 
     struct MTextureStagingBuffer {

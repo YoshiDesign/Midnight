@@ -52,13 +52,12 @@ namespace aveng {
 
     SwapChain::~SwapChain() {
 
-        std::cout << "DESTROYING SWAPCHAIN!!" << std::endl;
+        std::cout << "Destroying SwapChain Images and Buffers" << std::endl;
 
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(device.device(), imageView, nullptr);
-            
         }
-
+        
         // Cleanup selection images from renderData
         for (size_t i = 0; i < swapChainImages.size(); i++) {
             if (renderData.rdSelectionImageViews[i] != VK_NULL_HANDLE) {
@@ -68,9 +67,16 @@ namespace aveng {
                 vmaDestroyImage(device.allocator(), renderData.rdSelectionImages[i], 
                                 renderData.rdSelectionImageAllocs[i]);
             }
-        }
 
+            if (renderData.pgStorageImage.size() > 0) {
+                vkDestroyImageView(device.device(), renderData.pgStorageImage[i].view, nullptr);
+                vmaDestroyImage(device.allocator(), renderData.pgStorageImage[i].image,
+                    renderData.pgStorageImage[i].allocation);
+            }
+        }
+        
         swapChainImageViews.clear();
+        renderData.pgStorageImage.clear();
         // mSelectionImageViews.clear();
         renderData.rdSelectionImages.clear();
         renderData.rdSelectionImageViews.clear();
@@ -81,7 +87,6 @@ namespace aveng {
             swapChain = nullptr;
         }
 
-        std::cout << "Destroying Depth Images" << std::endl;
         for (int i = 0; i < depthImages.size(); i++) {
             vkDestroyImageView(device.device(), depthImageViews[i], nullptr);
             vmaDestroyImage(device.allocator(), depthImages[i], depthImageAllocations[i]);

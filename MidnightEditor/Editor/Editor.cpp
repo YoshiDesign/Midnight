@@ -451,8 +451,7 @@ namespace aveng {
 			modelLib,
 			renderData.rdCommandBuffersGraphics[frameIndex],
 			renderData.rdDebugPipeline,
-			renderData.rdDebugAnimatedPipeline,
-			frameIndex);
+			renderData.rdDebugAnimatedPipeline);
 	}
 
 	void Editor::cleanup()
@@ -488,18 +487,11 @@ namespace aveng {
 		//vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengSelectionDescriptorLayout, nullptr);
 		//vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionDescriptorLayout, nullptr);
 		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdLineDescriptorLayout, nullptr);
-
-		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
-
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugPipelineLayout, nullptr);
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdDebugAnimatedPipelineLayout, nullptr);
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengSelectionPipelineLayout, nullptr);
 		//vkDestroyPipelineLayout(engineDevice.device(), renderData.rdAvengAnimationSelectionPipelineLayout, nullptr);
 		// vkDestroyPipelineLayout(engineDevice.device(), renderData.rdLinePipelineLayout, nullptr);
-
-		vkDestroyRenderPass(engineDevice.device(), renderData.rdLineRenderpass, nullptr);
-		vkDestroyRenderPass(engineDevice.device(), renderData.rdSelectionRenderpass, nullptr);
-		vkDestroyRenderPass(engineDevice.device(), renderData.rdImguiRenderpass, nullptr);
 
 		// vkDestroyDescriptorPool(engineDevice.device(), renderData.editorDescriptorPool, nullptr);
 	}

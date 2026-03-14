@@ -1,12 +1,27 @@
 #version 460 core
+
+const uint MAX_BINDLESS_TEXTURES = 500;
+
 layout (location = 0) in vec4 color;
 layout (location = 1) in vec4 normal;
 layout (location = 2) in vec2 texCoord;
 layout (location = 3) in vec3 fragPosWorld;
+layout (location = 4) flat in uint vInstanceIndex;
 
 layout (location = 0) out vec4 FragColor;
 
-layout (set = 0, binding = 0) uniform sampler2D tex;
+layout (set = 0, binding = 0) uniform sampler2D tex[MAX_BINDLESS_TEXTURES];
+
+struct Material {
+    uint baseTex;
+    uint data_1;
+    uint data_2;
+    uint ext_index;
+}; 
+
+layout (std430, set = 0, binding = 7) readonly restrict buffer Materials {
+  Material materials[];
+};
 
 layout (push_constant) uniform Constants {
   uint modelStride;
@@ -34,6 +49,8 @@ vec3 sRGB(vec3 c) {
 }
 
 void main() {
+
+    uint instanceId = vInstanceIndex + instanceBaseIndex;
 
     float ambientStrength = u_Lights.ambientLightColor.w;
     vec3 ambient = ambientStrength * u_Lights.ambientLightColor.rgb;
@@ -68,6 +85,7 @@ void main() {
 
     }
 
-    FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex, texCoord) * color;
+    FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[materials[instanceId].baseTex], texCoord) * color;
     FragColor.rgb = sRGB(FragColor.rgb);
+
 }

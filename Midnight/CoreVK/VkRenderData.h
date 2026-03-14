@@ -234,6 +234,8 @@ namespace aveng {
 			- command pools
 		*/
 
+		int MAX_FRAMES_IN_FLIGHT = 0;
+
 		// Tmp
 		int camera = 1; // which camera we're using
 		AvengCameraProxy cameraProxy{
@@ -309,20 +311,27 @@ namespace aveng {
 		*/
 		// VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
 		// VkDescriptorPool editorDescriptorPool = VK_NULL_HANDLE;
+
+		/* New Bindless Resources */
 		VkDescriptorPool avengBindlessDescriptorPool = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdBindlessDescriptorLayout = VK_NULL_HANDLE;		
+		std::vector<VkDescriptorSet> rdAvengBindlessDescriptorSets;		
+		VkPipelineLayout rdAvengBindlessPipelineLayout = VK_NULL_HANDLE;
 
-		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;				// Static
-		// VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;		// Texture
-		VkDescriptorSetLayout rdBindlessDescriptorLayout = VK_NULL_HANDLE;		// Texture
+		// VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;			// Texture
 
-		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;		// Terrain
+		/* Legacy */
+		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;						// Static
+
+		/* New Terrain Stuff - TODO */
+		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;				// Terrain
 		VkDescriptorSetLayout rdAvengComputeBasicTerrainDescriptorLayout = VK_NULL_HANDLE;  // Terrain TODO
 
-		// VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;		// Animation
-		// VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			 // Animation
-		//VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;		 // Animation
-		//VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE; // Animation
-		// VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE;			// EDITOR
+		// VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;					// Animation
+		// VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			// Animation
+		//VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;			// Animation
+		//VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE;	// Animation
+		// VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE;				// EDITOR
 		// VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE;	// EDITOR
 		// VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE;						// EDITOR
 		VkDescriptorSetLayout rdPointLightDescriptorLayout = VK_NULL_HANDLE;				// EDITOR
@@ -330,7 +339,6 @@ namespace aveng {
 		std::vector<VkDescriptorSet> rdAvengDescriptorSets;					// Static
 		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;		// Animation
 		std::vector<VkDescriptorSet> rdAvengBasicTerrainDescriptorSets;			// Terrain
-		std::vector<VkDescriptorSet> rdAvengBindlessDescriptorSets;		// Terrain
 		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;		// Animation
 		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;	// Animation
 		std::vector<VkDescriptorSet> rdAvengComputeBasicTerrainDescriptorSets;	// Terrain
@@ -341,17 +349,17 @@ namespace aveng {
 		/*
 		* Pipeline
 		*/
-		VkPipelineLayout rdDebugPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdDebugAnimatedPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengBindlessPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengSelectionPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengAnimationSelectionPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdLinePipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengComputeBasicTerrainPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
-		VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdDebugPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdDebugAnimatedPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdAvengPipelineLayout = VK_NULL_HANDLE;
+		//
+		//VkPipelineLayout rdAvengAnimationPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdAvengSelectionPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdAvengAnimationSelectionPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdLinePipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdAvengComputeBasicTerrainPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdAvengComputeTransformPipelineLayout = VK_NULL_HANDLE;
+		//VkPipelineLayout rdAvengComputeMatrixMultPipelineLayout = VK_NULL_HANDLE;
 		   
 		VkPipeline rdDebugPipeline = VK_NULL_HANDLE;
 		VkPipeline rdDebugAnimatedPipeline = VK_NULL_HANDLE;

@@ -180,7 +180,7 @@ namespace aveng {
 				t_req.height = scene->mTextures[i]->mHeight;
 				t_req.assimp_data = scene->mTextures[i]->pcData;
 
-				texReg.getOrCreate(newKey, gltfSrc, t_req, frameIndex);
+				texReg.getOrCreate(newKey, gltfSrc, t_req);
 
 				// Clear the pre-loaded assimp_data
 				t_req.assimp_data = nullptr;
@@ -197,9 +197,9 @@ namespace aveng {
 		mRootNode = AssimpNode::createNode(rootNodeName);
 		std::printf("%s: root node name: '%s'\n", __FUNCTION__, rootNodeName.c_str());
 
-		processNode(renderData, mRootNode, rootNode, scene, modelBaseDir, contentRoot, texReg, gltfSrc, frameIndex);
+		processNode(renderData, mRootNode, rootNode, scene, modelBaseDir, contentRoot, texReg, gltfSrc);
 
-		build(renderData, key, scene, rootNode, frameIndex);
+		build(renderData, key, scene, rootNode);
 
 	}
 
@@ -208,8 +208,7 @@ namespace aveng {
 		VkRenderData& renderData,
 		const AssetKey& key, // Not strictly needed
 		const aiScene* scene,
-		aiNode* rootNode,
-		const int frameIndex
+		aiNode* rootNode
 	) {
 
 		std::cout << "Model Loading: " << key << "\n";
@@ -399,8 +398,7 @@ namespace aveng {
 		const std::string modelBaseDir, 
 		const std::string contentRoot,
 		TextureRegistry& texReg,
-		TextureGltfSource& gltfSrc, // No need to use the abstract base here
-		int frameIndex
+		TextureGltfSource& gltfSrc // No need to use the abstract base here
 		) 
 	{
 		std::string nodeName = aNode->mName.C_Str();
@@ -413,7 +411,7 @@ namespace aveng {
 				aiMesh* modelMesh = scene->mMeshes[aNode->mMeshes[i]];
 
 				AssimpMesh mesh;
-				mesh.processMesh(renderData, engineDevice, modelMesh, scene, /*assetDirectory*/ modelBaseDir, contentRoot, mTextures, texReg, gltfSrc, frameIndex);
+				mesh.processMesh(renderData, engineDevice, modelMesh, scene, /*assetDirectory*/ modelBaseDir, contentRoot, mTextures, texReg, gltfSrc);
 
 				mModelMeshes.emplace_back(mesh.getMesh());
 
@@ -439,15 +437,14 @@ namespace aveng {
 			// std::printf("%s: --- found child node '%s'\n", __FUNCTION__, childName.c_str());
 
 			std::shared_ptr<AssimpNode> childNode = node->addChild(childName);
-			processNode(renderData, childNode, aNode->mChildren[i], scene, modelBaseDir, contentRoot, texReg, gltfSrc, frameIndex);
+			processNode(renderData, childNode, aNode->mChildren[i], scene, modelBaseDir, contentRoot, texReg, gltfSrc);
 		}
 	}
 
 	void AvengModel::drawInstancedV3(
 		VkCommandBuffer graphicsCommandBuffer,
 		VkPipelineLayout bindlessLayout,
-		uint32_t instanceCount,
-		int frameIndex) const
+		uint32_t instanceCount) const
 	{
 		for (unsigned int i = 0; i < mModelMeshes.size(); ++i) {
 			const VkMesh& mesh = mModelMeshes.at(i);

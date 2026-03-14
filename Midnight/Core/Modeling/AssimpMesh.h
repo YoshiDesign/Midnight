@@ -27,8 +27,7 @@ namespace aveng {
             const std::string modelBaseDir, const std::string contentRoot,
             std::unordered_map<std::string, VkTextureData>& textures,
             TextureRegistry& texReg,
-            TextureGltfSource& gltfSource,
-            int frameIndex
+            TextureGltfSource& gltfSource
             );
 
         std::string getMeshName();

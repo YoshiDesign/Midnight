@@ -22,10 +22,10 @@ namespace aveng {
         ~AssimpInstance() = default;
 
         void init(ModelId id, const ModelMeta& meta, const TransformSettings& ts, const AnimSettings& as);
+        ModelId modelId() const { return modelId_; }
 
-        ModelId modelId() const             { return modelId_; }
         void setAnimClipNr(uint32_t clipNr) { anim.clipNr = clipNr; }
-        void setModelId(ModelId id)         { modelId_ = id; };
+        // void setModelId(ModelId id)         { modelId_ = id; };
         void resizeNodeTransformData(unsigned int boneCount);
 
         void setTranslation(glm::vec3 position);
@@ -51,10 +51,8 @@ namespace aveng {
         void clearPoseFast();
         
     private:
-
-        ModelId modelId_ = 0; // Never derive it from AvengModel*, never ask the model for it later.
         struct AnimationMeta animationMeta {}; // Used for queries
-
+        ModelId modelId_;
         // Sent to the Compute Shader - bone TRS transforms
         std::vector<NodeTransformData> mNodeTransformData{};
     };

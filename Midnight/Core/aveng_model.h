@@ -53,8 +53,7 @@ namespace aveng {
 			VkRenderData& renderData,
 			const AssetKey& key, // Not strictly needed
 			const aiScene* scene,
-			aiNode* rootNode,
-			const int frameIndex
+			aiNode* rootNode
 		);
 
 		[[deprecated("Use V3 instead")]]
@@ -84,8 +83,7 @@ namespace aveng {
 			const std::string modelBaseDir, 
 			const std::string contentRoot, // Texture root
 			TextureRegistry& texReg,
-			TextureGltfSource& gltfSrc, // No need to use the abstract base here
-			int frameIndex
+			TextureGltfSource& gltfSrc // No need to use the abstract base here
 		/* std::string assetDirectory*/);
 
 		std::string getModelFileName();
@@ -110,10 +108,19 @@ namespace aveng {
 		std::vector<int32_t> getBoneParentIndexList() { return boneParentIndexList; }
 
 		void drawInstancedV2(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout pipelineLayout, uint32_t instanceCount, int frameIndex) const;
-		void drawInstancedV3(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout bindlessLayout, uint32_t instanceCount, int frameIndex) const;
+		void drawInstancedV3(VkCommandBuffer graphicsCommandBuffer, VkPipelineLayout bindlessLayout, uint32_t instanceCount) const;
 
 		void cleanup(EngineDevice& engineDevice, VkRenderData& renderData);
 	
+		void setModelFileName(std::string name) {
+			mModelFilename = name;
+		}
+
+		void setModelFileNamePath(std::string path) {
+			mModelFilenamePath = path;
+		}
+
+
 		std::string path; 
 
 		// Important indices. Might want to relocate these, or otherwise avoid copying them carelessly to other destinations

@@ -122,9 +122,9 @@ namespace aveng {
 		using Instance = InstanceFor<Tag>;
 		using Slot = InstanceSlot<Instance>;
 
-		std::vector<Slot> slots{};		// Access to the instance and its generation / alive status
-		std::vector<uint32_t> free{};	// Indices of available `slots`
-		std::vector<uint32_t> active{};	// Indices of active `slots`
+		std::vector<Slot> slots{};		// Access via handle.index
+		std::vector<uint32_t> free{};	// Indices of available `slots` - handle.index
+		std::vector<uint32_t> active{};	// Indices of active `slots` - handle.index
 
 		std::vector<Handle> instancesInOrder{};
 		std::unordered_map<ModelId, std::vector<Handle>> instancesPerModel;

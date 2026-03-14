@@ -22,6 +22,8 @@ namespace aveng {
 
                 if (outReq.height == 0) {
                     outReq.pixelBlob = stbi_load_from_memory(reinterpret_cast<unsigned char*>(outReq.assimp_data), outReq.width, &texWidth, &texHeight, &outReq.numChannels, STBI_rgb_alpha);
+                    outReq.width = texWidth;
+                    outReq.height = texHeight;
                 }
                 else {
                     outReq.pixelBlob = stbi_load_from_memory(reinterpret_cast<unsigned char*>(outReq.assimp_data), outReq.width * outReq.height, &texWidth, &texHeight, &outReq.numChannels, STBI_rgb_alpha);

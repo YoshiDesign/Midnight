@@ -1,5 +1,6 @@
 #include "AssimpMesh.h"
 #include "Utils/AssetResolution.h"
+#include "Utils/Logger.h"
 #include "CoreVK/Resources/MTexture.h"
 #include "Core/Imaging/TextureRegistry.h"
 #include "Core/Imaging/TextureGltfSource.h"
@@ -17,8 +18,7 @@ namespace aveng {
         const std::string contentRoot, 
         std::unordered_map<std::string, VkTextureData>& textures,
         TextureRegistry& texReg,
-        TextureGltfSource& gltfSrc, // No need to use the abstract base here
-        int frameIndex
+        TextureGltfSource& gltfSrc // No need to use the abstract base here
     ) {
         mMeshName = mesh->mName.C_Str();
         mTriangleCount = mesh->mNumFaces;
@@ -67,13 +67,15 @@ namespace aveng {
                                 // Resolve relative references robustly
                                 std::string texPath = resolveModelTexturePath(modelBaseDir, contentRoot, texName);
 
+                                Logger::log(1, "Uploading internal Texture: %s", texPath);
+
                                 TextureAssetKey newKey{ texPath };
                                 TextureCreateRequest t_req;
                                 t_req.assetKey = newKey;
                                 t_req.debugName = "[Mesh Reference]" + newKey.value;
                                 t_req.assimp_data = nullptr;
 
-                                texReg.getOrCreate(newKey, gltfSrc, t_req, frameIndex);
+                                texReg.getOrCreate(newKey, gltfSrc, t_req);
 
                             }
                         }
@@ -223,6 +225,9 @@ namespace aveng {
                 }
             }
         }
+
+        Logger::log(1, "MESH INFO\nIndices: %d\nVertices: %d\nFaces: %d\n", 
+            mMesh.indices.size(), mMesh.vertices.size(), mTriangleCount);
 
         return true;
     }

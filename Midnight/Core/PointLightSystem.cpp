@@ -19,7 +19,10 @@ namespace aveng {
 		createPipeline(renderPass, nColorAttachments, colorMask);
 	}
 
-	PointLightSystem::~PointLightSystem() {	}
+	PointLightSystem::~PointLightSystem() {
+		// vkDestroyPipelineLayout(engineDevice.device(), pipelineLayout, nullptr); // (Everything) Now uses the Bindless Layout
+		vkDestroyPipeline(engineDevice.device(), pipeline, nullptr);
+	}
 
 	/* Piggy-backing our bindlessPipeline for now */
 	void PointLightSystem::createPipeline(VkRenderPass renderPass, int nColorAttachments, bool colorMask)
