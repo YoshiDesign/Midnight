@@ -1,6 +1,7 @@
 #version 460 core
+#extension GL_EXT_nonuniform_qualifier : enable
 
-const uint MAX_BINDLESS_TEXTURES = 500;
+const uint MAX_BINDLESS_TEXTURES = 64;
 
 layout (location = 0) in vec4 color;
 layout (location = 1) in vec4 normal;
@@ -83,14 +84,14 @@ void main() {
         diffuseLight += lc * (attenuation * NdotL);
     }
 
-    FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[materials[instanceId].baseTex], texCoord) * color;
+    FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[nonuniformEXT(materials[instanceId].baseTex)], texCoord) * color;
     FragColor.rgb = sRGB(FragColor.rgb); // Enable for gamma correction
 
     if(selected) {
         vec3 highlight = vec3(0.25, 0.25, 0.25);
         FragColor.rgb += highlight;
     }
-
+    // FragColor = vec4(1, 0, 1, 1);
     /* fill the second color attachment with the ID of our model */
     SelectedInstance = instanceId + 1;
 }

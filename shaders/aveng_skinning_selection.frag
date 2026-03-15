@@ -1,6 +1,6 @@
 #version 460 core
 
-const uint MAX_BINDLESS_TEXTURES = 500;
+const uint MAX_BINDLESS_TEXTURES = 64;
 
 layout (location = 0) in vec4 color;
 layout (location = 1) in vec4 normal;

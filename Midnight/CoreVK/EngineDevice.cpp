@@ -87,6 +87,8 @@ namespace aveng {
         // Choose your weapon (GPU), or multiple of them (super advanced)
         pickPhysicalDevice();
 
+        checkPhysicalDeviceExtensions();
+
         // Determine the features of our GPU we will be utilizing
         createLogicalDevice();
 
@@ -190,6 +192,24 @@ namespace aveng {
 
         hasGflwRequiredInstanceExtensions();
 
+    }
+
+    void EngineDevice::checkPhysicalDeviceExtensions() {
+        VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
+        descriptorIndexingFeatures.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+
+        VkPhysicalDeviceFeatures2 features2{};
+        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        features2.pNext = &descriptorIndexingFeatures;
+
+        vkGetPhysicalDeviceFeatures2(_physicalDevice, &features2);
+
+        if (!descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing) {
+            throw std::runtime_error(
+                "Device does not support shaderSampledImageArrayNonUniformIndexing");
+        }
+    
     }
 
     /**

@@ -84,6 +84,7 @@ namespace aveng {
         QueueFamilyIndices findPhysicalQueueFamilies(){ return findQueueFamilies(_physicalDevice); };
         uint32_t getGraphicsQueueFamily() { return findPhysicalQueueFamilies().graphicsFamily; }
         VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+        void checkPhysicalDeviceExtensions();
 
         // Buffer Helper Functions
         void createBuffer(

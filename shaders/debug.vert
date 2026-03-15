@@ -33,16 +33,20 @@ void main() {
   bool selected = (pickId == instanceId + 1);
 
   mat4 modelMat = worldPosMat[instanceId];
-  gl_Position = projection * view * modelMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
+  // gl_Position = projection * view * modelMat * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 
+  vec4 worldPos = vec4(aPos.xyz, 1.0);    /// no model transform
+  gl_Position = projection * view * worldPos;   ///
+
+  // gl_Position = vec4(aPos.xy * 0.1, 0.0, 1.0);
   color = aColor;
   /* draw the instance always on top when highlighted, helps to find it better */
   if (selected) {
     gl_Position.z -= 1.0f;
   }
 
-  vec4 positionWorld = modelMat * vec4(aPos.xyz, 1.0);
-
+  // vec4 positionWorld = modelMat * vec4(aPos.xyz, 1.0); ///
+  vec4 positionWorld = worldPos;
   // True normal transpose even when non-uniform
   // normal = transpose(inverse(modelMat)) * vec4(aNormal.x, aNormal.y, aNormal.z, 1.0);
 

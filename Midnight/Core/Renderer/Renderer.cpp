@@ -1464,7 +1464,7 @@ namespace aveng {
 		ubo2_binding.binding = 6;
 		ubo2_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		ubo2_binding.descriptorCount = 1;
-		ubo2_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		ubo2_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 		ubo2_binding.pImmutableSamplers = nullptr;
 
 		// Materials

@@ -325,8 +325,7 @@ namespace aveng {
 		glm::mat4 local_engine =
 			Tools::gltfToEngine * local_gltf * glm::inverse(Tools::gltfToEngine);
 
-		// Used to later store on the ModelEntry once loaded. Model entries are used 
-		// for model queries to model metadata without touching the instance.
+		// The Model's Root Matrix. We store this in this model's ModelEntry
 		mRootTransformMatrix = local_engine;
 
 		return true;
