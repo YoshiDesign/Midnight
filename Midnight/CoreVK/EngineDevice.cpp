@@ -144,7 +144,7 @@ namespace aveng {
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "Midnight";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_1;  // GPU-assisted validation requires 1.1+
+        appInfo.apiVersion = VK_API_VERSION_1_2;  // GPU-assisted validation requires 1.1+
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;

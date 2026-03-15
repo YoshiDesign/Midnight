@@ -348,8 +348,8 @@ namespace aveng {
                     ++nextPickId;
 
                     pkt.instModelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
-                    pkt.instMaterialExts.push_back(statSlots[h.index].instance->common.matx);
-                    pkt.instMaterials.push_back(statSlots[h.index].instance->common.mat);
+                    pkt.instMaterialExts.push_back(animSlots[h.index].instance->common.matx);
+                    pkt.instMaterials.push_back(animSlots[h.index].instance->common.mat);
 
                     batch.instanceCount++;
                 }
@@ -392,8 +392,8 @@ namespace aveng {
                         ++nextPickId;
 
                         pkt.instModelMats.push_back(animSlots[h.index].instance->common.modelMatrix());
-                        pkt.instMaterialExts.push_back(statSlots[h.index].instance->common.matx);
-                        pkt.instMaterials.push_back(statSlots[h.index].instance->common.mat);
+                        pkt.instMaterialExts.push_back(animSlots[h.index].instance->common.matx);
+                        pkt.instMaterials.push_back(animSlots[h.index].instance->common.mat);
 
                         batch.instanceCount++;
                     }

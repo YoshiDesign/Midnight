@@ -1,6 +1,7 @@
 #include "ModelLibrary.h"
 #include "Core/Imaging/MidnightTextureSystem.h"
 #include "Core/Modeling/Sources/FilesystemAssetSource.h"
+#include "CoreVK/AvengUniformBuffer.h"
 #include "Core/Modeling/Sources/PackAssetSource.h"
 #include "CoreVK/EngineDevice.h"
 
@@ -285,15 +286,12 @@ namespace aveng {
 				const uint32_t boneCount = static_cast<uint32_t>(entry.model->getBoneList().size());
 				assert(entry.model->nParentNodeIndices == boneCount);
 
+				// Set the offset for this set of bones
 				entry.boneMeta.boneOffsetBase = nextBoneOffset;
 				entry.boneMeta.boneParentBase = nextParentOffset;
 				entry.boneMeta.boneCount = boneCount;
 
-				// [IMPORTANT] Sensitive data - these are globally determining the next model's offset
-				// VERY	MUCH NOT THREAD SAFE TO MULTITHREAD THE PENDING MODEL LOADS FOR THIS REASON
-				renderData_.skinState.nextBoneOffsetMatIdx += boneCount;
-				renderData_.skinState.nextBoneParentIdxIdx += boneCount;
-
+				// Record the meta 
 				ModelSkinMeta ms{
 					renderData_.skinState.nextBoneOffsetMatIdx,
 					renderData_.skinState.nextBoneParentIdxIdx,
@@ -301,9 +299,24 @@ namespace aveng {
 					0xBEEEEEEF // there it is (std140 compliance)
 				};
 
+				// [IMPORTANT] Sensitive data - these are globally determining the next model's offset
+				// VERY	MUCH NOT THREAD SAFE TO MULTITHREAD THE PENDING MODEL LOADS FOR THIS REASON
+				renderData_.skinState.nextBoneOffsetMatIdx += boneCount;
+				renderData_.skinState.nextBoneParentIdxIdx += boneCount;
+
 				// Update the ModelSkinMeta buffer - Note: this buffer is either appended to or cleared. Never updated arbitrarily
 				renderData_.rdBoneMetaBufferData.push_back(ms);
+
+				// Assign the skin meta index for this model to its ModelEntry
+				entry.skinMetaIndex = static_cast<uint32_t>(renderData_.rdBoneMetaBufferData.size() - 1);
+
+				// Upload the Per-Model bone metadata structs
+				for (int i = 0; i < renderData_.MAX_FRAMES_IN_FLIGHT; i++) {
+					UniformBuffer::uploadData(engineDevice_, renderData_.rdBoneMetaBuffers[i], renderData_.rdBoneMetaBufferData);
+				}
+
 				std::cout << entry.key << " has " << entry.boneMeta.boneCount << " bones.\n";
+
 			}
 
 			anyLoaded = true;

@@ -532,17 +532,23 @@ namespace aveng {
 		/* Bindless Pipeline Layout - Combined resources to support all shader stages in 1 pipeline */
 		std::vector<VkDescriptorSetLayout> layouts = { renderData.rdBindlessDescriptorLayout };
 
-		std::vector<VkPushConstantRange> pushConstants = { 
-			// Note: these stage flags must match stageFlags arg of vkCmdPushConstants
-			{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) },
-			{ VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkComputePushConstants) }
-			// Note that if stages overlapped on usage across different pc's then we couldn't start both offsets at 0
-			// E.g.
-			/*layout(push_constant) uniform Constants {
-				layout(offset = 16) uint modelOffset;
-				layout(offset = 20) uint skinMetaIndex;
-			} pc;*/
+		std::vector<VkPushConstantRange> pushConstants = {
+			{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,  sizeof(VkPushConstants) },
+			{ VK_SHADER_STAGE_COMPUTE_BIT,                               16, sizeof(VkComputePushConstants) }
 		};
+
+		// Note that if stages overlapped on usage across different pc's then we couldn't start both offsets at 0
+		// E.g.
+		/*layout(push_constant) uniform Constants {
+			layout(offset = 16) uint modelOffset;
+			layout(offset = 20) uint skinMetaIndex;
+		} pc;*/
+
+		//std::vector<VkPushConstantRange> pushConstants = { 
+		//	// Note: these stage flags must match stageFlags arg of vkCmdPushConstants
+		//	{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants) },
+		//	{ VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkComputePushConstants) }
+		//};
 
 		if (!PipelineLayout::init(engineDevice, renderData.rdAvengBindlessPipelineLayout, layouts, pushConstants)) {
 			std::printf("%s error: could not init Assimp pipeline layout\n", __FUNCTION__);
@@ -633,7 +639,6 @@ namespace aveng {
 		* This is why we use a semaphore to signal 
 		*/
 
-		mComputeTimer.start();
 		mComputeModelData.pkModelOffset = modelOffset; // Identical to the VkPushConstants::pkInstanceBaseIndex - for parallel instance data (base)
 		mComputeModelData.skinMetaIndex = skinMetaOffset;
 
@@ -654,7 +659,7 @@ namespace aveng {
 			renderData.rdCommandBuffersCompute.at(currentFrameIndex),
 			renderData.rdAvengBindlessPipelineLayout, // Unified bindless layout
 			VK_SHADER_STAGE_COMPUTE_BIT,
-			0,
+			16,
 			sizeof(VkComputePushConstants),
 			&mComputeModelData
 		);
@@ -662,7 +667,7 @@ namespace aveng {
 		vkCmdDispatch(renderData.rdCommandBuffersCompute.at(currentFrameIndex), numberOfBones, groupsY, 1);
 
 		/* memory barrier between the compute shaders
-		 * wait for TRS buffer to be written  */
+		 * wait for TRS buffer to be written  */ 
 		VkBufferMemoryBarrier trsBufferBarrier{};
 		trsBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 		trsBufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -1007,6 +1012,8 @@ namespace aveng {
 				std::printf("%s error: failed to submit compute command buffer (%i)\n", __FUNCTION__, result);
 				return WTF_BOOM;
 			};
+			
+			return 0;
 
 		}
 		else {

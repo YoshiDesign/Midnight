@@ -12,8 +12,8 @@ struct ModelSkinMeta {
 };
 
 layout(push_constant) uniform Constants {
-    uint modelOffset;     // base into per-instance arrays
-    uint skinMetaIndex;   // sequential model index into relative base indices since they're heterogenous
+    layout(offset = 16) uint modelOffset;       // base into per-instance bone arrays
+    layout(offset = 20) uint skinMetaIndex;     // sequential model index into relative base indices since they're heterogenous
 };
 
 // Per instance

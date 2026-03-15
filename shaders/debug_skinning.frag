@@ -1,4 +1,5 @@
 #version 460 core
+#extension GL_EXT_nonuniform_qualifier : enable
 
 const uint MAX_BINDLESS_TEXTURES = 64;
 
@@ -50,7 +51,7 @@ vec3 sRGB(vec3 c) {
 }
 
 void main() {
-
+    
     uint instanceId = vInstanceIndex + instanceBaseIndex;
     bool selected = (pickId == instanceId + 1);
 
@@ -61,7 +62,7 @@ void main() {
     vec3 diffuseLight = vec3(0.0);
 
     for(uint i = 0; i < u_Lights.numLights && i < 100; i++) {
-
+        
         vec3 lightPosition = u_Lights.lightPositions[i].rgb;
         float lightRadius = u_Lights.lightPositions[i].w;
 
@@ -87,8 +88,17 @@ void main() {
 
     }
 
-    FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[materials[instanceId].baseTex], texCoord) * color;
-    FragColor.rgb = vec3(1.0, 0.0, 1.0); // sRGB(FragColor.rgb);
+    // User vertex colors only
+    if (materials[instanceId].data_1 == 1) {
+        FragColor = vec4(ambient + diffuseLight, 1.0) * color;
+    } 
+    else  { 
+        // Use Texture
+        FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[nonuniformEXT(materials[instanceId].baseTex)], texCoord) * color;
+    }
+
+    /* Note: Performing the sRGB conversion at the last minute is (apparently) best for preserving quality */
+    FragColor.rgb = sRGB(FragColor.rgb); // Enable for gamma correction
 
     if(selected) {
         vec3 highlight = vec3(0.25, 0.25, 0.25);

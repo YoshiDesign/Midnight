@@ -313,7 +313,6 @@ namespace aveng {
 				{
 					throw std::runtime_error("model buffer allocation size was incorrect");
 				}
-
 			}
 		}
 		

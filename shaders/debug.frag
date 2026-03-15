@@ -93,6 +93,7 @@ void main() {
         FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[nonuniformEXT(materials[instanceId].baseTex)], texCoord) * color;
     }
 
+    /* Note: Performing the sRGB conversion at the last minute is (apparently) best for preserving quality */
     FragColor.rgb = sRGB(FragColor.rgb); // Enable for gamma correction
 
     if(selected) {

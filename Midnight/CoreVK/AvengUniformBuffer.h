@@ -80,6 +80,9 @@ namespace aveng {
 
         /* UNUSED */ static void uploadData(EngineDevice& engineDevice, VkUniformBufferData& uboData, VkUploadMatrices matrices);
         /* UNUSED */ static void uploadData(EngineDevice& engineDevice, VkUniformBufferData& uboData, PointLightData pointLightData);
+
+        static void uploadData(EngineDevice& engineDevice, VkUniformBufferData& uboData, std::span<ModelSkinMeta> skinMeta);
+
         static void uploadPersistentData(EngineDevice& engineDevice, VkUniformBufferData& uboData, VkUploadMatrices matrices);
         static void uploadPersistentData(EngineDevice& engineDevice, VkUniformBufferData& uboData, PointLightData pointLightData);
 

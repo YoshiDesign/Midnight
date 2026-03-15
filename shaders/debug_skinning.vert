@@ -50,6 +50,9 @@ void main() {
 
   color = aColor;
 
+  /// vec4 worldPos = vec4(aPos.xyz, 1.0);    /// no model transform
+  /// gl_Position = projection * view * worldPos;   ///
+
   /* draw the instance always on top when highlighted, helps to find it better */
   if (selected) {
     gl_Position.z -= 1.0f;

@@ -92,6 +92,24 @@ namespace aveng {
 
     }
 
+    // Currently AoS
+    void UniformBuffer::uploadData(EngineDevice& engineDevice, VkUniformBufferData& uboData, std::span<ModelSkinMeta> skinMeta) {
+
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), uboData.bufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map uniform buffer memory (error: %i)\n", __FUNCTION__, result);
+            return;
+        }
+        std::memcpy(data, skinMeta.data(), (sizeof(ModelSkinMeta) * skinMeta.size()));
+        vmaUnmapMemory(engineDevice.allocator(), uboData.bufferAlloc);
+
+        if (!uboData.isHostCoherent) {
+            vmaFlushAllocation(engineDevice.allocator(), uboData.bufferAlloc, 0, uboData.bufferSize);
+        }
+
+    }
+
     /* TODO - Make these templated functions */
     void UniformBuffer::uploadPersistentData(EngineDevice& engineDevice, VkUniformBufferData& uboData, PointLightData pointLightData) {
 

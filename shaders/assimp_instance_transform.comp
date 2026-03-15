@@ -18,8 +18,8 @@ struct ModelSkinMeta {
 };
 
 layout(push_constant) uniform Constants {
-    uint modelOffset;     // base into per-instance-per-bone arrays
-    uint skinMetaIndex;   // which model's metadata to use
+    layout(offset = 16) uint modelOffset;       // base into per-instance bone arrays
+    layout(offset = 20) uint skinMetaIndex;     // sequential model index into relative base indices since they're heterogenous
 };
 
 // Per model - note: std140 requires proper alignment
@@ -77,6 +77,7 @@ mat4 getRotationMatrix(uint index) {
 }
 
 void main() {
+    
     uint localBone = gl_GlobalInvocationID.x;
     uint instance  = gl_GlobalInvocationID.y;
 
@@ -91,4 +92,5 @@ void main() {
         getTranslationMatrix(index) *
         getRotationMatrix(index) *
         getScaleMatrix(index);
+
 }
