@@ -74,6 +74,7 @@ namespace aveng {
                                 t_req.assetKey = newKey;
                                 t_req.debugName = "[Mesh Reference]" + newKey.value;
                                 t_req.assimp_data = nullptr;
+                                t_req.size = 0;
 
                                 texReg.getOrCreate(newKey, gltfSrc, t_req);
 

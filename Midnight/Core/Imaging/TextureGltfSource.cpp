@@ -24,10 +24,13 @@ namespace aveng {
                     outReq.pixelBlob = stbi_load_from_memory(reinterpret_cast<unsigned char*>(outReq.assimp_data), outReq.width, &texWidth, &texHeight, &outReq.numChannels, STBI_rgb_alpha);
                     outReq.width = texWidth;
                     outReq.height = texHeight;
+                    
                 }
                 else {
                     outReq.pixelBlob = stbi_load_from_memory(reinterpret_cast<unsigned char*>(outReq.assimp_data), outReq.width * outReq.height, &texWidth, &texHeight, &outReq.numChannels, STBI_rgb_alpha);
                 }
+
+                outReq.size = texWidth * texHeight * 4;
             
             }
 
@@ -35,6 +38,7 @@ namespace aveng {
         else {
             // load internally referenced textures from file
             outReq.pixelBlob = stbi_load(key.value.c_str(), &outReq.width, &outReq.height, &outReq.numChannels, STBI_rgb_alpha);
+            outReq.size = outReq.width * outReq.height * 4;
         }
 
         if (!outReq.pixelBlob) {
@@ -44,7 +48,7 @@ namespace aveng {
         }
 
         outReq.mipLevels += static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight))));
-        outReq.size = texWidth * texHeight * 4; // Per the docs
+        
 
         return true;
 
