@@ -93,8 +93,6 @@ namespace aveng {
         uint32_t staticBatchCount = 0;
         uint32_t animatedBatchCount = 0;
 
-
-
         // Animated instances - length = numBones (see boneBase)
         std::vector<NodeTransformData> nodeTransformData;  // (bone transforms) Already padded to aligned counts
 
@@ -183,9 +181,9 @@ namespace aveng {
 
             maxInstances = stat.slots->size() + anim.slots->size();
             pkt.drawList.reserve(maxInstances);
-            pkt.instModelMats.resize(maxInstances);
-            pkt.instMaterialExts.resize(maxInstances);
-            pkt.instMaterials.resize(maxInstances);
+            pkt.instModelMats.reserve(maxInstances);
+            pkt.instMaterialExts.reserve(maxInstances);
+            pkt.instMaterials.reserve(maxInstances);
             pkt.pickIds.resize(maxInstances);
             pkt.pickToHandle.resize(maxInstances + 1); // +1 because pickId 0 is NullInstance
 
@@ -261,7 +259,7 @@ namespace aveng {
                 }
                 else {
                     model_ids.reserve(perModelMap.size());
-                    for (const auto& kv : perModelMap) model_ids.push_back(kv.first);
+                    for (const auto& kv : perModelMap) { model_ids.push_back(kv.first); }
                 }
 
                 for (ModelId mid : model_ids) {

@@ -94,7 +94,7 @@ namespace aveng {
 
         // Initialize VMA allocator
         VmaAllocatorCreateInfo allocatorInfo = {};
-        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_1;  // Match instance API version
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;  // Match instance API version
         allocatorInfo.physicalDevice = _physicalDevice;
         allocatorInfo.device = _device;
         allocatorInfo.instance = _instance;

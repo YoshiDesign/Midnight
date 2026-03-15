@@ -84,14 +84,25 @@ void main() {
         diffuseLight += lc * (attenuation * NdotL);
     }
 
-    FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[nonuniformEXT(materials[instanceId].baseTex)], texCoord) * color;
+    // User vertex colors only
+    if (materials[instanceId].data_1 == 1) {
+        FragColor = vec4(ambient + diffuseLight, 1.0) * color;
+    } 
+    else  { 
+        // Use Texture
+        FragColor = vec4(ambient + diffuseLight, 1.0) * texture(tex[nonuniformEXT(materials[instanceId].baseTex)], texCoord) * color;
+    }
+
     FragColor.rgb = sRGB(FragColor.rgb); // Enable for gamma correction
 
     if(selected) {
         vec3 highlight = vec3(0.25, 0.25, 0.25);
         FragColor.rgb += highlight;
     }
-    // FragColor = vec4(1, 0, 1, 1);
+
+    // FragColor = vec4(1, 0, 1, 1); // dbugger
+
     /* fill the second color attachment with the ID of our model */
     SelectedInstance = instanceId + 1;
+
 }
