@@ -87,6 +87,7 @@ namespace aveng {
 		SceneFacade sceneFacade_;
 		Renderer renderer;
 
+		std::unique_ptr<GameInput> gameInput_;
 #ifdef ENABLE_EDITOR
 		// Prefer pointers/optional to avoid duplicating big member-init lists
 		std::unique_ptr<Editor> editor_;
@@ -108,7 +109,6 @@ namespace aveng {
 		std::unique_ptr<IAssetSource> assetSource_;
 
 		//
-		std::unique_ptr<GameInput> gameInput_;
 		std::unique_ptr<InputSystem> inputSystem_;
 		
 		/*

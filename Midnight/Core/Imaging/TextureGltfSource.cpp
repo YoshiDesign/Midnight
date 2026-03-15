@@ -48,8 +48,6 @@ namespace aveng {
         }
 
         outReq.mipLevels += static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight))));
-        
-
         return true;
 
 	}
