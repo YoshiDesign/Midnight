@@ -704,8 +704,6 @@ namespace aveng {
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, // TODO - Inspect the dstStageMask usage
 			&boneMatrixBufferBarrier, 0, nullptr);
 
-		renderData.rdComputeTime += mComputeTimer.stop();
-
 	}
 
 	/**
@@ -949,7 +947,7 @@ namespace aveng {
 
 		/* record compute commands */
 		result = vkResetFences(engineDevice.device(), 1, &renderData.rdComputeFence.at(currentFrameIndex));
-		mComputeTimer.start();
+
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: compute fence reset failed (error: %i)\n", __FUNCTION__, result);
 			return WTF_BOOM;
@@ -1040,7 +1038,6 @@ namespace aveng {
 			};
 		}
 
-		renderData.rdComputeTime = mComputeTimer.stop();
 	}
 
 	void Renderer::beginGraphicsCommands(int frameIndex)
@@ -1069,69 +1066,6 @@ namespace aveng {
 			throw std::runtime_error("error: could not end render pass");
 		}
 
-	}
-
-	bool Renderer::drawModels(
-		const FramePacket& pkt,
-		const IModelLibrary& modelLib,
-		VkCommandBuffer commandBuffer,
-		VkPipeline basicPipeline,
-		VkPipeline animationPipeline,
-		VkPipelineLayout basicLayout,
-		VkPipelineLayout animationLayout,
-		VkDescriptorSet basicDescriptorSet,
-		VkDescriptorSet animationDescriptorSet,
-		int frameIndex)
-	{
-
-		// ========== STATIC PASS ==========
-		// Bind static pipeline once, then draw all static batches
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, basicPipeline);
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			basicLayout, 1, 1, &basicDescriptorSet, 0, nullptr);
-
-		for (uint32_t i = 0; i < pkt.staticBatchCount; ++i) {
-			const DrawBatch& b = pkt.batches[i];
-			if (b.instanceCount == 0) continue;
-
-			// Pointer here? Really?
-			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
-			if (!model) continue;
-
-			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset; // first instance index in global buffers
-			mModelPushConst.pkModelBoneStride = 0;	// Unused for static batches
-			mModelPushConst.pkSkinMatOffset = 0;	// Unused for static batches
-			mModelPushConst.pkPickId = renderData.selectedPickId;
-			vkCmdPushConstants(commandBuffer, basicLayout,
-				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
-
-			model->drawInstancedV2(commandBuffer, basicLayout, b.instanceCount, frameIndex);
-		}
-
-		// ========== ANIMATED PASS ==========
-		// Bind animated pipeline once, then draw all animated batches
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, animationPipeline);
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			animationLayout, 1, 1, &animationDescriptorSet, 0, nullptr);
-
-		for (uint32_t i = pkt.staticBatchCount; i < pkt.batches.size(); ++i) {
-			const DrawBatch& b = pkt.batches[i];
-			if (b.instanceCount == 0) continue;
-
-			const AvengModel* model = modelLib.pModel(b.modelId); /* modelRegistry_.get(b.modelId) */
-			if (!model) continue;
-
-			mModelPushConst.pkInstanceBaseIndex = b.drawListOffset;
-			mModelPushConst.pkModelBoneStride = b.boneCount;
-			mModelPushConst.pkSkinMatOffset = b.boneBaseOffset;
-			mModelPushConst.pkPickId = renderData.selectedPickId;
-			vkCmdPushConstants(commandBuffer, animationLayout,
-				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkPushConstants), &mModelPushConst);
-
-			model->drawInstancedV2(commandBuffer, animationLayout, b.instanceCount, frameIndex);
-		}
-
-		return true;
 	}
 	
 	bool Renderer::drawModelsBindless(
@@ -1210,20 +1144,16 @@ namespace aveng {
 		renderData.rdDrawTime = mDrawTimer.stop();
 		mDrawTimer.start();
 
-		// animatedModelLoaded = false;
-		renderData.rdMatricesSize = 0;
+		renderData.rdMatricesSize = 0; // Not in use atm
 		renderData.rdUploadToUBOTime = 0.0f;
 		renderData.rdUploadSSBO1Time = 0.0f;
 		renderData.rdUploadSSBO2Time = 0.0f;
-		renderData.rdMatrixGenerateTime = 0.0f;
 	}
 
 	void Renderer::updateCamera()
 	{
-		// TODO - Make sure these don't contain garbage values before assigned
 		mMatrices.projectionMatrix = renderData.cameraProxy.projection;
 		mMatrices.viewMatrix = renderData.cameraProxy.view;
-		// Maybe ambient light as well
 	}
 
 	bool Renderer::createSyncObjects() {
@@ -1877,7 +1807,6 @@ namespace aveng {
 	{
 		if (buffer_trash.size() > 0) {
 			for (auto& pending : buffer_trash) {
-				std::cout << "Destroying Buffer from Renderer" << std::endl;
 				vmaDestroyBuffer(engineDevice.allocator(), pending.buffer, pending.allocation);
 			}
 			buffer_trash.clear();

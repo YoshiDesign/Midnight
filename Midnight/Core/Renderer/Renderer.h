@@ -114,18 +114,6 @@ namespace aveng {
 			const ModelLibrary& modelLib, // used to get Model pointers, *for now*
 			float deltaTime);
 
-		bool drawModels(
-			const FramePacket& pkt,
-			const IModelLibrary& modelLib_, // used to get Model pointers, *for now*
-			VkCommandBuffer commandBuffer, 
-			VkPipeline basicPipeline, 
-			VkPipeline animationPipeline, 
-			VkPipelineLayout basicLayout, 
-			VkPipelineLayout animationLayout, 
-			VkDescriptorSet basicDescriptorSet,
-			VkDescriptorSet animationDescriptorSet,
-			int frameIndex);
-
 		bool drawModelsBindless(
 			const FramePacket& pkt,
 			const IModelLibrary& modelLib,
@@ -196,7 +184,6 @@ namespace aveng {
 		VkResult result;
 
 		Timer mDrawTimer{};
-		Timer mComputeTimer{};
 		Timer mUploadToUBOTimer{};
 		Timer mUploadToSSBO1Timer{};
 		Timer mUploadToSSBO2Timer{};

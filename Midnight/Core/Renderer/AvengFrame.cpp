@@ -137,12 +137,14 @@ namespace aveng {
 			return false;
 		}
 
+		mComputeTimer.start();
 		// Compute bone transforms for skinning mat's
 		int animComputeResult = renderer.dispatchCompute(modelLib__, pkt);
 		if (animComputeResult == WTF_BOOM) {
 			// Terrible sync issue. Die.
 			throw std::runtime_error("Failed to dispatch animation compute.");
 		}
+		renderData.rdComputeTime = mComputeTimer.stop();
 
 		/* start graphics rendering - reset fence only after we're committed to submitting */
 		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence.at(currentFrameIndex));

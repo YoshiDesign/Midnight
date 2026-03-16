@@ -54,5 +54,7 @@ namespace aveng {
 		GameData& gameData;
 		Renderer& renderer;
 		Editor* pEditor; // fwd declare
+
+		Timer mComputeTimer{};
 	};
 }
