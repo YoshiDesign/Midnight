@@ -36,10 +36,10 @@
 *     [buildPoints(chunk A), buildHeights(chunk B), buildPoints(chunk C),
 *      buildAllPoints(chunk A), buildTriangulation(chunk D), 
 *      ...]        
-*   | Thread #3 grabs: buildPoints(chunk A)     ✓ completes
-*   | Thread #3 grabs: buildHeights(chunk B)    ✓ completes  
-*   | Thread #3 grabs: buildAllPoints(chunk A)  ✓ completes
-*   | Thread #5 grabs: buildPoints(chunk C)     ✓ completes
+*   | Thread #3 grabs: buildPoints(chunk A)     [x] completes
+*   | Thread #3 grabs: buildHeights(chunk B)    [x] completes  
+*   | Thread #3 grabs: buildAllPoints(chunk A)  [x] completes
+*   | Thread #5 grabs: buildPoints(chunk C)     [x] completes
 * Key insight: Threads are workers that pull tasks from a shared queue. They don't "own" chunks.
 *
 * [IMPORTANT] Every thread has its own ChunkArena instance.
@@ -70,9 +70,9 @@ namespace aveng {
 
             // shared_ptr is a convenience tradeoff: simpler queue + lifetime, but some heap allocation / refcounting
             /*
-            * You can remove it if your queue can store move-only jobs 
-            * (e.g., a custom move-only function wrapper instead of std::function). 
-            * Then you can move the packaged_task into the job and avoid shared_ptr overhead.
+            * We can remove it if the queue can store move-only jobs 
+            * (e.g. a custom move-only function wrapper instead of std::function). 
+            * Then we can move the packaged_task into the job and avoid shared_ptr overhead.
             */
             auto task = std::make_shared<std::packaged_task<R()>>(std::forward<Fn>(fn));
             std::shared_future<R> fut = task->get_future().share();
@@ -80,7 +80,7 @@ namespace aveng {
             return fut;
         }
 
-        // A more "modern" approach to `submit`
+        // A more "modern" approach to `submit` using invoke_result_t
         //template<class Fn>
         //auto submit(Fn&& fn) -> std::shared_future<std::invoke_result_t<Fn&>> {
         //    using R = std::invoke_result_t<Fn&>;

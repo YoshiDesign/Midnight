@@ -254,3 +254,32 @@ namespace procgen {
 	};
 
 }
+
+
+/* CHUNK RECORD NOTES
+* Hard Invariants:
+*	Scratch outputs: not published (or published only as a completion signal), or published as "handle + owner"
+*	Final outputs: safe to publish as raw pointers because they’re stable until eviction
+*
+* Why?
+*	`discardScratchIntermediates()` resets the arena and nulls pointers, but:
+*	the futures may still exist and be shared elsewhere
+*	shared_future<Points const*> might still return a pointer that now points into freed arena memory
+*
+*	[IMPORTANT] Be sure to clearly delineate between what is an internal dependency and what is a public artifact,
+*	while also being clear about the state of the chunk record (generating, gpu_ready, uploaded, evicted, freed, etc)
+*	Do not let this become a lifetime safety nightmare by resetting scratch when futures still exist.
+* 
+* Policy: after mesh is built, you can drop intermediates.
+*
+* This is our solution to:
+*	- Task A publishes Heights* from scratch arena
+*	- Task B gets future, hasn't called .get() yet
+*	- Task C calls rec.scratch.reset()
+*	- Task B calls fut.get() -> dangling pointer
+* I've probably said this elsewhere, but just in case.
+* Only reset scratch after:
+*	- Final mesh is complete (all intermediate futures resolved)
+*	- No external references to intermediate data exist
+*	- ChunkRecord is in a valid state
+*/

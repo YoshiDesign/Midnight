@@ -54,7 +54,7 @@ struct VertexAdjacency
 {
     // IMPORTANT
     // triangleIndices[] are CHUNK-LOCAL triangle IDs in [0..numTriangles).
-    // We'll add pc.baseTriangle when indexing shared triangle/face arrays.
+    // We'll add align.baseCoreTriangle when indexing shared triangle/face arrays.
     uint triangleIndices[MAX_ADJACENT_TRIS];
     uint count;
     uint _pad0;
@@ -99,6 +99,7 @@ layout(set = 0, std140, binding = 9) uniform TerrainAlignment
     uint countCoreFaceNarea;
     uint countHaloFaceNarea;
 
+    // Used to distinguish output ownership from input availability
     vec2 coreMinXZ;
     vec2 coreMaxXZ;
     vec2 supportMinXZ;
@@ -164,35 +165,46 @@ float cornerAngle(vec3 p0, vec3 p1, vec3 p2)
     return atan(s, d); // [0..pi]
 }
 
-// triLocal is in [0..pc.numTriangles). vLocal in [0..pc.numVertices).
-// Returns corner angle at vLocal and face normal (from shared face buffer).
+/**
+ * triLocal is in [0..align.countCoreTriangle + align.countHaloTriangle). 
+ * vLocal in [0..align.countCorePosition) because we skip halo vertices
+ * Returns corner angle at vLocal and face normal (from shared face buffer).
+ */
 bool getTriCornerAngleAndNormal(uint triLocal, uint vLocal, out float angle, out vec3 faceN)
 {
-    if (triLocal >= pc.numTriangles) { angle = 0.0; faceN = vec3(0); return false; }
+    // Note that we take every triangle into account during this function call.
+    // It should only be executed when working with core vertices, which require
+    // normal computations from incident triangles, which can be outside of the core
 
-    uint triGlobal = pc.baseTriangle + triLocal;
+    if (triLocal >= align.countCoreTriangle + align.countHaloTriangle) { 
+        angle = 0.0; faceN = vec3(0); 
+        return false; 
+    }
+
+    // uint triGlobal = pc.baseTriangle + triLocal;
+    uint triGlobal = align.baseCoreTriangle + triLocal;
     uvec3 t = tris[triGlobal]; // chunk-local vertex indices
 
     // Ensure vLocal is in this tri
     if (t.x == vLocal)
     {
-        uint g0 = pc.baseVertex + t.x;
-        uint g1 = pc.baseVertex + t.y;
-        uint g2 = pc.baseVertex + t.z;
+        uint g0 = align.baseCorePosition + t.x;
+        uint g1 = align.baseCorePosition + t.y;
+        uint g2 = align.baseCorePosition + t.z;
         angle = cornerAngle(positions[g0].xyz, positions[g1].xyz, positions[g2].xyz);
     }
     else if (t.y == vLocal)
     {
-        uint g0 = pc.baseVertex + t.y;
-        uint g1 = pc.baseVertex + t.z;
-        uint g2 = pc.baseVertex + t.x;
+        uint g0 = align.baseCorePosition + t.y;
+        uint g1 = align.baseCorePosition + t.z;
+        uint g2 = align.baseCorePosition + t.x;
         angle = cornerAngle(positions[g0].xyz, positions[g1].xyz, positions[g2].xyz);
     }
     else if (t.z == vLocal)
     {
-        uint g0 = pc.baseVertex + t.z;
-        uint g1 = pc.baseVertex + t.x;
-        uint g2 = pc.baseVertex + t.y;
+        uint g0 = align.baseCorePosition + t.z;
+        uint g1 = align.baseCorePosition + t.x;
+        uint g2 = align.baseCorePosition + t.y;
         angle = cornerAngle(positions[g0].xyz, positions[g1].xyz, positions[g2].xyz);
     }
     else
@@ -212,9 +224,13 @@ bool getTriCornerAngleAndNormal(uint triLocal, uint vLocal, out float angle, out
 void main()
 {
     uint vLocal = gl_GlobalInvocationID.x;
-    if (vLocal >= pc.numVertices) return;
+    // if (vLocal >= pc.numVertices) return;
 
-    uint vGlobal = pc.baseVertex + vLocal;
+    // Don't compute vertices we don't care about
+    if (vLocal >= align.countCorePosition) { return; }
+
+    // uint vGlobal = pc.baseVertex + vLocal;
+    uint vGlobal = align.baseCorePosition + vLocal;
 
     VertexAdjacency adj = adjacency[vGlobal];
     uint c = min(adj.count, MAX_ADJACENT_TRIS);
@@ -231,9 +247,11 @@ void main()
         for (uint i = 0; i < c; ++i)
         {
             uint triLocal = adj.triangleIndices[i];
-            if (triLocal >= pc.numTriangles) { continue; } 
+            // if (triLocal >= pc.numTriangles) { continue; } 
+            if (triLocal >= align.countCoreTriangle) { continue; } 
 
-            uint triGlobal = pc.baseTriangle + triLocal;
+            // uint triGlobal = pc.baseTriangle + triLocal;
+            uint triGlobal = align.baseCoreTriangle + triLocal;
             vec4 nA = faceN_area[triGlobal];
             sum += nA.xyz;
         }
@@ -261,8 +279,8 @@ void main()
     // -------------------------
     // 2) Steepness from normal | Slope
     // -------------------------
-    float alignment = abs(dot(N, up));  // 1=flat, 0=vertical
-    float steepness = 1.0 - saturate(alignment);
+    float grade = abs(dot(N, up));  // 1=flat, 0=vertical
+    float steepness = 1.0 - saturate(grade);
     steepnessOut[vGlobal] = steepness;
 
     // -------------------------

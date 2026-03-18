@@ -172,7 +172,7 @@ namespace aveng {
         }
 
 #ifdef M_DEBUG
-        std::cout << "writing chunk data..." << std::endl;
+        // std::cout << "writing chunk data..." << std::endl;
         dumpChunkData(coord, points);
 #endif
         return points;

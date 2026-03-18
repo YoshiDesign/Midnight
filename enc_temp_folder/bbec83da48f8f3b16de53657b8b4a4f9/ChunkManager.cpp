@@ -313,6 +313,10 @@ namespace aveng {
 
                 RecordPin pipelineHold(*this, rec); // holds across all stages
 
+                //auto pts = tasks_.wait(requestAllPoints(rec->coord, frameIndex));
+                //auto h = tasks_.wait(requestHeights(rec->coord, frameIndex));
+                //auto tri = tasks_.wait(requestTriangulation(rec->coord, frameIndex));
+                //auto spa = tasks_.wait(requestSpatialGrid(rec->coord, frameIndex));
                 auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
 
                 auto mesh = buildMesh(*rec);
@@ -931,7 +935,6 @@ namespace aveng {
 
     FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& rec)
     {
-        // You shall not pass
         if( rec.points == nullptr 
          || rec.allPoints == nullptr
          || rec.heightField == nullptr
