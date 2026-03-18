@@ -13,21 +13,6 @@
 * Currently, this implementation offers a lot of extensibility.
 * E.g. , we could add priority queues, task stealing, or even a work-stealing scheduler.
 * 
-* Warning: This helping-wait pattern is great, but suceptible to over-eager graph expansion.
-*          If multithreading a dependency graph of sorts, be sure to clearly define
-*          your execution model, lazily if possible. The Terrain Generator is a great example of this
-*          since stage requests execute upon prerequisite stage requests which must be completed first.
-* 
-*          Eagerly executing requests with any sort of dependency structure can lock up the application
-*          or lead to frustrating bugs and ruin your dinner.
-* 
-* Eager: 
-*   A request function recursively fans out and schedules the whole dependency tree immediately.
-*
-* Lazy:
-*   A request function schedules only its own stage, and that stage requests its prerequisite 
-*   when it actually executes. Clearly the more synchronized approach.
-* 
 * Notes: 
 *   - Your pool is FIFO. Some tasks can be long, some short -> you can get load imbalance. 
 *     It's fine for now, but later you might want work stealing.

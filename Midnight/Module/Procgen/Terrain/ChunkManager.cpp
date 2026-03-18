@@ -336,7 +336,7 @@ namespace aveng {
     std::shared_future<Points const*> ChunkManager::requestPoints(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
-        std::printf("Request Points\n");
+        // std::printf("Request Points\n");
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->pointsOnce, [this, rec] {
@@ -354,7 +354,7 @@ namespace aveng {
     {
         // std::printf("[%s] ChunkCoord{%d,%d} \n", __FUNCTION__, c.x, c.z);
         ChunkRecord* rec = getOrCreateRecord(c);
-        std::printf("Request AllPoints\n");
+        // std::printf("Request AllPoints\n");
         //auto pointsF = requestPoints(c, frameIndex);
 
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
@@ -380,7 +380,7 @@ namespace aveng {
                 // Ensure neighbors' points exist
                 std::array<std::shared_future<Points const*>, 9> pf;
                 for (int i = 0; i < 9; ++i) {
-                    // std::printf("Requesting points for neighbor: %d\n", i);
+                    // // std::printf("Requesting points for neighbor: %d\n", i);
                     pf[i] = requestPoints(neighbors[i], frameIndex); // This is safe bc requestPoints uses call_once with that stage's once-flag
                 }
 
@@ -400,7 +400,7 @@ namespace aveng {
     // The height function will remain deterministic across world-space.
     std::shared_future<HeightField const*> ChunkManager::requestHeights(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
-        std::printf("Request Heights\n");
+        // std::printf("Request Heights\n");
 
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
@@ -419,7 +419,7 @@ namespace aveng {
     // Triangulation
     std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
-        std::printf("Request Triangulation\n");
+        // std::printf("Request Triangulation\n");
 
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
@@ -439,7 +439,7 @@ namespace aveng {
     std::shared_future<SpatialGrid const*> ChunkManager::requestSpatialGrid(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
-        std::printf("Request SpatialGrid\n");
+        // std::printf("Request SpatialGrid\n");
 
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
@@ -458,7 +458,7 @@ namespace aveng {
     // Erosion
     std::shared_future<ErosionField const*> ChunkManager::requestErosion(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
-        std::printf("Request Erosion\n");
+        // std::printf("Request Erosion\n");
 
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
@@ -467,6 +467,7 @@ namespace aveng {
             // Get settings
             const ErosionSettings s = erosionMgr_ ? erosionMgr_->getActiveSettings() : ErosionSettings{};
 
+            // We could, of course, define these internal lambdas beforehand
             rec->erosionF = tasks_.submit([this, rec, s, frameIndex]() -> ErosionField const* {
                 RecordPin taskHold(*this, rec);
                 auto spatialF = requestSpatialGrid(rec->coord, frameIndex);
@@ -481,7 +482,7 @@ namespace aveng {
 
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)
     {
-        std::printf("Build Points\n");
+        // std::printf("Build Points\n");
 
         // 1) Reset thread-local scratch for this job
         tlsScratchArena().reset();
@@ -535,7 +536,7 @@ namespace aveng {
     }
 
     AllPoints const* ChunkManager::buildAllPoints(ChunkRecord& rec) {
-        std::printf("Build All Points\n");
+        // std::printf("Build All Points\n");
         // 1) Reset thread-local scratch for this job
         tlsScratchArena().reset();
         
@@ -615,7 +616,7 @@ namespace aveng {
 
     HeightField const* ChunkManager::buildHeights(ChunkRecord& rec)
     {
-        std::printf("Build Heights\n");
+        // std::printf("Build Heights\n");
         // 1) Reset thread-local scratch for this job
         tlsScratchArena().reset();
 
@@ -662,7 +663,7 @@ namespace aveng {
 
     Triangulation const* ChunkManager::buildTriangulation(ChunkRecord& rec)
     {
-        std::printf("Build Triangulation\n");
+        // std::printf("Build Triangulation\n");
         // Note, I haven't designed any configurations for Triangulation. Potential options:
         // - omit the circumcenter calculations. They're only needed if we'd like a voronoi layer, but enabled by default.
         // - add different triangulation algorithms for better quality meshes, but maybe a perf tradeoff.
@@ -719,12 +720,7 @@ namespace aveng {
 
     SpatialGrid const* ChunkManager::buildSpatialGrid(ChunkRecord& rec)
     {
-        std::printf("Build SpatialGrid\n");
-#ifdef M_DEBUG
-        assert(rec.triangulation && "[buildSpatialGrid] Missing triangulation prerequisite");
-        assert(rec.allPoints && "[buildSpatialGrid] Missing allPoints prerequisite");
-        assert(rec.heightField && "[buildSpatialGrid] Missing heightField prerequisite");
-#endif
+        // std::printf("Build SpatialGrid\n");
 
         // If we ever get called redundantly (shouldn't happen with call_once),
         // just return the already-published product.
@@ -744,9 +740,7 @@ namespace aveng {
 
 #ifdef M_DEBUG
         {
-            std::printf("[SpatialGrid] prereqs: tri=%p pts=%p hf=%p\n",
-                (void*)rec.triangulation, (void*)rec.allPoints, (void*)rec.heightField);
-
+            // Checking out totals from previous stages
             if (rec.triangulation) {
                 std::printf("[SpatialGrid] tri: tris=%zu halfEdges=%zu triEdge0=%zu siteEdge=%zu\n",
                     rec.triangulation->tris.size(),
@@ -764,6 +758,8 @@ namespace aveng {
                     rec.heightField->heights.size());
             }
 
+            // Proof that the SpatialGrid covers the halo region for individual chunks.
+            // This means we can include reliable adjacency information, efficiently, to compute shaders
             std::printf("[SpatialGrid] cellSize=%f bounds(minx,minz,maxx,maxz)=(%f,%f,%f,%f) halo=%f\n",
                 cellSize, minX, minZ, maxX, maxZ, rec.halo);
 
@@ -771,8 +767,6 @@ namespace aveng {
             if (!(maxX > minX && maxZ > minZ)) std::printf("[SpatialGrid][!!] bounds are degenerate/inverted\n");
         }
 #endif
-
-
         // Build via free function (returns owning pointer)
         std::unique_ptr<SpatialGrid> sg = BuildSpatialGrid(
             rec.triangulation,
@@ -805,7 +799,7 @@ namespace aveng {
 
     ErosionField const* ChunkManager::buildErosion(ChunkRecord& rec, const ErosionSettings& settings)
     {
-        std::printf("Build Erosion\n");
+        // std::printf("Build Erosion\n");
         // Erosion is call_once'd => safe to reuse rec.scratch for the whole stage
         rec.scratch.reset(); // whatever your API is
 
