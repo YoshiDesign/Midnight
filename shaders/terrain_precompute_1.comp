@@ -29,7 +29,7 @@ layout(set = 0, std140, binding = 9) uniform TerrainAlignment
     uint baseCoreAdjacency;
     uint countCoreAdjacency;
     uint countHaloAdjacency;
-
+    // Deprecated - compute will handle FaceNarea, not CPU
     uint baseCoreFaceNarea;
     uint countCoreFaceNarea;
     uint countHaloFaceNarea;

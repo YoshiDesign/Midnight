@@ -38,13 +38,14 @@ namespace aveng {
 
         std::printf("[%s] ChunkCoord{%d, %d}", __FUNCTION__, start_coord.x, start_coord.z);
         // Note that we're only calling requestMesh from outside of a loop, since we're still just doing test runs.
-        chunks_->requestMesh(start_coord, frameIndex_);
+        // chunks_->requestMesh(start_coord, frameIndex_);
+        chunks_->requestRenderable(start_coord, frameIndex_);
         return;
         
         //lastRequested_.clear();
         //lastRequested_.reserve(static_cast<size_t>(cols) * static_cast<size_t>(rows));
 
-        //// Convention: cols increases +x, rows increases +z (adjust if your grid differs).
+        // Convention: cols increases +x, rows increases +z (adjust if your grid differs).
         //for (int r = 0; r < rows; ++r) {
         //    for (int c = 0; c < cols; ++c) {
         //        const ChunkCoord coord = offsetCoord(start_coord, c, r);

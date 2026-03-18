@@ -64,11 +64,17 @@ namespace aveng {
 
 	struct TriEdgeRef { TriIndex triIdx; int edgeSlot; }; // edgeSlot 0..2
 
-	// Deprecated
-	/*struct Site {
-		Vec2 Pos;
-		float Height;
-	};*/
+	//
+	struct VoronoiCell {
+		SiteIndex site = -1;
+		bool closed = false;
+		std::pmr::vector<TriIndex> tris;
+		std::pmr::vector<Vec2> vertices;
+
+		explicit VoronoiCell(std::pmr::memory_resource* mr)
+			: tris(mr), vertices(mr) {
+		}
+	};
 
 	// -------------------------
 	// ChunkCoord + Hash

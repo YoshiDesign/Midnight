@@ -115,24 +115,11 @@ namespace aveng {
 	struct FinalMeshCPU {
 		std::pmr::vector<glm::vec3> vbo_positions;
 		std::pmr::vector<uint32_t>  ibo_indices;
-		std::pmr::vector<glm::vec4> FaceN_Area;   
 		std::pmr::vector<glm::vec3> tris;   
-		std::pmr::vector<glm::vec3> comp_positions;
+		std::pmr::vector<glm::vec3> packed_positions;
 		std::pmr::vector<procgen::VertexAdjacency> adjacency;
 		explicit FinalMeshCPU(std::pmr::memory_resource* mr)
-			: vbo_positions(mr), FaceN_Area(mr), ibo_indices(mr), tris(mr), comp_positions(mr), adjacency(mr) {
-		}
-	};
-
-	//
-	struct VoronoiCell {
-		SiteIndex site = -1;
-		bool closed = false;
-		std::pmr::vector<TriIndex> tris;
-		std::pmr::vector<Vec2> vertices;
-
-		explicit VoronoiCell(std::pmr::memory_resource* mr)
-			: tris(mr), vertices(mr) {
+			: vbo_positions(mr), ibo_indices(mr), tris(mr), packed_positions(mr), adjacency(mr) {
 		}
 	};
 

@@ -5,6 +5,7 @@
 #include "Module/Procgen/Types.h"
 #include "Runtime/Threading/Types.h"
 #include "Module/Procgen/Noise/Config.h"
+#include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Core/Math/wyhash.h"
 
 /*
@@ -100,6 +101,9 @@ namespace aveng {
         std::shared_future<ErosionField const*>     requestErosion(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<FinalMeshCPU const*>     requestMesh(ChunkCoord c, uint64_t frameIndex);
 
+        // Renderable assembly: 3x3 core + 5x5 support region
+        std::unique_ptr<procgen::TerrainRenderable> requestRenderable(ChunkCoord center, uint64_t frameIndex);
+
         // Streaming helpers
         ChunkRecord* pin(ChunkCoord c, uint64_t frameIndex); // 
         void pin(ChunkRecord* rec, uint64_t frameIndex); // ptr pin
@@ -127,6 +131,7 @@ namespace aveng {
 		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
         ErosionField const* buildErosion(ChunkRecord& r, const ErosionSettings& settings);       // alloc in scratch
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
+        std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);
 
         ThreadPoolTaskSystem& tasks_;
         TerrainConfig cfg_; // Note that this differs from our prototype, where each Chunk owned its own config

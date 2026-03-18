@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include "CoreVK/VkRenderData.h"
+#include "Module/Procgen/Types.h"
+#include "Utils/glm_includes.h"
 
 /**
  * Notes: https://chatgpt.com/g/g-p-67fd00e1b6748191913d770a83c124e5-vulkanengine/c/69a23f92-6b58-8330-824f-6c0b36959eec
@@ -47,7 +49,34 @@ namespace procgen {
 	struct TerrainBuilderOptions {
 	
 	};
-	
+
+	/**
+	 * CPU-side renderable for a 3x3 core region backed by a 5x5 support region.
+	 *
+	 * Layout convention for packed buffers: [3x3 core data | halo/support data]
+	 * The compute shader reads the full buffer; the graphics pipeline only draws core.
+	 *
+	 * Binding map (terrain_precompute_1.comp):
+	 *   binding 3 = packedTriangles (uvec3 on GPU, stored as vec3 for layout compat)
+	 *   binding 4 = packedPositions (vec4 on GPU, w unused)
+	 *   binding 9 = alignment UBO (BasicTerrainAlignmentData)
+	 */
+	struct TerrainRenderable {
+
+		// Graphics pipeline inputs (3x3 core only)
+		std::vector<glm::vec3> vbo;       // Core vertex positions
+		std::vector<uint32_t>  ibo;       // Core triangle indices (into vbo)
+
+		// Compute pipeline inputs -- flat [3x3_core | halo] layout
+		std::vector<glm::vec3>        packedPositions;  // All positions: core then halo
+		std::vector<glm::vec3>        packedTriangles;  // Site-index triples (bit-pattern uint32 in float, read as uvec3 on GPU)
+		std::vector<VertexAdjacency>  packedAdjacency;  // Per-vertex incident triangle list
+
+		// Alignment metadata (maps 1:1 to BasicTerrainAlignmentData UBO, binding 9)
+		aveng::BasicTerrainAlignmentData alignment{};
+
+		aveng::ChunkCoord center{};
+	};
 
 	// TODO - Move descriptor sets here
 

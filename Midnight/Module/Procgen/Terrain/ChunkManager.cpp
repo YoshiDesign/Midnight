@@ -5,12 +5,14 @@
 #include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Noise/Functions.h"
 #include "Module/Procgen/Delaunay.h"
+#include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Module/Procgen/Terrain/Erosion/Data.h"
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Terrain/Erosion/HydraulicErosion.h"
 #include "Module/Procgen/Terrain/Erosion/RidgeEnhancement.h"
 #include "Module/Procgen/Terrain/Erosion/ThermalErosion.h"
 #include "Module/Procgen/Terrain/Erosion/Initialization.h"
+#include <cstring>
 
 #ifdef M_DEBUG
 #include <filesystem>
@@ -45,6 +47,29 @@ namespace {
         out[6] = { center.x - 1, center.z + 1 };
         out[7] = { center.x,     center.z + 1 };
         out[8] = { center.x + 1, center.z + 1 };
+    }
+
+    // Get 5x5 neighborhood: indices [0..8] are the inner 3x3, [9..24] are the outer ring.
+    void get5x5Neighborhood(aveng::ChunkCoord center, aveng::ChunkCoord out[25]) noexcept {
+        // Inner 3x3 first (same layout as get3x3Neighborhood)
+        get3x3Neighborhood(center, out);
+        // Outer ring (16 chunks)
+        int idx = 9;
+        for (int dz = -2; dz <= 2; ++dz) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                if (dx >= -1 && dx <= 1 && dz >= -1 && dz <= 1) continue;
+                out[idx++] = { center.x + dx, center.z + dz };
+            }
+        }
+    }
+
+    // Pack a uint32_t site index into a float preserving bit pattern (GPU reads as uvec3)
+    inline glm::vec3 packTriIndices(uint32_t a, uint32_t b, uint32_t c) {
+        glm::vec3 v;
+        std::memcpy(&v.x, &a, sizeof(uint32_t));
+        std::memcpy(&v.y, &b, sizeof(uint32_t));
+        std::memcpy(&v.z, &c, sizeof(uint32_t));
+        return v;
     }
 
     aveng::Bounds2 expandBounds(aveng::Bounds2 b, float halo) noexcept {
@@ -315,10 +340,7 @@ namespace aveng {
 
                 auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
 
-                auto mesh = buildMesh(*rec);
-
-                //return mesh;
-                return nullptr;
+                return buildMesh(*rec);
             });
         });
 
@@ -925,7 +947,6 @@ namespace aveng {
 
     FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& rec)
     {
-        // You shall not pass
         if( rec.points == nullptr 
          || rec.allPoints == nullptr
          || rec.heightField == nullptr
@@ -933,12 +954,401 @@ namespace aveng {
          || rec.erosion == nullptr
         ) { return nullptr; }
 
-        // TODO - Pack FaceN_Area array
-        // TODO - 
+        const auto& pts       = rec.allPoints->pts;
+        const auto& coreIdx   = rec.allPoints->coreIdx;
+        const auto& triangles = rec.triangulation->tris;
+        const auto& eHeights  = rec.erosion->eHeights;
+        const size_t totalPts = pts.size();
+        const size_t numCoreVerts = coreIdx.size();
 
-        // Punt to the BasicTerrainAsset
-        return nullptr; 
+        // Allocate FinalMeshCPU in durable (final) arena
+        if (!rec.finalMesh) {
+            auto alloc = std::pmr::polymorphic_allocator<FinalMeshCPU>(rec.final.mr());
+            rec.finalMesh = alloc.allocate(1);
+            std::construct_at(rec.finalMesh, rec.final.mr());
+        }
+        FinalMeshCPU& mesh = *rec.finalMesh;
+
+        // -- Core membership mask (flat, no hashing) --
+        std::pmr::vector<uint8_t> isCore(totalPts, uint8_t(0), tlsScratchArena().mr());
+        for (uint32_t ci : coreIdx) {
+            isCore[ci] = 1;
+        }
+
+        // -- old2new remap: global site index -> core-only VBO index --
+        constexpr uint32_t UNMAPPED = UINT32_MAX;
+        std::pmr::vector<uint32_t> old2new(totalPts, UNMAPPED, tlsScratchArena().mr());
+
+        // 1a. VBO positions (core only)
+        mesh.vbo_positions.clear();
+        mesh.vbo_positions.reserve(numCoreVerts);
+        for (uint32_t ci : coreIdx) {
+            old2new[ci] = static_cast<uint32_t>(mesh.vbo_positions.size());
+            mesh.vbo_positions.push_back(glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y));
+        }
+
+        // 1b/1c. IBO indices + tris (core triangles only)
+        mesh.ibo_indices.clear();
+        mesh.tris.clear();
+        mesh.ibo_indices.reserve(triangles.size() * 3);
+        mesh.tris.reserve(triangles.size());
+
+        for (const auto& tri : triangles) {
+            if (!(isCore[tri.A] && isCore[tri.B] && isCore[tri.C])) continue;
+
+            mesh.ibo_indices.push_back(old2new[tri.A]);
+            mesh.ibo_indices.push_back(old2new[tri.B]);
+            mesh.ibo_indices.push_back(old2new[tri.C]);
+
+            mesh.tris.push_back(packTriIndices(old2new[tri.A], old2new[tri.B], old2new[tri.C]));
+        }
+
+        // 1d. Packed positions: [core..., halo...]
+        mesh.packed_positions.clear();
+        mesh.packed_positions.reserve(totalPts);
+        for (uint32_t ci : coreIdx) {
+            mesh.packed_positions.push_back(glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y));
+        }
+        for (size_t i = 0; i < totalPts; ++i) {
+            if (!isCore[i]) {
+                mesh.packed_positions.push_back(glm::vec3(pts[i].x, -eHeights[i], pts[i].y));
+            }
+        }
+
+        // 1e. Adjacency: one entry per vertex (core + halo), triangle indices are chunk-local
+        mesh.adjacency.clear();
+        mesh.adjacency.resize(totalPts);
+        std::memset(mesh.adjacency.data(), 0, totalPts * sizeof(procgen::VertexAdjacency));
+
+        for (uint32_t ti = 0; ti < static_cast<uint32_t>(triangles.size()); ++ti) {
+            const SiteIndex verts[3] = { triangles[ti].A, triangles[ti].B, triangles[ti].C };
+            for (int k = 0; k < 3; ++k) {
+                auto& adj = mesh.adjacency[verts[k]];
+                if (adj.count < procgen::MAX_ADJACENT_TRIS) {
+                    adj.triangleIndices[adj.count++] = ti;
+                }
+            }
+        }
+
+        return rec.finalMesh;
     }
+
+
+    // ---------------------------------------------------------------------------
+    // Renderable assembly: 3x3 core region + 5x5 support (halo) region
+    // ---------------------------------------------------------------------------
+
+    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::requestRenderable(ChunkCoord center, uint64_t frameIndex)
+    {
+        ChunkCoord neighbors[25];
+        get5x5Neighborhood(center, neighbors);
+
+        // Pin all 25 chunks for the duration of this build
+        std::array<RecordPin, 25> pins;
+        for (int i = 0; i < 25; ++i) {
+            ChunkRecord* r = getOrCreateRecord(neighbors[i]);
+            pins[i] = RecordPin(*this, r, frameIndex);
+        }
+
+        // Inner 3x3: full pipeline through mesh
+        std::array<std::shared_future<FinalMeshCPU const*>, 9> meshFutures;
+        for (int i = 0; i < 9; ++i) {
+            meshFutures[i] = requestMesh(neighbors[i], frameIndex);
+        }
+
+        // Outer 16: only need up to SpatialGrid (ensures allPoints, triangulation, heights exist)
+        std::array<std::shared_future<SpatialGrid const*>, 16> spatialFutures;
+        for (int i = 9; i < 25; ++i) {
+            spatialFutures[i - 9] = requestSpatialGrid(neighbors[i], frameIndex);
+        }
+
+        // Wait for all
+        for (int i = 0; i < 9; ++i) {
+            tasks_.wait(meshFutures[i]);
+        }
+        for (int i = 0; i < 16; ++i) {
+            tasks_.wait(spatialFutures[i]);
+        }
+
+        return buildRenderable(center, frameIndex);
+    }
+
+
+    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderable(ChunkCoord center, uint64_t frameIndex)
+    {
+        using namespace procgen;
+
+        ChunkCoord neighbors[25];
+        get5x5Neighborhood(center, neighbors);
+
+        // Collect chunk records (all should exist and be populated by now)
+        std::array<ChunkRecord*, 25> recs{};
+        for (int i = 0; i < 25; ++i) {
+            recs[i] = getOrCreateRecord(neighbors[i]);
+        }
+
+        auto renderable = std::make_unique<TerrainRenderable>();
+        renderable->center = center;
+
+        // Compute world bounds for core 3x3 and support 5x5
+        const float cs = cfg_.chunkSize;
+        const glm::vec2 coreMin = { (center.x - 1) * cs, (center.z - 1) * cs };
+        const glm::vec2 coreMax = { (center.x + 2) * cs, (center.z + 2) * cs };
+        const glm::vec2 suppMin = { (center.x - 2) * cs, (center.z - 2) * cs };
+        const glm::vec2 suppMax = { (center.x + 3) * cs, (center.z + 3) * cs };
+
+        // ----- Pass 1: Build global vertex remap -----
+        // We need a global vertex index for every unique (chunk, localSiteIdx) pair.
+        // Layout: [3x3 core verts | 3x3 halo verts | outer-16 all verts]
+        //          ^-- "core" for alignment --^  ^-- "halo" for alignment --^
+
+        struct ChunkVertexInfo {
+            uint32_t globalBase = 0;
+            uint32_t coreCount  = 0;
+            uint32_t totalCount = 0;
+        };
+        std::array<ChunkVertexInfo, 25> chunkInfo{};
+
+        // Count vertices
+        uint32_t totalCoreVerts = 0;
+        uint32_t totalHaloVerts = 0;
+
+        // Inner 3x3: core verts go to the core section, non-core go to halo
+        for (int i = 0; i < 9; ++i) {
+            auto* ap = recs[i]->allPoints;
+            if (!ap) continue;
+            chunkInfo[i].coreCount  = static_cast<uint32_t>(ap->coreIdx.size());
+            chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
+            totalCoreVerts += chunkInfo[i].coreCount;
+            totalHaloVerts += (chunkInfo[i].totalCount - chunkInfo[i].coreCount);
+        }
+
+        // Outer 16: all their verts are halo/support
+        for (int i = 9; i < 25; ++i) {
+            auto* ap = recs[i]->allPoints;
+            if (!ap) continue;
+            chunkInfo[i].coreCount  = 0;
+            chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
+            totalHaloVerts += chunkInfo[i].totalCount;
+        }
+
+        const uint32_t totalVerts = totalCoreVerts + totalHaloVerts;
+
+        // Assign global base offsets
+        // Core region: pack 3x3 core verts contiguously
+        uint32_t coreOffset = 0;
+        for (int i = 0; i < 9; ++i) {
+            chunkInfo[i].globalBase = coreOffset; // base for this chunk's core verts
+            coreOffset += chunkInfo[i].coreCount;
+        }
+
+        // Halo region: pack 3x3 halo verts, then outer-16 verts
+        uint32_t haloOffset = totalCoreVerts;
+        // (We'll assign individual halo offsets per chunk during the packing pass)
+
+        // ----- Pass 2: Pack positions and build per-chunk old2global remap -----
+        renderable->packedPositions.resize(totalVerts);
+
+        // Per-chunk remap: chunk-local site index -> global vertex index
+        // We use a vector of vectors (stack allocated in terms of references)
+        std::vector<std::vector<uint32_t>> old2global(25);
+
+        for (int i = 0; i < 25; ++i) {
+            auto* ap = recs[i]->allPoints;
+            if (!ap) continue;
+
+            const auto& pts = ap->pts;
+            const auto& coreIdx = ap->coreIdx;
+            const size_t nPts = pts.size();
+            const auto& eHeights = (i < 9 && recs[i]->erosion) ? recs[i]->erosion->eHeights
+                                                                : recs[i]->heightField->heights;
+
+            old2global[i].resize(nPts, UINT32_MAX);
+
+            // Build core membership for this chunk
+            std::vector<uint8_t> isCore(nPts, 0);
+            if (i < 9) {
+                for (uint32_t ci : coreIdx) {
+                    isCore[ci] = 1;
+                }
+            }
+
+            if (i < 9) {
+                // Inner 3x3: core verts get the core base, halo verts get halo base
+                uint32_t localCoreOff = chunkInfo[i].globalBase;
+                for (uint32_t ci : coreIdx) {
+                    uint32_t gIdx = localCoreOff++;
+                    old2global[i][ci] = gIdx;
+                    renderable->packedPositions[gIdx] = glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y);
+                }
+                for (size_t si = 0; si < nPts; ++si) {
+                    if (!isCore[si]) {
+                        uint32_t gIdx = haloOffset++;
+                        old2global[i][si] = gIdx;
+                        renderable->packedPositions[gIdx] = glm::vec3(pts[si].x, -eHeights[si], pts[si].y);
+                    }
+                }
+            } else {
+                // Outer 16: all verts go to halo section
+                for (size_t si = 0; si < nPts; ++si) {
+                    uint32_t gIdx = haloOffset++;
+                    old2global[i][si] = gIdx;
+                    renderable->packedPositions[gIdx] = glm::vec3(pts[si].x, -eHeights[si], pts[si].y);
+                }
+            }
+        }
+
+        // ----- Pass 3: Pack triangles [core | halo] with rebased indices -----
+        // First pass: count core vs halo triangles
+        uint32_t totalCoreTris = 0;
+        uint32_t totalHaloTris = 0;
+
+        for (int i = 0; i < 25; ++i) {
+            auto* tri = recs[i]->triangulation;
+            if (!tri) continue;
+
+            auto* ap = recs[i]->allPoints;
+            if (!ap) continue;
+
+            const size_t nPts = ap->pts.size();
+            std::vector<uint8_t> isCore(nPts, 0);
+            if (i < 9) {
+                for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
+            }
+
+            for (const auto& t : tri->tris) {
+                if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
+                    ++totalCoreTris;
+                } else {
+                    ++totalHaloTris;
+                }
+            }
+        }
+
+        const uint32_t totalTris = totalCoreTris + totalHaloTris;
+        renderable->packedTriangles.resize(totalTris);
+
+        uint32_t coreTriOffset = 0;
+        uint32_t haloTriOffset = totalCoreTris;
+
+        for (int i = 0; i < 25; ++i) {
+            auto* tri = recs[i]->triangulation;
+            if (!tri) continue;
+
+            auto* ap = recs[i]->allPoints;
+            if (!ap) continue;
+
+            const size_t nPts = ap->pts.size();
+            std::vector<uint8_t> isCore(nPts, 0);
+            if (i < 9) {
+                for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
+            }
+
+            for (const auto& t : tri->tris) {
+                uint32_t gA = old2global[i][t.A];
+                uint32_t gB = old2global[i][t.B];
+                uint32_t gC = old2global[i][t.C];
+
+                if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
+                    renderable->packedTriangles[coreTriOffset++] = packTriIndices(gA, gB, gC);
+                } else {
+                    renderable->packedTriangles[haloTriOffset++] = packTriIndices(gA, gB, gC);
+                }
+            }
+        }
+
+        // ----- Pass 4: Build adjacency [core | halo] -----
+        renderable->packedAdjacency.resize(totalVerts);
+        std::memset(renderable->packedAdjacency.data(), 0, totalVerts * sizeof(VertexAdjacency));
+
+        // We need to iterate triangles again with the global triangle index
+        // to assign globally-rebased triangle IDs to each vertex's adjacency.
+        coreTriOffset = 0;
+        haloTriOffset = totalCoreTris;
+
+        for (int i = 0; i < 25; ++i) {
+            auto* tri = recs[i]->triangulation;
+            if (!tri) continue;
+
+            auto* ap = recs[i]->allPoints;
+            if (!ap) continue;
+
+            const size_t nPts = ap->pts.size();
+            std::vector<uint8_t> isCore(nPts, 0);
+            if (i < 9) {
+                for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
+            }
+
+            for (const auto& t : tri->tris) {
+                uint32_t gA = old2global[i][t.A];
+                uint32_t gB = old2global[i][t.B];
+                uint32_t gC = old2global[i][t.C];
+
+                uint32_t globalTriIdx;
+                if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
+                    globalTriIdx = coreTriOffset++;
+                } else {
+                    globalTriIdx = haloTriOffset++;
+                }
+
+                const uint32_t verts[3] = { gA, gB, gC };
+                for (int k = 0; k < 3; ++k) {
+                    auto& adj = renderable->packedAdjacency[verts[k]];
+                    if (adj.count < MAX_ADJACENT_TRIS) {
+                        adj.triangleIndices[adj.count++] = globalTriIdx;
+                    }
+                }
+            }
+        }
+
+        // ----- Pass 5: Build VBO and IBO (3x3 core only) -----
+        // VBO = the core positions (already packed at indices [0..totalCoreVerts))
+        renderable->vbo.resize(totalCoreVerts);
+        for (uint32_t v = 0; v < totalCoreVerts; ++v) {
+            renderable->vbo[v] = renderable->packedPositions[v];
+        }
+
+        // IBO = core triangles with indices remapped into VBO space
+        // Core triangles already reference global indices [0..totalCoreVerts),
+        // and VBO is a direct copy of that range, so VBO-local index = global index.
+        renderable->ibo.reserve(totalCoreTris * 3);
+        for (uint32_t ti = 0; ti < totalCoreTris; ++ti) {
+            const glm::vec3& packed = renderable->packedTriangles[ti];
+            uint32_t a, b, c;
+            std::memcpy(&a, &packed.x, sizeof(uint32_t));
+            std::memcpy(&b, &packed.y, sizeof(uint32_t));
+            std::memcpy(&c, &packed.z, sizeof(uint32_t));
+            renderable->ibo.push_back(a);
+            renderable->ibo.push_back(b);
+            renderable->ibo.push_back(c);
+        }
+
+        // ----- Fill alignment UBO -----
+        auto& align = renderable->alignment;
+        align.baseCorePosition  = 0;
+        align.countCorePosition = totalCoreVerts;
+        align.countHaloPosition = totalHaloVerts;
+
+        align.baseCoreTriangle  = 0;
+        align.countCoreTriangle = totalCoreTris;
+        align.countHaloTriangle = totalHaloTris;
+
+        align.baseCoreAdjacency  = 0;
+        align.countCoreAdjacency = totalCoreVerts;
+        align.countHaloAdjacency = totalHaloVerts;
+
+        align.baseCoreFaceNarea  = 0; // deprecated on CPU
+        align.countCoreFaceNarea = totalCoreTris;
+        align.countHaloFaceNarea = totalHaloTris;
+
+        align.coreMinXZ    = coreMin;
+        align.coreMaxXZ    = coreMax;
+        align.supportMinXZ = suppMin;
+        align.supportMaxXZ = suppMax;
+
+        return renderable;
+    }
+
 
     /* Lifetime saftey features & eviction policy (below) */
 
