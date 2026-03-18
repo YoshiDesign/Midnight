@@ -1520,6 +1520,9 @@
     <ClInclude Include="Core\Imaging\TextureFilesystemSource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\GpuResources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="vendor\glm\detail\func_common.inl">

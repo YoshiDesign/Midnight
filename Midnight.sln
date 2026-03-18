@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.3.11520.95 d18.3
+VisualStudioVersion = 18.3.11520.95
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MidnightEngine", "Midnight\Midnight.vcxproj", "{77F66662-A85B-4904-AF4D-659851D2333F}"
 EndProject
@@ -64,9 +64,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shaders", "shaders", "{02EA
 		shaders\point_light.vert = shaders\point_light.vert
 		shaders\archive\simple_shader.frag = shaders\archive\simple_shader.frag
 		shaders\archive\simple_shader.vert = shaders\archive\simple_shader.vert
-		shaders\terrain-precompute.comp = shaders\terrain-precompute.comp
 		shaders\terrain-triplanar_1.frag = shaders\terrain-triplanar_1.frag
 		shaders\terrain_1.vert = shaders\terrain_1.vert
+		shaders\terrain_precompute_1.comp = shaders\terrain_precompute_1.comp
+		shaders\terrain_precompute_2.comp = shaders\terrain_precompute_2.comp
 	EndProjectSection
 EndProject
 Global

@@ -312,7 +312,7 @@ namespace aveng {
                 // `wait` calls .get() internally while ensuring no pool starves. Typical helping-wait design.
                 // 
                 // Note that these local future values arent "used", they're mostly just for signaling completion.
-                // But, they keep the pipeline honest in case a consumer ever needs to rely on the restulting
+                // But, they keep the pipeline honest in case a consumer ever needs to rely on the resulting
                 // data without first referencing the chunk record and hoping it's all there.
                 // This also forces some obvious invariance: "future is ready so the product exists"
                 // 
@@ -369,6 +369,9 @@ namespace aveng {
     {
         // std::printf("[%s] ChunkCoord{%d,%d} \n", __FUNCTION__, c.x, c.z);
         ChunkRecord* rec = getOrCreateRecord(c);
+
+        if (rec->points == nullptr) { requestPoints(c, frameIndex); }
+
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->allPointsOnce, [this, rec, c, frameIndex] {
@@ -410,6 +413,9 @@ namespace aveng {
     // The height function will remain deterministic across world-space.
     std::shared_future<HeightField const*> ChunkManager::requestHeights(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
+
+        if (rec->allPoints == nullptr) { requestAllPoints(c, frameIndex); }
+
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->heightsOnce, [&] {
@@ -425,11 +431,14 @@ namespace aveng {
     // Triangulation
     std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
+
+        if (rec->heightField == nullptr) { requestHeights(c, frameIndex); }
+
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->triangOnce, [&] {
             rec->triangF = tasks_.submit([this, rec, c, frameIndex]() -> Triangulation const* {
-                RecordPin taskHold(*this, rec);   // pin/unpin
+                RecordPin taskHold(*this, rec);   // RAII pin
                 return buildTriangulation(*rec);
             });
         });
@@ -440,6 +449,9 @@ namespace aveng {
     std::shared_future<SpatialGrid const*> ChunkManager::requestSpatialGrid(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
+
+        if (rec->triangulation == nullptr) { requestTriangulation(c, frameIndex); }
+
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->spatialOnce, [this, rec, frameIndex] {
@@ -784,13 +796,13 @@ namespace aveng {
 
         assert(sg && "[buildSpatialGrid] BuildSpatialGrid returned null");
         std::printf("Completed SpatialGrid\n");
+        dumpSpatialGridData(rec.coord, &(*rec.spatial));
 #endif
 
-        // Publish into the record. This makes the lifetime tied to ChunkRecord,
-        // but still easy to drop/clear on eviction.
+        // Publish into the record
         rec.spatial.emplace(std::move(*sg));
-        dumpSpatialGridData(rec.coord, &(*rec.spatial));
-        // Return stable pointer into the optional.
+        
+        // Return stable pointer into the optional
         return &(*rec.spatial);
 
     }
@@ -920,13 +932,23 @@ namespace aveng {
 
     }
 
-    FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& r)
+    FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& rec)
     {
+        if( rec.points == nullptr 
+         || rec.allPoints == nullptr
+         || rec.heightField == nullptr
+         || rec.triangulation == nullptr
+         || rec.erosion == nullptr
+        ) { return nullptr; }
+
+        // TODO - Pack FaceN_Area array
+        // TODO - 
+
         // Punt to the BasicTerrainAsset
-        return nullptr;
+        return nullptr; 
     }
 
-    /* Lifetime saftey features below */
+    /* Lifetime saftey features & eviction policy (below) */
 
     // Pin based on chunk coord - this can end up creating a chunk record
     ChunkRecord* ChunkManager::pin(ChunkCoord c, uint64_t frameIndex) {

@@ -1,15 +1,16 @@
 #version 460
 layout(local_size_x = 256) in;
 
-/*
-    Pre-compute v1 for terrain generator
-    Supports shared/global SSBOs via baseVertex/baseTriangle offsets.
-*/
+/**
+ * Note:
+ * Compute receives the entire support region, but only needs to compute
+ * on behalf of core region vertices. The support region ensure continuity.
+ */
 
 // -------------------------
 // Settings / Parameters UBO
 // -------------------------
-layout(std140, binding = 0) uniform SettingsUBO
+layout(set = 0, std140, binding = 0) uniform SettingsUBO
 {
     uint normalMode;        // 0 = area-weighted, 1 = angle-weighted
     uint weightOutputMode;  // 0 = SSBO, 1 = image, 2 = both
@@ -25,7 +26,7 @@ layout(std140, binding = 0) uniform SettingsUBO
     float rockEnd;
 
     float eps;
-} ubo;
+} settings;
 
 // Push constants for per-dispatch counts + offsets into shared buffers
 layout(push_constant) uniform PC
@@ -40,9 +41,9 @@ layout(push_constant) uniform PC
 // Inputs (SSBOs)
 // -------------------------
 
-// faceN_area[globalTri].xyz = normalized face normal
+// faceN_area[globalTri].xyz = (normalized?) face normal
 // faceN_area[globalTri].w   = triangle area (or weight)
-layout(std430, binding = 1) readonly buffer FaceNormals
+layout(set = 0, std430, binding = 1) readonly buffer FaceNormals
 {
     vec4 faceN_area[];
 };
@@ -61,44 +62,70 @@ struct VertexAdjacency
     uint _pad2;
 };
 
-layout(std430, binding = 2) readonly buffer Adjacency
+layout(set = 0, std430, binding = 2) readonly buffer Adjacency
 {
     VertexAdjacency adjacency[];
 };
 
 // tris[] stores chunk-local vertex indices, not global ones. 
 // pc.baseTriangle is the first triangle for the current chunk
-layout(std430, binding = 3) readonly buffer Triangles
+layout(set = 0, std430, binding = 3) readonly buffer Triangles
 {
     uvec3 tris[];
 };
 
 // positions[globalV].xyz = position; positions[globalV].y used as height
-layout(std430, binding = 4) readonly buffer Positions
+layout(set = 0, std430, binding = 4) readonly buffer Positions
 {
     vec4 positions[];
 };
 
+layout(set = 0, std140, binding = 9) uniform TerrainAlignment
+{
+    // baseCore + countCore = haloBase
+    uint baseCorePosition;
+    uint countCorePosition;
+    uint countHaloPosition;
+
+    uint baseCoreTriangle;
+    uint countCoreTriangle;
+    uint countHaloTriangle;
+
+    uint baseCoreAdjacency;
+    uint countCoreAdjacency;
+    uint countHaloAdjacency;
+
+    uint baseCoreFaceNarea;
+    uint countCoreFaceNarea;
+    uint countHaloFaceNarea;
+
+    vec2 coreMinXZ;
+    vec2 coreMaxXZ;
+    vec2 supportMinXZ;
+    vec2 supportMaxXZ;
+
+} align;
+
 // -------------------------
 // Outputs (shared SSBOs)
 // -------------------------
-layout(std430, binding = 5) writeonly buffer VertexNormals
+layout(set = 0, std430, binding = 5) writeonly buffer VertexNormals
 {
     vec4 vertexNormals[];
 };
 
 // ONLY FOR DEBUG (at the moment) - This is very useful data
-layout(std430, binding = 6) writeonly buffer VertexSteepness
+layout(set = 0, std430, binding = 6) writeonly buffer VertexSteepness
 {
     float steepnessOut[];
 };
 
-layout(std430, binding = 7) writeonly buffer VertexWeights
+layout(set = 0, std430, binding = 7) writeonly buffer VertexWeights
 {
     vec4 weightsOut[];
 };
 
-layout(binding = 1, rgba16f) uniform writeonly image2D weightmapImage;
+layout(set = 0, binding = 8, rgba16f) uniform writeonly image2D weightmapImage;
 
 // -------------------------
 // Helpers
@@ -108,7 +135,7 @@ float saturate(float x) { return clamp(x, 0.0, 1.0); }
 
 float smooth01(float e0, float e1, float x)
 {
-    float d = max(e1 - e0, ubo.eps);
+    float d = max(e1 - e0, settings.eps);
     float t = saturate((x - e0) / d);
     return t * t * (3.0 - 2.0 * t);
 }
@@ -116,7 +143,7 @@ float smooth01(float e0, float e1, float x)
 vec3 safeNormalize(vec3 v, vec3 fallback)
 {
     float len2 = dot(v, v);
-    if (len2 < ubo.eps) return fallback;
+    if (len2 < settings.eps) return fallback;
     return v * inversesqrt(len2);
 }
 
@@ -128,7 +155,7 @@ float cornerAngle(vec3 p0, vec3 p1, vec3 p2)
 
     float e1Len2 = dot(e1, e1);
     float e2Len2 = dot(e2, e2);
-    if (e1Len2 < ubo.eps || e2Len2 < ubo.eps) return 0.0;
+    if (e1Len2 < settings.eps || e2Len2 < settings.eps) return 0.0;
 
     float d = dot(e1, e2);
     vec3 c = cross(e1, e2);
@@ -196,19 +223,19 @@ void main()
     // 1) Vertex normal
     // -------------------------
     vec3 sum = vec3(0.0);
-    vec3 up = safeNormalize(ubo.upDir.xyz, vec3(0.0, 1.0, 0.0));
+    vec3 up = safeNormalize(settings.upDir.xyz, vec3(0.0, 1.0, 0.0));
 
-    if (ubo.normalMode == 0u)
+    if (settings.normalMode == 0u)
     {
         // Area-weighted: sum += faceNormal * area
         for (uint i = 0; i < c; ++i)
         {
             uint triLocal = adj.triangleIndices[i];
-            if (triLocal >= pc.numTriangles) continue;
+            if (triLocal >= pc.numTriangles) { continue; } 
 
             uint triGlobal = pc.baseTriangle + triLocal;
             vec4 nA = faceN_area[triGlobal];
-            sum += nA.xyz * nA.w;
+            sum += nA.xyz;
         }
     }
     else
@@ -220,10 +247,11 @@ void main()
 
             float ang;
             vec3 faceN;
-            if (!getTriCornerAngleAndNormal(triLocal, vLocal, ang, faceN))
+            if (!getTriCornerAngleAndNormal(triLocal, vLocal, ang, faceN)) {
                 continue;
+            }
 
-            sum += faceN * ang;
+            sum += safeNormalize(faceN, settings.upDir) * ang;
         }
     }
 
@@ -240,17 +268,17 @@ void main()
     // -------------------------
     // 3) Material weights (grass/rock/snow)
     // -------------------------
-    float h = -positions[vGlobal].y;                                // Note: negated to assume our convention
+    float h = -positions[vGlobal].y;                                // Note: negated to assume Midnight's right-hand convention
 
-    float rockW = smooth01(ubo.rockStart, ubo.rockEnd, steepness);
+    float rockW = smooth01(settings.rockStart, settings.rockEnd, steepness);
 
-    float snowW = smooth01(ubo.snowStart, ubo.snowEnd, h);
+    float snowW = smooth01(settings.snowStart, settings.snowEnd, h);
     snowW *= (1.0 - rockW); // keep snow off cliffs (optional)
 
     float grassW = max(0.0, 1.0 - max(rockW, snowW));
 
     float s = grassW + rockW + snowW;
-    if (s < ubo.eps)
+    if (s < settings.eps)
     {
         grassW = 1.0; rockW = 0.0; snowW = 0.0;
         s = 1.0;
@@ -259,18 +287,18 @@ void main()
     float invS = 1.0 / s;
     vec4 w = vec4(grassW * invS, rockW * invS, snowW * invS, 0.0);
 
-    if (ubo.weightOutputMode == 0u || ubo.weightOutputMode == 2u)
+    if (settings.weightOutputMode == 0u || settings.weightOutputMode == 2u)
     {
         weightsOut[vGlobal] = w;
     }
 
-    if (ubo.weightOutputMode == 1u || ubo.weightOutputMode == 2u)
+    if (settings.weightOutputMode == 1u || settings.weightOutputMode == 2u)
     {
         // NOTE: We pack by GLOBAL vertexId so every vertex has a unique texel.
         uint id = vGlobal;
 
-        uint x = (ubo.weightmapWidth > 0u) ? (id % ubo.weightmapWidth) : id;
-        uint y = (ubo.weightmapWidth > 0u) ? (id / ubo.weightmapWidth) : 0u;
+        uint x = (settings.weightmapWidth > 0u) ? (id % settings.weightmapWidth) : id;
+        uint y = (settings.weightmapWidth > 0u) ? (id / settings.weightmapWidth) : 0u;
         imageStore(weightmapImage, ivec2(int(x), int(y)), w);
     }
 }

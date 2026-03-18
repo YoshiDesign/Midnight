@@ -113,11 +113,14 @@ namespace aveng {
 
 	// Final durable product example (you’ll extend)
 	struct FinalMeshCPU {
-		std::pmr::vector<glm::vec3> positions;
-		std::pmr::vector<glm::vec3> normals;   // could be filled by compute later
-		std::pmr::vector<uint32_t>  indices;
+		std::pmr::vector<glm::vec3> vbo_positions;
+		std::pmr::vector<uint32_t>  ibo_indices;
+		std::pmr::vector<glm::vec4> FaceN_Area;   
+		std::pmr::vector<glm::vec3> tris;   
+		std::pmr::vector<glm::vec3> comp_positions;
+		std::pmr::vector<procgen::VertexAdjacency> adjacency;
 		explicit FinalMeshCPU(std::pmr::memory_resource* mr)
-			: positions(mr), normals(mr), indices(mr) {
+			: vbo_positions(mr), FaceN_Area(mr), ibo_indices(mr), tris(mr), comp_positions(mr), adjacency(mr) {
 		}
 	};
 
@@ -203,31 +206,34 @@ namespace aveng {
 		*	the futures may still exist and be shared elsewhere
 		*	shared_future<Points const*> might still return a pointer that now points into freed arena memory
 		*
-		*	Be sure to clearly delineate between what is an internal dependency and what is a public artifact.
+		*	[IMPORTANT] Be sure to clearly delineate between what is an internal dependency and what is a public artifact,
+		*	while also being clear about the state of the chunk record (generating, gpu_ready, uploaded, evicted, freed, etc)
 		*	Do not let this become a lifetime safety nightmare by resetting scratch when futures still exist.
+		* 
+		* Policy: after mesh is built, you can drop intermediates.
+		*
+		* This is our solution to:
+		*	- Task A publishes Heights* from scratch arena
+		*	- Task B gets future, hasn't called .get() yet
+		*	- Task C calls rec.scratch.reset()
+		*	- Task B calls fut.get() -> dangling pointer
+		* I've probably said this elsewhere, but just in case.
+		* Only reset scratch after:
+		*	- Final mesh is complete (all intermediate futures resolved)
+		*	- No external references to intermediate data exist
+		*	- ChunkRecord is in a valid state
 		*/
 
-		// discardScratchIntermediates Policy: after mesh is built, you can drop intermediates.
-		/**
-		 * This is our solution to:
-		 *  - Task A publishes Heights* from scratch arena
-		 *	- Task B gets future, hasn't called .get() yet
-		 *	- Task C calls rec.scratch.reset()
-		 *	- Task B calls fut.get() -> dangling pointer
-		 * I've probably said this elsewhere, but just in case:
-		 *  Only reset scratch after:
-		 *  - Final mesh is complete (all intermediate futures resolved)
-		 *  - No external references to intermediate data exist
-		 */
 		void discardScratchIntermediates() {
 			// reset scratch arena; product pointers become invalid, so null them
-			scratch.reset();
+			scratch.reset(); // REQUIRED
 			points = nullptr;
 			allPoints = nullptr;
 			heightField = nullptr;
 			triangulation = nullptr;
 			erosion = nullptr;
 		}
+
 	};
 
 }

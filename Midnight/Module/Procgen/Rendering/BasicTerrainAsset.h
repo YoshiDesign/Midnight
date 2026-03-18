@@ -33,41 +33,21 @@
  * 
  */
 
-namespace aveng {
+/**
+ * Terminology:
+ * Core region = drawable 3x3
+ * Support region = 5x5 packed compute input
+ * Packed region = actual data ranges written into SSBOs
+ * Output region = subset of vertices/triangles whose outputs are meaningful to graphics
+ */
 
-	// A basic terrain asset represents a 3x3 set of generated terrain chunks.
-	// Read the chat-gpt conversation from the notes above for exhaustive info.
-	// Remember: We ARE the dark matter
-	//struct BasicTerrainAsset {
-	//	// TODO - Texture Data
-	//	unsigned int mTriangleCount = 0;
-	//	unsigned int mVertexCount = 0;
-	//	std::vector<VkVertexBufferData> mVertexBuffers{}; // Mapped into Vulkan memory
-	//	std::vector<VkIndexBufferData> mIndexBuffers{};	  // Mapped into Vulkan memory
-	//	std::vector<VkUniformBufferData> mModelMat{}; // Model Position Data
-	//	std::vector<VkShaderStorageBufferData> mTriangles{}; // Compute
-	//	std::vector<VkShaderStorageBufferData> mAdjacency{}; // Compute - vector of vectors of (incident?) triangles
-
-	//	VkTerrainPushConstant pc;
-	//};
+namespace procgen {
 
 	// In case any configurables come to mind.
 	struct TerrainBuilderOptions {
 	
 	};
 	
-	// for compute
-	//struct VertexAdjacency
-	//{
-	//	// IMPORTANT
-	//	// triangleIndices[] are CHUNK-LOCAL triangle IDs in [0..numTriangles).
-	//	// We'll add pc.baseTriangle when indexing shared triangle/face arrays.
-	//	uint32_t triangleIndices[MAX_ADJACENT_TRIS];
-	//	uint32_t count;
-	//	uint32_t _pad0;
-	//	uint32_t _pad1;
-	//	uint32_t _pad2;
-	//};
 
 	// TODO - Move descriptor sets here
 

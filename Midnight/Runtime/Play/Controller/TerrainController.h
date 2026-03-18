@@ -44,6 +44,8 @@ namespace aveng {
         // Managers
         procgen::ErosionManager erosionMgr_;
 
+
+
         uint64_t frameIndex_ = 0;
 
         // v1: store futures so you can introspect progress in debug UI if you want

@@ -1,5 +1,7 @@
 #pragma once
 #include <string>
+#include <cstdint>
+#include "CoreVK/VkRenderData.h"
 #include "Core/Math/wyhash.h"
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Noise/Config.h"
@@ -13,6 +15,7 @@ namespace aveng {
 	using SiteIndex = uint32_t;
 	static constexpr EdgeIndex kInvalidEdge = -1; // NOTE - These wrap... bc their types are uint32_t. I oops'd, but we can scale to 64 if we really need validity at that scale.
 	static constexpr TriIndex  kInvalidTri = -1;  // NOTE - So be consistently aware of this subtle alarm bell.
+
 
 	const enum Border {
 		Border_None = 0,
@@ -75,7 +78,7 @@ namespace aveng {
 	inline bool operator==(ChunkCoord a, ChunkCoord b) noexcept { return a.x == b.x && a.z == b.z; }
 
 	// -------------------------
-	// Bounds2
+	// Bounds2 - AABB
 	// -------------------------
 	struct Bounds2 {
 		float minX{}, minZ{}, maxX{}, maxZ{};
@@ -214,4 +217,40 @@ namespace aveng {
 		HardnessParams hardness{};
 		RidgeParams ridges{};
 	};
+}
+
+namespace procgen {
+
+	const int MAX_ADJACENT_TRIS = 12;
+
+	// for compute
+	struct VertexAdjacency
+	{
+		// IMPORTANT
+		// triangleIndices[] are CHUNK-LOCAL triangle IDs in [0..numTriangles).
+		// We'll add pc.baseTriangle when indexing shared triangle/face arrays.
+		aveng::TriIndex triangleIndices[MAX_ADJACENT_TRIS];
+		uint32_t count;
+		uint32_t _pad0;
+		uint32_t _pad1;
+		uint32_t _pad2;
+	};
+
+	// A basic terrain asset represents a 3x3 set of generated terrain chunks.
+	struct BasicTerrainAsset {
+
+		unsigned int mTriangleCount = 0;
+		unsigned int mVertexCount = 0;
+		std::vector<aveng::VkVertexBufferData> BasicTerrainVBO{}; // Mapped into Vulkan memory
+		std::vector<aveng::VkIndexBufferData> BasicTerrainIBO{};  // Mapped into Vulkan memory
+		std::vector<aveng::VkShaderStorageBufferData> BasicTerrainGigaSSBO{}; // Contains all of the below data in one big buffer
+		// std::vector<aveng::VkShaderStorageBufferData> BasicTerrainSSBOModelMats{}; // Compute - Model mat for this region
+		// std::vector<aveng::VkShaderStorageBufferData> BasicTerrainSSBOTriangles{}; // Compute - Triangle indices for this region
+		// std::vector<aveng::VkShaderStorageBufferData> BasicTerrainSSBOAdjacency{}; // Compute - <VertexAdjacency>[] AoSoA of incident triangles to each vertex
+		// std::vector<aveng::VkShaderStorageBufferData> BasicTerrainSSBOPositions{}; // Compute - <vec4> Positions - This duplicates the VBO data, for now. w component is free parking for now
+		// std::vector<aveng::VkShaderStorageBufferData> BasicTerrainSSBOFaceNArea{}; // BUT NOT THIS ONE Compute - <vec4> Each triangle face normal (xyz) and triangle's area (w)
+
+		aveng::VkBasicTerrainPushConstant pc;
+	};
+
 }

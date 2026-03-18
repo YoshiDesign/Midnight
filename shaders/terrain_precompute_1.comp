@@ -1,0 +1,92 @@
+#version 460
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+/**
+ * Note:
+ * Compute receives the entire support region, but only needs to compute
+ * on behalf of core region vertices. The support region ensure continuity.
+ */
+
+layout(push_constant) uniform PC
+{
+    uint baseVertex;    // global vertex base for this chunk in shared buffers
+    uint baseTriangle;  // global triangle base for this chunk in shared buffers
+    uint numVertices;   // vertices in this chunk
+    uint numTriangles;  // triangles in this chunk (defensive checks)
+} pc;
+
+layout(set = 0, std140, binding = 9) uniform TerrainAlignment
+{
+    // baseCore + countCore = haloBase
+    uint baseCorePosition;
+    uint countCorePosition;
+    uint countHaloPosition;
+
+    uint baseCoreTriangle;
+    uint countCoreTriangle;
+    uint countHaloTriangle;
+
+    uint baseCoreAdjacency;
+    uint countCoreAdjacency;
+    uint countHaloAdjacency;
+
+    uint baseCoreFaceNarea;
+    uint countCoreFaceNarea;
+    uint countHaloFaceNarea;
+
+    vec2 coreMinXZ;
+    vec2 coreMaxXZ;
+    vec2 supportMinXZ;
+    vec2 supportMaxXZ;
+
+} align;
+
+layout(set = 0, std430, binding = 3) readonly buffer Triangles
+{
+    uvec3 tris[];
+};
+
+layout(set = 0, std430, binding = 4) readonly buffer Positions
+{
+    vec4 positions[];
+};
+
+layout(set = 0, std430, binding = 1) writeonly buffer FaceNormals
+{
+    vec4 faceN_area[];
+};
+
+void main()
+{
+    uint triIndex = gl_GlobalInvocationID.x;
+
+    if (triIndex >= pc.numTriangles) {
+        return;
+    }
+
+    uvec3 tri = tris[triIndex];
+
+    vec3 p0 = positions[tri.x].xyz;
+    vec3 p1 = positions[tri.y].xyz;
+    vec3 p2 = positions[tri.z].xyz;
+
+    vec3 e1 = p1 - p0;
+    vec3 e2 = p2 - p0;
+
+    vec3 n = cross(e1, e2);
+    faceN_area[triIndex] = vec4(n, 0.5 * length(n));
+}
+
+/**
+ * Personal study-guide
+ *
+ * layout(local_size_x = A, local_size_y = B, local_size_z = C) in;
+ * 
+ * gl_WorkGroupSize        // == uvec3(A,B,C), compile-time constant
+ * gl_NumWorkGroups        // number of workgroups dispatched
+ * gl_WorkGroupID          // current workgroup coordinate
+ * gl_LocalInvocationID    // current invocation coordinate inside workgroup
+ * gl_LocalInvocationIndex // current invocation flattened within workgroup
+ * gl_GlobalInvocationID   // global coordinate across full dispatch
+ * 
+ */

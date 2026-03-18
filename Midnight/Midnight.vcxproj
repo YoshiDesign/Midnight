@@ -322,6 +322,7 @@
     <ClInclude Include="Module\Procgen\Terrain\Erosion\Presets.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\RidgeEnhancement.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\ThermalErosion.h" />
+    <ClInclude Include="Module\Procgen\Terrain\GpuResources.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
     <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
     <ClInclude Include="Runtime\Debug.h" />

@@ -4,8 +4,8 @@ layout(location = 0) in vec3 inPosition; // from vertex buffer
 
 layout(location = 0) out vec3 vWorldPos;
 layout(location = 1) out vec3 vWorldNormal;
-layout(location = 2) out vec3 vMatWeights; // Useless when rendering weights to a 2D image
-layout(location = 3) out float vSteep; // Extensible! We're not using this for much rn
+layout(location = 2) out vec3 vMatWeights; // Useless when rendering weights to a 2D image is enabled
+layout(location = 3) out float vSteep;     // Extensible! We're not using this for much rn, but its nice to have
 
 layout (std140, set = 0, binding = 1) uniform Matrices {
   mat4 view;

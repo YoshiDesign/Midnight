@@ -780,13 +780,15 @@ namespace aveng {
         const float* heights, size_t heightsCount,
         Vec3& outN
     ) {
-        if (!heights) return false;
-        if (!validTri(tri, triID)) return false;
-        if (heightsCount < allPts.pts.size()) return false;
+        if (!heights) { return false; }
+        if (!validTri(tri, triID)) { return false; }
+        if (heightsCount < allPts.pts.size()) { return false; }
 
-        const Triangle& t = getTri(tri, triID);
+        const Triangle& t = getTri(tri, triID); // TODO - inline this explicitly
         const SiteIndex A = triA(t), B = triB(t), C = triC(t);
-        if (!validSite(allPts, A) || !validSite(allPts, B) || !validSite(allPts, C)) return false;
+
+        // Simple "this index exists" check
+        if (!validSite(allPts, A) || !validSite(allPts, B) || !validSite(allPts, C)) { return false; }
 
         const Vec2 a2 = allPts.pts[A];
         const Vec2 b2 = allPts.pts[B];

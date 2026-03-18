@@ -145,6 +145,33 @@ namespace aveng {
 		uint32_t pad;
 	};
 
+	// UBO - Binding 9 Basic Terrain Pipeline
+	struct alignas(16) BasicTerrainAlignmentData {
+
+		// baseCore + countCore = haloBase
+		uint32_t baseCorePosition;
+		uint32_t countCorePosition;
+		uint32_t countHaloPosition;
+
+		uint32_t baseCoreTriangle;
+		uint32_t countCoreTriangle;
+		uint32_t countHaloTriangle;
+
+		uint32_t baseCoreAdjacency;
+		uint32_t countCoreAdjacency;
+		uint32_t countHaloAdjacency;
+
+		uint32_t baseCoreFaceNarea;
+		uint32_t countCoreFaceNarea;
+		uint32_t countHaloFaceNarea;
+		
+		// Used to distinguish output ownership from input availability
+		glm::vec2 coreMinXZ;
+		glm::vec2 coreMaxXZ;
+		glm::vec2 supportMinXZ;
+		glm::vec2 supportMaxXZ;
+	};
+
 	struct VkPushConstants {
 		uint32_t pkModelBoneStride;
 		uint32_t pkInstanceBaseIndex;
@@ -155,6 +182,13 @@ namespace aveng {
 	struct VkComputePushConstants {
 		uint32_t pkModelOffset;
 		uint32_t skinMetaIndex;
+	};
+
+	struct VkBasicTerrainPushConstant {
+		uint32_t baseVertex;
+		uint32_t baseTriangle;
+		uint32_t numVertices;
+		uint32_t numTriangles;
 	};
 
 	//struct PK {

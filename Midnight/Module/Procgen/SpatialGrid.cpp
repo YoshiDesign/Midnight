@@ -5,8 +5,9 @@
 
 namespace aveng {
     // -----------------------------
-      // BuildSpatialGrid
-      // -----------------------------
+    // SpatialGrid
+    // A read-only acceleration structure
+    // -----------------------------
     std::unique_ptr<SpatialGrid> BuildSpatialGrid(
         const Triangulation* triangulation,
         const AllPoints* allPoints,
@@ -178,6 +179,10 @@ namespace aveng {
     // SpatialGrid methods
     // -----------------------------
 
+    /* 
+     *   Locate a triangle within a chunk given world coordinates.
+     *   Remember that each chunk has its own SpatialGrid
+     */
     std::pair<TriIndex, bool> SpatialGrid::LocateTriangle(float x, float z) const
     {
         if (!tri || !pts || tris.empty()) {
@@ -248,6 +253,7 @@ namespace aveng {
         return { w.wa * ha + w.wb * hb + w.wc * hc, true };
     }
 
+    /* Note: Delaunay.cpp includes the function for calculating normals per triangle. This just fetches them based on a world coordinate. */
     std::pair<Vec3, bool> SpatialGrid::GetTriangleNormal(float x, float z, std::span<const Vec3> normals) const
     {
         const auto [ti, ok] = LocateTriangle(x, z);
