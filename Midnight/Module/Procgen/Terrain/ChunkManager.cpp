@@ -1,3 +1,5 @@
+#include <cstring>
+#include <mutex>
 #include "ChunkManager.h"
 #include "avpch.h"
 #include "Core/Math/quantize.h"
@@ -12,7 +14,6 @@
 #include "Module/Procgen/Terrain/Erosion/RidgeEnhancement.h"
 #include "Module/Procgen/Terrain/Erosion/ThermalErosion.h"
 #include "Module/Procgen/Terrain/Erosion/Initialization.h"
-#include <cstring>
 
 #ifdef M_DEBUG
 #include <filesystem>
@@ -994,7 +995,7 @@ namespace aveng {
         mesh.tris.reserve(triangles.size());
 
         for (const auto& tri : triangles) {
-            if (!(isCore[tri.A] && isCore[tri.B] && isCore[tri.C])) continue;
+            if (!(isCore[tri.A] && isCore[tri.B] && isCore[tri.C])) { continue; }
 
             mesh.ibo_indices.push_back(old2new[tri.A]);
             mesh.ibo_indices.push_back(old2new[tri.B]);
@@ -1033,39 +1034,135 @@ namespace aveng {
         return rec.finalMesh;
     }
 
+    /* Async */
+    uint64_t  ChunkManager::requestRenderableAsync(ChunkCoord center, uint64_t frameIndex)
+    {
+        ChunkRecord* rec = getOrCreateRecord(center);
+
+        uint64_t requestId = 0;
+        bool shouldSubmit = false;
+
+        {
+            std::scoped_lock lock(rec->renderableMutex);
+
+            // If already queued/building/ready, decide your policy.
+            // Simplest policy: don't enqueue duplicate builds if something is already in flight or done.
+            if (rec->renderableState == RenderableBuildState::Queued ||
+                rec->renderableState == RenderableBuildState::Building ||
+                rec->renderableState == RenderableBuildState::Ready)
+            {
+                return rec->requestedRenderableId;
+            }
+
+            requestId = ++rec->requestedRenderableId;
+            rec->renderableState = RenderableBuildState::Queued;
+            rec->renderablePublished = false;
+            shouldSubmit = true;
+        }
+        if (shouldSubmit) {
+            tasks_.submit([this, center, frameIndex, requestId]() {
+                ChunkRecord* workerRec = getOrCreateRecord(center);
+                RecordPin hold(*this, workerRec, frameIndex);
+
+                {
+                    std::scoped_lock lock(workerRec->renderableMutex);
+
+                    // If another request superseded us before we even started, abandon.
+                    if (workerRec->requestedRenderableId != requestId) {
+                        return;
+                    }
+
+                    workerRec->renderableState = RenderableBuildState::Building;
+                }
+
+                try {
+                    auto renderable = generate(center, frameIndex, requestId);
+
+                    bool shouldPublish = false;
+
+                    {
+                        std::scoped_lock lock(workerRec->renderableMutex);
+
+                        // If stale, discard result silently.
+                        if (workerRec->requestedRenderableId != requestId) {
+                            return;
+                        }
+
+                        workerRec->renderableResult = std::move(renderable);
+                        workerRec->completedRenderableId = requestId;
+                        workerRec->renderableState = RenderableBuildState::Ready;
+                        workerRec->renderablePublished = true;
+                        shouldPublish = true;
+                    }
+
+                    if (shouldPublish) {
+                        completedRenderables_.push(procgen::RenderableCompletion{
+                            .coord = center,
+                            .requestId = requestId,
+                            .success = true
+                        });
+
+                        // For High Perf streaming without chunk renderable cache
+                        //completedRenderables_.push(procgen::RenderableCompletion_ALT{
+                        //    .coord = center,
+                        //    .requestId = requestId,
+                        //    .success = true,
+                        //    .renderable = std::move(renderable)
+                        //});
+                    }
+                }
+                catch (...) { // ugh
+                    {
+                        std::scoped_lock lock(workerRec->renderableMutex);
+
+                        // Only mark failure if still current request
+                        if (workerRec->requestedRenderableId == requestId) {
+                            workerRec->renderableState = RenderableBuildState::Failed;
+                        }
+                    }
+
+                    completedRenderables_.push(procgen::RenderableCompletion{
+                        .coord = center,
+                        .requestId = requestId,
+                        .success = false
+                    });
+                }
+            });
+        }
+    }
+
 
     // ---------------------------------------------------------------------------
     // Renderable assembly: 3x3 core region + 5x5 support (halo) region
     // ---------------------------------------------------------------------------
 
-    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::requestRenderable(ChunkCoord center, uint64_t frameIndex)
+    /* meat n' potatoes */
+    std::unique_ptr<procgen::TerrainRenderable>
+        ChunkManager::generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
     {
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors);
 
-        // Pin all 25 chunks for the duration of this build
         std::array<RecordPin, 25> pins;
         for (int i = 0; i < 25; ++i) {
             ChunkRecord* r = getOrCreateRecord(neighbors[i]);
             pins[i] = RecordPin(*this, r, frameIndex);
         }
 
-        // Inner 3x3: full pipeline through mesh
         std::array<std::shared_future<FinalMeshCPU const*>, 9> meshFutures;
         for (int i = 0; i < 9; ++i) {
             meshFutures[i] = requestMesh(neighbors[i], frameIndex);
         }
 
-        // Outer 16: only need up to SpatialGrid (ensures allPoints, triangulation, heights exist)
         std::array<std::shared_future<SpatialGrid const*>, 16> spatialFutures;
         for (int i = 9; i < 25; ++i) {
             spatialFutures[i - 9] = requestSpatialGrid(neighbors[i], frameIndex);
         }
 
-        // Wait for all
         for (int i = 0; i < 9; ++i) {
             tasks_.wait(meshFutures[i]);
         }
+
         for (int i = 0; i < 16; ++i) {
             tasks_.wait(spatialFutures[i]);
         }
@@ -1073,13 +1170,12 @@ namespace aveng {
         return buildRenderable(center, frameIndex);
     }
 
-
     std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderable(ChunkCoord center, uint64_t frameIndex)
     {
         using namespace procgen;
 
         ChunkCoord neighbors[25];
-        get5x5Neighborhood(center, neighbors);
+        get5x5Neighborhood(center, neighbors); // Guarantees 3x3 is [0-8]
 
         // Collect chunk records (all should exist and be populated by now)
         std::array<ChunkRecord*, 25> recs{};
@@ -1102,6 +1198,7 @@ namespace aveng {
         // Layout: [3x3 core verts | 3x3 halo verts | outer-16 all verts]
         //          ^-- "core" for alignment --^  ^-- "halo" for alignment --^
 
+        // TODO: convert all scratch 
         struct ChunkVertexInfo {
             uint32_t globalBase = 0;
             uint32_t coreCount  = 0;
@@ -1116,7 +1213,7 @@ namespace aveng {
         // Inner 3x3: core verts go to the core section, non-core go to halo
         for (int i = 0; i < 9; ++i) {
             auto* ap = recs[i]->allPoints;
-            if (!ap) continue;
+            if (!ap) { continue; }
             chunkInfo[i].coreCount  = static_cast<uint32_t>(ap->coreIdx.size());
             chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
             totalCoreVerts += chunkInfo[i].coreCount;
@@ -1126,8 +1223,8 @@ namespace aveng {
         // Outer 16: all their verts are halo/support
         for (int i = 9; i < 25; ++i) {
             auto* ap = recs[i]->allPoints;
-            if (!ap) continue;
-            chunkInfo[i].coreCount  = 0;
+            if (!ap) { continue; }
+            chunkInfo[i].coreCount  = 0; // No contribution to inner 3x3 core region
             chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
             totalHaloVerts += chunkInfo[i].totalCount;
         }
@@ -1161,7 +1258,7 @@ namespace aveng {
             const auto& coreIdx = ap->coreIdx;
             const size_t nPts = pts.size();
             const auto& eHeights = (i < 9 && recs[i]->erosion) ? recs[i]->erosion->eHeights
-                                                                : recs[i]->heightField->heights;
+                                                               : recs[i]->heightField->heights;
 
             old2global[i].resize(nPts, UINT32_MAX);
 
@@ -1347,6 +1444,37 @@ namespace aveng {
         align.supportMaxXZ = suppMax;
 
         return renderable;
+    }
+
+    bool ChunkManager::tryTakeRenderable(
+        ChunkCoord center,
+        uint64_t requestId,
+        std::unique_ptr<procgen::TerrainRenderable>& out)
+    {
+        ChunkRecord* rec = getOrCreateRecord(center);
+        if (!rec) { return false; }
+
+        std::scoped_lock lock(rec->renderableMutex);
+
+        if (rec->renderableState != RenderableBuildState::Ready) {
+            return false;
+        }
+
+        if (rec->completedRenderableId != requestId) {
+            return false; // stale completion or newer request replaced it
+        }
+
+        if (!rec->renderableResult) {
+            return false;
+        }
+
+        out = std::move(rec->renderableResult);
+
+        // Keep or clear state depending on caching policy.
+        rec->renderableState = RenderableBuildState::None;
+        rec->renderablePublished = false;
+
+        return true;
     }
 
 

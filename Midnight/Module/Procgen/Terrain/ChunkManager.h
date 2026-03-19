@@ -4,8 +4,10 @@
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Module/Procgen/Types.h"
 #include "Runtime/Threading/Types.h"
+#include "Runtime/Threading/ConcurrentQueue.h"
 #include "Module/Procgen/Noise/Config.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
+#include "Module/Procgen/Terrain/GpuResources.h"
 #include "Core/Math/wyhash.h"
 
 /*
@@ -102,7 +104,7 @@ namespace aveng {
         std::shared_future<FinalMeshCPU const*>     requestMesh(ChunkCoord c, uint64_t frameIndex);
 
         // Renderable assembly: 3x3 core + 5x5 support region
-        std::unique_ptr<procgen::TerrainRenderable> requestRenderable(ChunkCoord center, uint64_t frameIndex);
+        // std::unique_ptr<procgen::TerrainRenderable> requestRenderable(ChunkCoord center, uint64_t frameIndex);
 
         // Streaming helpers
         ChunkRecord* pin(ChunkCoord c, uint64_t frameIndex); // 
@@ -114,12 +116,29 @@ namespace aveng {
         /* Managers - TODO - More managers */
         void initManagers(procgen::ErosionManager* er);
 
-    private:
+        /* Render Target & Completion Queue Drain */
+        uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex);
+        bool tryTakeRenderable(ChunkCoord center, uint64_t requestId,
+            std::unique_ptr<procgen::TerrainRenderable>& out);
+
+        template <typename Fn>
+        void drainCompletedRenderables(Fn&& fn)
+        {
+            completedRenderables_.drain(std::forward<Fn>(fn));
+        }
+
         ChunkRecord* getOrCreateRecord(ChunkCoord c);
+
+    private:
+
+        // Sync Build Method
+        std::unique_ptr<procgen::TerrainRenderable>
+        generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId);
 
         /* Params, stage managers and Configs */
         void initManagerDefaults();
 
+        mtools::ConcurrentQueue<procgen::RenderableCompletion> completedRenderables_;
 
         procgen::ErosionManager* erosionMgr_ = nullptr;
 

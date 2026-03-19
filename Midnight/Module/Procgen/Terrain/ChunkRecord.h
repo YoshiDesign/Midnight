@@ -4,10 +4,13 @@
 #include <mutex>
 #include <optional>
 #include <cstdint>
+#include <memory>
 #include "Utils/glm_includes.h"
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/SpatialGrid.h"
 #include "Runtime/Memory/ChunkArena.h"
+#include "Module/Procgen/Terrain/GpuResources.h"
+#include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 namespace aveng {
 	/*
 	* PMR usage -
@@ -74,6 +77,16 @@ namespace aveng {
 	// So repeated resize() or reserve() growth patterns may accumulate memory inside the arena.
 	// For this reason we always compute our resources in a scratch pmr, resize, and set the final product once.
 	// -------------------------
+
+	enum class RenderableBuildState : uint8_t
+	{
+		None,
+		Queued,
+		Building,
+		Ready,
+		Failed
+	};
+
 	struct Points {
 		std::pmr::vector<Vec2> core; // core points only
 		explicit Points(std::pmr::memory_resource* mr) : core(mr) {}
@@ -174,6 +187,18 @@ namespace aveng {
 
 		std::once_flag spatialOnce;
 		std::shared_future<SpatialGrid const*> spatialF;
+
+		// New top-level renderable product
+		//std::once_flag renderableOnce;
+		//std::shared_future<void> renderableBuildF;
+
+		// ---- top-level packed renderable state ----
+		mutable std::mutex renderableMutex;
+		RenderableBuildState renderableState = RenderableBuildState::None;
+		uint64_t requestedRenderableId = 0;   // increment whenever a new build is requested
+		uint64_t completedRenderableId = 0;   // request id that produced current result
+		std::unique_ptr<procgen::TerrainRenderable> renderableResult;
+		bool renderablePublished = false; // optional; mostly useful for debugging
 
 		// Note - SpatialGrid bounds are core + halo
 		std::optional<SpatialGrid> spatial; // Not trivially destructible!

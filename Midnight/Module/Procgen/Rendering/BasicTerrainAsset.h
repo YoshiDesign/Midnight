@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <memory>
 #include "CoreVK/VkRenderData.h"
 #include "Module/Procgen/Types.h"
 #include "Utils/glm_includes.h"
@@ -45,21 +46,11 @@
 
 namespace procgen {
 
-	// In case any configurables come to mind.
-	struct TerrainBuilderOptions {
-	
-	};
-
 	/**
 	 * CPU-side renderable for a 3x3 core region backed by a 5x5 support region.
 	 *
 	 * Layout convention for packed buffers: [3x3 core data | halo/support data]
 	 * The compute shader reads the full buffer; the graphics pipeline only draws core.
-	 *
-	 * Binding map (terrain_precompute_1.comp):
-	 *   binding 3 = packedTriangles (uvec3 on GPU, stored as vec3 for layout compat)
-	 *   binding 4 = packedPositions (vec4 on GPU, w unused)
-	 *   binding 9 = alignment UBO (BasicTerrainAlignmentData)
 	 */
 	struct TerrainRenderable {
 
@@ -78,22 +69,24 @@ namespace procgen {
 		aveng::ChunkCoord center{};
 	};
 
-	// TODO - Move descriptor sets here
+	struct RenderableCompletion
+	{
+		aveng::ChunkCoord coord;
+		uint64_t requestId; // Build generation id
+		bool success;
+	};
 
-	/*
-		REFERENCE
-	for (const auto& mesh : mModelMeshes) {
-		VkVertexBufferData vertexBuffer;
-		VertexBuffer::init(engineDevice, vertexBuffer, mesh.vertices.size() * sizeof(VkVertex));
-		VertexBuffer::uploadData(engineDevice, vertexBuffer, mesh);
-		mVertexBuffers.emplace_back(vertexBuffer);
+	struct RenderableCompletion_ALT
+	{
+		aveng::ChunkCoord coord;
+		uint64_t requestId;
+		bool success;
+		std::unique_ptr<TerrainRenderable> renderable;
+	};
 
-		VkIndexBufferData indexBuffer;
-		IndexBuffer::init(engineDevice, indexBuffer, mesh.indices.size() * sizeof(uint32_t));
-		IndexBuffer::uploadData(engineDevice, indexBuffer, mesh);
-		mIndexBuffers.emplace_back(indexBuffer);
-	}
+	// In case any configurables come to mind.
+	struct TerrainBuilderOptions {
 	
-	*/
+	};
 
 }

@@ -334,6 +334,7 @@
     <ClInclude Include="Runtime\Play\IGameInstance.h" />
     <ClInclude Include="Runtime\Play\PlayManager.h" />
     <ClInclude Include="Runtime\Play\WorldManager.h" />
+    <ClInclude Include="Runtime\Threading\ConcurrentQueue.h" />
     <ClInclude Include="Runtime\Threading\ITaskSystem.h" />
     <ClInclude Include="Runtime\Threading\Scratch.h" />
     <ClInclude Include="Runtime\Threading\Types.h" />
