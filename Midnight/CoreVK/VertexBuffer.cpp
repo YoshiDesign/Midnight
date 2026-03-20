@@ -118,7 +118,7 @@ namespace aveng {
         return true;
     }
 
-    bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, std::vector<glm::vec3> vertexData) {
+    bool VertexBuffer::uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const std::vector<glm::vec3>& vertexData) {
         unsigned int vertexDataSize = vertexData.size() * sizeof(glm::vec3);
 
         /* buffer too small, resize */
@@ -153,7 +153,7 @@ namespace aveng {
     bool VertexBuffer::uploadToGPU(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData) {
         VkBufferMemoryBarrier vertexBufferBarrier{};
         vertexBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        vertexBufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+        vertexBufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         vertexBufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
         vertexBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         vertexBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

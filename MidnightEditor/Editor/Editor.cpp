@@ -5,6 +5,7 @@
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/swapchain.h"
 #include "CoreVK/SkinningPipeline.h"
+#include "CoreVK/TerrainPipeline.h"
 #include "CoreVK/LinePipeline.h"
 #include "CoreVK/PipelineLayout.h"
 #include "Core/aveng_window.h"
@@ -17,6 +18,7 @@
 #include "Core/Renderer/FramePacketBuilder.h"
 #include "Game/Camera/CameraManager.h"
 #include "Editor/EditorCamera.h"
+#include "Runtime/Play/Controller/TerrainController.h"
 
 namespace aveng {
 
@@ -291,6 +293,15 @@ namespace aveng {
 			throw std::runtime_error("editor fail 3");
 		}
 
+		// Terrain Debug Pipeline
+		vertexShaderFile = "shaders/terrain_debug.vert.spv";
+		fragmentShaderFile = "shaders/terrain_debug.frag.spv";
+		if (!TerrainPipeline::init(engineDevice, renderData.rdAvengBasicTerrainPipelineLayout,
+			renderData.rdAvengEditorBasicTerrainPipeline, renderData.rdSelectionRenderpass, 2, vertexShaderFile, fragmentShaderFile)) {
+			std::printf("%s error: could not init Terrain Debug shader pipeline\n", __FUNCTION__);
+			throw std::runtime_error("editor fail 3");
+		}
+
 		aveng_imgui.init(
 			renderData.rdImguiRenderpass,
 			swapchain->imageCount()
@@ -445,13 +456,22 @@ namespace aveng {
 	[[ deprecated("This assumes non-bindless descriptor sets. Which need to be reimplemented to use.") ]]
 	void Editor::drawModels(const IModelLibrary& modelLib, const FramePacket& pkt, int frameIndex)
 	{
-
 		renderer.drawModelsBindless(
 			pkt,
 			modelLib,
 			renderData.rdCommandBuffersGraphics[frameIndex],
 			renderData.rdDebugPipeline,
 			renderData.rdDebugAnimatedPipeline);
+	}
+
+	void Editor::renderTerrain() {
+		renderer.updateTerrainDescriptorSets(currentFrameIndex);
+		renderer.terrainController().update();
+		renderer.terrainController().render(
+			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
+			renderData.rdAvengEditorBasicTerrainPipeline,
+			currentFrameIndex
+		);
 	}
 
 	void Editor::cleanup()

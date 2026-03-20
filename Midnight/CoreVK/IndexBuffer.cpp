@@ -95,6 +95,61 @@ namespace aveng {
 
         return true;
     }
+    
+    bool IndexBuffer::uploadData(EngineDevice& engineDevice, VkIndexBufferData& bufferData, std::vector<uint32_t>& indices) {
+        /* buffer too small, resize */
+        unsigned int indexDataSize = indices.size() * sizeof(uint32_t);
+        if (bufferData.bufferSize < indexDataSize) {
+            cleanup(engineDevice, bufferData);
+
+            if (!init(engineDevice, bufferData, indexDataSize)) {
+                std::printf("%s error: could not create index buffer of size %i bytes\n", __FUNCTION__, indexDataSize);
+                return false;
+            }
+            std::printf("%s: index buffer resize to %i bytes\n", __FUNCTION__, indexDataSize);
+            // bufferData.bufferSize = indexDataSize;
+        }
+
+        /* copy data to staging buffer */
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), bufferData.stagingBufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: could not map index buffer memory (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        std::memcpy(data, indices.data(), indexDataSize);
+        vmaUnmapMemory(engineDevice.allocator(), bufferData.stagingBufferAlloc);
+        vmaFlushAllocation(engineDevice.allocator(), bufferData.stagingBufferAlloc, 0, indexDataSize);
+
+        VkBufferMemoryBarrier indexBufferBarrier{};
+        indexBufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        indexBufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; // VK_ACCESS_MEMORY_WRITE_BIT; // The latter here assumes we want read-access after copying
+        indexBufferBarrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT;
+        indexBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        indexBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        indexBufferBarrier.buffer = bufferData.stagingBuffer;
+        indexBufferBarrier.offset = 0;
+        indexBufferBarrier.size = bufferData.bufferSize;
+
+        VkBufferCopy stagingBufferCopy{};
+        stagingBufferCopy.srcOffset = 0;
+        stagingBufferCopy.dstOffset = 0;
+        stagingBufferCopy.size = bufferData.bufferSize;
+
+        /* trigger data transfer via command buffer */
+        VkCommandBuffer commandBuffer = engineDevice.createSingleShotBuffer();
+
+        vkCmdCopyBuffer(commandBuffer, bufferData.stagingBuffer,
+            bufferData.buffer, 1, &stagingBufferCopy);
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &indexBufferBarrier, 0, nullptr);
+
+        if (!engineDevice.submitSingleShotBuffer(commandBuffer)) {
+            return false;
+        }
+
+        return true;
+    }
 
     void IndexBuffer::cleanup(EngineDevice& engineDevice, VkIndexBufferData& bufferData) {
         vmaDestroyBuffer(engineDevice.allocator(), bufferData.stagingBuffer,

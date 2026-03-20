@@ -1,12 +1,15 @@
-#include "SkinningPipeline.h"
+#include "TerrainPipeline.h"
 #include <vector>
 #include <cstddef>
 #include "Shader.h"
 #include "Utils/Logger.h"
 #include "CoreVK/VkRenderData.h"
+#include "Utils/glm_includes.h"
 
 namespace aveng {
-    bool SkinningPipeline::init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline,
+
+
+    bool TerrainPipeline::init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline,
         VkRenderPass renderpass, uint32_t numColorAttachments, std::string vertexShaderFilename, std::string fragmentShaderFilename) {
         /* shader */
         VkShaderModule vertexModule = Shader::loadShader(engineDevice.device(), vertexShaderFilename);
@@ -34,44 +37,32 @@ namespace aveng {
         std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfo = { vertexStageInfo, fragmentStageInfo };
 
         /* assemble the graphics pipeline itself */
-        std::vector<VkVertexInputBindingDescription> vertexBindings = { { 0, static_cast<uint32_t>(sizeof(VkVertex)), VK_VERTEX_INPUT_RATE_VERTEX } };
+        std::vector<VkVertexInputBindingDescription> vertexBindings = {
+            { 0, static_cast<uint32_t>(sizeof(glm::vec3)), VK_VERTEX_INPUT_RATE_VERTEX }
+        };
 
         VkVertexInputAttributeDescription positionAttribute{};
         positionAttribute.binding = 0;
         positionAttribute.location = 0;
-        positionAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-        positionAttribute.offset = static_cast<uint32_t>(offsetof(VkVertex, position));
+        positionAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
+        positionAttribute.offset = 0;
 
-        VkVertexInputAttributeDescription colorAttribute{};
-        colorAttribute.binding = 0;
-        colorAttribute.location = 1;
-        colorAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-        colorAttribute.offset = static_cast<uint32_t>(offsetof(VkVertex, color));
+        //VkVertexInputAttributeDescription colorAttribute{};
+        //colorAttribute.binding = 0;
+        //colorAttribute.location = 1;
+        //colorAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        //colorAttribute.offset = static_cast<uint32_t>(offsetof(VkVertex, color));
 
-        VkVertexInputAttributeDescription normalAttribute{};
-        normalAttribute.binding = 0;
-        normalAttribute.location = 2;
-        normalAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-        normalAttribute.offset = static_cast<uint32_t>(offsetof(VkVertex, normal));
-
-        VkVertexInputAttributeDescription jointsAttribute{};
-        jointsAttribute.binding = 0;
-        jointsAttribute.location = 3;
-        jointsAttribute.format = VK_FORMAT_R32G32B32A32_UINT;
-        jointsAttribute.offset = static_cast<uint32_t>(offsetof(VkVertex, boneNumber));
-
-        VkVertexInputAttributeDescription weightAttribute{};
-        weightAttribute.binding = 0;
-        weightAttribute.location = 4;
-        weightAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-        weightAttribute.offset = static_cast<uint32_t>(offsetof(VkVertex, boneWeight));
+        //VkVertexInputAttributeDescription normalAttribute{};
+        //normalAttribute.binding = 0;
+        //normalAttribute.location = 2;
+        //normalAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        //normalAttribute.offset = static_cast<uint32_t>(offsetof(VkVertex, normal));
 
         std::vector<VkVertexInputAttributeDescription> attributes{};
         attributes.emplace_back(positionAttribute);
-        attributes.emplace_back(colorAttribute);
-        attributes.emplace_back(normalAttribute);
-        attributes.emplace_back(jointsAttribute);
-        attributes.emplace_back(weightAttribute);
+        //attributes.emplace_back(colorAttribute);
+        //attributes.emplace_back(normalAttribute);
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -100,7 +91,7 @@ namespace aveng {
         rasterizerInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         rasterizerInfo.depthClampEnable = VK_FALSE;
         rasterizerInfo.rasterizerDiscardEnable = VK_FALSE;
-        rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizerInfo.polygonMode = VK_POLYGON_MODE_LINE;
         rasterizerInfo.lineWidth = 1.0f;
         rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
         /* use CCW winding */
@@ -182,7 +173,8 @@ namespace aveng {
         return true;
     }
 
-    void SkinningPipeline::cleanup(EngineDevice& engineDevice, VkPipeline& pipeline) {
+    void TerrainPipeline::cleanup(EngineDevice& engineDevice, VkPipeline& pipeline) {
         vkDestroyPipeline(engineDevice.device(), pipeline, nullptr);
     }
+
 }

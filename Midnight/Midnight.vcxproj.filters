@@ -219,6 +219,9 @@
     <ClCompile Include="Core\Imaging\TextureFilesystemSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CoreVK\TerrainPipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1524,6 +1527,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Runtime\Threading\ConcurrentQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreVK\TerrainPipeline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -93,10 +93,6 @@ layout(set = 0, std140, binding = 9) uniform TerrainAlignment
     uint countCoreAdjacency;
     uint countHaloAdjacency;
 
-    uint baseCoreFaceNarea;
-    uint countCoreFaceNarea;
-    uint countHaloFaceNarea;
-
     // Used to distinguish output ownership from input availability
     vec2 coreMinXZ;
     vec2 coreMaxXZ;

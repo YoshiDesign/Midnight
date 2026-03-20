@@ -181,6 +181,7 @@
     <ClCompile Include="CoreVK\LightPipeline.cpp" />
     <ClCompile Include="CoreVK\LinePipeline.cpp" />
     <ClCompile Include="CoreVK\PipelineLayout.cpp" />
+    <ClCompile Include="CoreVK\TerrainPipeline.cpp" />
     <ClCompile Include="Core\Camera\aveng_camera.cpp" />
     <ClCompile Include="Core\Imaging\MidnightTextureSystem.cpp" />
     <ClCompile Include="Core\Imaging\TextureFilesystemSource.cpp" />
@@ -255,6 +256,7 @@
     <ClInclude Include="CoreVK\Resources\graphics_enums.h" />
     <ClInclude Include="CoreVK\Resources\MTexture.h" />
     <ClInclude Include="CoreVK\Resources\platform.h" />
+    <ClInclude Include="CoreVK\TerrainPipeline.h" />
     <ClInclude Include="Core\Imaging\ITextureSource.h" />
     <ClInclude Include="Core\Imaging\MidnightTextureSystem.h" />
     <ClInclude Include="Core\Imaging\TextureFilesystemSource.h" />

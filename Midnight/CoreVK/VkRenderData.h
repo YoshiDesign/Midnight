@@ -161,10 +161,6 @@ namespace aveng {
 		uint32_t countCoreAdjacency;
 		uint32_t countHaloAdjacency;
 
-		uint32_t baseCoreFaceNarea;
-		uint32_t countCoreFaceNarea;
-		uint32_t countHaloFaceNarea;
-		
 		// Used to distinguish output ownership from input availability
 		glm::vec2 coreMinXZ;
 		glm::vec2 coreMaxXZ;
@@ -189,6 +185,10 @@ namespace aveng {
 		uint32_t baseTriangle;
 		uint32_t numVertices;
 		uint32_t numTriangles;
+	};
+
+	struct VkBasicTerrainDebugPC {
+		glm::mat4 modelMat;
 	};
 
 	//struct PK {
@@ -340,45 +340,30 @@ namespace aveng {
 		//std::vector<VkFence> rdRuntimeComputeFence;
 		std::vector<VkFence> rdImagesInFlight; // Tracks which frame's fence is using each swapchain image
 
-		/*
-		* Descriptors
-		*/
-		// VkDescriptorPool avengDescriptorPool = VK_NULL_HANDLE;
-		// VkDescriptorPool editorDescriptorPool = VK_NULL_HANDLE;
-
 		/* New Bindless Resources */
 		VkDescriptorPool avengBindlessDescriptorPool = VK_NULL_HANDLE;
 		VkDescriptorSetLayout rdBindlessDescriptorLayout = VK_NULL_HANDLE;		
-		std::vector<VkDescriptorSet> rdAvengBindlessDescriptorSets;		
 		VkPipelineLayout rdAvengBindlessPipelineLayout = VK_NULL_HANDLE;
+		std::vector<VkDescriptorSet> rdAvengBindlessDescriptorSets;		
 
-		// VkDescriptorSetLayout rdAvengTextureDescriptorLayout = VK_NULL_HANDLE;			// Texture
+		/* Terrain Resources */
+		VkDescriptorPool avengBasicTerrainDescriptorPool = VK_NULL_HANDLE;
+		VkDescriptorSetLayout rdBasicTerrainDescriptorSetLayout = VK_NULL_HANDLE;
+		// VkDescriptorSetLayout rdAvengComputeBasicTerrainDescriptorLayout = VK_NULL_HANDLE;
+		VkPipelineLayout rdAvengBasicTerrainPipelineLayout = VK_NULL_HANDLE;
+		std::vector<VkDescriptorSet> rdAvengBasicTerrainDescriptorSets;
 
-		/* Legacy */
-		VkDescriptorSetLayout rdAvengDescriptorLayout = VK_NULL_HANDLE;						// Static
-
-		/* New Terrain Stuff - TODO */
-		VkDescriptorSetLayout rdTerrainBasicDescriptorLayout = VK_NULL_HANDLE;				// Terrain
-		VkDescriptorSetLayout rdAvengComputeBasicTerrainDescriptorLayout = VK_NULL_HANDLE;  // Terrain TODO
-
-		// VkDescriptorSetLayout rdAvengAnimationDescriptorLayout = VK_NULL_HANDLE;					// Animation
-		// VkDescriptorSetLayout rdAvengComputeTransformDescriptorLayout = VK_NULL_HANDLE;			// Animation
-		//VkDescriptorSetLayout rdAvengComputeMatrixMultDescriptorLayout = VK_NULL_HANDLE;			// Animation
-		//VkDescriptorSetLayout rdAvengComputeMatrixMultPerModelDescriptorLayout = VK_NULL_HANDLE;	// Animation
-		// VkDescriptorSetLayout rdAvengSelectionDescriptorLayout = VK_NULL_HANDLE;				// EDITOR
-		// VkDescriptorSetLayout rdAvengAnimationSelectionDescriptorLayout = VK_NULL_HANDLE;	// EDITOR
-		// VkDescriptorSetLayout rdLineDescriptorLayout = VK_NULL_HANDLE;						// EDITOR
-		VkDescriptorSetLayout rdPointLightDescriptorLayout = VK_NULL_HANDLE;				// EDITOR
-
-		std::vector<VkDescriptorSet> rdAvengDescriptorSets;					// Static
-		std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;		// Animation
-		std::vector<VkDescriptorSet> rdAvengBasicTerrainDescriptorSets;			// Terrain
-		std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;		// Animation
-		std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;	// Animation
-		std::vector<VkDescriptorSet> rdAvengComputeBasicTerrainDescriptorSets;	// Terrain
-		std::vector<VkDescriptorSet> rdAvengSelectionDescriptorSets;				// EDITOR
-		std::vector<VkDescriptorSet> rdAvengAnimationSelectionDescriptorSets;		// EDITOR
-		std::vector<VkDescriptorSet> rdLineDescriptorSets;							// EDITOR
+		// EDITOR
+		// VkDescriptorSetLayout rdPointLightDescriptorLayout = VK_NULL_HANDLE;				// EDITOR
+		//std::vector<VkDescriptorSet> rdAvengDescriptorSets;					// Static
+		//std::vector<VkDescriptorSet> rdAvengAnimationDescriptorSets;		// Animation
+		//std::vector<VkDescriptorSet> rdAvengBasicTerrainDescriptorSets;			// Terrain
+		//std::vector<VkDescriptorSet> rdAvengComputeTransformDescriptorSets;		// Animation
+		//std::vector<VkDescriptorSet> rdAvengComputeMatrixMultDescriptorSets;	// Animation
+		//std::vector<VkDescriptorSet> rdAvengComputeBasicTerrainDescriptorSets;	// Terrain
+		//std::vector<VkDescriptorSet> rdAvengSelectionDescriptorSets;				// EDITOR
+		//std::vector<VkDescriptorSet> rdAvengAnimationSelectionDescriptorSets;		// EDITOR
+		//std::vector<VkDescriptorSet> rdLineDescriptorSets;							// EDITOR
 
 		/*
 		* Pipeline
@@ -404,6 +389,8 @@ namespace aveng {
 		VkPipeline rdLinePipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeTransformPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengComputeMatrixMultPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengBasicTerrainPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengEditorBasicTerrainPipeline = VK_NULL_HANDLE;
 
 		std::vector<VkShaderStorageBufferData> rdShaderBoneMatrixOffsetBuffers;	// Storage Buffer
 		std::vector<glm::mat4> globalBoneOffsetMatricesList{};					// Data - Reserved/Resized during model loading

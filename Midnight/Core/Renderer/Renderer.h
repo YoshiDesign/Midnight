@@ -20,6 +20,7 @@ namespace aveng {
 	class AssimpInstance;
 	class AvengWindow;
 	class CameraManager;
+	class TerrainController;
 	struct CameraTransform;
 	struct IRenderSceneView;
 	
@@ -31,6 +32,7 @@ namespace aveng {
 			EngineDevice& engineDevice, 
 			AvengWindow& window, 
 			VkRenderData& renderData, 
+			TerrainController& terrain,
 			CameraManager& cameraManager,	// These systems could be composed into another "services" struct
 			const IModelQuery& mq,			// These systems could be composed into another "services" struct
 			IModelAnimQuery& aq				// These systems could be composed into another "services" struct
@@ -73,10 +75,13 @@ namespace aveng {
 		bool createBindlessDescriptors();
 		bool createBindlessDescriptorLayouts();
 		bool createBindlessDescriptorSets();
+		bool createBasicTerrainDescriptors();
+		bool createBasicTerrainDescriptorLayouts();
+		bool createBasicTerrainDescriptorSets();
 
 		void updateBindlessDescriptorSets(int frameIndex);
 		void updateTextureArrayDescriptorSet(TextureHandle handle, VkImageView view, VkSampler sampler, int frameIndex);
-
+		void updateTerrainDescriptorSets(int frameIndex);
 		int dispatchCompute(const IModelLibrary& modelLib, const FramePacket& pkt);
 
 		/* ProcGen - TODO */
@@ -121,6 +126,8 @@ namespace aveng {
 			VkPipeline basicPipeline,
 			VkPipeline animationPipeline);
 
+		void renderTerrain();
+
 		void reset_timers();
 
 		bool beginFrame(); // Synchronization
@@ -149,6 +156,8 @@ namespace aveng {
 		
 		void destroyTrash();
 		void cleanup();
+
+		TerrainController& terrainController() { return terrainController_; }
 
 		// New Resource Methods 
 
@@ -179,6 +188,7 @@ namespace aveng {
 		AvengWindow& aveng_window;
 		EngineDevice& engineDevice;
 		CameraManager& cameraManager;
+		TerrainController& terrainController_;
 
 		VkResult err;
 		VkResult result;

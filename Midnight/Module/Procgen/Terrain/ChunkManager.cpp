@@ -1434,10 +1434,6 @@ namespace aveng {
         align.countCoreAdjacency = totalCoreVerts;
         align.countHaloAdjacency = totalHaloVerts;
 
-        align.baseCoreFaceNarea  = 0; // deprecated on CPU
-        align.countCoreFaceNarea = totalCoreTris;
-        align.countHaloFaceNarea = totalHaloTris;
-
         align.coreMinXZ    = coreMin;
         align.coreMaxXZ    = coreMax;
         align.supportMinXZ = suppMin;

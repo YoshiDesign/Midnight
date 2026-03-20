@@ -5,7 +5,11 @@
 #include <memory>
 // #include "Runtime/Commands/TerrainCMD.h" // TODO. Maybe...
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
+#include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Module/Procgen/Types.h"
+
+// TODO - We're going to make a TerrainRenderSystem
+#include <vulkan/vulkan_core.h>
 
 namespace procgen {
     struct TerrainRenderable;
@@ -17,7 +21,9 @@ namespace aveng {
 
     // Forward declarations to keep compile-times sane.
     struct FinalMeshCPU;
+    struct VkRenderData;
     class ChunkManager;
+    class EngineDevice;
 
     enum class TerrainRuntimeState : uint8_t
     {
@@ -37,6 +43,9 @@ namespace aveng {
         uint64_t requestId = 0;
 
         std::unique_ptr<procgen::TerrainRenderable> cpuRenderable;
+
+        procgen::TerrainGpuChunk gpu;
+
         TerrainGpuHandle gpuHandle{};
     };
 
@@ -46,10 +55,18 @@ namespace aveng {
      */
     class TerrainController {
     public:
-        explicit TerrainController(ChunkManager& chunks) noexcept;
+        explicit TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, ChunkManager& chunks) noexcept;
 
         // Called once per tick by the engine (Midnight) so gameplay doesn't need to thread frame indices everywhere.
         void setFrameIndex(uint64_t frameIndex) noexcept;
+
+        bool uploadTerrainChunkToGpu(TerrainChunkSlot& slot);
+
+        void serviceCpuReadyChunks();
+
+        void update(/*const Camera& camera*/);
+
+        void render(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex);
 
         /**
          * Request the final renderable data for compute and graphics.
@@ -73,6 +90,15 @@ namespace aveng {
 
     private:
         static ChunkCoord offsetCoord(ChunkCoord base, int dx, int dz) noexcept;
+
+        EngineDevice& engineDevice_;
+
+        const int kMaxUploadsPerFrame = 2;
+
+        VkRenderData& renderData_;
+
+        VkBasicTerrainPushConstant pc;
+        VkBasicTerrainDebugPC dpc;
 
         // CEO
         ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning

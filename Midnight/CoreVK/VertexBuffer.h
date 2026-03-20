@@ -20,7 +20,7 @@ namespace aveng {
         static bool uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const VkLineMesh& vertexData);
 
         // Unused as far as I can tell
-        static bool uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, std::vector<glm::vec3> vetrexData); // nice
+        static bool uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const std::vector<glm::vec3>& vetrexData); // nice
         static void cleanup(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData);
     private:
         static bool uploadToGPU(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData);

@@ -16,5 +16,7 @@ C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug.vert -o shaders\debug.vert.sp
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug.frag -o shaders\debug.frag.spv
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug_skinning.vert -o shaders\debug_skinning.vert.spv
 C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\debug_skinning.frag -o shaders\debug_skinning.frag.spv
+C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\terrain_debug.vert -o shaders\terrain_debug.vert.spv
+C:\VulkanSDK\1.4.309.0\Bin\glslc.exe shaders\terrain_debug.frag -o shaders\terrain_debug.frag.spv
 
 pause

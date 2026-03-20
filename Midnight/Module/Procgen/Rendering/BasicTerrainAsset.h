@@ -4,6 +4,7 @@
 #include "CoreVK/VkRenderData.h"
 #include "Module/Procgen/Types.h"
 #include "Utils/glm_includes.h"
+#include "CoreVK/VkRenderData.h"
 
 /**
  * Notes: https://chatgpt.com/g/g-p-67fd00e1b6748191913d770a83c124e5-vulkanengine/c/69a23f92-6b58-8330-824f-6c0b36959eec
@@ -58,11 +59,13 @@ namespace procgen {
 		std::vector<glm::vec3> vbo;       // Core vertex positions
 		std::vector<uint32_t>  ibo;       // Core triangle indices (into vbo)
 
+		/* The Giga-SSBO */
 		// Compute pipeline inputs -- flat [3x3_core | halo] layout
 		std::vector<glm::vec3>        packedPositions;  // All positions: core then halo
 		std::vector<glm::vec3>        packedTriangles;  // Site-index triples (bit-pattern uint32 in float, read as uvec3 on GPU)
 		std::vector<VertexAdjacency>  packedAdjacency;  // Per-vertex incident triangle list
 
+		/* The Alignment UBO */
 		// Alignment metadata (maps 1:1 to BasicTerrainAlignmentData UBO, binding 9)
 		aveng::BasicTerrainAlignmentData alignment{};
 
@@ -87,6 +90,29 @@ namespace procgen {
 	// In case any configurables come to mind.
 	struct TerrainBuilderOptions {
 	
+	};
+
+	struct TerrainPackedGpuData
+	{
+		aveng::VkShaderStorageBufferData packedPositionsSsbo{};   // vec3[]
+		aveng::VkShaderStorageBufferData packedTrianglesSsbo{};   // uvec3 bit-packed through glm::vec3 CPU-side
+		aveng::VkShaderStorageBufferData packedAdjacencySsbo{};   // VertexAdjacency[]
+		aveng::VkUniformBufferData alignmentUbo{};          // BasicTerrainAlignmentData
+	};
+
+	struct TerrainDrawGpuData
+	{
+		aveng::VkVertexBufferData vertexBuffer{};
+		aveng::VkIndexBufferData  indexBuffer{};
+		uint32_t indexCount = 0;
+		uint32_t vertexCount = 0;
+	};
+
+	struct TerrainGpuChunk
+	{
+		TerrainDrawGpuData draw;
+		TerrainPackedGpuData packed;
+		bool valid = false;
 	};
 
 }

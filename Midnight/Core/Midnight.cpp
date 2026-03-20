@@ -7,12 +7,12 @@ namespace aveng {
 	Midnight::Midnight(GameData& gd)
 		// Just remember that initialization order is the member declaration order, not your initializer list order
 		: taskSystem_{ std::thread::hardware_concurrency() }
-		, chunkManager_(taskSystem_)
-		, terrain_(chunkManager_)
-		, debug_{}
-		, game_data(gd)
 		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
 		, engineDevice(aveng_window)
+		, chunkManager_(taskSystem_)
+		, terrain_(engineDevice, renderData, chunkManager_)
+		, debug_{}
+		, game_data(gd)
 		, textureSystem_(engineDevice, renderData)
 		, modelLib_(engineDevice, renderData, textureSystem_)
 		, sceneFacade_(modelLib_, modelLib_.query()) // intentionally injecting registry as a separate interface (query())
@@ -21,6 +21,7 @@ namespace aveng {
 			engineDevice, 
 			aveng_window, 
 			renderData, 
+			terrain_,
 			cameraManager, 
 			modelLib_.query(), 
 			modelLib_.animQuery()

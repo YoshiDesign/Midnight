@@ -7,6 +7,7 @@
 #include "Core/Renderer/Renderer.h"
 #include "Services/IRenderSceneView.h"
 #include "CoreVK/Resources/platform.h"
+#include "Runtime/Play/Controller/TerrainController.h"
 #include <cassert>
 
 namespace aveng {
@@ -201,6 +202,8 @@ namespace aveng {
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
 			pEditor->drawModels(modelLib__, pkt, currentFrameIndex);
 
+			pEditor->renderTerrain();
+
 		}
 		else {
 #endif
@@ -219,6 +222,8 @@ namespace aveng {
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
 				renderData.rdAvengAnimationPipeline);
+
+			renderer.renderTerrain();
 
 #ifdef ENABLE_EDITOR
 		}

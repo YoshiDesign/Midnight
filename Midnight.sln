@@ -66,6 +66,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shaders", "shaders", "{02EA
 		shaders\archive\simple_shader.vert = shaders\archive\simple_shader.vert
 		shaders\terrain-triplanar_1.frag = shaders\terrain-triplanar_1.frag
 		shaders\terrain_1.vert = shaders\terrain_1.vert
+		shaders\terrain_debug.frag = shaders\terrain_debug.frag
+		shaders\terrain_debug.vert = shaders\terrain_debug.vert
 		shaders\terrain_precompute_1.comp = shaders\terrain_precompute_1.comp
 		shaders\terrain_precompute_2.comp = shaders\terrain_precompute_2.comp
 	EndProjectSection

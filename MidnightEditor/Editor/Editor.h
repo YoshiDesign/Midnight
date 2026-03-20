@@ -61,6 +61,7 @@ namespace aveng {
 		void renderGUI(float frameTime);
 		void renderLights();
 		void drawModels(const IModelLibrary& modelLib, const FramePacket& pkt, int frameIndex);
+		void renderTerrain();
 		void cleanup();
 		void destroyTrash();
 		void recreateFrameBuffers(SwapChain* swapchain);
