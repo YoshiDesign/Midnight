@@ -453,7 +453,6 @@ namespace aveng {
 		vkCmdEndRenderPass(commandBuffer);
 	}
 
-	[[ deprecated("This assumes non-bindless descriptor sets. Which need to be reimplemented to use.") ]]
 	void Editor::drawModels(const IModelLibrary& modelLib, const FramePacket& pkt, int frameIndex)
 	{
 		renderer.drawModelsBindless(
@@ -465,9 +464,8 @@ namespace aveng {
 	}
 
 	void Editor::renderTerrain() {
-		renderer.updateTerrainDescriptorSets(currentFrameIndex);
 		renderer.terrainController().update();
-		renderer.terrainController().render(
+		renderer.terrainController().renderDebug(
 			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 			renderData.rdAvengEditorBasicTerrainPipeline,
 			currentFrameIndex

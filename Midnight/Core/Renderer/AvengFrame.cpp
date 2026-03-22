@@ -202,6 +202,13 @@ namespace aveng {
 			// This does the exact same thing as renderer.drawModels, but with the editor's pipeline/framebuffers/renderpass.
 			pEditor->drawModels(modelLib__, pkt, currentFrameIndex);
 
+			// Bind pipeline - Tmp Placement
+			vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengEditorBasicTerrainPipeline);
+
+			VkDescriptorSet renderSets[1] = { renderData.rdAvengBasicTerrainDescriptorSets[currentFrameIndex] };
+			vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS,
+				renderData.rdAvengBasicTerrainPipelineLayout, 0, 1, renderSets, 0, nullptr);
+
 			pEditor->renderTerrain();
 
 		}
@@ -222,6 +229,13 @@ namespace aveng {
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengPipeline,
 				renderData.rdAvengAnimationPipeline);
+
+			// Bind pipeline - Tmp Placement
+			vkCmdBindPipeline(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.rdAvengEditorBasicTerrainPipeline);
+
+			VkDescriptorSet renderSets[1] = { renderData.rdAvengBasicTerrainDescriptorSets[currentFrameIndex] };
+			vkCmdBindDescriptorSets(renderData.rdCommandBuffersGraphics.at(currentFrameIndex), VK_PIPELINE_BIND_POINT_GRAPHICS,
+				renderData.rdAvengBasicTerrainPipelineLayout, 0, 1, renderSets, 0, nullptr);
 
 			renderer.renderTerrain();
 

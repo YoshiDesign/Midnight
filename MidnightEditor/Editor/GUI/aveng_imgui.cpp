@@ -494,38 +494,55 @@ namespace aveng {
 
             ImGui::Begin("Debug");
 
-            ImGui::Checkbox("Input Panel", &show_input_panel);
-            ImGui::Checkbox("All Cameras", &show_all_cameras);
+            if (ImGui::BeginTabBar("DebugTabs")) {
 
-            ImGui::Text(
-                "Last Click At: (%d, %d)", editorData.eMouseLastClickX, editorData.eMouseLastClickY);
+                if (ImGui::BeginTabItem("Debug")) {
+                    ImGui::Checkbox("Input Panel", &show_input_panel);
+                    ImGui::Checkbox("All Cameras", &show_all_cameras);
 
-            ImGui::Text(
-                "Camera Position:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.translation.x, editorData.cameraTransform.translation.y, editorData.cameraTransform.translation.z);
-            ImGui::Text(
-                "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.rotation.x, editorData.cameraTransform.rotation.y, editorData.cameraTransform.rotation.z);
-
-            if (show_all_cameras) {
-                int i = 0;
-                ImGui::Text("_____________________________");
-                for (const auto& cam : editorData.cameraDebugList) {
-                    std::string name(cam.name);
-                    ImGui::Text("Camera ID[%d]:\t%s", i, name.c_str());
-                    ImGui::Text("Active:\t%d", cam.active);
                     ImGui::Text(
-                        "Position:\t(%.03lf, %.03lf, %.03lf)",cam.transform.translation.x, cam.transform.translation.y, cam.transform.translation.z);
+                        "Last Click At: (%d, %d)", editorData.eMouseLastClickX, editorData.eMouseLastClickY);
+
                     ImGui::Text(
-                        "Rotation:\t(%.03lf, %.03lf, %.03lf)", cam.transform.rotation.x, cam.transform.rotation.y, cam.transform.rotation.z);
-                    ++i;
+                        "Camera Position:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.translation.x, editorData.cameraTransform.translation.y, editorData.cameraTransform.translation.z);
+                    ImGui::Text(
+                        "Camera Rotation:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.rotation.x, editorData.cameraTransform.rotation.y, editorData.cameraTransform.rotation.z);
+
+                    if (show_all_cameras) {
+                        int i = 0;
+                        ImGui::Text("_____________________________");
+                        for (const auto& cam : editorData.cameraDebugList) {
+                            std::string name(cam.name);
+                            ImGui::Text("Camera ID[%d]:\t%s", i, name.c_str());
+                            ImGui::Text("Active:\t%d", cam.active);
+                            ImGui::Text(
+                                "Position:\t(%.03lf, %.03lf, %.03lf)",cam.transform.translation.x, cam.transform.translation.y, cam.transform.translation.z);
+                            ImGui::Text(
+                                "Rotation:\t(%.03lf, %.03lf, %.03lf)", cam.transform.rotation.x, cam.transform.rotation.y, cam.transform.rotation.z);
+                            ++i;
+                        }
+                        ImGui::Text("_____________________________");
+                    }
+
+                    if (ImGui::Button("Play HolyShip")) {
+                        editorData.playHolyShip = true;
+                        editorData.requestPlay("holyship");
+                    }
+                    if (ImGui::Button("Play Starfield")) {
+                        editorData.requestPlay("starfield");
+                    }
+
+                    ImGui::EndTabItem();
                 }
-                ImGui::Text("_____________________________");
-            }
 
-            if (ImGui::Button("Play HolyShip")) {
-                editorData.requestPlay("holyship");
-            }
-            if (ImGui::Button("Play Starfield")) {
-                editorData.requestPlay("starfield");
+                if (ImGui::BeginTabItem("Terrain")) {
+                    //ImGui::Text("Core Points: %u", renderData.terrStats.corePoints);
+                    //ImGui::SameLine();
+                    //ImGui::Text("Halo Points: %u", renderData.terrStats.haloPoints);
+                    //ImGui::EndTabItem();
+                }
+
+                ImGui::EndTabBar();
             }
 
             ImGui::End(); // End Debug window

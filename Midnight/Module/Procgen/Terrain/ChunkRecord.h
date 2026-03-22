@@ -183,7 +183,7 @@ namespace aveng {
 		std::shared_future<ErosionField const*> erosionF;
 
 		std::once_flag meshOnce;
-		std::shared_future<FinalMeshCPU const*> meshF;
+		std::shared_future</*FinalMeshCPU const**/ bool> meshF;
 
 		std::once_flag spatialOnce;
 		std::shared_future<SpatialGrid const*> spatialF;

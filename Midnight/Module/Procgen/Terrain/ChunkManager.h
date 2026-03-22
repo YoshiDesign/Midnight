@@ -26,6 +26,7 @@
  * TODO: Create a thinner interface rather than passing manager ref's into ChunkManager.
  */
 
+
 // I still suck at organizing namespaces. This project is very long-lived, we'll get there.
 namespace procgen {
 
@@ -101,7 +102,7 @@ namespace aveng {
         std::shared_future<Triangulation const*>    requestTriangulation(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<SpatialGrid const*>      requestSpatialGrid(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<ErosionField const*>     requestErosion(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<FinalMeshCPU const*>     requestMesh(ChunkCoord c, uint64_t frameIndex);
+        std::shared_future</*FinalMeshCPU const**/bool>     requestMesh(ChunkCoord c, uint64_t frameIndex);
 
         // Renderable assembly: 3x3 core + 5x5 support region
         // std::unique_ptr<procgen::TerrainRenderable> requestRenderable(ChunkCoord center, uint64_t frameIndex);
@@ -150,6 +151,7 @@ namespace aveng {
 		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
         ErosionField const* buildErosion(ChunkRecord& r, const ErosionSettings& settings);       // alloc in scratch
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
+        std::unique_ptr<procgen::TerrainRenderable> buildRenderablev2(ChunkCoord center, uint64_t frameIndex);
         std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);
 
         ThreadPoolTaskSystem& tasks_;

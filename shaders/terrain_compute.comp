@@ -1,0 +1,261 @@
+#version 460
+layout(local_size_x = 256) in;
+
+/**
+ * Unified terrain compute shader.
+ * Runs per-vertex over core region vertices. Face normals are computed inline
+ * from adjacent triangles, eliminating the need for a separate face-normal pass
+ * and the inter-stage memory barrier.
+ *
+ * The full support region (core + halo) is available as input so that core
+ * vertices near chunk boundaries get correct normals from halo triangles.
+ */
+
+// -------------------------
+// Settings / Parameters UBO
+// -------------------------
+layout(set = 0, std140, binding = 0) uniform SettingsUBO
+{
+    uint normalMode;        // 0 = area-weighted, 1 = angle-weighted
+    uint weightOutputMode;  // 0 = SSBO, 1 = image, 2 = both
+    uint numLayers;
+    uint weightmapWidth;
+
+    vec4 upDir;
+
+    float snowStart;
+    float snowEnd;
+
+    float rockStart;
+    float rockEnd;
+
+    float eps;
+} settings;
+
+layout(push_constant) uniform PC
+{
+    uint baseVertex;    // reserved for future batching (currently 0)
+    uint baseTriangle;  // reserved for future batching (currently 0)
+    uint numVertices;   // core vertices to process
+    uint numTriangles;  // total triangles in support region (core + halo)
+} pc;
+
+// -------------------------
+// Inputs (SSBOs)
+// -------------------------
+
+const uint MAX_ADJACENT_TRIS = 12;
+
+struct VertexAdjacency
+{
+    uint triangleIndices[MAX_ADJACENT_TRIS];
+    uint count;
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
+};
+
+layout(set = 0, std430, binding = 2) readonly buffer Adjacency
+{
+    VertexAdjacency adjacency[];
+};
+
+layout(set = 0, std430, binding = 3) readonly buffer Triangles
+{
+    uvec3 tris[];
+};
+
+layout(set = 0, std430, binding = 4) readonly buffer Positions
+{
+    vec4 positions[];
+};
+
+// -------------------------
+// Outputs (SSBOs)
+// -------------------------
+layout(set = 0, std430, binding = 5) writeonly buffer VertexNormals
+{
+    vec4 vertexNormals[];
+};
+
+layout(set = 0, std430, binding = 6) writeonly buffer VertexSteepness
+{
+    float steepnessOut[];
+};
+
+layout(set = 0, std430, binding = 7) writeonly buffer VertexWeights
+{
+    vec4 weightsOut[];
+};
+
+// -------------------------
+// Helpers
+// -------------------------
+
+float saturate(float x) { return clamp(x, 0.0, 1.0); }
+
+float smooth01(float e0, float e1, float x)
+{
+    float d = max(e1 - e0, settings.eps);
+    float t = saturate((x - e0) / d);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+vec3 safeNormalize(vec3 v, vec3 fallback)
+{
+    float len2 = dot(v, v);
+    if (len2 < settings.eps) return fallback;
+    return v * inversesqrt(len2);
+}
+
+float cornerAngle(vec3 p0, vec3 p1, vec3 p2)
+{
+    vec3 e1 = p1 - p0;
+    vec3 e2 = p2 - p0;
+
+    float e1Len2 = dot(e1, e1);
+    float e2Len2 = dot(e2, e2);
+    if (e1Len2 < settings.eps || e2Len2 < settings.eps) return 0.0;
+
+    float d = dot(e1, e2);
+    vec3 c = cross(e1, e2);
+    float s = length(c);
+
+    return atan(s, d);
+}
+
+/**
+ * Compute face normal inline and return the corner angle at vLocal.
+ * triLocal is in [0..pc.numTriangles).
+ * vLocal is in [0..pc.numVertices) (core vertices only).
+ */
+bool getTriCornerAngleAndNormal(uint triLocal, uint vLocal, out float angle, out vec3 faceN)
+{
+    if (triLocal >= pc.numTriangles) {
+        angle = 0.0; faceN = vec3(0);
+        return false;
+    }
+
+    uint triGlobal = pc.baseTriangle + triLocal;
+    uvec3 t = tris[triGlobal];
+
+    vec3 pA = positions[pc.baseVertex + t.x].xyz;
+    vec3 pB = positions[pc.baseVertex + t.y].xyz;
+    vec3 pC = positions[pc.baseVertex + t.z].xyz;
+
+    faceN = cross(pB - pA, pC - pA);
+
+    if (t.x == vLocal)
+    {
+        angle = cornerAngle(pA, pB, pC);
+    }
+    else if (t.y == vLocal)
+    {
+        angle = cornerAngle(pB, pC, pA);
+    }
+    else if (t.z == vLocal)
+    {
+        angle = cornerAngle(pC, pA, pB);
+    }
+    else
+    {
+        angle = 0.0;
+        faceN = vec3(0.0);
+        return false;
+    }
+
+    return true;
+}
+
+// -------------------------
+// Main
+// -------------------------
+void main()
+{
+    uint vLocal = gl_GlobalInvocationID.x;
+
+    if (vLocal >= pc.numVertices) { return; }
+
+    uint vGlobal = pc.baseVertex + vLocal;
+
+    VertexAdjacency adj = adjacency[vGlobal];
+    uint c = min(adj.count, MAX_ADJACENT_TRIS);
+
+    // -------------------------
+    // 1) Vertex normal
+    // -------------------------
+    vec3 sum = vec3(0.0);
+    vec3 up = safeNormalize(settings.upDir.xyz, vec3(0.0, 1.0, 0.0));
+
+    if (settings.normalMode == 0u)
+    {
+        // Area-weighted: cross product magnitude encodes 2x triangle area
+        for (uint i = 0; i < c; ++i)
+        {
+            uint triLocal = adj.triangleIndices[i];
+            if (triLocal >= pc.numTriangles) { continue; }
+
+            uint triGlobal = pc.baseTriangle + triLocal;
+            uvec3 t = tris[triGlobal];
+
+            vec3 pA = positions[pc.baseVertex + t.x].xyz;
+            vec3 pB = positions[pc.baseVertex + t.y].xyz;
+            vec3 pC = positions[pc.baseVertex + t.z].xyz;
+
+            sum += cross(pB - pA, pC - pA);
+        }
+    }
+    else
+    {
+        // Angle-weighted: sum += faceNormal * cornerAngle
+        for (uint i = 0; i < c; ++i)
+        {
+            uint triLocal = adj.triangleIndices[i];
+
+            float ang;
+            vec3 faceN;
+            if (!getTriCornerAngleAndNormal(triLocal, vLocal, ang, faceN)) {
+                continue;
+            }
+
+            sum += safeNormalize(faceN, settings.upDir.xyz) * ang;
+        }
+    }
+
+    vec3 N = safeNormalize(sum, up);
+    vertexNormals[vGlobal] = vec4(N, 0.0);
+
+    // -------------------------
+    // 2) Steepness / Slope
+    // -------------------------
+    float grade = abs(dot(N, up));  // 1=flat, 0=vertical
+    float steepness = 1.0 - saturate(grade);
+    steepnessOut[vGlobal] = steepness;
+
+    // -------------------------
+    // 3) Material weights (grass/rock/snow)
+    // -------------------------
+    float h = -positions[vGlobal].y;
+
+    float rockW = smooth01(settings.rockStart, settings.rockEnd, steepness);
+
+    float snowW = smooth01(settings.snowStart, settings.snowEnd, h);
+    snowW *= (1.0 - rockW);
+
+    float grassW = max(0.0, 1.0 - max(rockW, snowW));
+
+    float s = grassW + rockW + snowW;
+    if (s < settings.eps)
+    {
+        grassW = 1.0; rockW = 0.0; snowW = 0.0;
+        s = 1.0;
+    }
+
+    float invS = 1.0 / s;
+    vec4 w = vec4(grassW * invS, rockW * invS, snowW * invS, 0.0);
+
+    if (settings.weightOutputMode == 0u || settings.weightOutputMode == 2u)
+    {
+        weightsOut[vGlobal] = w;
+    }
+}

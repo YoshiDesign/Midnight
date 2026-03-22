@@ -56,6 +56,8 @@ namespace aveng {
         CameraTransform cameraTransform{};
         std::vector<CameraDebugInfo> cameraDebugList;
 
+        bool playHolyShip = false;
+
         bool eMousePick = false;
         bool eMouseLock = false;
         bool eShowTRSPanel = false;

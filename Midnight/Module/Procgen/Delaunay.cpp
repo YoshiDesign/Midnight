@@ -276,6 +276,8 @@ namespace { // Note - these could be specified `inline` only to hint to the comp
 
 namespace aveng {
 
+    struct PolyEdge { SiteIndex a, b; TriIndex neighbor; };
+
     // This is not a general purpose function - `out` must have a valid `tris` member.
     // Builds connectivity + caches from triangles.
     // - tris must be CCW for "inside circumcircle" / Voronoi orientation sanity.
@@ -466,8 +468,6 @@ namespace aveng {
         std::pmr::vector<TriIndex> badTris(scratchMr);
         badTris.reserve(64);
 
-        // TODO - move this
-        struct PolyEdge { SiteIndex a, b; TriIndex neighbor; };
         std::pmr::unordered_map<uint64_t, int> edgeCount(scratchMr);
         std::pmr::unordered_map<uint64_t, PolyEdge> edgeInfo(scratchMr);
         std::pmr::vector<PolyEdge> polygon(scratchMr);

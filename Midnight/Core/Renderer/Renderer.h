@@ -79,6 +79,16 @@ namespace aveng {
 		bool createBasicTerrainDescriptorLayouts();
 		bool createBasicTerrainDescriptorSets();
 
+		// Terrain Lit Graphics Methods
+		bool createTerrainLitDescriptors();
+		bool createTerrainLitGraphicsDescriptorLayout();
+		bool createTerrainLitPipelineLayout();
+
+		// Terrain Compute Methods
+		bool createTerrainComputeDescriptors();
+		bool createTerrainComputeDescriptorLayout();
+		bool createTerrainComputePipelineLayout();
+
 		void updateBindlessDescriptorSets(int frameIndex);
 		void updateTextureArrayDescriptorSet(TextureHandle handle, VkImageView view, VkSampler sampler, int frameIndex);
 		void updateTerrainDescriptorSets(int frameIndex);
@@ -113,7 +123,7 @@ namespace aveng {
 		bool createSyncObjects();
 
 		// IRenderSceneView as an arg allows us to use different scene sources.
-		// Alternatively you could store IRenderSceneView* but only if your engine guarantees it’s always valid and you prefer a slightly simpler callsite.
+		// Alternatively you could store IRenderSceneView* but only if your engine guarantees itï¿½s always valid and you prefer a slightly simpler callsite.
 		int update(
 			const FramePacket& pkt,
 			const ModelLibrary& modelLib, // used to get Model pointers, *for now*
@@ -158,6 +168,7 @@ namespace aveng {
 		void cleanup();
 
 		TerrainController& terrainController() { return terrainController_; }
+		const VkUniformBufferData& terrainSettingsUbo() const { return mTerrainSettingsUbo; }
 
 		// New Resource Methods 
 
@@ -220,6 +231,9 @@ namespace aveng {
 
 		VkPushConstants mModelPushConst{};
 		VkComputePushConstants mComputeModelData{};
+
+		// Terrain compute - TODO this will need a new home
+		VkUniformBufferData mTerrainSettingsUbo{};
 
 		PointLightData mPointLightData{};
 

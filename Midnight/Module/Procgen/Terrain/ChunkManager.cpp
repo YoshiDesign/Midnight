@@ -25,6 +25,13 @@
 
 namespace {
 
+    struct TriRef
+    {
+        aveng::ChunkRecord* rec = nullptr;
+        uint32_t localTriIndex = 0;
+        uint8_t neighborIdx = 0;
+    };
+
     // TODO - Idk where to put this yet. I'm sure we'll land on a convention
     // as procgen grows.
     void ApplyDelta(std::span<float> work, std::span<const float> delta) {
@@ -35,6 +42,44 @@ namespace {
             work[i] += delta[i];
         }
 
+    }
+
+    bool pointInRectHalfOpen(const aveng::Vec2 centroid, const aveng::Bounds2 bounds) {
+        return (centroid.x >= bounds.minX && centroid.x < bounds.maxX) &&
+               (centroid.y >= bounds.minZ && centroid.y < bounds.maxZ);
+    }
+
+    // For chunk->triangle ownership
+    aveng::Vec2 triangleCentroid(
+        const aveng::Vec2& a,
+        const aveng::Vec2& b,
+        const aveng::Vec2& c) noexcept
+    {
+        return (a + b + c) * (1.0f / 3.0f);
+    }
+
+    bool triangleOwnedByRectCentroid(
+        const aveng::Triangle& t,
+        const std::pmr::vector<aveng::Vec2>& pts,
+        const aveng::Bounds2& ownershipRect) noexcept
+    {
+        const aveng::Vec2 a = pts[t.A];
+        const aveng::Vec2 b = pts[t.B];
+        const aveng::Vec2 c = pts[t.C];
+
+        const aveng::Vec2 centroid = triangleCentroid(a, b, c);
+        //
+        //std::printf(
+        //    "A=(%.3f, %.3f) B=(%.3f, %.3f) C=(%.3f, %.3f) Centroid=(%.3f, %.3f)\n",
+        //    a.x, a.y,
+        //    b.x, b.y,
+        //    c.x, c.y,
+        //    centroid.x, centroid.y
+        //);
+
+        bool result = pointInRectHalfOpen(centroid, ownershipRect);
+        // std::printf("Result <Bool>: %d\n", result);
+        return result;
     }
 
     // Get 3x3 neighborhood coordinates (including self at center)
@@ -65,12 +110,26 @@ namespace {
     }
 
     // Pack a uint32_t site index into a float preserving bit pattern (GPU reads as uvec3)
-    inline glm::vec3 packTriIndices(uint32_t a, uint32_t b, uint32_t c) {
+    glm::vec3 packTriIndices(uint32_t a, uint32_t b, uint32_t c) {
         glm::vec3 v;
+        // I'm not sure if this is bit-casting, I need to study what that implies.
+        // All I know is that we can't return v.x directly due to being floats 
+        // which means something different to the call-site
         std::memcpy(&v.x, &a, sizeof(uint32_t));
         std::memcpy(&v.y, &b, sizeof(uint32_t));
         std::memcpy(&v.z, &c, sizeof(uint32_t));
         return v;
+    }
+
+    void unpackTriIndices(
+        const glm::vec3& tri,
+        uint32_t& a,
+        uint32_t& b,
+        uint32_t& c) noexcept
+    {
+        std::memcpy(&a, &tri.x, sizeof(uint32_t));
+        std::memcpy(&b, &tri.y, sizeof(uint32_t));
+        std::memcpy(&c, &tri.z, sizeof(uint32_t));
     }
 
     aveng::Bounds2 expandBounds(aveng::Bounds2 b, float halo) noexcept {
@@ -312,7 +371,7 @@ namespace aveng {
         auto rec = std::make_unique<ChunkRecord>();
         rec->coord = coord;
         rec->halo = cfg_.halo;
-        rec->coreBounds = { // Bounds are in world space
+        rec->coreBounds = { // Bounds are in world space with local space {0,0} at bottom-left
             coord.x * cfg_.chunkSize,
             coord.z * cfg_.chunkSize,
             (coord.x + 1) * cfg_.chunkSize,
@@ -329,19 +388,19 @@ namespace aveng {
     }
 
     // Consider this implementation now that we've reasoned about pinning/unpinning, 
-    std::shared_future<FinalMeshCPU const*> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
+    std::shared_future</*FinalMeshCPU const**/bool> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->meshOnce, [this, rec, frameIndex] {
-            rec->meshF = tasks_.submit([this, rec, frameIndex]() -> FinalMeshCPU const* {
+            rec->meshF = tasks_.submit([this, rec, frameIndex]() -> bool /*FinalMeshCPU const**/ {
 
                 RecordPin pipelineHold(*this, rec); // holds across all stages
 
                 auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
 
-                return buildMesh(*rec);
+                return true;// buildMesh(*rec);
             });
         });
 
@@ -738,6 +797,10 @@ namespace aveng {
 
         dumpTriangulationDatas(rec.coord, rec.triangulation);
 #endif
+
+        // Triangle ownership
+
+
         return rec.triangulation;
     }
 
@@ -973,12 +1036,18 @@ namespace aveng {
         // -- Core membership mask (flat, no hashing) --
         std::pmr::vector<uint8_t> isCore(totalPts, uint8_t(0), tlsScratchArena().mr());
         for (uint32_t ci : coreIdx) {
+            // for 4-5k points this is trivially expensive
+            // but there should be a faster way to fill a vector with 1's
             isCore[ci] = 1;
         }
 
         // -- old2new remap: global site index -> core-only VBO index --
-        constexpr uint32_t UNMAPPED = UINT32_MAX;
-        std::pmr::vector<uint32_t> old2new(totalPts, UNMAPPED, tlsScratchArena().mr());
+        constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
+        std::pmr::vector<uint32_t> old2new(
+            totalPts, 
+            UNMAPPED,
+            tlsScratchArena().mr()
+        );
 
         // 1a. VBO positions (core only)
         mesh.vbo_positions.clear();
@@ -1149,7 +1218,7 @@ namespace aveng {
             pins[i] = RecordPin(*this, r, frameIndex);
         }
 
-        std::array<std::shared_future<FinalMeshCPU const*>, 9> meshFutures;
+        std::array<std::shared_future</*FinalMeshCPU const**/ bool>, 9> meshFutures;
         for (int i = 0; i < 9; ++i) {
             meshFutures[i] = requestMesh(neighbors[i], frameIndex);
         }
@@ -1167,7 +1236,248 @@ namespace aveng {
             tasks_.wait(spatialFutures[i]);
         }
 
-        return buildRenderable(center, frameIndex);
+        return buildRenderablev2(center, frameIndex);
+    }
+
+    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderablev2(ChunkCoord center, uint64_t frameIndex)
+    {
+        using namespace procgen;
+
+        ChunkCoord neighbors[25];
+        get5x5Neighborhood(center, neighbors); // inner 3x3 = [0..8]
+
+        std::array<ChunkRecord*, 25> recs{};
+        for (int i = 0; i < 25; ++i) {
+            recs[i] = getOrCreateRecord(neighbors[i]);
+        }
+
+        auto renderable = std::make_unique<TerrainRenderable>();
+        renderable->center = center;
+
+        const float cs = cfg_.chunkSize;
+        // Compute world bounds for core 3x3 and support 5x5
+        const glm::vec2 coreMin = { (center.x - 1) * cs, (center.z - 1) * cs };
+        const glm::vec2 coreMax = { (center.x + 2) * cs, (center.z + 2) * cs };
+        const glm::vec2 suppMin = { (center.x - 2) * cs, (center.z - 2) * cs };
+        const glm::vec2 suppMax = { (center.x + 3) * cs, (center.z + 3) * cs };
+
+        std::array<Bounds2, 25> ownershipRects{};
+        for (int i = 0; i < 25; ++i) {
+            const ChunkCoord cc = neighbors[i];
+
+            ownershipRects[i] = Bounds2{
+                cc.x * cs,
+                cc.z * cs,
+                (cc.x + 1) * cs,
+                (cc.z + 1) * cs
+            };
+        }
+
+        // Step 2 - Triangle ownership determines included vertices
+        std::vector<TriRef> coreTriRefs;
+        std::vector<TriRef> haloTriRefs;
+        coreTriRefs.reserve(4096);
+        haloTriRefs.reserve(4096);
+
+        for (int i = 0; i < 25; ++i) {
+            ChunkRecord* rec = recs[i];
+            if (!rec || !rec->triangulation || !rec->allPoints) {
+                continue;
+            }
+
+            //for (int i = 0; i < 25; ++i) {
+            //    printf("neighbors[%d] = (%d,%d)\n", i, neighbors[i].x, neighbors[i].z);
+            //}
+
+            const auto& tris = rec->triangulation->tris;
+            const auto& pts = rec->allPoints->pts;
+            const Bounds2& ownerRect = ownershipRects[i];
+
+            for (uint32_t triIdx = 0; triIdx < static_cast<uint32_t>(tris.size()); ++triIdx) {
+                const auto& t = tris[triIdx];
+
+                assert(t.A < pts.size() && t.B < pts.size() && t.C < pts.size());
+
+                if (!triangleOwnedByRectCentroid(t, pts, ownerRect)) {
+                    continue;
+                }
+
+                TriRef ref{};
+                ref.rec = rec;
+                ref.localTriIndex = triIdx;
+                ref.neighborIdx = static_cast<uint8_t>(i);
+
+                if (i < 9) {
+                    coreTriRefs.push_back(ref);
+                }
+                else {
+                    haloTriRefs.push_back(ref);
+                }
+
+            }
+        }
+
+        // Step 3 - Assign global vertex indices
+        constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
+
+        std::vector<std::vector<uint32_t>> old2global(25);
+        for (int i = 0; i < 25; ++i) {
+            if (!recs[i] || !recs[i]->allPoints) {
+                continue;
+            }
+
+            const size_t nPts = recs[i]->allPoints->pts.size();
+            old2global[i].assign(nPts, UNMAPPED);
+        }
+
+        // Lazy vertex global index assignment helper
+        // This is where our packed set becomes minimal.
+        // We only reference vertices given owned triangles
+        auto mapVertex = [&](int neighborIdx, uint32_t localSiteIdx) -> uint32_t
+        {
+            uint32_t& slot = old2global[neighborIdx][localSiteIdx];
+            if (slot != UNMAPPED) {
+                return slot;
+            }
+
+            ChunkRecord* rec = recs[neighborIdx];
+            const auto& pts = rec->allPoints->pts;
+            const auto& heights =
+                (rec->erosion) ? rec->erosion->eHeights
+                : rec->heightField->heights;
+
+            const uint32_t gIdx = static_cast<uint32_t>(renderable->packedPositions.size());
+            slot = gIdx;
+
+            renderable->packedPositions.emplace_back(
+                pts[localSiteIdx].x,
+                -heights[localSiteIdx], // Note, we're inverting Y (TODO: This is being done elsewhere, I think this is the place to do it though)
+                pts[localSiteIdx].y,
+                1.0f
+            );
+
+            return gIdx;
+        };
+
+        // Step 4 - Emit packed triangles [core | halo] and build IBO
+        uint32_t totalCoreTris = static_cast<uint32_t>(coreTriRefs.size());
+        uint32_t totalHaloTris = static_cast<uint32_t>(haloTriRefs.size());
+
+        renderable->packedTriangles.resize(totalCoreTris + totalHaloTris);
+        renderable->ibo.reserve(totalCoreTris * 3);
+
+        uint32_t coreWrite = 0;
+        uint32_t haloWrite = totalCoreTris;
+
+        for (const TriRef& ref : coreTriRefs) {
+            const auto& t = ref.rec->triangulation->tris[ref.localTriIndex];
+
+            const uint32_t gA = mapVertex(ref.neighborIdx, t.A);
+            const uint32_t gB = mapVertex(ref.neighborIdx, t.B);
+            const uint32_t gC = mapVertex(ref.neighborIdx, t.C);
+
+            renderable->packedTriangles[coreWrite++] = packTriIndices(gA, gB, gC);
+            renderable->ibo.push_back(gA);
+            renderable->ibo.push_back(gB);
+            renderable->ibo.push_back(gC);
+        }
+
+        const uint32_t totalCoreVerts = static_cast<uint32_t>(renderable->packedPositions.size());
+
+#ifdef M_DEBUG
+        for (uint32_t i = 0; i < static_cast<uint32_t>(renderable->ibo.size()); ++i) {
+            if (renderable->ibo[i] >= totalCoreVerts) {
+                printf("BAD CORE IBO[%u] = %u, totalCoreVerts=%u\n",
+                    i, renderable->ibo[i], totalCoreVerts);
+            }
+            assert(renderable->ibo[i] < totalCoreVerts);
+        }
+#endif
+
+        for (const TriRef& ref : haloTriRefs) {
+            const auto& t = ref.rec->triangulation->tris[ref.localTriIndex];
+
+            const uint32_t gA = mapVertex(ref.neighborIdx, t.A);
+            const uint32_t gB = mapVertex(ref.neighborIdx, t.B);
+            const uint32_t gC = mapVertex(ref.neighborIdx, t.C);
+
+            renderable->packedTriangles[haloWrite++] = packTriIndices(gA, gB, gC);
+        }
+
+        const uint32_t totalVerts = static_cast<uint32_t>(renderable->packedPositions.size());
+        const uint32_t totalHaloVerts = totalVerts - totalCoreVerts;
+        const uint32_t totalTris = totalCoreTris + totalHaloTris;
+
+        // ----- Build adjacency [core verts | halo verts] -----
+        renderable->packedAdjacency.resize(totalVerts);
+        std::memset(
+            renderable->packedAdjacency.data(),
+            0,
+            totalVerts * sizeof(VertexAdjacency)
+        );
+
+        for (uint32_t triIdx = 0; triIdx < totalTris; ++triIdx) {
+            uint32_t a, b, c;
+            unpackTriIndices(renderable->packedTriangles[triIdx], a, b, c);
+
+            const uint32_t verts[3] = { a, b, c };
+            for (int k = 0; k < 3; ++k) {
+                auto& adj = renderable->packedAdjacency[verts[k]];
+                if (adj.count < MAX_ADJACENT_TRIS) {
+                    adj.triangleIndices[adj.count++] = triIdx;
+                }
+            }
+        }
+
+        // ----- Build VBO (3x3 core only) -----
+        renderable->vbo.resize(totalCoreVerts);
+        for (uint32_t v = 0; v < totalCoreVerts; ++v) {
+            renderable->vbo[v] = glm::vec3(renderable->packedPositions[v]);
+        }
+
+        // ----- Fill alignment UBO -----
+        auto& align = renderable->alignment;
+
+        // Positions: [core | halo]
+        align.baseCorePosition = 0;
+        align.countCorePosition = totalCoreVerts;
+        align.countHaloPosition = totalHaloVerts;
+
+        // Triangles: [core | halo]
+        align.baseCoreTriangle = 0;
+        align.countCoreTriangle = totalCoreTris;
+        align.countHaloTriangle = totalHaloTris;
+
+        // Adjacency: [core | halo]
+        align.baseCoreAdjacency = 0;
+        align.countCoreAdjacency = totalCoreVerts;
+        align.countHaloAdjacency = totalHaloVerts;
+
+        align.coreMinXZ = coreMin;
+        align.coreMaxXZ = coreMax;
+        align.supportMinXZ = suppMin;
+        align.supportMaxXZ = suppMax;
+#if M_DEBUG
+        std::printf(
+            "Renderable {%d,%d}: coreTris=%zu haloTris=%zu total=%zu\n",
+            center.x, center.z,
+            coreTriRefs.size(),
+            haloTriRefs.size(),
+            coreTriRefs.size() + haloTriRefs.size()
+        );
+
+        std::printf(
+            "Renderable {%d,%d}: packedVerts=%zu\n",
+            center.x, center.z,
+            renderable->packedPositions.size()
+        );
+
+        printf("coreTris=%u haloTris=%u coreVerts=%u haloVerts=%u vbo=%zu ibo=%zu\n",
+            totalCoreTris, totalHaloTris, totalCoreVerts, totalHaloVerts,
+            renderable->vbo.size(), renderable->ibo.size());
+#endif
+        return renderable;
+
     }
 
     std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderable(ChunkCoord center, uint64_t frameIndex)
@@ -1198,7 +1508,7 @@ namespace aveng {
         // Layout: [3x3 core verts | 3x3 halo verts | outer-16 all verts]
         //          ^-- "core" for alignment --^  ^-- "halo" for alignment --^
 
-        // TODO: convert all scratch 
+        // TODO: convert to scratch 
         struct ChunkVertexInfo {
             uint32_t globalBase = 0;
             uint32_t coreCount  = 0;
@@ -1260,29 +1570,33 @@ namespace aveng {
             const auto& eHeights = (i < 9 && recs[i]->erosion) ? recs[i]->erosion->eHeights
                                                                : recs[i]->heightField->heights;
 
-            old2global[i].resize(nPts, UINT32_MAX);
+            // Create a mapping to translate local chunk points to a global index
+            constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
+            old2global[i].resize(nPts, UNMAPPED);
 
             // Build core membership for this chunk
             std::vector<uint8_t> isCore(nPts, 0);
             if (i < 9) {
                 for (uint32_t ci : coreIdx) {
+                    // Flag generated core points of the 3x3 region
                     isCore[ci] = 1;
                 }
             }
 
+            // Region delineation
             if (i < 9) {
                 // Inner 3x3: core verts get the core base, halo verts get halo base
                 uint32_t localCoreOff = chunkInfo[i].globalBase;
                 for (uint32_t ci : coreIdx) {
                     uint32_t gIdx = localCoreOff++;
                     old2global[i][ci] = gIdx;
-                    renderable->packedPositions[gIdx] = glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y);
+                    renderable->packedPositions[gIdx] = glm::vec4(pts[ci].x, -eHeights[ci], pts[ci].y, 1.0f);
                 }
                 for (size_t si = 0; si < nPts; ++si) {
                     if (!isCore[si]) {
                         uint32_t gIdx = haloOffset++;
                         old2global[i][si] = gIdx;
-                        renderable->packedPositions[gIdx] = glm::vec3(pts[si].x, -eHeights[si], pts[si].y);
+                        renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
                     }
                 }
             } else {
@@ -1290,7 +1604,7 @@ namespace aveng {
                 for (size_t si = 0; si < nPts; ++si) {
                     uint32_t gIdx = haloOffset++;
                     old2global[i][si] = gIdx;
-                    renderable->packedPositions[gIdx] = glm::vec3(pts[si].x, -eHeights[si], pts[si].y);
+                    renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
                 }
             }
         }
@@ -1330,10 +1644,10 @@ namespace aveng {
 
         for (int i = 0; i < 25; ++i) {
             auto* tri = recs[i]->triangulation;
-            if (!tri) continue;
+            if (!tri) { continue; }
 
             auto* ap = recs[i]->allPoints;
-            if (!ap) continue;
+            if (!ap) { continue; }
 
             const size_t nPts = ap->pts.size();
             std::vector<uint8_t> isCore(nPts, 0);
@@ -1403,6 +1717,10 @@ namespace aveng {
         renderable->vbo.resize(totalCoreVerts);
         for (uint32_t v = 0; v < totalCoreVerts; ++v) {
             renderable->vbo[v] = renderable->packedPositions[v];
+            glm::vec3 vert = renderable->packedPositions[v];
+            if (v > 4000) {
+                std::printf("V1 vbo[%d] = {%f, %f, %f}\n", v, vert.x, vert.y, vert.z);
+            }
         }
 
         // IBO = core triangles with indices remapped into VBO space

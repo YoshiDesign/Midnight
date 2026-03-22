@@ -9,6 +9,10 @@ layout(set = 0, binding = 1) uniform CameraUBO
     mat4 proj;
 } camera;
 
+layout (push_constant) uniform Constants {
+    mat4 modelMat;
+};
+
 void main()
 {
     vec4 worldPos = vec4(inPosition, 1.0);

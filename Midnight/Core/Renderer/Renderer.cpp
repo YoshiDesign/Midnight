@@ -105,6 +105,20 @@ namespace aveng {
 			the pool, descriptors, pipeline, etc here */
 		createBasicTerrainDescriptors();
 
+		if (!createTerrainComputeDescriptors()) {
+			throw std::runtime_error("Failed to create terrain compute descriptors");
+		}
+
+		// TMP Placement - TODO - Clean up the entire lit terrain pipeline's resources
+		// Set immediately after the UBO is created so TerrainController can upload chunks
+		terrainController_.setTerrainSettingsUbo(
+			mTerrainSettingsUbo.buffer,
+			sizeof(TerrainComputeSettings));
+
+		if (!createTerrainLitDescriptors()) {
+			throw std::runtime_error("Failed to create terrain lit descriptors");
+		}
+
 		// Create pipelines now that descriptor layouts are ready
 		if (!createPipelineLayouts()) {
 			std::cerr << "error [Renderer 1]!" << std::endl;
@@ -622,6 +636,14 @@ namespace aveng {
 		if (!ComputePipeline::init(engineDevice, renderData.rdAvengBindlessPipelineLayout,
 			renderData.rdAvengComputeMatrixMultPipeline, computeShaderFile)) {
 			std::printf("%s error: could not init Assimp Matrix Mult compute shader pipeline\n", __FUNCTION__);
+			return false;
+		}
+
+		// Terrain Compute Pipeline (unified normals + steepness + weights)
+		computeShaderFile = "shaders/terrain_compute.comp.spv";
+		if (!ComputePipeline::init(engineDevice, renderData.rdTerrainComputePipelineLayout,
+			renderData.rdTerrainComputePipeline, computeShaderFile)) {
+			std::printf("%s error: could not init terrain compute shader pipeline\n", __FUNCTION__);
 			return false;
 		}
 
@@ -1169,9 +1191,8 @@ namespace aveng {
 
 	void Renderer::renderTerrain()
 	{
-		updateTerrainDescriptorSets(currentFrameIndex);
 		terrainController_.update();
-		terrainController_.render(
+		terrainController_.renderDebug(
 			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 			renderData.rdAvengBasicTerrainPipeline,
 			currentFrameIndex
@@ -1247,8 +1268,14 @@ namespace aveng {
 		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
+		TerrainPipeline::cleanup(engineDevice, renderData.rdAvengBasicTerrainPipeline);
+		TerrainPipeline::cleanup(engineDevice, renderData.rdAvengEditorBasicTerrainPipeline);
+		TerrainPipeline::cleanup(engineDevice, renderData.rdTerrainComputePipeline);
 
 		PipelineLayout::cleanup(engineDevice, renderData.rdAvengBindlessPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdAvengBasicTerrainPipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdTerrainComputePipelineLayout);
+		PipelineLayout::cleanup(engineDevice, renderData.rdTerrainLitPipelineLayout);
 		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengPipelineLayout);
 		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengAnimationPipelineLayout);
 		// PipelineLayout::cleanup(engineDevice, renderData.rdAvengComputeTransformPipelineLayout);
@@ -1271,27 +1298,21 @@ namespace aveng {
 
 			// TODO Material Buffers
 
-			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengDescriptorSets[i]);
-			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengAnimationDescriptorSets[i]);
-			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeTransformDescriptorSets[i]);
-			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeMatrixMultDescriptorSets[i]);
-			// TERRAIN vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
+			//vkFreeDescriptorSets(engineDevice.device(), renderData.avengDescriptorPool, 1, &renderData.rdAvengComputeBasicTerrainDescriptorSets[i]);
 
+			// I don't think we need to explicitly do this, the pool's destruction should take care of it.
 			vkFreeDescriptorSets(engineDevice.device(), renderData.avengBindlessDescriptorPool, 1, &renderData.rdAvengBindlessDescriptorSets[i]);
+			// vkFreeDescriptorSets(engineDevice.device(), renderData.avengBasicTerrainDescriptorPool, 1, &renderData.rdAvengBasicTerrainDescriptorSets[i]); // Not Necessary given the omitted pool flag
 
 		}
 
-		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengDescriptorLayout, nullptr);
-		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengAnimationDescriptorLayout, nullptr);
-		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengTextureDescriptorLayout, nullptr);
-		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeTransformDescriptorLayout, nullptr);
-		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultDescriptorLayout, nullptr);
-		// vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeMatrixMultPerModelDescriptorLayout, nullptr);
-
-		// TERRAIN vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdAvengComputeBasicTerrainDescriptorLayout, nullptr);
+		// Not a multi-buffered UBO
+		UniformBuffer::cleanup(engineDevice, mTerrainSettingsUbo);
 
 		//
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdBindlessDescriptorLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdBasicTerrainDescriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdTerrainComputeDescriptorSetLayout, nullptr);
 
 		//
 		// vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
@@ -1300,9 +1321,9 @@ namespace aveng {
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdSelectionRenderpass, nullptr);
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdImguiRenderpass, nullptr);
 
-
 		// Bindless
 		vkDestroyDescriptorPool(engineDevice.device(), renderData.avengBindlessDescriptorPool, nullptr);
+
 
 		std::printf("%s: Vulkan renderer destroyed\n", __FUNCTION__);
 	}
@@ -1578,23 +1599,23 @@ namespace aveng {
 
 	bool Renderer::createBasicTerrainDescriptorLayouts()
 	{
-		VkDescriptorSetLayoutBinding terrain_bindings[1];
+		VkDescriptorSetLayoutBinding terrain_bindings[2];
 
-		// SSBO1
-		//VkDescriptorSetLayoutBinding& terrain_ssbo_1 = terrain_bindings[0];
-		//terrain_ssbo_1.binding = 0;
-		//terrain_ssbo_1.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		//terrain_ssbo_1.descriptorCount = 1;
-		//terrain_ssbo_1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
-		//terrain_ssbo_1.pImmutableSamplers = nullptr;
+		// Binding 1: VP Matrix UBO
+		terrain_bindings[0] = {};
+		terrain_bindings[0].binding = 1;
+		terrain_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		terrain_bindings[0].descriptorCount = 1;
+		terrain_bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
+		terrain_bindings[0].pImmutableSamplers = nullptr;
 
-		// Alignment UBO | VP Matrix if Debug
-		VkDescriptorSetLayoutBinding& terrain_ubo_1 = terrain_bindings[0];
-		terrain_ubo_1.binding = 1;
-		terrain_ubo_1.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		terrain_ubo_1.descriptorCount = 1;
-		terrain_ubo_1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
-		terrain_ubo_1.pImmutableSamplers = nullptr;
+		// Binding 2: Lights UBO
+		terrain_bindings[1] = {};
+		terrain_bindings[1].binding = 2;
+		terrain_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		terrain_bindings[1].descriptorCount = 1;
+		terrain_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		terrain_bindings[1].pImmutableSamplers = nullptr;
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1606,7 +1627,7 @@ namespace aveng {
 		result = vkCreateDescriptorSetLayout(engineDevice.device(), &layoutInfo, nullptr,
 			&renderData.rdBasicTerrainDescriptorSetLayout);
 		if (result != VK_SUCCESS) {
-			Logger::log(1, "%s error: could not create bindless descriptor set layouts\n", __FUNCTION__, result);
+			Logger::log(1, "%s error: could not create terrain descriptor set layouts\n", __FUNCTION__, result);
 			return false;
 		}
 		return true;
@@ -1628,6 +1649,249 @@ namespace aveng {
 				return false;
 			}
 
+		}
+
+		return true;
+	}
+
+	// ---- Terrain Compute Descriptors ----
+
+	bool Renderer::createTerrainComputeDescriptors()
+	{
+		// Pool sized for per-chunk descriptor sets.
+		// We allocate one set per chunk on upload, so generous maxSets.
+		constexpr uint32_t MAX_TERRAIN_CHUNKS = 64;
+		VkDescriptorPoolSize poolSizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  MAX_TERRAIN_CHUNKS },      // binding 0: SettingsUBO
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,  MAX_TERRAIN_CHUNKS * 6 },  // bindings 2,3,4 (input) + 5,6,7 (output)
+		};
+
+		VkDescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		poolInfo.poolSizeCount = static_cast<uint32_t>(ArraySize(poolSizes));
+		poolInfo.pPoolSizes = poolSizes;
+		poolInfo.maxSets = MAX_TERRAIN_CHUNKS;
+
+		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &poolInfo, nullptr,
+			&renderData.avengTerrainComputeDescriptorPool);
+		if (result != VK_SUCCESS) {
+			Logger::log(1, "%s error: could not create terrain compute descriptor pool (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		if (!createTerrainComputeDescriptorLayout()) return false;
+		if (!createTerrainComputePipelineLayout()) return false;
+
+		// Create the shared terrain compute Settings UBO with sensible defaults
+		if (!UniformBuffer::init(engineDevice, mTerrainSettingsUbo, sizeof(TerrainComputeSettings), MapMode::OnDemand)) {
+			Logger::log(1, "%s error: could not create terrain settings UBO\n", __FUNCTION__);
+			return false;
+		}
+
+		TerrainComputeSettings defaults{};
+		defaults.normalMode = 0;       // area-weighted
+		defaults.weightOutputMode = 0; // SSBO only
+		defaults.numLayers = 3;
+		defaults.weightmapWidth = 0;
+		defaults.upDir = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+		defaults.snowStart = 30.0f;
+		defaults.snowEnd = 50.0f;
+		defaults.rockStart = 0.5f;
+		defaults.rockEnd = 0.8f;
+		defaults.eps = 1e-6f;
+
+		void* mapped;
+		result = vmaMapMemory(engineDevice.allocator(), mTerrainSettingsUbo.bufferAlloc, &mapped);
+		if (result == VK_SUCCESS) {
+			std::memcpy(mapped, &defaults, sizeof(TerrainComputeSettings));
+			vmaUnmapMemory(engineDevice.allocator(), mTerrainSettingsUbo.bufferAlloc);
+		}
+
+		return true;
+	}
+
+	bool Renderer::createTerrainComputeDescriptorLayout()
+	{
+		VkDescriptorSetLayoutBinding bindings[7];
+
+		// Binding 0: SettingsUBO
+		bindings[0] = {};
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		// Binding 2: Adjacency (input)
+		bindings[1] = {};
+		bindings[1].binding = 2;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[1].descriptorCount = 1;
+		bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		// Binding 3: Triangles (input)
+		bindings[2] = {};
+		bindings[2].binding = 3;
+		bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[2].descriptorCount = 1;
+		bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		// Binding 4: Positions (input)
+		bindings[3] = {};
+		bindings[3].binding = 4;
+		bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[3].descriptorCount = 1;
+		bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		// Binding 5: VertexNormals (output)
+		bindings[4] = {};
+		bindings[4].binding = 5;
+		bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[4].descriptorCount = 1;
+		bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		// Binding 6: VertexSteepness (output)
+		bindings[5] = {};
+		bindings[5].binding = 6;
+		bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[5].descriptorCount = 1;
+		bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		// Binding 7: VertexWeights (output)
+		bindings[6] = {};
+		bindings[6].binding = 7;
+		bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[6].descriptorCount = 1;
+		bindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = ArraySize(bindings);
+		layoutInfo.pBindings = bindings;
+
+		VkResult result = vkCreateDescriptorSetLayout(engineDevice.device(), &layoutInfo, nullptr,
+			&renderData.rdTerrainComputeDescriptorSetLayout);
+		if (result != VK_SUCCESS) {
+			Logger::log(1, "%s error: could not create terrain compute descriptor set layout (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		return true;
+	}
+
+	bool Renderer::createTerrainComputePipelineLayout()
+	{
+		std::vector<VkDescriptorSetLayout> layouts = { renderData.rdTerrainComputeDescriptorSetLayout };
+		std::vector<VkPushConstantRange> pushConstants = {
+			{ VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkBasicTerrainComputePushConstants) }
+		};
+
+		if (!PipelineLayout::init(engineDevice, renderData.rdTerrainComputePipelineLayout, layouts, pushConstants)) {
+			std::printf("%s error: could not init terrain compute pipeline layout\n", __FUNCTION__);
+			return false;
+		}
+
+		return true;
+	}
+
+	// ---- Terrain Lit Graphics Descriptors ----
+
+	bool Renderer::createTerrainLitDescriptors()
+	{
+		constexpr uint32_t MAX_TERRAIN_CHUNKS = 64;
+		VkDescriptorPoolSize poolSizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_TERRAIN_CHUNKS * 3 }, // normals, weights, steepness per chunk
+		};
+
+		VkDescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		poolInfo.poolSizeCount = static_cast<uint32_t>(ArraySize(poolSizes));
+		poolInfo.pPoolSizes = poolSizes;
+		poolInfo.maxSets = MAX_TERRAIN_CHUNKS;
+
+		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &poolInfo, nullptr,
+			&renderData.avengTerrainLitDescriptorPool);
+		if (result != VK_SUCCESS) {
+			Logger::log(1, "%s error: could not create terrain lit descriptor pool (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		if (!createTerrainLitGraphicsDescriptorLayout()) return false;
+		if (!createTerrainLitPipelineLayout()) return false;
+
+		return true;
+	}
+
+	bool Renderer::createTerrainLitGraphicsDescriptorLayout()
+	{
+		VkDescriptorSetLayoutBinding bindings[3] = {};
+
+		// Binding 0: VertexNormals SSBO
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		// Binding 1: VertexWeights SSBO
+		bindings[1].binding = 1;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[1].descriptorCount = 1;
+		bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		// Binding 2: VertexSteepness SSBO
+		bindings[2].binding = 2;
+		bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[2].descriptorCount = 1;
+		bindings[2].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = ArraySize(bindings);
+		layoutInfo.pBindings = bindings;
+
+		VkResult result = vkCreateDescriptorSetLayout(engineDevice.device(), &layoutInfo, nullptr,
+			&renderData.rdTerrainLitGraphicsDescriptorSetLayout);
+		if (result != VK_SUCCESS) {
+			Logger::log(1, "%s error: could not create terrain lit graphics descriptor set layout (error: %i)\n", __FUNCTION__, result);
+			return false;
+		}
+
+		return true;
+	}
+
+	bool Renderer::createTerrainLitPipelineLayout()
+	{
+		VkDescriptorSetLayout layouts[] = {
+			renderData.rdBasicTerrainDescriptorSetLayout,          // set 0: per-frame (VP + lights)
+			renderData.rdTerrainLitGraphicsDescriptorSetLayout     // set 1: per-chunk (SSBOs)
+		};
+
+		VkPushConstantRange pushRange{};
+		pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		pushRange.offset = 0;
+		pushRange.size = sizeof(VkBasicTerrainDebugPC);
+
+		// TODO - Use:
+		/*
+			PipelineLayout::init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout,
+			std::vector<VkDescriptorSetLayout> layouts, std::vector<VkPushConstantRange> pushConstants)
+		*/
+
+		VkPipelineLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		layoutInfo.setLayoutCount = ArraySize(layouts);
+		layoutInfo.pSetLayouts = layouts;
+		layoutInfo.pushConstantRangeCount = 1;
+		layoutInfo.pPushConstantRanges = &pushRange;
+
+		VkResult result = vkCreatePipelineLayout(engineDevice.device(), &layoutInfo, nullptr,
+			&renderData.rdTerrainLitPipelineLayout);
+		if (result != VK_SUCCESS) {
+			Logger::log(1, "%s error: could not create terrain lit pipeline layout (error: %i)\n", __FUNCTION__, result);
+			return false;
 		}
 
 		return true;
@@ -1674,27 +1938,37 @@ namespace aveng {
 		vkUpdateDescriptorSets(engineDevice.device(), 1, &write, 0, nullptr);
 	}
 
-	// DEBUG
 	void Renderer::updateTerrainDescriptorSets(int frameIndex) {
-		//
+
 		VkDescriptorBufferInfo viewProjInfo{};
 		viewProjInfo.buffer = mPerspectiveViewMatrixUBOBuffers[frameIndex].buffer;
 		viewProjInfo.offset = 0;
 		viewProjInfo.range = VK_WHOLE_SIZE;
 
-		VkWriteDescriptorSet viewProjWriteDescriptorSet{};
-		viewProjWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		viewProjWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		viewProjWriteDescriptorSet.dstSet = renderData.rdAvengBasicTerrainDescriptorSets[frameIndex];
-		viewProjWriteDescriptorSet.dstBinding = 1;
-		viewProjWriteDescriptorSet.descriptorCount = 1;
-		viewProjWriteDescriptorSet.pBufferInfo = &viewProjInfo;
+		VkDescriptorBufferInfo lightsInfo{};
+		lightsInfo.buffer = mPointLightUBOBuffers[frameIndex].buffer;
+		lightsInfo.offset = 0;
+		lightsInfo.range = VK_WHOLE_SIZE;
 
-		VkWriteDescriptorSet writeDescriptorSets[1] = {
-			viewProjWriteDescriptorSet
-		};
+		VkWriteDescriptorSet writes[2] = {};
 
-		vkUpdateDescriptorSets(engineDevice.device(), 1, writeDescriptorSets, 0, nullptr);
+		// Binding 1: VP Matrix
+		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writes[0].dstSet = renderData.rdAvengBasicTerrainDescriptorSets[frameIndex];
+		writes[0].dstBinding = 1;
+		writes[0].descriptorCount = 1;
+		writes[0].pBufferInfo = &viewProjInfo;
+
+		// Binding 2: Lights UBO
+		writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writes[1].dstSet = renderData.rdAvengBasicTerrainDescriptorSets[frameIndex];
+		writes[1].dstBinding = 2;
+		writes[1].descriptorCount = 1;
+		writes[1].pBufferInfo = &lightsInfo;
+
+		vkUpdateDescriptorSets(engineDevice.device(), 2, writes, 0, nullptr);
 	}
 
 	void Renderer::updateBindlessDescriptorSets(int frameIndex) {

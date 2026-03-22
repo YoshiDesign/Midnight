@@ -59,14 +59,12 @@ namespace procgen {
 		std::vector<glm::vec3> vbo;       // Core vertex positions
 		std::vector<uint32_t>  ibo;       // Core triangle indices (into vbo)
 
-		/* The Giga-SSBO */
-		// Compute pipeline inputs -- flat [3x3_core | halo] layout
-		std::vector<glm::vec3>        packedPositions;  // All positions: core then halo
+		// Compute pipeline inputs -- flat [core | halo] layout
+		std::vector<glm::vec4>        packedPositions;  // All positions: core then halo (w = 1.0)
 		std::vector<glm::vec3>        packedTriangles;  // Site-index triples (bit-pattern uint32 in float, read as uvec3 on GPU)
 		std::vector<VertexAdjacency>  packedAdjacency;  // Per-vertex incident triangle list
 
-		/* The Alignment UBO */
-		// Alignment metadata (maps 1:1 to BasicTerrainAlignmentData UBO, binding 9)
+		// Alignment metadata (still useful for SSBO packing and descriptor offset computation)
 		aveng::BasicTerrainAlignmentData alignment{};
 
 		aveng::ChunkCoord center{};
@@ -94,10 +92,28 @@ namespace procgen {
 
 	struct TerrainPackedGpuData
 	{
-		aveng::VkShaderStorageBufferData packedPositionsSsbo{};   // vec3[]
-		aveng::VkShaderStorageBufferData packedTrianglesSsbo{};   // uvec3 bit-packed through glm::vec3 CPU-side
-		aveng::VkShaderStorageBufferData packedAdjacencySsbo{};   // VertexAdjacency[]
-		aveng::VkUniformBufferData alignmentUbo{};          // BasicTerrainAlignmentData
+		// Single VkBuffer for all compute inputs: [positions | triangles | adjacency]
+		aveng::VkShaderStorageBufferData inputSsbo{};
+		VkDeviceSize positionsOffset  = 0;  // byte offset into inputSsbo (always 0)
+		VkDeviceSize trianglesOffset  = 0;  // byte offset, aligned to minStorageBufferOffsetAlignment
+		VkDeviceSize adjacencyOffset  = 0;  // byte offset, aligned
+
+		// Single VkBuffer for all compute outputs: [normals | steepness | weights]
+		aveng::VkShaderStorageBufferData outputSsbo{};
+		VkDeviceSize normalsOffset    = 0;  // byte offset (always 0)
+		VkDeviceSize steepnessOffset  = 0;  // byte offset, aligned
+		VkDeviceSize weightsOffset    = 0;  // byte offset, aligned
+
+		// Per-chunk descriptor set for compute bindings
+		VkDescriptorSet computeDescriptorSet = VK_NULL_HANDLE;
+
+		// Per-chunk descriptor set for lit graphics bindings (normals, weights, steepness SSBOs)
+		VkDescriptorSet graphicsDescriptorSet = VK_NULL_HANDLE;
+
+		// Counts for dispatch sizing / push constants
+		uint32_t totalVerts  = 0;  // core + halo
+		uint32_t coreVerts   = 0;  // core only (dispatch size = numVertices)
+		uint32_t totalTris   = 0;  // core + halo (push constant numTriangles)
 	};
 
 	struct TerrainDrawGpuData

@@ -85,6 +85,8 @@ namespace aveng {
 		CameraManager cameraManager;
 		ModelLibrary modelLib_;
 		SceneFacade sceneFacade_;
+		ChunkManager chunkManager_;
+		TerrainController terrain_;
 		Renderer renderer;
 
 		std::unique_ptr<GameInput> gameInput_;
@@ -99,8 +101,7 @@ namespace aveng {
 		std::unique_ptr<AvengFrame>  frame_;
 
 		// ---- Internal APIs
-		ChunkManager chunkManager_;
-		TerrainController terrain_;
+
 		DebugController debug_;
 		GameServices gameServices_;
 		MidnightTextureSystem textureSystem_; // Injected into modelLibrary - owned/composed by Midnight

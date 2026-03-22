@@ -57,17 +57,35 @@ namespace aveng {
     public:
         explicit TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, ChunkManager& chunks) noexcept;
 
+        ~TerrainController();
+
         // Called once per tick by the engine (Midnight) so gameplay doesn't need to thread frame indices everywhere.
         void setFrameIndex(uint64_t frameIndex) noexcept;
 
+        void setTerrainSettingsUbo(VkBuffer buffer, VkDeviceSize size) noexcept {
+            settingsUboBuffer_ = buffer;
+            settingsUboSize_ = size;
+        }
+
         bool uploadTerrainChunkToGpu(TerrainChunkSlot& slot);
+
+        bool writeChunkComputeDescriptorSet(
+            procgen::TerrainPackedGpuData& packed,
+            VkBuffer settingsUboBuffer,
+            VkDeviceSize settingsUboSize);
+
+        bool writeChunkGraphicsDescriptorSet(procgen::TerrainPackedGpuData& packed);
 
         void serviceCpuReadyChunks();
 
         void update(/*const Camera& camera*/);
 
         void render(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex);
+        void renderDebug(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex);
 
+        void cleanup();
+
+        void cleanupOne(TerrainChunkSlot& slot);
         /**
          * Request the final renderable data for compute and graphics.
          * The renderable comprises a 3x3 region of space with up to a 5x5 region
@@ -99,6 +117,10 @@ namespace aveng {
 
         VkBasicTerrainPushConstant pc;
         VkBasicTerrainDebugPC dpc;
+
+        // Shared terrain compute settings UBO (owned by Renderer)
+        VkBuffer settingsUboBuffer_ = VK_NULL_HANDLE;
+        VkDeviceSize settingsUboSize_ = 0;
 
         // CEO
         ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning

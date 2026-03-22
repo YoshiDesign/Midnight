@@ -4,46 +4,43 @@ layout(location = 0) in vec3 inPosition; // from vertex buffer
 
 layout(location = 0) out vec3 vWorldPos;
 layout(location = 1) out vec3 vWorldNormal;
-layout(location = 2) out vec3 vMatWeights; // Useless when rendering weights to a 2D image is enabled
-layout(location = 3) out float vSteep;     // Extensible! We're not using this for much rn, but its nice to have
+layout(location = 2) out vec3 vMatWeights;
+layout(location = 3) out float vSteep;
 
+// Set 0: Per-frame global data
 layout (std140, set = 0, binding = 1) uniform Matrices {
   mat4 view;
   mat4 projection;
 };
 
-// Model transform for this draw (chunk transform). If you already use push constants for this,
-// swap this to push constants. Keeping it simple here.
-layout(set = 0, binding = 2, std140) uniform ObjectUBO {
-    mat4 model;
-} uObj;
-
-// Compute outputs (SSBOs) indexed by vertex ID
-layout(std430, set = 0, binding = 3) readonly buffer VertexNormals {
+// Set 1: Per-chunk compute outputs (SSBOs)
+layout(std430, set = 1, binding = 0) readonly buffer VertexNormals {
     vec4 vertexNormals[]; // xyz = normal
 };
 
-layout(std430, set = 0, binding = 4) readonly buffer VertexWeights {
+layout(std430, set = 1, binding = 1) readonly buffer VertexWeights {
     vec4 weightsOut[]; // x=grass, y=rock, z=snow
 };
 
-layout(std430, set=0, binding=5) readonly buffer VertexSteepness {
+layout(std430, set = 1, binding = 2) readonly buffer VertexSteepness {
     float steepnessOut[];
 };
 
+// Model transform via push constants (matches VkBasicTerrainDebugPC)
+layout(push_constant) uniform PC {
+    mat4 model;
+} push;
+
 void main()
 {
-    // Vertex index *after* index-buffer fetch in Vulkan
     uint vid = uint(gl_VertexIndex);
 
     vec3 N = vertexNormals[vid].xyz;
     vec3 W = weightsOut[vid].xyz;
 
-    vec4 worldPos4 = uObj.model * vec4(inPosition, 1.0);
+    vec4 worldPos4 = push.model * vec4(inPosition, 1.0);
 
-    // If you have non-uniform scaling, normal transform needs inverse-transpose.
-    // For terrain chunks with only translation / uniform scale, mat3(model) is fine.
-    mat3 normalMat = mat3(uObj.model);
+    mat3 normalMat = mat3(push.model);
     vec3 worldN = normalize(normalMat * N);
 
     vWorldPos    = worldPos4.xyz;
@@ -52,5 +49,5 @@ void main()
 
     vSteep = steepnessOut[vid];
 
-    gl_Position = uCam.viewProj * worldPos4;
+    gl_Position = projection * view * worldPos4;
 }

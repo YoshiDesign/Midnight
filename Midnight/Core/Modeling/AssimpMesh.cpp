@@ -131,7 +131,7 @@ namespace aveng {
             else {
                 vertex.normal = glm::vec4(0.0f);
             }
-
+             
             if (mesh->HasTextureCoords(0)) {
                 vertex.position.w = mesh->mTextureCoords[0][i].x;
                 vertex.normal.w = mesh->mTextureCoords[0][i].y;
