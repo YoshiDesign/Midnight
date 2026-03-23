@@ -125,5 +125,8 @@
     <ClInclude Include="Editor\Utils\selection_utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Editor\GUI\UIComponents\TerrainSettings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -7,7 +7,7 @@ namespace procgen {
 	static aveng::ErosionSettings DefaultErosion(uint16_t nThreads) {
 
 		aveng::HydraulicErosionParams hydraulic{
-			60000,	// numDroplets
+			10000,	// numDroplets
 			32,		// maxSteps
 			2048,	// batchSize
 			std::floor(nThreads / 6), // maxWorkers: 1/6 of the hardware's threads
@@ -33,7 +33,7 @@ namespace procgen {
 			0.57,  // ~30 degrees angle of repose
 			0.30,  // Transfer 30% of excess per iteration
 			30,	   // 30 Iterations
-			std::floor(nThreads / 3)
+			1 // std::floor(nThreads / 3)
 		};
 
 		aveng::HardnessParams hardness{
@@ -52,11 +52,12 @@ namespace procgen {
 			2,
 			0.4f,
 			"normalized",
-			12
+			1
 		};
 
 		return aveng::ErosionSettings{
-			hydraulic, thermal, hardness, ridges
+			hydraulic, thermal, hardness, ridges,
+			true,	   true,    true,     true
 		};
 
 	}

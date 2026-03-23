@@ -14,7 +14,7 @@ namespace aveng::noise {
     };
 
     struct BlueNoiseConfig {
-        float MinDist = 0.0;
+        float MinDist = 8.0;
         int MaxTries = 30;
     };
 

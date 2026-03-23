@@ -28,16 +28,18 @@
 *   Still bandwidth heavy, but much less than 30×N
 */
 
+using FPTYPE = float;
+
 namespace procgen {
 
     // ---- Droplet ----
     struct Droplet {
         aveng::Vec2 pos;    // WORLD x/z
         aveng::Vec2 dir;    // unit direction in x/z
-        float water = 0.f;
-        float vel = 0.f;
-        float sediment = 0.f;
-        float capacity = 0.f;
+        FPTYPE water = 0.f;
+        FPTYPE vel = 0.f;
+        FPTYPE sediment = 0.f;
+        FPTYPE capacity = 0.f;
         bool alive = true;
     };
 
@@ -46,8 +48,8 @@ namespace procgen {
 namespace procgen::detail {
 
     // Weighted average hardness on a triangle
-    float AvgHardnessTri(
-        std::span<const float> hardness,
+    FPTYPE AvgHardnessTri(
+        std::span<const FPTYPE> hardness,
         aveng::SiteIndex a, 
         aveng::SiteIndex b, 
         aveng::SiteIndex c,
@@ -55,14 +57,14 @@ namespace procgen::detail {
     )
     {
         // safety: clamp weights if your barycentric can slightly overshoot
-        const float wa = w.wa, wb = w.wb, wc = w.wc;
+        const FPTYPE wa = w.wa, wb = w.wb, wc = w.wc;
         return wa * hardness[a] + wb * hardness[b] + wc * hardness[c];
     }
 
     // Move direction update (unit step length preserved)
     void UpdateDirectionUnitStep(procgen::Droplet& d, aveng::Vec2 gradDownhill, const aveng::HydraulicErosionParams& cfg) {
         // Paper-style: dirNew = dirOld*inertia - grad*(1-inertia), then normalize (magnitude 1)
-        const float pin = cfg.inertia;
+        const FPTYPE pin = cfg.inertia;
         aveng::Vec2 dirNew{
             d.dir.x * pin - gradDownhill.x * (1.0f - pin),
             d.dir.y * pin - gradDownhill.y * (1.0f - pin),
@@ -113,22 +115,22 @@ namespace procgen {
         }
 
         const auto bounds = sg.worldBounds;
-        const float margin = std::max(0.0f, cfg.spawnMargin);
+        const FPTYPE margin = std::max(0.0f, cfg.spawnMargin);
 
-        const float spawnMinX = bounds.minX + margin;
-        const float spawnMaxX = bounds.maxX - margin;
-        const float spawnMinZ = bounds.minZ + margin;
-        const float spawnMaxZ = bounds.maxZ - margin;
+        const FPTYPE spawnMinX = bounds.minX + margin;
+        const FPTYPE spawnMaxX = bounds.maxX - margin;
+        const FPTYPE spawnMinZ = bounds.minZ + margin;
+        const FPTYPE spawnMaxZ = bounds.maxZ - margin;
 
         // If margin is too large, fall back to full bounds (don’t crash / don’t spawn NaNs)
         const bool spawnOk = (spawnMaxX > spawnMinX) && (spawnMaxZ > spawnMinZ);
-        const float aMinX = spawnOk ? spawnMinX : bounds.minX;
-        const float aMaxX = spawnOk ? spawnMaxX : bounds.maxX;
-        const float aMinZ = spawnOk ? spawnMinZ : bounds.minZ;
-        const float aMaxZ = spawnOk ? spawnMaxZ : bounds.maxZ;
+        const FPTYPE aMinX = spawnOk ? spawnMinX : bounds.minX;
+        const FPTYPE aMaxX = spawnOk ? spawnMaxX : bounds.maxX;
+        const FPTYPE aMinZ = spawnOk ? spawnMinZ : bounds.minZ;
+        const FPTYPE aMaxZ = spawnOk ? spawnMaxZ : bounds.maxZ;
 
         // Work constants
-        const float oneMinusEvap = 1.0f - cfg.pEvaporation;
+        const FPTYPE oneMinusEvap = 1.0f - cfg.pEvaporation;
 
         // Batch scheduling
         const uint32_t total = cfg.numDroplets;
@@ -143,19 +145,19 @@ namespace procgen {
         const uint32_t batchSize = (total + numBatches - 1u) / numBatches;
 
         // Each task returns a full-size local delta array (simple + deterministic; optimize later with tiling/sparse).
-        std::vector<std::shared_future<std::vector<float>>> futures;
+        std::vector<std::shared_future<std::vector<FPTYPE>>> futures;
         futures.reserve(numBatches);
 
         // Capture read-only spans for speed
-        const float* heights = ws.workHeights.data();
-        const float* hard = ws.hardness.data();
+        const FPTYPE* heights = ws.workHeights.data();
+        const FPTYPE* hard = ws.hardness.data();
 
         for (uint32_t b = 0; b < numBatches; ++b) {
             const uint32_t begin = b * batchSize;
             const uint32_t end = std::min(total, begin + batchSize);
 
             // TODO : I don't think we're using thread local scratch allocation
-            futures.push_back(tasks.submit([=, &allPts, &tri, &sg, &cfg]() -> std::vector<float> {
+            futures.push_back(tasks.submit([=, &allPts, &tri, &sg, &cfg]() -> std::vector<FPTYPE> {
 
                 /*
                     TODO: Debugging
@@ -172,15 +174,15 @@ namespace procgen {
 
                 //std::pmr::memory_resource* mr = arena.mr();
 
-                std::vector<float> localDelta;
+                std::vector<FPTYPE> localDelta;
                 localDelta.assign(allPts.pts.size(), 0.0f);
 
                 for (uint32_t di = begin; di < end; ++di) {
 
                     uint64_t s = aveng::wyhash64(hydroSeed, uint64_t(di)); // per-droplet stream seed
                     // spawn
-                    float rx = aveng::u24_to_f01(aveng::wyrand(&s));
-                    float rz = aveng::u24_to_f01(aveng::wyrand(&s));
+                    FPTYPE rx = aveng::u24_to_f01(aveng::wyrand(&s));
+                    FPTYPE rz = aveng::u24_to_f01(aveng::wyrand(&s));
                     //aveng::SplitMix64 rng(aveng::wyhash64(hydroSeed, uint64_t(di))); OLD - not about it
 
                     /*
@@ -191,7 +193,7 @@ namespace procgen {
                     Droplet d;
                     d.water = cfg.initWater;
                     d.vel = cfg.initVel;
-                    d.sediment = 0.0f;
+                    d.sediment = 0.0f; // Note, initializing with 0 sediment
                     d.capacity = cfg.pCapacity;
                     d.alive = true;
                     d.pos = { aMinX + (aMaxX - aMinX) * rx,
@@ -207,13 +209,13 @@ namespace procgen {
                     // New - uses wyrand. This loop should typically execute no more than twice, average.
                     aveng::Vec2 v;
                     for (;;) {
-                        float x = aveng::randSigned(s);
-                        float y = aveng::randSigned(s);
+                        FPTYPE x = aveng::randSigned(s);
+                        FPTYPE y = aveng::randSigned(s);
 
-                        float r2 = x * x + y * y;
+                        FPTYPE r2 = x * x + y * y;
 
                         if (r2 > 1e-12f && r2 <= 1.0f) {
-                            float invLen = 1.0f / std::sqrt(r2); // "what the fuck"
+                            FPTYPE invLen = 1.0f / std::sqrt(r2); // "what the fuck"
                             d.dir.x = x * invLen;
                             d.dir.y = y * invLen;
                             break;
@@ -232,13 +234,13 @@ namespace procgen {
                         if (!aveng::Barycentric(allPts, tri, t1, d.pos, w1)) { d.alive = false; break; }
 
                         // Sample height at current position
-                        float h1 = 0.f;
+                        FPTYPE h1 = 0.f;
                         if (!aveng::SampleScalar(allPts, tri, t1, d.pos, heights, allPts.pts.size(), h1)) {
                             d.alive = false; break;
                         }
 
                         // Triangle gradient (constant over triangle)
-                        float dhdx = 0.f, dhdz = 0.f;
+                        FPTYPE dhdx = 0.f, dhdz = 0.f;
                         if (!aveng::TriangleGradient(allPts, tri, t1, heights, allPts.pts.size(), dhdx, dhdz)) {
                             d.alive = false; break;
                         }
@@ -256,7 +258,7 @@ namespace procgen {
                         if (!ok2) { d.alive = false; break; }
 
                         // Sample height at new position
-                        float h2 = 0.f;
+                        FPTYPE h2 = 0.f;
                         if (!aveng::SampleScalar(allPts, tri, t2, d.pos, heights, allPts.pts.size(), h2)) {
                             d.alive = false; break;
                         }
@@ -267,7 +269,7 @@ namespace procgen {
                             d.alive = false; break;
                         }
                         
-                        const float hdiff = h2 - h1; // <0 downhill
+                        const FPTYPE hdiff = h2 - h1; // <0 downhill
 
                         // Tri vertex indices
                         const auto& T1 = tri.tris[t1];
@@ -278,12 +280,12 @@ namespace procgen {
                         // ----- Erode / deposit -----
                         if (hdiff < 0.0f) {
                             // Capacity = max(-hdiff, minSlope) * vel * water * pCapacity
-                            const float slopeTerm = std::max(-hdiff, cfg.pMinSlope);
+                            const FPTYPE slopeTerm = std::max(-hdiff, cfg.pMinSlope);
                             d.capacity = slopeTerm * d.vel * d.water * cfg.pCapacity;
 
                             bool excess = false;
-                            float toDeposit = 0.f;
-                            float toErode = 0.f;
+                            FPTYPE toDeposit = 0.f;
+                            FPTYPE toErode = 0.f;
 
                             if (d.sediment > d.capacity) {
                                 toDeposit = (d.sediment - d.capacity) * cfg.pDeposition;
@@ -298,7 +300,7 @@ namespace procgen {
                                 toErode = std::min(toErode, -hdiff);
 
                                 // Hardness scaling: harder erodes less (hardness assumed [0..1])
-                                const float avgH = detail::AvgHardnessTri(std::span<const float>(hard, allPts.pts.size()),
+                                const FPTYPE avgH = detail::AvgHardnessTri(std::span<const FPTYPE>(hard, allPts.pts.size()),
                                    A1, B1, C1, w1);
                                 toErode *= (1.0f - avgH);
 
@@ -327,7 +329,7 @@ namespace procgen {
                                 d.alive = false;
                             }
                             else {
-                                const float deposit = std::min(d.sediment, hdiff);
+                                const FPTYPE deposit = std::min(d.sediment, hdiff);
                                 localDelta[A1] += w1.wa * deposit;
                                 localDelta[B1] += w1.wb * deposit;
                                 localDelta[C1] += w1.wc * deposit;
@@ -353,7 +355,7 @@ namespace procgen {
 
                         // Extra evaporation if slope ~ 0 and capacity ~ 0 (requested)
                         // Use gradient magnitude as a stronger flatness signal than hdiff alone.
-                        const float slopeMag = std::sqrt(dhdx * dhdx + dhdz * dhdz);
+                        const FPTYPE slopeMag = std::sqrt(dhdx * dhdx + dhdz * dhdz);
                         if (slopeMag < cfg.flatSlopeEps && d.capacity < cfg.flatCapEps) {
                             d.water *= (1.0f - cfg.flatExtraEvap); // "drastically increase"
                         }
@@ -374,10 +376,10 @@ namespace procgen {
             }));
         }
 
-        // Reduce all local deltas into ws.delta (single-threaded reduction for now)
+        // Reduce all local deltas into ws.delta (NOT single-threaded reduction at the moment)
         // (You can parallelize the reduction later by chunking the index range.)
         for (auto& fut : futures) {
-             /* std::vector<float> */ auto local = tasks.wait(fut);
+             /* std::vector<FPTYPE> */ auto local = tasks.wait(fut);
             // accumulate
             for (size_t i = 0; i < N; ++i) {
                 ws.delta[i] += local[i];
