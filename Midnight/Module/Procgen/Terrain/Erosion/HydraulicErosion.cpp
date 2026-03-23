@@ -17,7 +17,7 @@
 #include "Core/Math/wyhash.h"
 
 /*
-TODO: Hydraulic Erosion Optimizations
+* TODO: Hydraulic Erosion Optimizations
 * - Tile sparse accumulation (best overall)
 *   Each batch accumulates into a small set of tiles (or per-tile arrays)
 *   Reduction only touches tiles that were hit
@@ -377,7 +377,7 @@ namespace procgen {
         // Reduce all local deltas into ws.delta (single-threaded reduction for now)
         // (You can parallelize the reduction later by chunking the index range.)
         for (auto& fut : futures) {
-             /* std::vector<float> */ auto local = fut.get(); // auto might cause a move
+             /* std::vector<float> */ auto local = tasks.wait(fut);
             // accumulate
             for (size_t i = 0; i < N; ++i) {
                 ws.delta[i] += local[i];

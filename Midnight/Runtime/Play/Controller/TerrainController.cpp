@@ -9,6 +9,11 @@
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/AvengStorageBuffer.h"
 
+namespace {
+    VkDeviceSize alignUp(VkDeviceSize value, VkDeviceSize alignment) {
+        return (value + alignment - 1) & ~(alignment - 1);
+    }
+}
 
 namespace aveng {
 	
@@ -23,8 +28,6 @@ namespace aveng {
     TerrainController::~TerrainController() {
         cleanup();
     }
-
-
 
     // TODO - this isn't the only mgr which will need a frame index. Put it in 1 place and read it every frame.
     void TerrainController::setFrameIndex(uint64_t frameIndex) noexcept {
@@ -53,6 +56,9 @@ namespace aveng {
 
     void TerrainController::render(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex)
     {
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
         for (auto const& [coord, slot] : slots_) {
             if (slot.state != TerrainRuntimeState::Resident) {
                 continue;
@@ -95,6 +101,13 @@ namespace aveng {
     
     void TerrainController::renderDebug(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex)
     {
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData_.rdAvengEditorBasicTerrainPipeline);
+
+        VkDescriptorSet renderSets[1] = { renderData_.rdAvengBasicTerrainDescriptorSets[currentFrameIndex] };
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData_.rdAvengBasicTerrainPipelineLayout, 
+                                0, 1, renderSets, 0, nullptr);
+
         for (auto const& [coord, slot] : slots_) {
             if (slot.state != TerrainRuntimeState::Resident) {
                 continue;
@@ -103,14 +116,6 @@ namespace aveng {
             if (!slot.gpu.valid || slot.gpu.draw.indexCount == 0) {
                 continue;
             }
-
-            // std::printf("rendering chunk {%d, %d}\n", coord.x, coord.z);
-
-            //glm::vec3 worldOffset{
-            //    coord.x * 256.0f,
-            //    0.0f,
-            //    coord.z * 256.0f
-            //};
 
             glm::mat4 modelMat{ 1.0 };
 
@@ -164,8 +169,19 @@ namespace aveng {
         }
     }
 
-    static VkDeviceSize alignUp(VkDeviceSize value, VkDeviceSize alignment) {
-        return (value + alignment - 1) & ~(alignment - 1);
+    void TerrainController::setTerrainConfig(TerrainConfig tcfg)
+    {
+        chunks_->setGlobalConfig(tcfg);   
+    }
+
+    void TerrainController::setTerrainNoiseParams(noise::NoiseParams noise)
+    {
+        chunks_->setNoiseParams(noise);
+    }
+
+    void TerrainController::setTerrainWeatheringParams(ErosionSettings erosion)
+    {
+        chunks_->setErosionParameters(erosion);
     }
 
     bool TerrainController::uploadTerrainChunkToGpu(TerrainChunkSlot& slot) {

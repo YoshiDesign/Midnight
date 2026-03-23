@@ -6,8 +6,8 @@ namespace aveng {
 		glm::vec3 rotate{ 0 };
 
 		// TODO - Move these to an Editor Parameters class if you care to
-		float climbSpeed{ 10.0f };
-		float lookSpeed{ 2.0f };
+		float climbSpeed{ 240.0f };
+		float lookSpeed{ 4.0f };
 		float rollSpeed{ 8.0f };
 
 		// Note: glfwGetKey polls cached state, and won't tell you about key repeat status

@@ -151,10 +151,6 @@ namespace aveng {
 		float halo = 32.f;			// 4x minPointDist, for now
 		uint16_t nThreads = 0;
 		noise::NoiseParams noise{};
-		bool hydraulicErosionEnabled = true;
-		bool thermalErosionEnabled = true;
-		bool ridgeEnhancementEnabled = true;
-		bool hardnessMapEnabled = true;
 	};
 
 	/* Stage Params 
@@ -201,7 +197,6 @@ namespace aveng {
 		float NoiseFrequency;  // Frequency of hardness noise (lower = larger features)
 		float BaseHardness;	   // Minimum hardness for all sites (0-1)
 		float ElevationPower;  // Exponent for elevation curve (1=linear, 2=quadratic)
-		bool Enabled;		   // Master toggle for hardness map generation
 	};
 
 	struct RidgeParams {
@@ -213,7 +208,6 @@ namespace aveng {
 		float MinHeight;     // Minimum elevation for ridge enhancement (world units)
 		std::string MinHeightMode; // "absolute" = world height, "normalized" = 0-1 within chunk
 		uint16_t MaxWorkers;
-		bool Enabled;
 	};
 
 	/* Stage Settings */
@@ -222,6 +216,10 @@ namespace aveng {
 		ThermalErosionParams thermal{};
 		HardnessParams hardness{};
 		RidgeParams ridges{};
+		bool hydraulicErosionEnabled = true;
+		bool thermalErosionEnabled = true;
+		bool ridgeEnhancementEnabled = true;
+		bool hardnessMapEnabled = true;
 	};
 }
 

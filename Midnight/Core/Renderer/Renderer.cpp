@@ -10,6 +10,7 @@
 #include "CoreVK/SkinningPipeline.h"
 #include "CoreVK/ComputePipeline.h"
 #include "CoreVK/TerrainPipeline.h"
+
 #include "Core/Texture.h"
 #include "CoreVK/Resources/gpu_resources.h"
 // #include "CoreVK/LinePipeline.h"
@@ -23,6 +24,10 @@
 #include "Runtime/Play/Controller/TerrainController.h"
 #include "Game/Camera/CameraManager.h"
 #include "Core/Renderer/ModelLibrary.h"
+
+#ifdef M_DEBUG
+#include "CoreVK/TerrainDebugPipeline.h"
+#endif
 
 #define LOG(a) std::cout<<a<<std::endl;
 #define DESTROY_UNIFORM_BUFFERS 1	// Unused as far as I can tell
@@ -115,6 +120,7 @@ namespace aveng {
 			mTerrainSettingsUbo.buffer,
 			sizeof(TerrainComputeSettings));
 
+		// NOTE: This also creates the pipeline layout for the lit pipeline, so don't look for it in createPipelineLayouts()
 		if (!createTerrainLitDescriptors()) {
 			throw std::runtime_error("Failed to create terrain lit descriptors");
 		}
@@ -596,6 +602,9 @@ namespace aveng {
 
 		VkRenderPass renderPass = aveng_swapchain->getRenderPass();
 
+		/*
+		* Render Pipelines
+		*/
 		// Basic Pipeline
 		std::string vertexShaderFile = "shaders/assimp.vert.spv";
 		std::string fragmentShaderFile = "shaders/assimp.frag.spv";
@@ -613,17 +622,29 @@ namespace aveng {
 			std::printf("%s error: could not init Assimp Skinning shader pipeline\n", __FUNCTION__);
 			return false;
 		}
-
+#ifdef M_DEBUG
 		// Terrain Debug Pipeline
 		vertexShaderFile = "shaders/terrain_debug.vert.spv";
 		fragmentShaderFile = "shaders/terrain_debug.frag.spv";
-		if (!TerrainPipeline::init(engineDevice,  renderData.rdAvengBasicTerrainPipelineLayout,
+		if (!TerrainDebugPipeline::init(engineDevice,  renderData.rdAvengBasicTerrainPipelineLayout,
 			renderData.rdAvengBasicTerrainPipeline, renderPass, 1, vertexShaderFile, fragmentShaderFile)) {
 			std::printf("%s error: could not init Terrain Debug shader pipeline\n", __FUNCTION__);
 			return false;
 		}
+#endif
+		// Terrain Lit Pipeline
+		vertexShaderFile = "shaders/terrain_1.vert.spv";
+		fragmentShaderFile = "shaders/terrain_simple.frag.spv";
+		if (!TerrainPipeline::init(engineDevice, renderData.rdTerrainLitPipelineLayout,
+			renderData.rdAvengTerrainLitPipeline, renderPass, 1, vertexShaderFile, fragmentShaderFile)) {
+			std::printf("%s error: could not init Terrain Debug shader pipeline\n", __FUNCTION__);
+			return false;
+		}
 
-		// Animation Compute Input Pipeline
+		/*
+		* Compute Pipelines
+		*/
+		// Animation Compute Stage 1 - Input Pipeline
 		std::string computeShaderFile = "shaders/assimp_instance_transform.comp.spv";
 		if (!ComputePipeline::init(engineDevice, renderData.rdAvengBindlessPipelineLayout,
 			renderData.rdAvengComputeTransformPipeline, computeShaderFile)) {
@@ -631,7 +652,7 @@ namespace aveng {
 			return false;
 		}
 
-		// Animation Compute Output Pipeline - WHY IS THIS A 2ND PIPELINE YOU FOOL
+		// Animation Compute Stage 2 - Output Pipeline - WHY IS THIS A 2ND PIPELINE YOU TUTORIAL FOLLOWING FOOL
 		computeShaderFile = "shaders/assimp_instance_matrix_mult.comp.spv";
 		if (!ComputePipeline::init(engineDevice, renderData.rdAvengBindlessPipelineLayout,
 			renderData.rdAvengComputeMatrixMultPipeline, computeShaderFile)) {
@@ -1191,12 +1212,24 @@ namespace aveng {
 
 	void Renderer::renderTerrain()
 	{
-		terrainController_.update();
-		terrainController_.renderDebug(
-			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
-			renderData.rdAvengBasicTerrainPipeline,
-			currentFrameIndex
-		);
+
+		if (1) {
+			terrainController_.update();
+			terrainController_.renderDebug(
+				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
+				renderData.rdAvengBasicTerrainPipeline,
+				currentFrameIndex
+			);
+		}
+		else {
+			terrainController_.update();
+			terrainController_.render(
+				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
+				renderData.rdAvengTerrainLitPipeline,
+				currentFrameIndex
+			);
+		}
+
 	}
 
 	// Timers in this class
@@ -1269,6 +1302,7 @@ namespace aveng {
 		vkDestroyPipeline(engineDevice.device(), renderData.rdAvengAnimationSelectionPipeline, nullptr);
 		vkDestroyPipeline(engineDevice.device(), renderData.rdLinePipeline, nullptr);
 		TerrainPipeline::cleanup(engineDevice, renderData.rdAvengBasicTerrainPipeline);
+		TerrainPipeline::cleanup(engineDevice, renderData.rdAvengTerrainLitPipeline);
 		TerrainPipeline::cleanup(engineDevice, renderData.rdAvengEditorBasicTerrainPipeline);
 		TerrainPipeline::cleanup(engineDevice, renderData.rdTerrainComputePipeline);
 
@@ -1314,7 +1348,7 @@ namespace aveng {
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdBasicTerrainDescriptorSetLayout, nullptr);
 		vkDestroyDescriptorSetLayout(engineDevice.device(), renderData.rdTerrainComputeDescriptorSetLayout, nullptr);
 
-		//
+		// old school
 		// vkDestroyDescriptorPool(engineDevice.device(), renderData.avengDescriptorPool, nullptr);
 
 		vkDestroyRenderPass(engineDevice.device(), renderData.rdLineRenderpass, nullptr);

@@ -70,8 +70,9 @@
 * Each stage is a separate task. Any available thread can grab any task.
 */
 
-namespace aveng {
 
+inline thread_local int g_waitDepth = 0;
+namespace aveng {
     /* The underlying abstract class, our "contract" which the threadpool will operate according to */
     class ITaskSystem {
     public:
@@ -105,9 +106,14 @@ namespace aveng {
         //    return fut;
         //}
 
+
         // Helping wait: avoids deadlocks when workers wait on other tasks.
         template<class T>
         T wait(const std::shared_future<T>& fut) {
+
+            ++g_waitDepth;
+            struct Scope { ~Scope() { --g_waitDepth; } } scope;
+
             while (fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
                 // Always try to run a job.
                 if (!try_run_one_job()) {

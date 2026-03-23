@@ -198,7 +198,7 @@ namespace procgen {
             std::vector<double> acc(N, 0.0);
 
             for (auto& f : futures) {
-                const std::vector<float> local = f.get();
+                const std::vector<float> local = tasks.wait(f);
                 // local.size() should be N
                 for (uint32_t i = 0; i < N; ++i) {
                     acc[i] += (double)local[i];

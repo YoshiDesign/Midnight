@@ -64,8 +64,8 @@ namespace aveng {
         noise::NoiseParams defaultNoiseParams() {
             return {
                 7,      // octaves
-                0.01f,  // frequency
-                20.0f,   // amplitude
+                0.005f,  // frequency
+                32.0f,   // amplitude
                 0.5f,   // persistence
                 2.0f    // lacunarity
             };
@@ -78,11 +78,7 @@ namespace aveng {
                 8.f,    // minPointDist
                 32.f,   // halo
                 tasks_.nThreads(),
-				defaultNoiseParams(),
-                true,
-                true,
-                true,
-                true
+				defaultNoiseParams()
             };
         }
 
@@ -103,9 +99,6 @@ namespace aveng {
         std::shared_future<SpatialGrid const*>      requestSpatialGrid(ChunkCoord c, uint64_t frameIndex);
         std::shared_future<ErosionField const*>     requestErosion(ChunkCoord c, uint64_t frameIndex);
         std::shared_future</*FinalMeshCPU const**/bool>     requestMesh(ChunkCoord c, uint64_t frameIndex);
-
-        // Renderable assembly: 3x3 core + 5x5 support region
-        // std::unique_ptr<procgen::TerrainRenderable> requestRenderable(ChunkCoord center, uint64_t frameIndex);
 
         // Streaming helpers
         ChunkRecord* pin(ChunkCoord c, uint64_t frameIndex); // 
@@ -129,6 +122,21 @@ namespace aveng {
         }
 
         ChunkRecord* getOrCreateRecord(ChunkCoord c);
+
+        void setGlobalConfig(TerrainConfig& tcfg) {
+            cfg_.worldSeed = tcfg.worldSeed;
+            cfg_.chunkSize = tcfg.chunkSize;
+            cfg_.halo = tcfg.halo;
+            cfg_.minPointDist = tcfg.minPointDist;
+        }
+
+        void setNoiseParams(noise::NoiseParams noise) {
+            std::printf("Amplitude: %f\tFrequency: %f\n", noise.amplitude, noise.frequency);
+            std::printf("Updated Noise\n");
+            cfg_.noise = noise;
+        }
+
+        void setErosionParameters(ErosionSettings eroCfg);
 
     private:
 
@@ -156,6 +164,8 @@ namespace aveng {
 
         ThreadPoolTaskSystem& tasks_;
         TerrainConfig cfg_; // Note that this differs from our prototype, where each Chunk owned its own config
+                            // Settings can be modulated during runtime to produce different results over time.
+                            // There are per-stage settings too, naturally
 
 		static constexpr size_t STRIPES = 64; // This should be a power of two for the bitwise bucket calculation to work correctly
         std::array<StripeBucket, STRIPES> records_;

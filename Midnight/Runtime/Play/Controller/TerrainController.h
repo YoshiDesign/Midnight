@@ -62,10 +62,17 @@ namespace aveng {
         // Called once per tick by the engine (Midnight) so gameplay doesn't need to thread frame indices everywhere.
         void setFrameIndex(uint64_t frameIndex) noexcept;
 
+        // Compute Shader Render Settings for terrain generation - Nothing to do with terrain generation itself
         void setTerrainSettingsUbo(VkBuffer buffer, VkDeviceSize size) noexcept {
             settingsUboBuffer_ = buffer;
             settingsUboSize_ = size;
         }
+
+        void setTerrainConfig(TerrainConfig tcfg);
+
+        void setTerrainNoiseParams(noise::NoiseParams noise);
+
+        void setTerrainWeatheringParams(ErosionSettings erosion);
 
         bool uploadTerrainChunkToGpu(TerrainChunkSlot& slot);
 

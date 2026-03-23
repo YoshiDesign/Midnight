@@ -46,7 +46,7 @@ namespace aveng {
                 c.driver->update(dt, input, c.transform);
             }
 
-            // Interesting, that we apply calculations to the CameraSlot's transform member, 
+            // Interesting that we apply calculations to the CameraSlot's transform member, 
             // and then apply it to the camera member's transform_. Yet another invariant /shrug
             c.camera.setTransform(c.transform);
 

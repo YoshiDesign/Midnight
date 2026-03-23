@@ -4,13 +4,29 @@
 #include "Core/Modeling/AssimpInstance.h"
 #include "Game/Camera/CameraManager.h"
 #include "Core/Modeling/ModelAndInstanceData.h"
+#include "Module/Procgen/Types.h"
+#include "Module/Procgen/Noise/Config.h"
 
 namespace aveng {
 
     // Editor sink to emit commands to XOne
     struct EditorCommand {
-        enum class Type { RequestPlay, RequestStop, RequestPause, RequestResume } type;
+        enum class Type { 
+            RequestPlay, 
+            RequestStop, 
+            RequestPause, 
+            RequestResume, 
+            GenerateTerrain,
+            UpdateTerrainGlobalParams,
+            UpdateTerrainNoiseParams,
+            UpdateWeatheringParams
+        } type;
         std::string payload; // e.g. "holyship"
+        int terrain_x; // GenerateTerrain
+        int terrain_z; // GenerateTerrain
+        TerrainConfig tcfg; // UpdateTerrainGlobalParams
+        noise::NoiseParams ncfg; // UpdateTerrainNoiseParams
+        ErosionSettings erosion; // UpdateWeatheringParams
     };
 
     struct EditorData {
@@ -38,10 +54,40 @@ namespace aveng {
         std::vector<EditorCommand> commands;
 
         void requestPlay(std::string_view game) {
-            commands.push_back({ EditorCommand::Type::RequestPlay, std::string(game) });
+            EditorCommand ec;
+            ec.type = EditorCommand::Type::RequestPlay;
+            ec.payload = std::string(game);
+            commands.push_back(ec);
         }
         void requestStop() {
-            commands.push_back({ EditorCommand::Type::RequestStop, {} });
+            EditorCommand ec;
+            ec.type = EditorCommand::Type::RequestStop;
+            commands.push_back(ec);
+        }
+        void requestTerrain(int x, int z) {
+            EditorCommand ec;
+            ec.type = EditorCommand::Type::GenerateTerrain;
+            ec.terrain_x = x;
+            ec.terrain_z = z;
+            commands.push_back(ec);
+        }
+        void requestTerrainGlobalParams(TerrainConfig tcfg) {
+            EditorCommand ec;
+            ec.type = EditorCommand::Type::UpdateTerrainGlobalParams;
+            ec.tcfg = tcfg;
+            commands.push_back(ec);
+        }
+        void requestTerrainNoiseParams(noise::NoiseParams noise) {
+            EditorCommand ec;
+            ec.type = EditorCommand::Type::UpdateTerrainNoiseParams;
+            ec.ncfg = noise;
+            commands.push_back(ec);
+        }
+        void requestTerrainWeatheringParams(ErosionSettings ero) {
+            EditorCommand ec;
+            ec.type = EditorCommand::Type::UpdateWeatheringParams;
+            ec.erosion = ero;
+            commands.push_back(ec);
         }
 
         std::vector<EditorCommand> drainCommands() {

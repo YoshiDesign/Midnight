@@ -6,7 +6,7 @@ namespace aveng {
 		glm::vec3 rotate{ 0 };
 
 		// TODO - Move these to a Game Parameters class
-		float climbSpeed{ 10.0f };
+		float climbSpeed{ 120.0f };
 		float lookSpeed{ 2.0f };
 		float rollSpeed{ 8.0f };
 

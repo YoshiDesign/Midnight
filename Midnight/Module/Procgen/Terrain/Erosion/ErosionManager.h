@@ -32,6 +32,10 @@ namespace procgen {
 		void setHardnessParams(aveng::HardnessParams p) {} // TODO
 		void setRidgeParams(aveng::RidgeParams p) {} // TODO
 
+		void setWeatheringConfig(aveng::ErosionSettings eroCfg) {
+			activeSettings_ = eroCfg;
+		}
+
 		aveng::ErosionSettings addCustomSettings( // TODO
 			aveng::HydraulicErosionParams hp,
 			aveng::ThermalErosionParams tp,
@@ -42,7 +46,7 @@ namespace procgen {
 		// Selectable settings, whether presets or user-defined
 		std::vector<aveng::ErosionSettings> settings_;
 		aveng::ErosionSettings activeSettings_;
-		uint16_t nThreads;
+		uint16_t nThreads{0};
 
 	};
 }

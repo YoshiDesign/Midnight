@@ -85,7 +85,22 @@ namespace xone {
 			// Process Editor Commands
 			for (const auto cmd : editorData().drainCommands()) {
 				switch (cmd.type) {
-				case aveng::EditorCommand::Type::RequestPlay: play.requestPlay(cmd.payload); break;
+				case aveng::EditorCommand::Type::RequestPlay: 
+					play.requestPlay(cmd.payload); 
+					break;
+				case aveng::EditorCommand::Type::GenerateTerrain: 
+					midnight.gameServices().terrain.generateChunks({ cmd.terrain_x, cmd.terrain_z }, 0, 0);
+					break;
+				case aveng::EditorCommand::Type::UpdateTerrainGlobalParams: 
+					midnight.gameServices().terrain.setTerrainConfig(cmd.tcfg);
+					break;
+				case aveng::EditorCommand::Type::UpdateTerrainNoiseParams: 
+					std::printf("Draining Noise Param Update Command\n");
+					midnight.gameServices().terrain.setTerrainNoiseParams(cmd.ncfg);
+					break;
+				case aveng::EditorCommand::Type::UpdateWeatheringParams:
+					midnight.gameServices().terrain.setTerrainWeatheringParams(cmd.erosion);
+					break;
 				// case aveng::EditorCommand::Type::RequestStop: play.requestStop(); break;
 				default: break;
 				}

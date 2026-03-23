@@ -23,6 +23,55 @@
 #include "Runtime/Debug.h"
 #endif
 
+/*
+* Policy
+* - pointers returned by futures are only valid while the chunk is pinned.
+* - Each stage function should only request the minimum prerequisite stage(s).
+*   This is guaranteed by cascading through requested stages.
+*
+* Design Notes:
+* - Anything you publish (return from a future) must be allocated in rec.final
+* - Scratch is per-thread and reset every job without risking published pointers
+* - Each ChunkRecord has its own scratch storage as well.
+*
+* Threads:
+* Each OS thread gets its own independent instance of tlsScratch.
+* - When worker threads run a task, each uses its own scratch arena.
+* - No locking, no contention, no cross-thread memory reuse bugs.
+* - If you ever run tasks on the main thread too (e.g. "helping wait" executes work inline),
+*   the main thread will have its own tlsScratch instance as well.
+*
+* Safety:
+*   - pin() is coupled to ChunkRecord generation, but not the other way around.
+*     We're using a strict lifetime policy at the moment.
+*
+* We pin at each individual stage. Why, you ask?
+* While stages can be requested independently, you want those stage tasks to
+* be safe even when no higher-level "pipeline pin" exists.
+*
+* We only "pipeline pin" because we want everything to occur before eviction becomes safe.
+*
+* Future Consideration:
+* - Generate halo points deterministically without reading neighbors:
+*     Sometimes people avoid halo stitching by generating points from a world seed for the expanded region and then
+*     selecting the core subset per chunk. That's elegant but changes the architecture: each chunk
+*     would be responsible for generating points in its expanded bounds, which we explicitly avoid at the moment.
+*/
+
+/*
+* Notes from Chat-Guy
+*
+* Returning ChunkRecord* is safe as long as eviction respects pins (lifetime safety!).
+*
+* If we want to squeeze a little more perf from this:
+*   If creation is heavy (it isn't too heavy here, but it's not free), you could tighten
+*   the critical section later (create outside the lock), but doing that safely requires a
+*   more careful "placeholder/state" approach so other threads don't see a half-initialized record.
+*   (Worth doing only if you measure it as a bottleneck.)
+*   Also, we can keep the bucket lock short by inserting a "shell" record quickly, then doing heavier
+*   initialization outside the lock
+*/
+
 namespace {
 
     struct TriRef
@@ -36,7 +85,7 @@ namespace {
     // as procgen grows.
     void ApplyDelta(std::span<float> work, std::span<const float> delta) {
 #ifdef M_DEBUG
-        assert(work.size() == delta.size() && "ApplyDelta: size mismatch");
+        // assert(work.size() == delta.size() && "ApplyDelta: size mismatch");
 #endif
         for (size_t i = 0; i < work.size(); ++i) {
             work[i] += delta[i];
@@ -159,7 +208,7 @@ namespace aveng {
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
         fs::path fullPath = exeDir /
-            std::format("chunk_{}_heights.txt", name);
+            std::format("heights_chunk_{}.txt", name);
 
         Debug::writeHeightDataToFile(fullPath, data);
     }
@@ -172,7 +221,7 @@ namespace aveng {
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
         fs::path fullPath = exeDir /
-            std::format("chunk_{}_triangulation.txt", name);
+            std::format("triangulation_chunk_{}.txt", name);
 
 		Debug::writeTriangulationDataToFile(fullPath, tri_data);
 
@@ -186,7 +235,7 @@ namespace aveng {
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
         fs::path fullPath = exeDir /
-            std::format("chunk_{}_sgrid.txt", name);
+            std::format("sgrid_chunk_{}.txt", name);
 
         Debug::writeSgridDataToFile(fullPath, grid);
 
@@ -200,7 +249,7 @@ namespace aveng {
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
         fs::path fullPath = exeDir /
-            std::format("chunk_{}_hydro.txt", name);
+            std::format("hydro_chunk_{}.txt", name);
 
         Debug::writeHydroDataToFile(fullPath, ws->delta);
 
@@ -214,7 +263,7 @@ namespace aveng {
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
         fs::path fullPath = exeDir /
-            std::format("chunk_{}_hydro.txt", name);
+            std::format("hydro_chunk_{}.txt", name);
 
         Debug::writeThermalDataToFile(fullPath, ws->delta);
 
@@ -230,7 +279,7 @@ namespace aveng {
         std::string name = std::to_string(coord.x) + "_" + std::to_string(coord.z);
 
         fs::path fullPath = exeDir /
-            std::format("chunk_{}_FinalHeights.txt", name);
+            std::format("FinalHeights_chunk_{}.txt", name);
 
         Debug::writeFinalHeightDataToFile(fullPath, data);
     }
@@ -277,6 +326,13 @@ namespace aveng {
         }
     };
 
+    ChunkManager::ChunkManager(ThreadPoolTaskSystem& tasks)
+        : tasks_(tasks)
+    {
+        cfg_ = defaultTerrainConfig(); // Global Config
+        cfg_.noise = defaultNoiseParams();
+    }
+
     /* Manager Setups */
     void ChunkManager::initManagers(procgen::ErosionManager* er)
     {
@@ -292,56 +348,11 @@ namespace aveng {
             // User Error... you probably didn't init TerrainConfig properly.
         }
     }
-    /* Manager Setups */
 
-    /*
-    * Policy 
-    * - pointers returned by futures are only valid while the chunk is pinned.
-    * - Each stage function should only request the minimum prerequisite stage(s). 
-    *   This is guaranteed by cascading through requested stages.
-    * 
-    * Design Notes:
-    * - Anything you publish (return from a future) must be allocated in rec.final
-    * - Scratch is per-thread and reset every job without risking published pointers
-    * - Each ChunkRecord has its own scratch storage as well.
-    * 
-    * Threads:
-    * Each OS thread gets its own independent instance of tlsScratch.
-    * - When worker threads run a task, each uses its own scratch arena.
-    * - No locking, no contention, no cross-thread memory reuse bugs.
-    * - If you ever run tasks on the main thread too (e.g. "helping wait" executes work inline), 
-    *   the main thread will have its own tlsScratch instance as well.
-    * 
-    * Safety:
-    *   - pin() is coupled to ChunkRecord generation, but not the other way around. 
-    *     We're using a strict lifetime policy at the moment.
-    * 
-    * We pin at each individual stage. Why, you ask?
-    * While stages can be requested independently, you want those stage tasks to 
-    * be safe even when no higher-level "pipeline pin" exists.
-    * 
-    * We only "pipeline pin" because we want everything to occur before eviction becomes safe.
-    * 
-    * Future Consideration:
-    * - Generate halo points deterministically without reading neighbors:
-    *     Sometimes people avoid halo stitching by generating points from a world seed for the expanded region and then 
-    *     selecting the core subset per chunk. That's elegant but changes the architecture: each chunk
-    *     would be responsible for generating points in its expanded bounds, which we explicitly avoid at the moment.
-    */
-
-    /*
-    * Notes from Chat-Guy
-    * 
-    * Returning ChunkRecord* is safe as long as eviction respects pins (lifetime safety!).
-    *
-    * If we want to squeeze a little more perf from this:
-    *   If creation is heavy (it isn't too heavy here, but it's not free), you could tighten 
-    *   the critical section later (create outside the lock), but doing that safely requires a 
-    *   more careful "placeholder/state" approach so other threads don't see a half-initialized record. 
-    *   (Worth doing only if you measure it as a bottleneck.)
-    *   Also, we can keep the bucket lock short by inserting a "shell" record quickly, then doing heavier 
-    *   initialization outside the lock
-    */
+    void ChunkManager::setErosionParameters(ErosionSettings eroCfg)
+    {
+        erosionMgr_->setWeatheringConfig(eroCfg);
+    }
 
     //
     ChunkRecord* ChunkManager::getOrCreateRecord(ChunkCoord coord)
@@ -406,13 +417,6 @@ namespace aveng {
 
         // [!] On the main thread we would use .get() on this future, which blocks.
         return rec->meshF;
-    }
-
-
-    ChunkManager::ChunkManager(ThreadPoolTaskSystem& tasks)
-        : tasks_(tasks) 
-    {
-        cfg_ = defaultTerrainConfig(); // Global Config
     }
 
     std::shared_future<Points const*> ChunkManager::requestPoints(ChunkCoord c, uint64_t frameIndex)
@@ -710,7 +714,7 @@ namespace aveng {
         heightsOut.resize(rec.allPoints->pts.size());
 
         // Bring the (default) noise
-        noise::NoiseParams np = defaultNoiseParams();
+        noise::NoiseParams np = cfg_.noise;
 
         for (size_t i = 0; i < rec.allPoints->pts.size(); i++) {
             // Heights in parallel with points (Sites)
@@ -721,7 +725,7 @@ namespace aveng {
         }
 
 #ifdef M_DEBUG
-		dumpChunkHeightData(rec.coord, heightsOut);
+		//dumpChunkHeightData(rec.coord, heightsOut);
 #endif
 
         // 4) Allocate the published product in FINAL memory.
@@ -790,12 +794,12 @@ namespace aveng {
 
 #ifdef M_DEBUG
         // Optional: sanity invariants (adapt to your exact half-edge layout)
-        assert(tri->triEdge0.size() == tri->tris.size());
-        assert(tri->siteEdge.size() == static_cast<size_t>(vertexCount));
+        // assert(tri->triEdge0.size() == tri->tris.size());
+        // assert(tri->siteEdge.size() == static_cast<size_t>(vertexCount));
         // If you do 3 half-edges per triangle:
         // assert(tri->halfEdges.size() == tri->tris.size() * 3);
 
-        dumpTriangulationDatas(rec.coord, rec.triangulation);
+        //dumpTriangulationDatas(rec.coord, rec.triangulation);
 #endif
 
         // Triangle ownership
@@ -825,33 +829,33 @@ namespace aveng {
         const float cellSize = cfg_.minPointDist;
 
 #ifdef M_DEBUG
-        {
-            // Checking out totals from previous stages
-            if (rec.triangulation) {
-                std::printf("[SpatialGrid] tri: tris=%zu halfEdges=%zu triEdge0=%zu siteEdge=%zu\n",
-                    rec.triangulation->tris.size(),
-                    rec.triangulation->halfEdges.size(),
-                    rec.triangulation->triEdge0.size(),
-                    rec.triangulation->siteEdge.size());
-            }
-            if (rec.allPoints) {
-                std::printf("[SpatialGrid] pts: pts=%zu coreIdx=%zu\n",
-                    rec.allPoints->pts.size(),
-                    rec.allPoints->coreIdx.size());
-            }
-            if (rec.heightField) {
-                std::printf("[SpatialGrid] hf: heights=%zu\n",
-                    rec.heightField->heights.size());
-            }
+        //{
+        //    // Checking out totals from previous stages
+        //    if (rec.triangulation) {
+        //        std::printf("[SpatialGrid] tri: tris=%zu halfEdges=%zu triEdge0=%zu siteEdge=%zu\n",
+        //            rec.triangulation->tris.size(),
+        //            rec.triangulation->halfEdges.size(),
+        //            rec.triangulation->triEdge0.size(),
+        //            rec.triangulation->siteEdge.size());
+        //    }
+        //    if (rec.allPoints) {
+        //        std::printf("[SpatialGrid] pts: pts=%zu coreIdx=%zu\n",
+        //            rec.allPoints->pts.size(),
+        //            rec.allPoints->coreIdx.size());
+        //    }
+        //    if (rec.heightField) {
+        //        std::printf("[SpatialGrid] hf: heights=%zu\n",
+        //            rec.heightField->heights.size());
+        //    }
 
-            // Proof that the SpatialGrid covers the halo region for individual chunks.
-            // This means we can include reliable adjacency information, efficiently, to compute shaders
-            std::printf("[SpatialGrid] cellSize=%f bounds(minx,minz,maxx,maxz)=(%f,%f,%f,%f) halo=%f\n",
-                cellSize, minX, minZ, maxX, maxZ, rec.halo);
+        //    // Proof that the SpatialGrid covers the halo region for individual chunks.
+        //    // This means we can include reliable adjacency information, efficiently, to compute shaders
+        //    std::printf("[SpatialGrid] cellSize=%f bounds(minx,minz,maxx,maxz)=(%f,%f,%f,%f) halo=%f\n",
+        //        cellSize, minX, minZ, maxX, maxZ, rec.halo);
 
-            if (!(cellSize > 0.0f)) std::printf("[SpatialGrid][!!] cellSize is not > 0\n");
-            if (!(maxX > minX && maxZ > minZ)) std::printf("[SpatialGrid][!!] bounds are degenerate/inverted\n");
-        }
+        //    if (!(cellSize > 0.0f)) std::printf("[SpatialGrid][!!] cellSize is not > 0\n");
+        //    if (!(maxX > minX && maxZ > minZ)) std::printf("[SpatialGrid][!!] bounds are degenerate/inverted\n");
+        //}
 #endif
         // Build via free function (returns owning pointer)
         std::unique_ptr<SpatialGrid> sg = BuildSpatialGrid(
@@ -868,15 +872,15 @@ namespace aveng {
 
 #ifdef M_DEBUG
 
-        if (!sg) {
-            std::printf("[SpatialGrid][!!] BuildSpatialGrid returned nullptr\n");
-            // If you want to hard-fail but still see the message:
-            assert(false && "BuildSpatialGrid returned null (see console prereq dump above)");
-        }
+        //if (!sg) {
+        //    std::printf("[SpatialGrid][!!] BuildSpatialGrid returned nullptr\n");
+        //    // If you want to hard-fail but still see the message:
+        //    assert(false && "BuildSpatialGrid returned null (see console prereq dump above)");
+        //}
 
-        assert(sg && "[buildSpatialGrid] BuildSpatialGrid returned null");
-        std::printf("Completed SpatialGrid\n");
-        dumpSpatialGridData(rec.coord, &(*rec.spatial));
+        //assert(sg && "[buildSpatialGrid] BuildSpatialGrid returned null");
+        std::printf("Completed SpatialGrid {%d, %d}\n", rec.coord.x, rec.coord.z);
+        //dumpSpatialGridData(rec.coord, &(*rec.spatial));
 #endif
         // Return stable pointer into the optional
         return &(*rec.spatial);
@@ -910,8 +914,8 @@ namespace aveng {
         // However, in our architecture we've synchronized stages so this isn't necessary.
 
         // Or do something like the below snippet, to be safe, should we change our design.
-        (void)requestHeights(rec.coord, 0 /*frameIndex*/).get(); // ensure built
-        (void)requestAllPoints(rec.coord, 0 /*frameIndex*/).get(); // ensure built
+        // (void)requestHeights(rec.coord, 0 /*frameIndex*/).get(); // ensure built
+        // (void)requestAllPoints(rec.coord, 0 /*frameIndex*/).get(); // ensure built
         //auto const& heights = rec.heightField->heights;
 
         // Get heights for copying.
@@ -932,59 +936,76 @@ namespace aveng {
         * Haste be with us.
         */
 
-        // 2) Hardness in scratch
-        procgen::ComputeHardnessMap(
-            ws.hardness, 
-			rec.allPoints->pts, // INVARIANT REMINDER - allPoints->pts.size() == heightField->heights.size()
-            ws.workHeights,
-            settings.hardness,
-            hardnessSeed
-        );
+        if (settings.hardnessMapEnabled) {
+        
+            // 2) Hardness in scratch
+            procgen::ComputeHardnessMap(
+                ws.hardness, 
+			    rec.allPoints->pts, // INVARIANT REMINDER - allPoints->pts.size() == heightField->heights.size()
+                ws.workHeights,
+                settings.hardness,
+                hardnessSeed
+            );
 
-        // 3) Hydraulic pass writes ws.delta, then apply into ws.workHeights
-        procgen::ComputeHydraulicErosion(
-            ws, 
-            *rec.allPoints, 
-            *rec.triangulation, 
-            rec.spatial.value(), 
-            settings.hydraulic,
-            hydroSeed,
-            tasks_
-        );
+        }
+
+        if (settings.hydraulicErosionEnabled) {
+        
+            // 3) Hydraulic pass writes ws.delta, then apply into ws.workHeights
+            procgen::ComputeHydraulicErosion(
+                ws, 
+                *rec.allPoints, 
+                *rec.triangulation, 
+                rec.spatial.value(), 
+                settings.hydraulic,
+                hydroSeed,
+                tasks_
+            );
+
+            ApplyDelta(ws.workHeights, ws.delta);
+            std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+        }
 
 #ifdef M_DEBUG
-        dumpHydraulicData(rec.coord, &ws);
+        std::printf("Completed HydroErosion {%d, %d}\n", rec.coord.x, rec.coord.z);
+       //dumpHydraulicData(rec.coord, &ws);
 #endif
 
-        ApplyDelta(ws.workHeights, ws.delta);
-        std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
 
-        // 4) Thermal pass writes ws.delta, then apply
-        procgen::ComputeThermalErosion(
-            ws,  
-            *rec.allPoints,
-            *rec.triangulation,
-            rec.spatial.value(),
-            settings.thermal,
-            thermalSeed,
-            tasks_
-        );
+        if (settings.thermalErosionEnabled) {
+        
+            // 4) Thermal pass writes ws.delta, then apply
+            procgen::ComputeThermalErosion(
+                ws,  
+                *rec.allPoints,
+                *rec.triangulation,
+                rec.spatial.value(),
+                settings.thermal,
+                thermalSeed,
+                tasks_
+            );
 
-        ApplyDelta(ws.workHeights, ws.delta);
-        std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+            ApplyDelta(ws.workHeights, ws.delta);
+            std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+        }
 
-        // 5) Ridge enhancement can use ping-pong:
-        ws.ping.resize(N);
-        ComputeRidgeEnhancement( /* WARNING: I DID NOT AUDIT THIS CODE AT ALL */
-            ws,
-            *rec.allPoints,
-            *rec.triangulation,
-            rec.spatial.value(),
-            settings.ridges,
-            ridgeSeed,
-            tasks_
-        );
-        ws.workHeights.swap(ws.ping);
+
+        if (settings.ridgeEnhancementEnabled) {
+
+            // 5) Ridge enhancement can use ping-pong
+            ws.ping.resize(N);
+            ComputeRidgeEnhancement( /* WARNING: I DID NOT REVIEW THIS CODE AT ALL */
+                ws,
+                *rec.allPoints,
+                *rec.triangulation,
+                rec.spatial.value(),
+                settings.ridges,
+                ridgeSeed,
+                tasks_
+            );
+
+            ws.workHeights.swap(ws.ping);
+        }
 
         // Allocate the published product in FINAL memory
         // This is the pointer that the future will return
@@ -1001,7 +1022,8 @@ namespace aveng {
         rec.erosion->eHeights.insert(rec.erosion->eHeights.end(), ws.workHeights.begin(), ws.workHeights.end());
 
 #ifdef M_DEBUG
-        dumpChunkFinalHeightData(rec.coord, rec.erosion->eHeights);
+        std::printf("[Completed] {%d, %d}\n", rec.coord.x, rec.coord.z);
+        //dumpChunkFinalHeightData(rec.coord, rec.erosion->eHeights);
 #endif
 
         // 6) Done. Scratch can be reused immediately by this worker for the next job.
@@ -1104,7 +1126,7 @@ namespace aveng {
     }
 
     /* Async */
-    uint64_t  ChunkManager::requestRenderableAsync(ChunkCoord center, uint64_t frameIndex)
+    uint64_t ChunkManager::requestRenderableAsync(ChunkCoord center, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(center);
 
@@ -1200,10 +1222,10 @@ namespace aveng {
         }
     }
 
-
     // ---------------------------------------------------------------------------
     // Renderable assembly: 3x3 core region + 5x5 support (halo) region
     // ---------------------------------------------------------------------------
+
 
     /* meat n' potatoes */
     std::unique_ptr<procgen::TerrainRenderable>
@@ -1385,13 +1407,13 @@ namespace aveng {
         const uint32_t totalCoreVerts = static_cast<uint32_t>(renderable->packedPositions.size());
 
 #ifdef M_DEBUG
-        for (uint32_t i = 0; i < static_cast<uint32_t>(renderable->ibo.size()); ++i) {
-            if (renderable->ibo[i] >= totalCoreVerts) {
-                printf("BAD CORE IBO[%u] = %u, totalCoreVerts=%u\n",
-                    i, renderable->ibo[i], totalCoreVerts);
-            }
-            assert(renderable->ibo[i] < totalCoreVerts);
-        }
+        //for (uint32_t i = 0; i < static_cast<uint32_t>(renderable->ibo.size()); ++i) {
+        //    if (renderable->ibo[i] >= totalCoreVerts) {
+        //        printf("BAD CORE IBO[%u] = %u, totalCoreVerts=%u\n",
+        //            i, renderable->ibo[i], totalCoreVerts);
+        //    }
+        //    assert(renderable->ibo[i] < totalCoreVerts);
+        //}
 #endif
 
         for (const TriRef& ref : haloTriRefs) {
@@ -1458,23 +1480,23 @@ namespace aveng {
         align.supportMinXZ = suppMin;
         align.supportMaxXZ = suppMax;
 #if M_DEBUG
-        std::printf(
-            "Renderable {%d,%d}: coreTris=%zu haloTris=%zu total=%zu\n",
-            center.x, center.z,
-            coreTriRefs.size(),
-            haloTriRefs.size(),
-            coreTriRefs.size() + haloTriRefs.size()
-        );
+        //std::printf(
+        //    "Renderable {%d,%d}: coreTris=%zu haloTris=%zu total=%zu\n",
+        //    center.x, center.z,
+        //    coreTriRefs.size(),
+        //    haloTriRefs.size(),
+        //    coreTriRefs.size() + haloTriRefs.size()
+        //);
 
-        std::printf(
-            "Renderable {%d,%d}: packedVerts=%zu\n",
-            center.x, center.z,
-            renderable->packedPositions.size()
-        );
+        //std::printf(
+        //    "Renderable {%d,%d}: packedVerts=%zu\n",
+        //    center.x, center.z,
+        //    renderable->packedPositions.size()
+        //);
 
-        printf("coreTris=%u haloTris=%u coreVerts=%u haloVerts=%u vbo=%zu ibo=%zu\n",
-            totalCoreTris, totalHaloTris, totalCoreVerts, totalHaloVerts,
-            renderable->vbo.size(), renderable->ibo.size());
+        //printf("coreTris=%u haloTris=%u coreVerts=%u haloVerts=%u vbo=%zu ibo=%zu\n",
+        //    totalCoreTris, totalHaloTris, totalCoreVerts, totalHaloVerts,
+        //    renderable->vbo.size(), renderable->ibo.size());
 #endif
         return renderable;
 

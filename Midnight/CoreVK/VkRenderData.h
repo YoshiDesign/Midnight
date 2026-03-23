@@ -400,7 +400,8 @@ namespace aveng {
 		VkPipeline rdAvengBasicTerrainPipeline = VK_NULL_HANDLE;
 		VkPipeline rdAvengEditorBasicTerrainPipeline = VK_NULL_HANDLE;
 		VkPipeline rdTerrainComputePipeline = VK_NULL_HANDLE;
-		VkPipeline rdTerrainLitPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengTerrainLitPipeline = VK_NULL_HANDLE;
+		VkPipeline rdAvengEditorTerrainLitPipeline = VK_NULL_HANDLE;
 
 		std::vector<VkShaderStorageBufferData> rdShaderBoneMatrixOffsetBuffers;	// Storage Buffer
 		std::vector<glm::mat4> globalBoneOffsetMatricesList{};					// Data - Reserved/Resized during model loading

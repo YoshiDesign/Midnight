@@ -1,4 +1,4 @@
-#include "TerrainPipeline.h"
+#include "TerrainDebugPipeline.h"
 #include <vector>
 #include <cstddef>
 #include "Shader.h"
@@ -8,8 +8,7 @@
 
 namespace aveng {
 
-
-    bool TerrainPipeline::init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline,
+    bool TerrainDebugPipeline::init(EngineDevice& engineDevice, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline,
         VkRenderPass renderpass, uint32_t numColorAttachments, std::string vertexShaderFilename, std::string fragmentShaderFilename) {
         /* shader */
         VkShaderModule vertexModule = Shader::loadShader(engineDevice.device(), vertexShaderFilename);
@@ -173,7 +172,7 @@ namespace aveng {
         return true;
     }
 
-    void TerrainPipeline::cleanup(EngineDevice& engineDevice, VkPipeline& pipeline) {
+    void TerrainDebugPipeline::cleanup(EngineDevice& engineDevice, VkPipeline& pipeline) {
         vkDestroyPipeline(engineDevice.device(), pipeline, nullptr);
     }
 

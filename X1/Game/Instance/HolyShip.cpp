@@ -16,6 +16,11 @@ namespace xone {
             play_.requestPlay("holyship");
             started_ = true;
             services.terrain.generateChunks(aveng::ChunkCoord{ 0,0 }, 2, 2);
+            //services.terrain.generateChunks(aveng::ChunkCoord{ 4,4 }, 2, 2);
+            //services.terrain.generateChunks(aveng::ChunkCoord{ -4,4 }, 2, 2);
+            //services.terrain.generateChunks(aveng::ChunkCoord{ -4,-4 }, 2, 2);
+            //services.terrain.generateChunks(aveng::ChunkCoord{ 4,-4 }, 2, 2);
+
         }
         
     }

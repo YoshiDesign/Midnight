@@ -27,10 +27,10 @@ namespace procgen {
         assert(outHardness.size() == N);
         assert(positions.size() >= N);
 
-        if (!cfg.Enabled) {
-            std::fill(outHardness.begin(), outHardness.end(), 0.0f);
-            return;
-        }
+        //if (!cfg.Enabled) {
+        //    std::fill(outHardness.begin(), outHardness.end(), 0.0f);
+        //    return;
+        //}
 
         // 1) Min/max (serial for determinism + simplicity)
         float minH = heights[0], maxH = heights[0];

@@ -464,12 +464,24 @@ namespace aveng {
 	}
 
 	void Editor::renderTerrain() {
+
 		renderer.terrainController().update();
-		renderer.terrainController().renderDebug(
-			renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
-			renderData.rdAvengEditorBasicTerrainPipeline,
-			currentFrameIndex
-		);
+
+		if (1) {
+			renderer.terrainController().renderDebug(
+				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
+				renderData.rdAvengEditorBasicTerrainPipeline,
+				currentFrameIndex
+			);
+		}
+		else {
+			renderer.terrainController().render(
+				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
+				renderData.rdAvengEditorTerrainLitPipeline,
+				currentFrameIndex
+			);
+		}
+
 	}
 
 	void Editor::cleanup()

@@ -94,7 +94,7 @@ namespace aveng {
 			inputSystem->handleKey(key, scancode, action, mods);
 #ifdef ENABLE_EDITOR
 			// Toggle between Game and Editor
-			if (inputSystem->isKeyPressed(GLFW_KEY_PERIOD) && action != GLFW_REPEAT) {
+			if (inputSystem->isKeyPressed(GLFW_KEY_F1) && action != GLFW_REPEAT) {
 				inputSystem->setMode((inputSystem->getMode() == AppMode::Game ? AppMode::Editor : AppMode::Game ));
 			}
 #endif

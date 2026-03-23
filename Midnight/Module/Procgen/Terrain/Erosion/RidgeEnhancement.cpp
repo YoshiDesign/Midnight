@@ -147,7 +147,7 @@ namespace procgen {
         uint64_t ridgeSeed,
         aveng::ITaskSystem& tasks
     ) {
-        if (!cfg.Enabled || cfg.Iterations <= 0) return;
+        //if (!cfg.Enabled || cfg.Iterations <= 0) return;
 
         const size_t N = ws.workHeights.size();
         if (N == 0) { return; }
@@ -195,7 +195,7 @@ namespace procgen {
                 }));
             }
 
-            for (auto& f : fut) { f.get(); }
+            for (auto& f : fut) { tasks.wait(f); }
         };
 
         const uint32_t maxWorkers = (cfg.MaxWorkers == 0 ? 1u : cfg.MaxWorkers);
