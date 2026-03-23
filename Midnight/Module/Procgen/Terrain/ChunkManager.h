@@ -36,7 +36,6 @@ namespace procgen {
 
 namespace aveng {
 
-
     struct Points;
     struct AllPoints;
     struct HeightField;
@@ -107,7 +106,7 @@ namespace aveng {
         void unpin(ChunkRecord* rec);
         void evictUnpinnedOlderThan(uint64_t frameIndex, uint64_t ageFrames);
 
-        /* Managers - TODO - More managers */
+        /* Managers */
         void initManagers(procgen::ErosionManager* er);
 
         /* Render Target & Completion Queue Drain */
@@ -115,14 +114,17 @@ namespace aveng {
         bool tryTakeRenderable(ChunkCoord center, uint64_t requestId,
             std::unique_ptr<procgen::TerrainRenderable>& out);
 
+        // Used after generation to acquire completed renderable 3x3 regions
         template <typename Fn>
         void drainCompletedRenderables(Fn&& fn)
         {
             completedRenderables_.drain(std::forward<Fn>(fn));
         }
 
+        // Used during generation to acquire the record we need
         ChunkRecord* getOrCreateRecord(ChunkCoord c);
 
+        /* Config/Settings */
         void setGlobalConfig(TerrainConfig& tcfg) {
             cfg_.worldSeed = tcfg.worldSeed;
             cfg_.chunkSize = tcfg.chunkSize;

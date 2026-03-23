@@ -17,37 +17,11 @@ namespace procgen {
 
 namespace aveng {
 
-    using TerrainGpuHandle = uint32_t;
-
     // Forward declarations to keep compile-times sane.
     struct FinalMeshCPU;
     struct VkRenderData;
     class ChunkManager;
     class EngineDevice;
-
-    enum class TerrainRuntimeState : uint8_t
-    {
-        Unrequested,
-        Requested,
-        CpuReady,
-        Uploading,
-        Resident,
-        Failed
-    };
-
-    struct TerrainChunkSlot
-    {
-        ChunkCoord coord{};
-        TerrainRuntimeState state = TerrainRuntimeState::Unrequested;
-
-        uint64_t requestId = 0;
-
-        std::unique_ptr<procgen::TerrainRenderable> cpuRenderable;
-
-        procgen::TerrainGpuChunk gpu;
-
-        TerrainGpuHandle gpuHandle{};
-    };
 
     /**
      * Game-facing interface for terrain generation / streaming.
@@ -62,26 +36,18 @@ namespace aveng {
         // Called once per tick by the engine (Midnight) so gameplay doesn't need to thread frame indices everywhere.
         void setFrameIndex(uint64_t frameIndex) noexcept;
 
-        // Compute Shader Render Settings for terrain generation - Nothing to do with terrain generation itself
+        // Forward requested params to the ChunkManager
+        void setTerrainConfig(TerrainConfig tcfg);
+        // Forward requested params to the ChunkManager
+        void setTerrainNoiseParams(noise::NoiseParams noise);
+        // Forward requested params to the ChunkManager
+        void setTerrainWeatheringParams(ErosionSettings erosion);
+
+        // VK Data - Compute Shader Terrain Rendering Settings
         void setTerrainSettingsUbo(VkBuffer buffer, VkDeviceSize size) noexcept {
             settingsUboBuffer_ = buffer;
             settingsUboSize_ = size;
         }
-
-        void setTerrainConfig(TerrainConfig tcfg);
-
-        void setTerrainNoiseParams(noise::NoiseParams noise);
-
-        void setTerrainWeatheringParams(ErosionSettings erosion);
-
-        bool uploadTerrainChunkToGpu(TerrainChunkSlot& slot);
-
-        bool writeChunkComputeDescriptorSet(
-            procgen::TerrainPackedGpuData& packed,
-            VkBuffer settingsUboBuffer,
-            VkDeviceSize settingsUboSize);
-
-        bool writeChunkGraphicsDescriptorSet(procgen::TerrainPackedGpuData& packed);
 
         void serviceCpuReadyChunks();
 
@@ -92,7 +58,7 @@ namespace aveng {
 
         void cleanup();
 
-        void cleanupOne(TerrainChunkSlot& slot);
+        void cleanupOne(procgen::TerrainChunkSlot& slot);
         /**
          * Request the final renderable data for compute and graphics.
          * The renderable comprises a 3x3 region of space with up to a 5x5 region
@@ -103,6 +69,8 @@ namespace aveng {
          * - We keep the futures in an internal list for debugging / inspection.
          */
         void generateChunks(ChunkCoord start_coord, int cols, int rows);
+
+        void evictChunks(ChunkCoord center);
 
         // void collectRenderable();
 
@@ -122,6 +90,8 @@ namespace aveng {
 
         VkRenderData& renderData_;
 
+        procgen::TerrainStreamPolicy basicPolicy{ 3 };
+
         VkBasicTerrainPushConstant pc;
         VkBasicTerrainDebugPC dpc;
 
@@ -135,7 +105,11 @@ namespace aveng {
         procgen::ErosionManager erosionMgr_;
         uint64_t frameIndex_ = 0;
 
-        std::unordered_map<ChunkCoord, TerrainChunkSlot, ChunkCoordHash> slots_;
+        /* ChunkCoord represents the center of a 3x3 renderable region, 
+         * though we actually receive data for a 5x5 region to support compute.
+         * Compute dispatch only needs to occur once the renderable is completed
+         */
+        std::unordered_map<ChunkCoord, procgen::TerrainChunkSlot, ChunkCoordHash> slots_;
 
         // std::unique_ptr<procgen::TerrainRenderable> lastRequested_;
 

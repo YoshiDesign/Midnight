@@ -131,4 +131,36 @@ namespace procgen {
 		bool valid = false;
 	};
 
+	/* renderer access */
+
+	using TerrainGpuHandle = uint32_t;
+
+	enum class TerrainRuntimeState : uint8_t
+	{
+		Unrequested,
+		Requested,
+		CpuReady,
+		Uploading,
+		Resident,
+		Failed
+	};
+
+	struct TerrainChunkSlot
+	{
+		aveng::ChunkCoord coord{};
+		TerrainRuntimeState state = TerrainRuntimeState::Unrequested;
+
+		uint64_t requestId = 0;
+
+		std::unique_ptr<procgen::TerrainRenderable> cpuRenderable;
+
+		procgen::TerrainGpuChunk gpu;
+
+		TerrainGpuHandle gpuHandle{};
+	};
+
+	struct TerrainStreamPolicy {
+		int evictRadius{ 0 }; // x,z distance from center beyond which we evict chunks
+	};
+
 }

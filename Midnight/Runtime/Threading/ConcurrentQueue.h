@@ -20,16 +20,19 @@ namespace mtools {
             queue_.pop_front();
             return true;
         }
-
+        
+        /* This doesn't need to be templated and can hinder perf */
         template <typename Fn>
         void drain(Fn&& fn)
         {
+            // Swap the queue to a local w/ a lock
             std::deque<T> local;
             {
                 std::scoped_lock lock(mutex_);
                 local.swap(queue_);
             }
 
+            // `item` is our completed terrain chunk (Terrain Generator)
             for (auto& item : local) {
                 fn(item);
             }
