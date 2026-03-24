@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <stdint.h>
+#include <unordered_set>
 #include "Runtime/Threading/ITaskSystem.h"
 #include "Module/Procgen/Types.h"
 #include "Runtime/Threading/Types.h"
@@ -121,6 +122,8 @@ namespace aveng {
             completedRenderables_.drain(std::forward<Fn>(fn));
         }
 
+        bool isAllPointsReady(const ChunkCoord coord) const;
+
         // Used during generation to acquire the record we need
         ChunkRecord* getOrCreateRecord(ChunkCoord c);
 
@@ -141,6 +144,8 @@ namespace aveng {
         void setErosionParameters(ErosionSettings eroCfg);
 
     private:
+        void markAllPointsReady(ChunkCoord coord);
+        void clearAllPointsReady(ChunkCoord coord);
 
         // Sync Build Method
         std::unique_ptr<procgen::TerrainRenderable>
@@ -171,6 +176,11 @@ namespace aveng {
 
 		static constexpr size_t STRIPES = 64; // This should be a power of two for the bitwise bucket calculation to work correctly
         std::array<StripeBucket, STRIPES> records_;
+
+        // Safe for parallel operations spanning overlapping regions
+        // If we need to change which stage this implies that's super easy. For now its AllPoints generation.
+        mutable std::mutex allPointsReadyMut_;
+        std::unordered_set<ChunkCoord, ChunkCoordHash> allPointsReady_;
     };
 
 }

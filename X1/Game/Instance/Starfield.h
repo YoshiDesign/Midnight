@@ -21,13 +21,13 @@ namespace xone {
             std::cout << "[Starfield] Exit\n";
         }
 
-        void update(const TickContext& ctx, const aveng::GameServices& services) override {
+        void update(const TickContext& ctx) override {
             // Pretend the user pressed "Start"
-            elapsed_ += ctx.dt;
-            if (elapsed_ > 1.0f && !started_) {
-                started_ = true;
-                play_.requestPlay("starfield");
-            }
+            //elapsed_ += ctx.dt;
+            //if (elapsed_ > 1.0f && !started_) {
+            //    started_ = true;
+            //    play_.requestPlay("starfield");
+            //}
         }
 
         void render(const RenderContext&) override {

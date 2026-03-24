@@ -111,6 +111,8 @@ namespace aveng {
 			return renderData.rdCommandBuffersCompute.at(currentFrameIndex);
 		}
 
+		uint64_t engineFrameNumber() const noexcept;
+
 		int getFrameIndex() const
 		{
 			// Note: This assertion saved you from serious headache. Assertions are great, use them

@@ -1,15 +1,17 @@
 #pragma once
 #include <string>
+#include <cstdint>
 #include "Runtime/Play/GameContext.h"
 #include "Core/Input/InputState.h"
+#include "Core/Camera/aveng_camera.h"
 
 namespace xone {
 
     struct TickContext {
         float dt{};
-        size_t frameIndex;
+        uint64_t frameIndex;
         const aveng::InputState& input;
-
+        const aveng::AvengCamera& camera;
     };
 
     struct RenderContext {
@@ -25,7 +27,7 @@ namespace xone {
         virtual void onExit() {}
 
         // Per-frame - state mutation
-        virtual void update(const TickContext& ctx, const aveng::GameServices& services) = 0;
+        virtual void update(const TickContext& ctx) = 0;
 
         /**
         * render()

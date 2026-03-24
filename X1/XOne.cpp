@@ -11,11 +11,11 @@
 
 namespace xone {
 
-	inline void RegisterGames(GameRegistry& registry, PlayManager& play) {
+	inline void RegisterGames(GameRegistry& registry, PlayManager& play, const aveng::GameServices& gs) {
 
 		/* Technically this is "register scene" */
-		registry.registerGame("holyship", [&play]() {
-			return std::make_unique<HolyShip>(play);
+		registry.registerGame("holyship", [&play, &gs]() {
+			return std::make_unique<HolyShip>(play, gs);
 		});
 
 		registry.registerGame("starfield", [&play]() {
@@ -36,31 +36,36 @@ namespace xone {
 		auto player_camera = std::make_unique<aveng::PlayerCamera>();
 		player_camera_id = midnight.registerCamera("player_camera", std::move(player_camera));
 
-		// Note: Editor's camera will take over if it's initialized
+		// Note: Editor's camera will take over if ENABLE_EDITOR
 		midnight.setActiveCamera(player_camera_id);
 
 		// "Yo, Tank..."
-		RegisterGames(registry, play);
+		RegisterGames(registry, play, midnight.gameServices());
 
 		std::chrono::time_point<std::chrono::steady_clock> loopStartTime = std::chrono::steady_clock::now();
 		std::chrono::time_point<std::chrono::steady_clock> loopEndTime = std::chrono::steady_clock::now();
 
 		// Render Loop
 		while (!midnight.shouldClose()) {
+
+			// Invariant: Counter must be able to outlive all complex life on earth
+			const uint64_t engineFrame = ++engineFrameCounter_;
+
 			// Potentially blocking
 			glfwPollEvents();
 
 			// Clear all input states, calculate mouse & scroll deltas, reset key edges, etc.
 			midnight.beginFrameInput();
-			TickContext tick{ 
-				frameTime, 
-				0, // midnight.frameIndex(), 
-				midnight.inputState() 
+			TickContext tick{
+				frameTime,
+				engineFrame,
+				midnight.inputState(),
+				midnight.camera()
 			};
 
 			// We may not need to pass gameServices during update(), 
 			// if the members of that struct don't necessarily update, or are just APIs
-			play.update(tick, midnight.gameServices());
+			play.update(tick);
 
 #ifdef ENABLE_EDITOR
 			/* There currently exist no methods for switching cameras within the context of AppMode::Game
@@ -82,27 +87,29 @@ namespace xone {
 			loopStartTime = loopEndTime;
 
 #ifdef ENABLE_EDITOR
-			// Process Editor Commands
-			for (const auto cmd : editorData().drainCommands()) {
-				switch (cmd.type) {
-				case aveng::EditorCommand::Type::RequestPlay: 
-					play.requestPlay(cmd.payload); 
-					break;
-				case aveng::EditorCommand::Type::GenerateTerrain: 
-					midnight.gameServices().terrain.generateChunks({ cmd.terrain_x, cmd.terrain_z }, 0, 0);
-					break;
-				case aveng::EditorCommand::Type::UpdateTerrainGlobalParams: 
-					midnight.gameServices().terrain.setTerrainConfig(cmd.tcfg);
-					break;
-				case aveng::EditorCommand::Type::UpdateTerrainNoiseParams: 
-					std::printf("Draining Noise Param Update Command\n");
-					midnight.gameServices().terrain.setTerrainNoiseParams(cmd.ncfg);
-					break;
-				case aveng::EditorCommand::Type::UpdateWeatheringParams:
-					midnight.gameServices().terrain.setTerrainWeatheringParams(cmd.erosion);
-					break;
-				// case aveng::EditorCommand::Type::RequestStop: play.requestStop(); break;
-				default: break;
+			if (midnight.mode() == aveng::AppMode::Editor) {
+				// Process Editor Commands
+				for (const auto cmd : editorData().drainCommands()) {
+					switch (cmd.type) {
+					case aveng::EditorCommand::Type::RequestPlay:
+						play.requestPlay(cmd.payload);
+						break;
+					case aveng::EditorCommand::Type::GenerateTerrain:
+						midnight.gameServices().terrain.generateChunks({ cmd.terrain_x, cmd.terrain_z });
+						break;
+					case aveng::EditorCommand::Type::UpdateTerrainGlobalParams:
+						midnight.gameServices().terrain.setTerrainConfig(cmd.tcfg);
+						break;
+					case aveng::EditorCommand::Type::UpdateTerrainNoiseParams:
+						std::printf("Draining Noise Param Update Command\n");
+						midnight.gameServices().terrain.setTerrainNoiseParams(cmd.ncfg);
+						break;
+					case aveng::EditorCommand::Type::UpdateWeatheringParams:
+						midnight.gameServices().terrain.setTerrainWeatheringParams(cmd.erosion);
+						break;
+						// case aveng::EditorCommand::Type::RequestStop: play.requestStop(); break;
+					default: break;
+					}
 				}
 			}
 #endif

@@ -23,11 +23,62 @@ namespace aveng {
     class ChunkManager;
     class EngineDevice;
 
+    enum class TerrainStreamMode {
+        LinearFlight,
+        AllRange
+    };
+
+    struct LinearFlightState {
+        int maxCenterWaveRequested = -1;
+        int maxFanWaveRequested = -1;
+    };
+
+    struct StreamUpdateContext {
+        ChunkCoord playerChunk;
+        uint64_t frameIndex;
+    };
+
+    struct StreamCommandBuffer {
+        std::vector<ChunkCoord> requestCenters;
+        std::vector<ChunkCoord> evictCenters;
+    };
+
+    struct LinearStreamPolicy {
+        int lateralRadius = 1;
+        int forwardRows = 3;
+        int backwardRows = 1;
+        int evictRadiusX = 3;
+        int evictRadiusZ = 4;
+    };
+
+    struct AllRangeStreamPolicy {
+        int radius = 2;     // produces NxN around arena center
+        bool keepFullGridResident = true;
+    };
+
+    struct TerrainStreamPolicy {
+        TerrainStreamMode mode = TerrainStreamMode::LinearFlight;
+        LinearStreamPolicy linear;
+        AllRangeStreamPolicy allRange;
+    };
+
+    struct StreamedChunkState {
+        enum class Status {
+            Requested,
+            Resident,
+            Evicting
+        };
+        Status status;
+    };
+
     /**
      * Game-facing interface for terrain generation / streaming.
      * Owns no terrain data; it just translates game intent into system work.
      */
     class TerrainController {
+    private:
+        static ChunkCoord offsetCoord(ChunkCoord base, int dx, int dz) noexcept;
+
     public:
         explicit TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, ChunkManager& chunks) noexcept;
 
@@ -49,6 +100,9 @@ namespace aveng {
             settingsUboSize_ = size;
         }
 
+        /* Streaming Policy */
+
+        /* Operational Requirements */
         void serviceCpuReadyChunks();
 
         void update(/*const Camera& camera*/);
@@ -68,7 +122,7 @@ namespace aveng {
          * - This does not block/is async. ChunkManager hands you a shared_future.
          * - We keep the futures in an internal list for debugging / inspection.
          */
-        void generateChunks(ChunkCoord start_coord, int cols, int rows);
+        void generateChunks(ChunkCoord start_coord);
 
         void evictChunks(ChunkCoord center);
 
@@ -78,19 +132,24 @@ namespace aveng {
 
         void drainCompletedTerrain();
 
+        bool hasAllPointsReady(const ChunkCoord coord) noexcept ;
+
         // Expose what was last requested for debug overlays, etc.
         // std::unique_ptr<procgen::TerrainRenderable> const& lastRequestedRenderable() const noexcept;
 
     private:
-        static ChunkCoord offsetCoord(ChunkCoord base, int dx, int dz) noexcept;
 
-        EngineDevice& engineDevice_;
+        /* ChunkCoord represents the center of a 3x3 renderable region,
+         * though we actually receive data for a 5x5 region to support compute.
+         * Compute dispatch only needs to occur once the renderable is completed
+         */
+        std::unordered_map<ChunkCoord, procgen::TerrainChunkSlot, ChunkCoordHash> slots_;
 
-        const int kMaxUploadsPerFrame = 2;
+        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash> managed_;
+        ChunkCoord currentCenter_;
+        TerrainStreamMode currentMode_;
 
-        VkRenderData& renderData_;
-
-        procgen::TerrainStreamPolicy basicPolicy{ 3 };
+        TerrainStreamPolicy policy_{};
 
         VkBasicTerrainPushConstant pc;
         VkBasicTerrainDebugPC dpc;
@@ -99,19 +158,20 @@ namespace aveng {
         VkBuffer settingsUboBuffer_ = VK_NULL_HANDLE;
         VkDeviceSize settingsUboSize_ = 0;
 
-        // CEO
-        ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
-        // Managers
-        procgen::ErosionManager erosionMgr_;
+       
+
+        // Dummy
         uint64_t frameIndex_ = 0;
 
-        /* ChunkCoord represents the center of a 3x3 renderable region, 
-         * though we actually receive data for a 5x5 region to support compute.
-         * Compute dispatch only needs to occur once the renderable is completed
-         */
-        std::unordered_map<ChunkCoord, procgen::TerrainChunkSlot, ChunkCoordHash> slots_;
 
         // std::unique_ptr<procgen::TerrainRenderable> lastRequested_;
+
+        // CEO (Chunk Executive Officer)
+        ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
+        const int kMaxUploadsPerFrame = 2;
+        EngineDevice& engineDevice_;
+        VkRenderData& renderData_;
+        procgen::ErosionManager erosionMgr_;
 
     };
 }

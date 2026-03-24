@@ -159,8 +159,4 @@ namespace procgen {
 		TerrainGpuHandle gpuHandle{};
 	};
 
-	struct TerrainStreamPolicy {
-		int evictRadius{ 0 }; // x,z distance from center beyond which we evict chunks
-	};
-
 }

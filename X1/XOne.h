@@ -1,5 +1,5 @@
 #pragma once
-
+#include <cstdint>
 #include "Game/data.h"
 #include "Core/Midnight.h"
 
@@ -36,7 +36,9 @@ namespace xone {
 	private:
 
 		float frameTime;
+		uint64_t engineFrameCounter_ = 0;
 		int player_camera_id;
+
 		::aveng::GameData gameData; // This is a big design flaw at the moment. Don't rely on it
 		::aveng::Midnight midnight{ gameData };
 

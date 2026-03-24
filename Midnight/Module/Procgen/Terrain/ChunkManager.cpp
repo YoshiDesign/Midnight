@@ -354,6 +354,31 @@ namespace aveng {
         erosionMgr_->setWeatheringConfig(eroCfg);
     }
 
+    /* 
+     * All Points Ready means any overlapping regions can safely generate in parallel 
+     * without the need to add more constly synchronization to keep the scheduler happy.
+     * Note: this is a working hypothesis due to a deadlocking scenario :)
+     * This readiness indication can belong to any stage. I'm just being optimistic
+     * by giving it to the (early) requestAllPoints stage.
+     * 
+     * If we tighten up streaming policy we could maybe factor out the mutex
+     * but that's beyond micro-optimizing at the moment.
+     */
+    bool ChunkManager::isAllPointsReady(const ChunkCoord coord) const {
+        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
+        return allPointsReady_.find(coord) != allPointsReady_.end();
+    }
+
+    void ChunkManager::markAllPointsReady(ChunkCoord coord) {
+        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
+        allPointsReady_.insert(coord);
+    }
+
+    void ChunkManager::clearAllPointsReady(ChunkCoord coord) {
+        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
+        allPointsReady_.erase(coord);
+    }
+
     //
     ChunkRecord* ChunkManager::getOrCreateRecord(ChunkCoord coord)
     {
@@ -879,9 +904,10 @@ namespace aveng {
         //}
 
         //assert(sg && "[buildSpatialGrid] BuildSpatialGrid returned null");
-        std::printf("Completed SpatialGrid {%d, %d}\n", rec.coord.x, rec.coord.z);
+        // std::printf("Completed SpatialGrid {%d, %d}\n", rec.coord.x, rec.coord.z);
         //dumpSpatialGridData(rec.coord, &(*rec.spatial));
 #endif
+        markAllPointsReady(rec.coord);
         // Return stable pointer into the optional
         return &(*rec.spatial);
 
@@ -967,7 +993,7 @@ namespace aveng {
         }
 
 #ifdef M_DEBUG
-        std::printf("Completed HydroErosion {%d, %d}\n", rec.coord.x, rec.coord.z);
+       // std::printf("Completed HydroErosion {%d, %d}\n", rec.coord.x, rec.coord.z);
        //dumpHydraulicData(rec.coord, &ws);
 #endif
 
@@ -1022,7 +1048,7 @@ namespace aveng {
         rec.erosion->eHeights.insert(rec.erosion->eHeights.end(), ws.workHeights.begin(), ws.workHeights.end());
 
 #ifdef M_DEBUG
-        std::printf("[Completed] {%d, %d}\n", rec.coord.x, rec.coord.z);
+        std::printf("[Chunk Completed] {%d, %d}\n", rec.coord.x, rec.coord.z);
         //dumpChunkFinalHeightData(rec.coord, rec.erosion->eHeights);
 #endif
 
@@ -1740,9 +1766,9 @@ namespace aveng {
         for (uint32_t v = 0; v < totalCoreVerts; ++v) {
             renderable->vbo[v] = renderable->packedPositions[v];
             glm::vec3 vert = renderable->packedPositions[v];
-            if (v > 4000) {
-                std::printf("V1 vbo[%d] = {%f, %f, %f}\n", v, vert.x, vert.y, vert.z);
-            }
+            //if (v > 4000) {
+            //    std::printf("V1 vbo[%d] = {%f, %f, %f}\n", v, vert.x, vert.y, vert.z);
+            //}
         }
 
         // IBO = core triangles with indices remapped into VBO space
@@ -1856,6 +1882,11 @@ namespace aveng {
                     const uint64_t age = (frameIndex >= last) ? (frameIndex - last) : 0;
 
                     if (pins == 0 && age > ageFrames) {
+                        clearAllPointsReady(rec->coord);
+                        // Move the chunk record out of its bucket
+                        // into a local that won't survive out of scope.
+                        // Important: This frees all pmr resources automatically,
+                        // to go where all ways must lead us, eventually.
                         toFree.emplace_back(std::move(it->second));
                         it = bucket.map.erase(it);
                     }
@@ -1864,9 +1895,6 @@ namespace aveng {
                     }
                 }
             } // unlock stripe before freeing memory
-
-            // Destructors run here without holding the stripe lock.
-            // `toFree` goes out of scope and frees arenas/buffers.
         }
     }
 

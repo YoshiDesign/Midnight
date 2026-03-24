@@ -6,22 +6,19 @@ namespace xone {
 
     void HolyShip::onEnter()
     {
-
+        std::printf("Enter The Gecko...\n");
+        game_start = true;
+        terrainStream_.reset();
     }
 
-    void HolyShip::update(const TickContext& ctx, const aveng::GameServices& services) {
+    void HolyShip::update(const TickContext& ctx) {
+        terrainStream_.update(ctx.camera, ctx.frameIndex);
         // Pretend the user pressed "Start"
-        elapsed_ += ctx.dt;
-        if (elapsed_ > 1.0f && !started_) {
-            play_.requestPlay("holyship");
-            started_ = true;
-            services.terrain.generateChunks(aveng::ChunkCoord{ 0,0 }, 2, 2);
-            //services.terrain.generateChunks(aveng::ChunkCoord{ 4,4 }, 2, 2);
-            //services.terrain.generateChunks(aveng::ChunkCoord{ -4,4 }, 2, 2);
-            //services.terrain.generateChunks(aveng::ChunkCoord{ -4,-4 }, 2, 2);
-            //services.terrain.generateChunks(aveng::ChunkCoord{ 4,-4 }, 2, 2);
-
-        }
+        //elapsed_ += ctx.dt;
+        //if (elapsed_ > 0.25f && !game_start) {
+        //    play_.requestPlay("holyship");
+        //    game_start = true;
+        //}
         
     }
 	

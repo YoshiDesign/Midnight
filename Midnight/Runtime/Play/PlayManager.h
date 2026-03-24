@@ -18,13 +18,15 @@ namespace xone {
             std::cout << "Pending Game ID: " << pendingId_ << std::endl;
         }
 
+        // Don't store this anywhere...
         std::string_view activeId() const { return activeId_; }
+
         IGameInstance* active() { return active_.get(); }
         const IGameInstance* active() const { return active_.get(); }
 
         // Apply game/sim transitions + update current game
         // TickContext includes input state
-        void update(const TickContext& ctx, const aveng::GameServices& services) {
+        void update(const TickContext& ctx) {
 
             // Apply pending playable transitions
             if (!pendingId_.empty() && pendingId_ != activeId_) {
@@ -33,11 +35,7 @@ namespace xone {
             }
 
             if (active_) {
-                
-                // TODO - This might be tmp placement
-                services.terrain.setFrameIndex(ctx.frameIndex);
-
-                active_->update(ctx, services);
+                active_->update(ctx);
             }
 
         }
@@ -63,7 +61,8 @@ namespace xone {
             // Create new from factory
             auto created = registry_.create(id);
             if (!created) {
-                // You can replace with your assert/log system
+                // TODO
+                // Replace with a proper assert/log system
                 // For now: leave active_ null
                 activeId_.clear();
                 return;

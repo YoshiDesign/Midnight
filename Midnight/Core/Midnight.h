@@ -52,6 +52,7 @@ namespace aveng {
 		int registerCamera(std::string name, std::unique_ptr<ICameraDriver> cameraDriver);
 		void setActiveCamera(int id) { cameraManager.setActive(id); }
 		const int& activeCameraId() const { return cameraManager.activeId(); }
+		const AvengCamera& camera() const { return cameraManager.active().camera; }
 
 		// Resource State
 		bool frameInProgress() { return renderer.isFrameInProgress(); }

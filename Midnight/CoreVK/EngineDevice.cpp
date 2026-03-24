@@ -158,15 +158,15 @@ namespace aveng {
             // [Validators] Create this instance's Debug Validation Layer
             
             // Setup validation features for GPU-assisted validation AND synchronization validation
-            VkValidationFeatureEnableEXT enabledValidationFeatures[] = {
-                VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
-                VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
-            };
+            // VkValidationFeatureEnableEXT enabledValidationFeatures[] = {
+                // VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+                // VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
+            // };
             
             VkValidationFeaturesEXT validationFeatures = {};
             validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-            validationFeatures.enabledValidationFeatureCount = 2;
-            validationFeatures.pEnabledValidationFeatures = enabledValidationFeatures;
+            validationFeatures.enabledValidationFeatureCount = 1;
+            validationFeatures.pEnabledValidationFeatures = nullptr; // enabledValidationFeatures;
             
             // Setup debug messenger
             VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;

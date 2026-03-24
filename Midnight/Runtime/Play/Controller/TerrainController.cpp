@@ -31,14 +31,10 @@ namespace aveng {
         frameIndex_ = frameIndex;
     }
 
+
     // Direct access to generate a chunk for debugging/editor
-    void TerrainController::generateChunks(ChunkCoord start_coord, int cols, int rows) {
-
-        std::printf("Generating Chunks...\nStart: {%d, %d} \n", start_coord.x, start_coord.z);
-
+    void TerrainController::generateChunks(ChunkCoord start_coord) {
         ensureChunkRequested(start_coord);
-        return;
-
     }
 
     void TerrainController::evictChunks(ChunkCoord center) {
@@ -252,6 +248,13 @@ namespace aveng {
             slot.cpuRenderable = std::move(cpuRenderable);
             slot.state = procgen::TerrainRuntimeState::CpuReady;
         });
+    }
+
+    /* */        
+    /* Streaming Policy */
+    /* */
+    bool TerrainController::hasAllPointsReady(const ChunkCoord coord) noexcept {
+        return chunks_->isAllPointsReady(coord);
     }
 
     // For higher perf, no cache lookups on renderables - Direct access on TerrainRenderable
