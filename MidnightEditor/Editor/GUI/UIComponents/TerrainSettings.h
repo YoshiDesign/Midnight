@@ -113,6 +113,10 @@ namespace aveng {
 
                 static ErosionSettings weathering;
 
+                static int hMaxWorkers = std::floor(std::thread::hardware_concurrency() / 6);
+                static int tMaxWorkers = std::floor(std::thread::hardware_concurrency() / 9);
+                static int rMaxWorkers = 1;
+
                 // Hardness
                 static float elevationWeight = 0.7f;
                 static float noiseWeight = 0.3f;
@@ -199,6 +203,11 @@ namespace aveng {
 
                 if (hydro) {
                     ImGui::Indent();
+
+                    ImGui::TextUnformatted("CPU Threads");
+                    ImGui::SameLine(200.f);
+                    ImGui::SetNextItemWidth(200.0f);
+                    ImGui::InputInt("##HydroThreads", &hMaxWorkers);
 
                     ImGui::Text("Droplets____________________________");
                     // Droplet Params
@@ -300,7 +309,10 @@ namespace aveng {
                 if (thermal) {
                     ImGui::Indent();
 
-
+                    ImGui::TextUnformatted("CPU Threads");
+                    ImGui::SameLine(200.f);
+                    ImGui::SetNextItemWidth(200.0f);
+                    ImGui::InputInt("##ThermalThreads", &tMaxWorkers);
 
                     ImGui::TextUnformatted("Talus Threshold");
                     ImGui::SameLine(200.f);
@@ -331,6 +343,10 @@ namespace aveng {
                 if (ridgeEnhance) {
                     ImGui::Indent();
 
+                    ImGui::TextUnformatted("CPU Threads");
+                    ImGui::SameLine(200.f);
+                    ImGui::SetNextItemWidth(200.0f);
+                    ImGui::InputInt("##RidgeThreads", &rMaxWorkers);
 
                     ImGui::TextUnformatted("Threshold");
                     ImGui::SameLine(200.f);
@@ -396,6 +412,7 @@ namespace aveng {
                     weathering.hardness = pHardness;
 
                     ThermalErosionParams pTherm;
+                    pTherm.maxWorkers = tMaxWorkers;
                     pTherm.TalusThreshold = tIterations;
                     pTherm.TransferRate = tTransferRate;
                     pTherm.Iterations = tTalusThreshold;
@@ -404,6 +421,7 @@ namespace aveng {
                     weathering.thermal = pTherm;
 
                     HydraulicErosionParams pHydro;
+                    pHydro.maxWorkers = hMaxWorkers;
                     pHydro.numDroplets = hNumDroplets;
                     pHydro.maxSteps = hMaxSteps;
                     pHydro.batchSize = hBatchSize;
@@ -425,6 +443,7 @@ namespace aveng {
                     weathering.hydraulic = pHydro;
 
                     RidgeParams pRidge;
+                    pRidge.MaxWorkers = rMaxWorkers;
                     pRidge.Threshold = rThreshold;
                     pRidge.BoostAmount = rBoostAmount;
                     pRidge.NoiseAmount = rNoiseAmount;

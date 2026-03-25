@@ -123,6 +123,8 @@ namespace aveng {
         }
 
         bool isAllPointsReady(const ChunkCoord coord) const;
+        bool isRegionAllPointsReady(ChunkCoord center) const;
+        bool isRegionAllStagesComplete(ChunkCoord center) const;
 
         // Used during generation to acquire the record we need
         ChunkRecord* getOrCreateRecord(ChunkCoord c);
@@ -146,6 +148,8 @@ namespace aveng {
     private:
         void markAllPointsReady(ChunkCoord coord);
         void clearAllPointsReady(ChunkCoord coord);
+        void markAllStagesComplete(ChunkCoord coord);
+        void clearAllStagesComplete(ChunkCoord coord);
 
         // Sync Build Method
         std::unique_ptr<procgen::TerrainRenderable>
@@ -181,6 +185,9 @@ namespace aveng {
         // If we need to change which stage this implies that's super easy. For now its AllPoints generation.
         mutable std::mutex allPointsReadyMut_;
         std::unordered_set<ChunkCoord, ChunkCoordHash> allPointsReady_;
+
+        mutable std::mutex allStagesCompleteMut_;
+        std::unordered_set<ChunkCoord, ChunkCoordHash> allStagesComplete_;
     };
 
 }

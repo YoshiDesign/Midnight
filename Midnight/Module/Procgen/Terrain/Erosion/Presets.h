@@ -33,7 +33,7 @@ namespace procgen {
 			0.57,  // ~30 degrees angle of repose
 			0.30,  // Transfer 30% of excess per iteration
 			30,	   // 30 Iterations
-			1 // std::floor(nThreads / 3)
+			std::floor(nThreads / 9)
 		};
 
 		aveng::HardnessParams hardness{

@@ -133,6 +133,8 @@ namespace aveng {
         void drainCompletedTerrain();
 
         bool hasAllPointsReady(const ChunkCoord coord) noexcept ;
+        bool hasRegionReady(ChunkCoord center) noexcept;
+        bool hasRegionComplete(ChunkCoord center) noexcept;
 
         // Expose what was last requested for debug overlays, etc.
         // std::unique_ptr<procgen::TerrainRenderable> const& lastRequestedRenderable() const noexcept;

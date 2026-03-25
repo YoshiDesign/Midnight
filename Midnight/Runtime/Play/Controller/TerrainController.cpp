@@ -250,11 +250,20 @@ namespace aveng {
         });
     }
 
-    /* */        
-    /* Streaming Policy */
-    /* */
+    // Check 1 chunk - Not very useful here, honestly
     bool TerrainController::hasAllPointsReady(const ChunkCoord coord) noexcept {
         return chunks_->isAllPointsReady(coord);
+    }
+
+    // Check that an entire 5x5 region has completed up to the spatial grid
+    bool TerrainController::hasRegionReady(ChunkCoord center) noexcept {
+        return chunks_->isRegionAllPointsReady(center);
+    }
+
+    // Check that an entire 5x5 region has completed up to the spatial grid and its inner 3x3 has fully completed
+    bool TerrainController::hasRegionComplete(ChunkCoord center) noexcept {
+        return chunks_->isRegionAllPointsReady(center)
+            && chunks_->isRegionAllStagesComplete(center);
     }
 
     // For higher perf, no cache lookups on renderables - Direct access on TerrainRenderable

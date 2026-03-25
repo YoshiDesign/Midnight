@@ -14,6 +14,7 @@
 #include "Module/Procgen/Terrain/Erosion/RidgeEnhancement.h"
 #include "Module/Procgen/Terrain/Erosion/ThermalErosion.h"
 #include "Module/Procgen/Terrain/Erosion/Initialization.h"
+#include "Utils/Logger.h"
 
 #ifdef M_DEBUG
 #include <filesystem>
@@ -356,7 +357,7 @@ namespace aveng {
 
     /* 
      * All Points Ready means any overlapping regions can safely generate in parallel 
-     * without the need to add more constly synchronization to keep the scheduler happy.
+     * without the need to add more costly synchronization to keep the scheduler happy.
      * Note: this is a working hypothesis due to a deadlocking scenario :)
      * This readiness indication can belong to any stage. I'm just being optimistic
      * by giving it to the (early) requestAllPoints stage.
@@ -369,14 +370,49 @@ namespace aveng {
         return allPointsReady_.find(coord) != allPointsReady_.end();
     }
 
+    bool ChunkManager::isRegionAllPointsReady(ChunkCoord center) const {
+        ChunkCoord region[25];
+        get5x5Neighborhood(center, region);
+
+        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
+        for (int i = 0; i < 25; ++i) {
+            if (allPointsReady_.find(region[i]) == allPointsReady_.end())
+                return false;
+        }
+        return true;
+    }
+
     void ChunkManager::markAllPointsReady(ChunkCoord coord) {
         std::lock_guard<std::mutex> lock(allPointsReadyMut_);
         allPointsReady_.insert(coord);
+        Logger::log(1, "READY {%d, %d}\n", coord.x, coord.z);
     }
 
     void ChunkManager::clearAllPointsReady(ChunkCoord coord) {
         std::lock_guard<std::mutex> lock(allPointsReadyMut_);
         allPointsReady_.erase(coord);
+    }
+
+    bool ChunkManager::isRegionAllStagesComplete(ChunkCoord center) const {
+        ChunkCoord core[9];
+        get3x3Neighborhood(center, core);
+
+        std::lock_guard<std::mutex> lock(allStagesCompleteMut_);
+        for (int i = 0; i < 9; ++i) {
+            if (allStagesComplete_.find(core[i]) == allStagesComplete_.end())
+                return false;
+        }
+        return true;
+    }
+
+    void ChunkManager::markAllStagesComplete(ChunkCoord coord) {
+        std::lock_guard<std::mutex> lock(allStagesCompleteMut_);
+        allStagesComplete_.insert(coord);
+    }
+
+    void ChunkManager::clearAllStagesComplete(ChunkCoord coord) {
+        std::lock_guard<std::mutex> lock(allStagesCompleteMut_);
+        allStagesComplete_.erase(coord);
     }
 
     //
@@ -559,7 +595,9 @@ namespace aveng {
                 RecordPin pin(*this, rec);
                 auto triangF = requestTriangulation(rec->coord, frameIndex);
                 auto* tri = tasks_.wait(triangF);
-                return buildSpatialGrid(*rec);
+                SpatialGrid const* sg = buildSpatialGrid(*rec);
+                markAllPointsReady(rec->coord);
+                return sg;
             });
         });
 
@@ -583,7 +621,9 @@ namespace aveng {
                 RecordPin taskHold(*this, rec);
                 auto spatialF = requestSpatialGrid(rec->coord, frameIndex);
                 auto* spatial = tasks_.wait(spatialF);
-                return buildErosion(*rec, s);
+                const ErosionField* ero = buildErosion(*rec, s);
+                markAllStagesComplete(rec->coord);
+                return ero;
             });
 
         });
@@ -907,7 +947,6 @@ namespace aveng {
         // std::printf("Completed SpatialGrid {%d, %d}\n", rec.coord.x, rec.coord.z);
         //dumpSpatialGridData(rec.coord, &(*rec.spatial));
 #endif
-        markAllPointsReady(rec.coord);
         // Return stable pointer into the optional
         return &(*rec.spatial);
 

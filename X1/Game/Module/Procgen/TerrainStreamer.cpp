@@ -1,6 +1,9 @@
 #include "TerrainStreamer.h"
+#include "Utils/Logger.h"
 
 namespace xone {
+
+    using namespace aveng;
 
     /*
     * Operational Success Criteria:
@@ -12,17 +15,18 @@ namespace xone {
     */
 
     TerrainStreamer::TerrainStreamer(
-        aveng::TerrainController& terrain,
-        const aveng::TerrainStreamPolicy& policy
+        TerrainController& terrain,
+        const TerrainStreamPolicy& policy
     )
         : terrain_(terrain)
         , policy_(policy)
         , linear_(policy.linear)
         , allRange_(policy.allRange)
     {
+        Logger::log(1, "TerrainStreamer Initialized\n");
     }
 
-    void TerrainStreamer::setPolicy(const aveng::TerrainStreamPolicy& policy)
+    void TerrainStreamer::setPolicy(const TerrainStreamPolicy& policy)
     {
         policy_ = policy;
         linear_.setPolicy(policy_.linear);
@@ -37,21 +41,23 @@ namespace xone {
         allRange_.reset();
     }
 
-    void TerrainStreamer::update(const aveng::AvengCamera& cam, uint64_t frameIndex)
+    void TerrainStreamer::update(const AvengCamera& cam, uint64_t frameIndex)
     {
-        aveng::StreamUpdateContext ctx{
+        StreamUpdateContext ctx{
             worldToChunk(cam.transform().translation),
             frameIndex
         };
 
-        aveng::StreamCommandBuffer cmds{};
+        StreamCommandBuffer cmds{};
 
         switch (policy_.mode) {
-        case aveng::TerrainStreamMode::LinearFlight:
+        case TerrainStreamMode::LinearFlight:
+            Logger::log(1, "Updating with LinearFlight Policy");
             linear_.update(ctx, terrain_, streamed_, cmds);
             break;
 
-        case aveng::TerrainStreamMode::AllRange:
+        case TerrainStreamMode::AllRange:
+            Logger::log(1, "Updating with AllRange Policy");
             allRange_.update(ctx, terrain_, streamed_, cmds);
             break;
         }
@@ -60,7 +66,7 @@ namespace xone {
         applyEvictions(cmds.evictCenters);
     }
 
-    aveng::ChunkCoord TerrainStreamer::worldToChunk(glm::vec3 pos) const
+    ChunkCoord TerrainStreamer::worldToChunk(glm::vec3 pos) const
     {
         constexpr float CHUNK_SIZE = 256.0f;
 
@@ -68,25 +74,28 @@ namespace xone {
         const int cx = static_cast<int>(std::floor(pos.x / CHUNK_SIZE));
         const int cz = static_cast<int>(std::floor(pos.z / CHUNK_SIZE));
 
+        Logger::log(1, "Camera {%d, %d}\n", cx, cz);
+
         return { cx, cz };
     }
 
-    void TerrainStreamer::applyRequests(const std::vector<aveng::ChunkCoord>& centers, uint64_t frameIndex)
+    void TerrainStreamer::applyRequests(const std::vector<ChunkCoord>& centers, uint64_t frameIndex)
     {
-        for (const aveng::ChunkCoord& c : centers) {
+        for (const ChunkCoord& c : centers) {
+            Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
             terrain_.generateChunks(c);
         }
     }
 
-    void TerrainStreamer::applyEvictions(const std::vector<aveng::ChunkCoord>& evictCenters)
+    void TerrainStreamer::applyEvictions(const std::vector<ChunkCoord>& evictCenters)
     {
-        for (const aveng::ChunkCoord& c : evictCenters) {
+        for (const ChunkCoord& c : evictCenters) {
             auto it = streamed_.find(c);
             if (it == streamed_.end()) {
                 continue;
             }
 
-            it->second.status = aveng::StreamedChunkState::Status::Evicting;
+            it->second.status = StreamedChunkState::Status::Evicting;
 
             // If/when you expose this:
             // terrain_.evictChunk(c);
@@ -99,20 +108,26 @@ namespace xone {
     }
 
     void LinearFlightStreamer::update(
-        const aveng::StreamUpdateContext& ctx,
-        aveng::TerrainController& terrain,
-        std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash>& streamed,
-        aveng::StreamCommandBuffer& outCmds
+        const StreamUpdateContext& ctx,
+        TerrainController& terrain,
+        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        StreamCommandBuffer& outCmds
     )
     {
+#ifdef M_DEBUG
+        Logger::log(1, "Linear Updating... Player Coord {%d, %d}\n", ctx.playerChunk.x, ctx.playerChunk.z);
+        for (auto& [k, v] : streamed) {
+            Logger::log(1, "Streamed[%d, %d] = %d\n", k.x, k.z, v.status);
+        }
+#endif
         requestInitialCenter(streamed, outCmds);
         advanceFrontier(terrain, streamed, outCmds);
         enqueueEvictions(ctx.playerChunk, streamed, outCmds);
     }
 
     void LinearFlightStreamer::requestInitialCenter(
-        std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash>& streamed,
-        aveng::StreamCommandBuffer& outCmds
+        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        StreamCommandBuffer& outCmds
     )
     {
         if (state_.maxCenterWaveRequested >= 0) {
@@ -120,14 +135,17 @@ namespace xone {
         }
 
         const LinearWaveCoords w0 = makeLinearWave(0);
+        Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
+        Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
+        Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
         requestIfNeeded(w0.center, streamed, outCmds);
         state_.maxCenterWaveRequested = 0;
     }
 
     void LinearFlightStreamer::advanceFrontier(
-        aveng::TerrainController& terrain,
-        std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash>& streamed,
-        aveng::StreamCommandBuffer& outCmds
+        TerrainController& terrain,
+        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        StreamCommandBuffer& outCmds
     )
     {
         bool progressed = false;
@@ -136,13 +154,13 @@ namespace xone {
             progressed = false;
 
             // Rule 1:
-            // If the next center wave has already been requested and its center is all-points-ready,
-            // request the two side fan chunks for that wave.
+            // If the next center wave has already been requested and its entire 5x5 support
+            // region is all-points-ready, request the two side fan chunks for that wave.
             const int nextFanWave = state_.maxFanWaveRequested + 1;
             if (nextFanWave <= state_.maxCenterWaveRequested) {
                 const LinearWaveCoords wave = makeLinearWave(nextFanWave);
 
-                if (terrain.hasAllPointsReady(wave.center)) {
+                if (terrain.hasRegionReady(wave.center)) {
                     requestIfNeeded(wave.leftFan, streamed, outCmds);
                     requestIfNeeded(wave.rightFan, streamed, outCmds);
 
@@ -152,14 +170,14 @@ namespace xone {
             }
 
             // Rule 2:
-            // Once the latest fan pair is all-points-ready, request the next center wave.
+            // Once both fan regions' full 5x5 support have completed erosion, request the next center wave.
             if (state_.maxFanWaveRequested >= 0 &&
                 state_.maxCenterWaveRequested == state_.maxFanWaveRequested)
             {
                 const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested);
 
-                if (terrain.hasAllPointsReady(currentFanWave.leftFan) &&
-                    terrain.hasAllPointsReady(currentFanWave.rightFan))
+                if (terrain.hasRegionComplete(currentFanWave.leftFan) &&
+                    terrain.hasRegionComplete(currentFanWave.rightFan))
                 {
                     const int nextCenterWave = state_.maxCenterWaveRequested + 1;
                     const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave);
@@ -174,15 +192,15 @@ namespace xone {
     }
 
     void LinearFlightStreamer::enqueueEvictions(
-        aveng::ChunkCoord playerChunk,
-        std::unordered_map<aveng::ChunkCoord,
-        aveng::StreamedChunkState,
-        aveng::ChunkCoordHash>& streamed,
-        aveng::StreamCommandBuffer& outCmds
+        ChunkCoord playerChunk,
+        std::unordered_map<ChunkCoord,
+        StreamedChunkState,
+        ChunkCoordHash>& streamed,
+        StreamCommandBuffer& outCmds
     )
     {
         for (auto& [coord, state] : streamed) {
-            if (state.status == aveng::StreamedChunkState::Status::Evicting) {
+            if (state.status == StreamedChunkState::Status::Evicting) {
                 continue;
             }
 
@@ -192,7 +210,7 @@ namespace xone {
         }
     }
 
-    bool LinearFlightStreamer::shouldEvict(aveng::ChunkCoord c, aveng::ChunkCoord playerChunk) const
+    bool LinearFlightStreamer::shouldEvict(ChunkCoord c, ChunkCoord playerChunk) const
     {
         const int dx = std::abs(c.x - playerChunk.x);
         const int dz = std::abs(c.z - playerChunk.z);
@@ -201,15 +219,17 @@ namespace xone {
     }
 
     void LinearFlightStreamer::requestIfNeeded(
-        aveng::ChunkCoord coord,
-        std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash>& streamed,
-        aveng::StreamCommandBuffer& outCmds
+        ChunkCoord coord,
+        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        StreamCommandBuffer& outCmds
     )
     {
         auto [it, inserted] = streamed.try_emplace(
             coord,
-            aveng::StreamedChunkState{ aveng::StreamedChunkState::Status::Requested }
+            StreamedChunkState{ StreamedChunkState::Status::Requested }
         );
+
+        Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
 
         if (inserted) {
             outCmds.requestCenters.push_back(coord);
@@ -221,12 +241,13 @@ namespace xone {
     }
 
     void AllRangeStreamer::update(
-        const aveng::StreamUpdateContext& ctx,
-        aveng::TerrainController& terrain,
-        std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash>& streamed,
-        aveng::StreamCommandBuffer& outCmds
+        const StreamUpdateContext& ctx,
+        TerrainController& terrain,
+        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        StreamCommandBuffer& outCmds
     )
     {
+        Logger::log(1, "AllRangeStreamer::update()\n");
         // Stub for later.
     }
 
