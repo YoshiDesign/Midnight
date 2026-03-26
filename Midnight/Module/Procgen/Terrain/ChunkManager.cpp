@@ -23,6 +23,24 @@
 #include <format>
 #include "Runtime/Debug.h"
 #endif
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+// #region agent log
+#include <chrono>
+namespace { namespace dbg {
+    inline void log(const char* hyp, const char* loc, const char* msg, const char* extra = nullptr) {
+        FILE* f;
+        fopen_s(&f, "c:\\Users\\Yoshi\\dev\\Midnight\\debug-f0cdb0.log", "a");
+        if (!f) return;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        fprintf(f, "{\"sessionId\":\"f0cdb0\",\"hypothesisId\":\"%s\",\"location\":\"%s\","
+            "\"message\":\"%s\",\"data\":{%s},\"timestamp\":%lld}\n",
+            hyp, loc, msg, extra ? extra : "", (long long)ms);
+        fclose(f);
+    }
+}}
+// #endregion
 
 /*
 * Policy
@@ -691,11 +709,11 @@ namespace aveng {
         // 1) Reset thread-local scratch for this job
         tlsScratchArena().reset();
         
-        // 2) Allocate AllPoints struct in chunk scratch (persists across stages)
+        // 2) Allocate AllPoints struct in chunk final (persists across stages)
         if (!rec.allPoints) {
-            auto alloc = std::pmr::polymorphic_allocator<AllPoints>(rec.scratch.mr());
+            auto alloc = std::pmr::polymorphic_allocator<AllPoints>(rec.final.mr());
             rec.allPoints = alloc.allocate(1);
-            std::construct_at(rec.allPoints, rec.scratch.mr());
+            std::construct_at(rec.allPoints, rec.final.mr());
         }
         
         // 3) Calculate expanded bounds for halo region
@@ -1207,6 +1225,10 @@ namespace aveng {
                 rec->renderableState == RenderableBuildState::Building ||
                 rec->renderableState == RenderableBuildState::Ready)
             {
+                // #region agent log
+                char b0[128]; snprintf(b0,sizeof(b0),"\"coord\":[%d,%d],\"state\":%d,\"reqId\":%llu",center.x,center.z,(int)rec->renderableState,(unsigned long long)rec->requestedRenderableId);
+                dbg::log("H1","ChunkManager.cpp:requestRenderableAsync","already_in_flight",b0);
+                // #endregion
                 return rec->requestedRenderableId;
             }
 
@@ -1215,16 +1237,28 @@ namespace aveng {
             rec->renderablePublished = false;
             shouldSubmit = true;
         }
+        // #region agent log
+        { char b1[128]; snprintf(b1,sizeof(b1),"\"coord\":[%d,%d],\"reqId\":%llu,\"frame\":%llu",center.x,center.z,(unsigned long long)requestId,(unsigned long long)frameIndex);
+          dbg::log("H2","ChunkManager.cpp:requestRenderableAsync","task_submitted",b1); }
+        // #endregion
         if (shouldSubmit) {
             tasks_.submit([this, center, frameIndex, requestId]() {
                 ChunkRecord* workerRec = getOrCreateRecord(center);
                 RecordPin hold(*this, workerRec, frameIndex);
+
+                // #region agent log
+                { char b2[128]; snprintf(b2,sizeof(b2),"\"coord\":[%d,%d],\"reqId\":%llu,\"tid\":%u",center.x,center.z,(unsigned long long)requestId,(unsigned)std::hash<std::thread::id>{}(std::this_thread::get_id())%10000);
+                  dbg::log("H2","ChunkManager.cpp:requestRenderableAsync","task_started",b2); }
+                // #endregion
 
                 {
                     std::scoped_lock lock(workerRec->renderableMutex);
 
                     // If another request superseded us before we even started, abandon.
                     if (workerRec->requestedRenderableId != requestId) {
+                        // #region agent log
+                        dbg::log("H3","ChunkManager.cpp:requestRenderableAsync","superseded_before_start");
+                        // #endregion
                         return;
                     }
 
@@ -1234,6 +1268,11 @@ namespace aveng {
                 try {
                     auto renderable = generate(center, frameIndex, requestId);
 
+                    // #region agent log
+                    { char b3[128]; snprintf(b3,sizeof(b3),"\"coord\":[%d,%d],\"reqId\":%llu,\"ok\":%s",center.x,center.z,(unsigned long long)requestId,renderable?"true":"false");
+                      dbg::log("H2","ChunkManager.cpp:requestRenderableAsync","generate_returned",b3); }
+                    // #endregion
+
                     bool shouldPublish = false;
 
                     {
@@ -1241,6 +1280,9 @@ namespace aveng {
 
                         // If stale, discard result silently.
                         if (workerRec->requestedRenderableId != requestId) {
+                            // #region agent log
+                            dbg::log("H3","ChunkManager.cpp:requestRenderableAsync","superseded_after_generate");
+                            // #endregion
                             return;
                         }
 
@@ -1252,22 +1294,22 @@ namespace aveng {
                     }
 
                     if (shouldPublish) {
+                        // #region agent log
+                        { char b4[128]; snprintf(b4,sizeof(b4),"\"coord\":[%d,%d],\"reqId\":%llu",center.x,center.z,(unsigned long long)requestId);
+                          dbg::log("H5","ChunkManager.cpp:requestRenderableAsync","completion_pushed",b4); }
+                        // #endregion
                         completedRenderables_.push(procgen::RenderableCompletion{
                             .coord = center,
                             .requestId = requestId,
                             .success = true
                         });
-
-                        // For High Perf streaming without chunk renderable cache
-                        //completedRenderables_.push(procgen::RenderableCompletion_ALT{
-                        //    .coord = center,
-                        //    .requestId = requestId,
-                        //    .success = true,
-                        //    .renderable = std::move(renderable)
-                        //});
                     }
                 }
                 catch (...) { // ugh
+                    // #region agent log
+                    { char b5[128]; snprintf(b5,sizeof(b5),"\"coord\":[%d,%d],\"reqId\":%llu",center.x,center.z,(unsigned long long)requestId);
+                      dbg::log("H3","ChunkManager.cpp:requestRenderableAsync","EXCEPTION_caught",b5); }
+                    // #endregion
                     {
                         std::scoped_lock lock(workerRec->renderableMutex);
 
@@ -1296,6 +1338,11 @@ namespace aveng {
     std::unique_ptr<procgen::TerrainRenderable>
         ChunkManager::generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
     {
+        // #region agent log
+        { char bg[128]; snprintf(bg,sizeof(bg),"\"center\":[%d,%d],\"reqId\":%llu",center.x,center.z,(unsigned long long)requestId);
+          dbg::log("H2","ChunkManager.cpp:generate","enter",bg); }
+        // #endregion
+
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors);
 
@@ -1315,13 +1362,33 @@ namespace aveng {
             spatialFutures[i - 9] = requestSpatialGrid(neighbors[i], frameIndex);
         }
 
+        // #region agent log
+        { char bg2[128]; snprintf(bg2,sizeof(bg2),"\"center\":[%d,%d]",center.x,center.z);
+          dbg::log("H2","ChunkManager.cpp:generate","begin_mesh_waits",bg2); }
+        // #endregion
         for (int i = 0; i < 9; ++i) {
+            // #region agent log
+            { char bg3[160]; snprintf(bg3,sizeof(bg3),"\"center\":[%d,%d],\"meshIdx\":%d,\"chunk\":[%d,%d]",center.x,center.z,i,neighbors[i].x,neighbors[i].z);
+              dbg::log("H2","ChunkManager.cpp:generate","mesh_wait_begin",bg3); }
+            // #endregion
             tasks_.wait(meshFutures[i]);
+            // #region agent log
+            { char bg4[160]; snprintf(bg4,sizeof(bg4),"\"center\":[%d,%d],\"meshIdx\":%d,\"chunk\":[%d,%d]",center.x,center.z,i,neighbors[i].x,neighbors[i].z);
+              dbg::log("H2","ChunkManager.cpp:generate","mesh_wait_done",bg4); }
+            // #endregion
         }
 
+        // #region agent log
+        { char bg5[128]; snprintf(bg5,sizeof(bg5),"\"center\":[%d,%d]",center.x,center.z);
+          dbg::log("H2","ChunkManager.cpp:generate","begin_spatial_waits",bg5); }
+        // #endregion
         for (int i = 0; i < 16; ++i) {
             tasks_.wait(spatialFutures[i]);
         }
+        // #region agent log
+        { char bg6[128]; snprintf(bg6,sizeof(bg6),"\"center\":[%d,%d]",center.x,center.z);
+          dbg::log("H2","ChunkManager.cpp:generate","all_waits_done",bg6); }
+        // #endregion
 
         return buildRenderablev2(center, frameIndex);
     }

@@ -111,8 +111,14 @@ namespace aveng {
         template<class T>
         T wait(const std::shared_future<T>& fut) {
 
-            ++g_waitDepth;
-            struct Scope { ~Scope() { --g_waitDepth; } } scope;
+            //++g_waitDepth;
+            //if (g_waitDepth > 1) {
+            //    std::printf("[WAIT] tid=%u depth=%d%s\n",
+            //        (unsigned)(std::hash<std::thread::id>{}(std::this_thread::get_id()) % 10000),
+            //        g_waitDepth,
+            //        g_waitDepth >= 4 ? " *** DEEP ***" : g_waitDepth >= 8 ? " *** EVEN DEEPER ***" : g_waitDepth >= 16 ? " *** SUPER DEEP ***" : "");
+            //}
+            //struct Scope { ~Scope() { --g_waitDepth; } } scope;
 
             while (fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
                 // Always try to run a job.

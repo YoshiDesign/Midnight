@@ -230,7 +230,7 @@ namespace xone {
         const int dz = c.z - playerChunk.z;  // signed: positive = ahead, negative = behind
 
         if (dx > policy_.evictRadiusX) return true;
-        if (dz > policy_.evictRadiusZ) return true;       // too far ahead
+        // if (dz > policy_.evictRadiusZ) return true;       // too far ahead
         if (dz < -policy_.evictBackwardZ) return true;     // too far behind
 
         return false;

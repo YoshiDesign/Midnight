@@ -1,0 +1,736 @@
+Your pool design itself was not obviously “wrong,” but it was vulnerable to a specific failure mode:
+
+workers were allowed to wait on futures from inside other worker tasks
+while waiting, they used a helping-wait loop
+that can work well for shallow dependency chains
+but it gets fragile when procedural generation creates overlapping region requests that recursively demand more chunk stages
+
+The strongest signal from your earlier experiments was this:
+
+non-overlapping regions could generate concurrently
+overlapping regions were fine if one side was already cached
+simultaneously building overlapping regions was where things stalled
+
+That strongly suggests dependency starvation / dependency cycle behavior, not a plain lock-order mutex deadlock.
+
+The two biggest likely issues:
+1. Waiting inside worker tasks
+
+If a worker task calls wait() on another task, you are spending a scarce worker slot on coordination instead of completion.
+
+That becomes dangerous when many tasks do it at once.
+
+2. Overlapping region construction
+
+This was the most revealing result from your own tests.
+
+If region A and region B both need overlapping support footprints at the same time, they may each begin constructing dependency subgraphs that collide in awkward ways. Even if each chunk stage is guarded by once_flag or shared futures, the orchestration still may create long chains of nested waits.
+
+I’m going to sketch a version that stays close to your current architecture: a pool, a worker-thread marker, a safer wait(), and a terrain-stage pattern that re-enqueues instead of blocking inside workers. Then I’ll show how the chunk manager would use it.
+
+Thought for a few seconds
+
+Absolutely. I’ll keep this close to your existing engine style and focus on the architectural pressure points.
+
+The goal
+
+We want an ITaskSystem that:
+
+still supports normal async jobs
+still lets the main thread block when needed
+does not let worker tasks deadlock the pool by blocking on other worker tasks
+encourages request → check readiness → re-enqueue instead of request → wait inside worker
+A good mental model
+
+Think of the pool as a place for doing work, not for sitting on dependencies.
+
+So:
+
+main thread: may block
+worker thread: should almost never block
+chunk stage jobs: should either
+complete now, or
+enqueue prerequisites and return
+
+That single policy change is the biggest win.
+
+A safer ITaskSystem
+
+Here’s a sketch of an interface I’d recommend.
+
+#pragma once
+
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <future>
+#include <memory>
+
+namespace aveng {
+
+    class ITaskHandle {
+    public:
+        virtual ~ITaskHandle() = default;
+
+        virtual bool isReady() const noexcept = 0;
+        virtual void wait() = 0; // external thread only, or special-case guarded
+    };
+
+    using TaskFn = std::function<void()>;
+
+    class ITaskSystem {
+    public:
+        virtual ~ITaskSystem() = default;
+
+        virtual void enqueue(TaskFn fn) = 0;
+
+        template<typename Fn>
+        auto submit(Fn&& fn) -> std::shared_future<decltype(fn())>;
+
+        virtual bool isWorkerThread() const noexcept = 0;
+
+        // Runs one available job if any. Returns true if work was executed.
+        virtual bool tryRunOneJob() = 0;
+
+        // External-thread wait. Worker use should assert in debug.
+        virtual void wait(std::shared_future<void>& fut) = 0;
+
+        template<typename T>
+        void wait(std::shared_future<T>& fut);
+
+        virtual uint32_t workerCount() const noexcept = 0;
+    };
+
+    template<typename Fn>
+    auto ITaskSystem::submit(Fn&& fn) -> std::shared_future<decltype(fn())> {
+        using R = decltype(fn());
+
+        auto promise = std::make_shared<std::promise<R>>();
+        auto fut = promise->get_future().share();
+
+        enqueue([promise, f = std::forward<Fn>(fn)]() mutable {
+            try {
+                if constexpr (std::is_void_v<R>) {
+                    f();
+                    promise->set_value();
+                } else {
+                    promise->set_value(f());
+                }
+            }
+            catch (...) {
+                promise->set_exception(std::current_exception());
+            }
+        });
+
+        return fut;
+    }
+
+    template<typename T>
+    void ITaskSystem::wait(std::shared_future<T>& fut) {
+        if (!isWorkerThread()) {
+            fut.wait();
+            return;
+        }
+
+#ifndef NDEBUG
+        // In the new policy, workers should not block.
+        assert(false && "Worker thread attempted blocking wait(). Re-enqueue instead.");
+#endif
+
+        // Fallback debug-friendly helping wait if you temporarily need it.
+        while (fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+            if (!tryRunOneJob()) {
+                std::this_thread::yield();
+            }
+        }
+    }
+
+} // namespace aveng
+
+What matters here:
+
+isWorkerThread() is first-class
+tryRunOneJob() exists for controlled helping
+wait() is explicitly biased toward external callers only
+in debug, worker blocking should scream immediately
+Thread-pool sketch
+
+Now the pool itself.
+
+#pragma once
+
+#include "ITaskSystem.h"
+#include <cassert>
+#include <condition_variable>
+#include <cstdint>
+#include <deque>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+namespace aveng {
+
+    class ThreadPoolTaskSystem final : public ITaskSystem {
+    public:
+        explicit ThreadPoolTaskSystem(uint32_t numWorkers);
+        ~ThreadPoolTaskSystem() override;
+
+        void enqueue(TaskFn fn) override;
+
+        bool isWorkerThread() const noexcept override;
+        bool tryRunOneJob() override;
+        void wait(std::shared_future<void>& fut) override;
+
+        uint32_t workerCount() const noexcept override { return static_cast<uint32_t>(workers_.size()); }
+
+    private:
+        void workerMain();
+
+    private:
+        std::vector<std::thread> workers_;
+
+        mutable std::mutex queueMut_;
+        std::condition_variable queueCv_;
+        std::deque<TaskFn> queue_;
+
+        std::atomic<bool> stopping_{ false };
+
+        static thread_local bool tlsIsWorker_;
+        static thread_local int  tlsWaitDepth_;
+    };
+
+} // namespace aveng
+#include "ThreadPoolTaskSystem.h"
+#include <chrono>
+
+namespace aveng {
+
+    thread_local bool ThreadPoolTaskSystem::tlsIsWorker_ = false;
+    thread_local int  ThreadPoolTaskSystem::tlsWaitDepth_ = 0;
+
+    ThreadPoolTaskSystem::ThreadPoolTaskSystem(uint32_t numWorkers) {
+        workers_.reserve(numWorkers);
+        for (uint32_t i = 0; i < numWorkers; ++i) {
+            workers_.emplace_back([this]() { workerMain(); });
+        }
+    }
+
+    ThreadPoolTaskSystem::~ThreadPoolTaskSystem() {
+        stopping_.store(true, std::memory_order_relaxed);
+        queueCv_.notify_all();
+
+        for (auto& t : workers_) {
+            if (t.joinable()) {
+                t.join();
+            }
+        }
+    }
+
+    void ThreadPoolTaskSystem::enqueue(TaskFn fn) {
+        {
+            std::lock_guard<std::mutex> lock(queueMut_);
+            queue_.push_back(std::move(fn));
+        }
+        queueCv_.notify_one();
+    }
+
+    bool ThreadPoolTaskSystem::isWorkerThread() const noexcept {
+        return tlsIsWorker_;
+    }
+
+    bool ThreadPoolTaskSystem::tryRunOneJob() {
+        TaskFn job;
+
+        {
+            std::lock_guard<std::mutex> lock(queueMut_);
+            if (queue_.empty()) {
+                return false;
+            }
+
+            job = std::move(queue_.front());
+            queue_.pop_front();
+        }
+
+        job();
+        return true;
+    }
+
+    void ThreadPoolTaskSystem::wait(std::shared_future<void>& fut) {
+        if (!isWorkerThread()) {
+            fut.wait();
+            return;
+        }
+
+#ifndef NDEBUG
+        assert(tlsWaitDepth_ == 0 && "Nested worker wait detected. Convert this flow to re-enqueue/continuation.");
+#endif
+
+        ++tlsWaitDepth_;
+
+        while (fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+            if (!tryRunOneJob()) {
+                std::this_thread::yield();
+            }
+        }
+
+        --tlsWaitDepth_;
+    }
+
+    void ThreadPoolTaskSystem::workerMain() {
+        tlsIsWorker_ = true;
+
+        while (!stopping_.load(std::memory_order_relaxed)) {
+            TaskFn job;
+
+            {
+                std::unique_lock<std::mutex> lock(queueMut_);
+                queueCv_.wait(lock, [this]() {
+                    return stopping_.load(std::memory_order_relaxed) || !queue_.empty();
+                });
+
+                if (stopping_.load(std::memory_order_relaxed) && queue_.empty()) {
+                    break;
+                }
+
+                job = std::move(queue_.front());
+                queue_.pop_front();
+            }
+
+            job();
+        }
+
+        tlsIsWorker_ = false;
+    }
+
+} // namespace aveng
+
+This version still supports helping-wait, but only as a transitional mechanism. The real improvement comes from changing how terrain stages are scheduled.
+
+The key chunk-stage rule
+
+A worker task should never do this:
+
+auto fut = requestTriangulation(coord);
+taskSystem.wait(fut); // bad inside worker
+buildSpatialGrid(coord);
+
+Instead it should do one of these two patterns.
+
+Pattern A: request + readiness check + re-enqueue
+
+This is the simplest fit for your current system.
+
+void ChunkManager::requestSpatialGrid(const ChunkCoord coord) {
+    ChunkRecord& rec = getOrCreateRecord(coord);
+
+    std::call_once(rec.spatialGridOnce, [&]() {
+        rec.spatialGridFuture = tasks_.submit([this, &rec, coord]() {
+            runSpatialGridStage(rec, coord);
+        });
+    });
+}
+
+void ChunkManager::runSpatialGridStage(ChunkRecord& rec, ChunkCoord coord) {
+    requestTriangulation(coord);
+
+    if (!rec.triangulationFuture.valid() ||
+        rec.triangulationFuture.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+
+        // Dependency not ready. Re-enqueue and leave worker free.
+        tasks_.enqueue([this, coord]() {
+            ChunkRecord& again = getOrCreateRecord(coord);
+            runSpatialGridStage(again, coord);
+        });
+        return;
+    }
+
+    // Safe: dependency is ready now, no blocking.
+    auto tri = rec.triangulationFuture.get(); // only if your future is non-shared and one-shot
+    // For shared_future-based staging, just access rec.triangulation product directly.
+
+    buildSpatialGrid(rec, coord);
+}
+
+That’s the essence.
+
+It looks a little blunt, but it works surprisingly well if:
+
+requests are deduplicated with once_flag
+work is idempotent
+stage completion writes durable outputs into the chunk record
+Pattern B: continuation registration
+
+This is cleaner, but requires a little more infrastructure.
+
+You attach callbacks that fire when a stage completes.
+
+For example:
+
+struct StageSignal {
+    std::mutex mut;
+    bool ready = false;
+    std::vector<std::function<void()>> continuations;
+
+    void onReady(std::function<void()> fn) {
+        std::lock_guard<std::mutex> lock(mut);
+        if (ready) {
+            fn();
+            return;
+        }
+        continuations.push_back(std::move(fn));
+    }
+
+    void markReady() {
+        std::vector<std::function<void()>> toRun;
+        {
+            std::lock_guard<std::mutex> lock(mut);
+            ready = true;
+            toRun.swap(continuations);
+        }
+        for (auto& fn : toRun) {
+            fn();
+        }
+    }
+};
+
+Then:
+
+void ChunkManager::requestSpatialGrid(const ChunkCoord coord) {
+    ChunkRecord& rec = getOrCreateRecord(coord);
+
+    std::call_once(rec.spatialGridOnce, [&]() {
+        requestTriangulation(coord);
+
+        rec.triangulationReady.onReady([this, coord]() {
+            tasks_.enqueue([this, coord]() {
+                ChunkRecord& r = getOrCreateRecord(coord);
+                buildSpatialGrid(r, coord);
+                r.spatialGridReady.markReady();
+            });
+        });
+    });
+}
+
+This avoids polling and avoids worker blocking entirely.
+
+For your engine right now, Pattern A is probably the faster retrofit.
+
+Recommended chunk record structure
+
+Here’s the kind of thing I’d use.
+
+struct ChunkRecord {
+    ChunkCoord coord{};
+
+    std::atomic<int32_t> pinCount{0};
+    std::atomic<uint64_t> lastTouchedFrame{0};
+
+    // Durable products
+    std::unique_ptr<Points>        points;
+    std::unique_ptr<AllPoints>     allPoints;
+    std::unique_ptr<HeightField>   heightField;
+    std::unique_ptr<Triangulation> triangulation;
+    std::unique_ptr<SpatialGrid>   spatialGrid;
+    std::unique_ptr<ErosionData>   erosion;
+    std::unique_ptr<FinalMeshCPU>  mesh;
+
+    // Stage init guards
+    std::once_flag pointsOnce;
+    std::once_flag allPointsOnce;
+    std::once_flag heightsOnce;
+    std::once_flag triangulationOnce;
+    std::once_flag spatialGridOnce;
+    std::once_flag erosionOnce;
+    std::once_flag meshOnce;
+
+    // Optional if you still want futures
+    std::shared_future<void> pointsFuture;
+    std::shared_future<void> allPointsFuture;
+    std::shared_future<void> heightsFuture;
+    std::shared_future<void> triangulationFuture;
+    std::shared_future<void> spatialGridFuture;
+    std::shared_future<void> erosionFuture;
+    std::shared_future<void> meshFuture;
+};
+
+Notice the future type is shared_future<void>.
+
+That is cleaner for this pattern because the real output lives in the record:
+
+rec.triangulation
+rec.spatialGrid
+rec.erosion
+
+The future only means “stage finished,” not “own the product.”
+
+That avoids weirdness with .get() ownership.
+
+A concrete stage conversion
+
+Here’s a realistic mesh-stage flow.
+
+Before: risky version
+void ChunkManager::requestMesh(const ChunkCoord coord) {
+    ChunkRecord& rec = getOrCreateRecord(coord);
+
+    std::call_once(rec.meshOnce, [&]() {
+        rec.meshFuture = tasks_.submit([this, &rec, coord]() {
+            requestErosion(coord);
+            tasks_.wait(rec.erosionFuture);   // risky
+            buildMesh(rec, coord);
+        });
+    });
+}
+After: non-blocking worker version
+void ChunkManager::requestMesh(const ChunkCoord coord) {
+    ChunkRecord& rec = getOrCreateRecord(coord);
+
+    std::call_once(rec.meshOnce, [&]() {
+        rec.meshFuture = tasks_.submit([this, coord]() {
+            ChunkRecord& r = getOrCreateRecord(coord);
+            runMeshStage(r, coord);
+        });
+    });
+}
+
+void ChunkManager::runMeshStage(ChunkRecord& rec, const ChunkCoord coord) {
+    requestErosion(coord);
+
+    if (!rec.erosionFuture.valid() ||
+        rec.erosionFuture.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+
+        tasks_.enqueue([this, coord]() {
+            ChunkRecord& again = getOrCreateRecord(coord);
+            runMeshStage(again, coord);
+        });
+        return;
+    }
+
+    if (rec.mesh) {
+        return; // defensive idempotence
+    }
+
+    rec.mesh = std::make_unique<FinalMeshCPU>(buildMeshFromRecord(rec, coord));
+}
+
+That alone removes one huge deadlock vector.
+
+A better helper for readiness
+
+You’ll probably want this:
+
+template<typename T>
+static bool isReady(const std::shared_future<T>& fut) noexcept {
+    if (!fut.valid()) return false;
+    return fut.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+}
+
+Then your stage code becomes cleaner:
+
+if (!isReady(rec.erosionFuture)) {
+    tasks_.enqueue([this, coord]() {
+        ChunkRecord& again = getOrCreateRecord(coord);
+        runMeshStage(again, coord);
+    });
+    return;
+}
+Important caution: avoid hot-spin re-enqueue storms
+
+If you naively re-enqueue immediately, you can flood the queue with retry jobs.
+
+So add one of these:
+
+a per-stage “retry pending” flag
+or a small delayed retry queue
+or only re-enqueue from the dependency’s completion path
+
+A simple flag version:
+
+struct ChunkRecord {
+    // ...
+    std::atomic<bool> meshRetryQueued{ false };
+};
+if (!isReady(rec.erosionFuture)) {
+    bool expected = false;
+    if (rec.meshRetryQueued.compare_exchange_strong(expected, true)) {
+        tasks_.enqueue([this, coord]() {
+            ChunkRecord& again = getOrCreateRecord(coord);
+            again.meshRetryQueued.store(false, std::memory_order_relaxed);
+            runMeshStage(again, coord);
+        });
+    }
+    return;
+}
+
+That prevents queue spam.
+
+Region admission control
+
+This was one of the strongest fixes implied by your experiments.
+
+If two active requests have overlapping support footprints, don’t run them at the same time.
+
+Something like:
+
+struct ActiveRegion {
+    ChunkCoord center;
+    int radius; // support radius in chunks
+};
+
+bool overlaps(const ActiveRegion& a, const ActiveRegion& b) {
+    const int aminX = a.center.x - a.radius;
+    const int amaxX = a.center.x + a.radius;
+    const int aminZ = a.center.z - a.radius;
+    const int amaxZ = a.center.z + a.radius;
+
+    const int bminX = b.center.x - b.radius;
+    const int bmaxX = b.center.x + b.radius;
+    const int bminZ = b.center.z - b.radius;
+    const int bmaxZ = b.center.z + b.radius;
+
+    const bool sepX = amaxX < bminX || bmaxX < aminX;
+    const bool sepZ = amaxZ < bminZ || bmaxZ < aminZ;
+    return !(sepX || sepZ);
+}
+
+Then a scheduler:
+
+class TerrainAdmissionController {
+public:
+    bool tryAcquire(const ChunkCoord center, int supportRadius) {
+        std::lock_guard<std::mutex> lock(mut_);
+
+        ActiveRegion incoming{ center, supportRadius };
+        for (const auto& r : active_) {
+            if (overlaps(r, incoming)) {
+                return false;
+            }
+        }
+
+        active_.push_back(incoming);
+        return true;
+    }
+
+    void release(const ChunkCoord center, int supportRadius) {
+        std::lock_guard<std::mutex> lock(mut_);
+        auto it = std::remove_if(active_.begin(), active_.end(),
+            [&](const ActiveRegion& r) {
+                return r.center.x == center.x &&
+                       r.center.z == center.z &&
+                       r.radius == supportRadius;
+            });
+        active_.erase(it, active_.end());
+    }
+
+private:
+    std::mutex mut_;
+    std::vector<ActiveRegion> active_;
+};
+
+Then your streamer only starts a region if admission succeeds. Otherwise it queues it for later.
+
+This is not just a workaround. It is a very sensible policy for your current dependency model.
+
+Debug instrumentation I would add immediately
+
+You need to see dependency behavior, not just hangs.
+
+I’d add a debug event like:
+
+enum class TerrainStage : uint8_t {
+    Points,
+    AllPoints,
+    Heights,
+    Triangulation,
+    SpatialGrid,
+    Erosion,
+    Mesh
+};
+
+struct StageTraceEvent {
+    uint64_t requestId;
+    ChunkCoord coord;
+    TerrainStage stage;
+    const char* action;   // "request", "begin", "defer", "complete"
+    std::thread::id tid;
+};
+
+Then log:
+
+stage requested
+stage began
+stage deferred due to dependency not ready
+dependency requested
+stage completed
+
+You’ll very quickly see whether:
+
+one stage is never becoming ready
+retries are exploding
+overlap admission is working
+worker blocking still exists somewhere
+What I’d change in policy, explicitly
+
+Here is the rule set I’d actually enforce in your engine:
+
+Allowed
+main thread may block on stage futures
+worker may submit work
+worker may request dependencies
+worker may check dependency readiness
+worker may re-enqueue itself once
+Disallowed
+worker may not call blocking wait() on chunk-stage futures
+worker may not recursively build another region inline
+overlapping support regions may not be admitted concurrently
+
+That would likely stabilize your terrain system a lot.
+
+Minimal migration path
+
+You do not need a total rewrite.
+
+You can migrate in this order:
+
+Add isWorkerThread()
+Add debug assert on worker-side wait()
+Convert just one problematic stage chain:
+mesh depends on erosion
+erosion depends on spatial grid
+Add per-stage retry flags
+Add region overlap admission control
+
+That should already tell you a lot.
+
+My strongest recommendation
+
+If you do only two things, do these:
+
+forbid blocking waits inside worker tasks
+serialize overlapping support-region builds
+
+Those two changes line up most directly with the behavior you observed.
+
+A compact example of the intended stage style
+
+This is the style I’d want to see everywhere:
+
+void ChunkManager::runErosionStage(ChunkRecord& rec, ChunkCoord coord) {
+    requestSpatialGrid(coord);
+
+    if (!isReady(rec.spatialGridFuture)) {
+        queueRetry(rec, TerrainStage::Erosion, [this, coord]() {
+            ChunkRecord& again = getOrCreateRecord(coord);
+            runErosionStage(again, coord);
+        });
+        return;
+    }
+
+    if (rec.erosion) return;
+
+    rec.erosion = std::make_unique<ErosionData>();
+    computeErosion(*rec.erosion, *rec.spatialGrid, *rec.heightField, coord);
+}
+
+That’s the heartbeat of the whole fix.

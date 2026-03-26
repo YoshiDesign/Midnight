@@ -10,7 +10,7 @@ namespace procgen {
 			10000,	// numDroplets
 			32,		// maxSteps
 			2048,	// batchSize
-			std::floor(nThreads / 6), // maxWorkers: 1/6 of the hardware's threads
+			std::floor(nThreads / 16), // maxWorkers: 1/6 of the hardware's threads
 
 			0.25f,	 // inertia
 			4.0f,	 // gravity 
@@ -33,7 +33,7 @@ namespace procgen {
 			0.57,  // ~30 degrees angle of repose
 			0.30,  // Transfer 30% of excess per iteration
 			30,	   // 30 Iterations
-			std::floor(nThreads / 9)
+			std::floor(nThreads / 16)
 		};
 
 		aveng::HardnessParams hardness{
