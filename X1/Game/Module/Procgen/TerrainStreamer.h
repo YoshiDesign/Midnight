@@ -27,19 +27,19 @@ namespace xone {
         aveng::ChunkCoord rightFan;
     };
 
-    inline LinearWaveCoords makeLinearWave(int k) {
+    inline LinearWaveCoords makeLinearWave(int k, int baseX) {
         if (k == 0) {
             return {
-                { 0, 0 },
-                { -2, 2 },
-                {  2, 2 }
+                { baseX, 0 },
+                { baseX - 2, 2 },
+                { baseX + 2, 2 }
             };
         }
 
         return {
-            { 0, 3 * k },
-            { -2, 3 * k + 2 },
-            {  2, 3 * k + 2 }
+            { baseX, 3 * k },
+            { baseX - 2, 3 * k + 2 },
+            { baseX + 2, 3 * k + 2 }
         };
     }
 
@@ -70,6 +70,7 @@ namespace xone {
         );
 
         void advanceFrontier(
+            const aveng::StreamUpdateContext& ctx,
             aveng::TerrainController& terrain,
             std::unordered_map<aveng::ChunkCoord,
             aveng::StreamedChunkState,
@@ -86,6 +87,8 @@ namespace xone {
         );
 
         bool shouldEvict(aveng::ChunkCoord c, aveng::ChunkCoord playerChunk) const;
+
+        void evictChunks(aveng::StreamCommandBuffer& outCmds, aveng::TerrainController& terrain);
 
         static void requestIfNeeded(
             aveng::ChunkCoord coord,
@@ -145,6 +148,7 @@ namespace xone {
         LinearFlightStreamer linear_;
         AllRangeStreamer allRange_;
         std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash> streamed_;
+        std::vector<aveng::ChunkCoord> pendingEvictions_;
     };
 
 }

@@ -1922,6 +1922,7 @@ namespace aveng {
 
                     if (pins == 0 && age > ageFrames) {
                         clearAllPointsReady(rec->coord);
+                        clearAllStagesComplete(rec->coord);
                         // Move the chunk record out of its bucket
                         // into a local that won't survive out of scope.
                         // Important: This frees all pmr resources automatically,
@@ -1935,6 +1936,27 @@ namespace aveng {
                 }
             } // unlock stripe before freeing memory
         }
+    }
+
+    bool ChunkManager::evictRecord(ChunkCoord coord) {
+        const size_t stripeIdx = stripeIndexwh(coord);
+        auto& bucket = records_[stripeIdx];
+
+        std::unique_ptr<ChunkRecord> toFree;
+        {
+            std::lock_guard<std::mutex> lock(bucket.mut);
+            auto it = bucket.map.find(coord);
+            if (it == bucket.map.end()) return false;
+
+            ChunkRecord* rec = it->second.get();
+            if (rec->pinCount.load(std::memory_order_relaxed) != 0) return false;
+
+            clearAllPointsReady(coord);
+            clearAllStagesComplete(coord);
+            toFree = std::move(it->second);
+            bucket.map.erase(it);
+        }
+        return true;
     }
 
 }

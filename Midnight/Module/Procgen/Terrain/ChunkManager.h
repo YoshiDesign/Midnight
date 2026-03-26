@@ -106,6 +106,7 @@ namespace aveng {
         void pin(ChunkRecord* rec); // touch
         void unpin(ChunkRecord* rec);
         void evictUnpinnedOlderThan(uint64_t frameIndex, uint64_t ageFrames);
+        bool evictRecord(ChunkCoord coord);
 
         /* Managers */
         void initManagers(procgen::ErosionManager* er);
@@ -144,6 +145,11 @@ namespace aveng {
         }
 
         void setErosionParameters(ErosionSettings eroCfg);
+
+        /* Getter */
+        float chunkSize() {
+            return cfg_.chunkSize;
+        }
 
     private:
         void markAllPointsReady(ChunkCoord coord);

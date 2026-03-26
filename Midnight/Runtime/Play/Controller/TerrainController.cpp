@@ -37,8 +37,18 @@ namespace aveng {
         ensureChunkRequested(start_coord);
     }
 
-    void TerrainController::evictChunks(ChunkCoord center) {
-    
+    void TerrainController::evictChunk(ChunkCoord center) {
+        if (slots_.find(center) != slots_.end()) {
+
+            for (int dz = -2; dz <= 2; ++dz) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    chunks_->evictRecord({ center.x + dx, center.z + dz });
+                }
+            }
+
+            cleanupOne(slots_.at(center));
+            slots_.erase(center);
+        }
     }
 
     void TerrainController::update(/*const Camera& camera*/)
@@ -48,7 +58,7 @@ namespace aveng {
         // requestMissingChunks(desired);
         drainCompletedTerrain();
         serviceCpuReadyChunks();
-        // evictUndesiredChunks(desired);
+        
     }
 
     // Render VK
@@ -181,6 +191,10 @@ namespace aveng {
     void TerrainController::setTerrainWeatheringParams(ErosionSettings erosion)
     {
         chunks_->setErosionParameters(erosion);
+    }
+
+    float TerrainController::getChunkSize() {
+        return chunks_->chunkSize();
     }
 
     //bool TerrainController::

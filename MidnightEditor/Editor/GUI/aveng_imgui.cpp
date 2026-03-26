@@ -1,3 +1,4 @@
+#include <thread>
 #include "aveng_imgui.h"
 #include "CoreVK/EngineDevice.h"
 #include "Core/aveng_window.h"
@@ -485,10 +486,11 @@ namespace aveng {
         const bool shift = ImGui::GetIO().KeyShift;
 
         {
-            ImGui::Begin("Engine Info");
-            ImGui::Text("Video Device:\t %s", engineDevice.properties.deviceName);
+            ImGui::Begin("System Info");
+            ImGui::Text("Available CPU Threads:\t%d", std::thread::hardware_concurrency());
+            ImGui::Text("Video Device:\t%s", engineDevice.properties.deviceName);
             ImGui::Text(
-                "Position:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.translation.x, editorData.cameraTransform.translation.y, editorData.cameraTransform.translation.z);
+                "You Are Here:\t(%.03lf, %.03lf, %.03lf)", editorData.cameraTransform.translation.x, editorData.cameraTransform.translation.y, editorData.cameraTransform.translation.z);
             ImGui::End();
         }
 

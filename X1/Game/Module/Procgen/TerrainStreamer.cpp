@@ -37,6 +37,7 @@ namespace xone {
     void TerrainStreamer::reset()
     {
         streamed_.clear();
+        pendingEvictions_.clear();
         linear_.reset();
         allRange_.reset();
     }
@@ -52,7 +53,7 @@ namespace xone {
 
         switch (policy_.mode) {
         case TerrainStreamMode::LinearFlight:
-            Logger::log(1, "Updating with LinearFlight Policy");
+            // Logger::log(1, "Updating with LinearFlight Policy");
             linear_.update(ctx, terrain_, streamed_, cmds);
             break;
 
@@ -68,13 +69,12 @@ namespace xone {
 
     ChunkCoord TerrainStreamer::worldToChunk(glm::vec3 pos) const
     {
-        constexpr float CHUNK_SIZE = 256.0f;
+
+        float chunk_size = terrain_.getChunkSize();
 
         // Assuming x/z world plane and chunk coordinates are based on floor division.
-        const int cx = static_cast<int>(std::floor(pos.x / CHUNK_SIZE));
-        const int cz = static_cast<int>(std::floor(pos.z / CHUNK_SIZE));
-
-        Logger::log(1, "Camera {%d, %d}\n", cx, cz);
+        const int cx = static_cast<int>(std::floor(pos.x / chunk_size));
+        const int cz = static_cast<int>(std::floor(pos.z / chunk_size));
 
         return { cx, cz };
     }
@@ -82,7 +82,7 @@ namespace xone {
     void TerrainStreamer::applyRequests(const std::vector<ChunkCoord>& centers, uint64_t frameIndex)
     {
         for (const ChunkCoord& c : centers) {
-            Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
+            // Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
             terrain_.generateChunks(c);
         }
     }
@@ -96,9 +96,15 @@ namespace xone {
             }
 
             it->second.status = StreamedChunkState::Status::Evicting;
+            pendingEvictions_.push_back(c);
+        }
 
-            // If/when you expose this:
-            // terrain_.evictChunk(c);
+        if (pendingEvictions_.size() >= 3) {
+            for (const ChunkCoord& c : pendingEvictions_) {
+                terrain_.evictChunk(c);
+                streamed_.erase(c);
+            }
+            pendingEvictions_.clear();
         }
     }
 
@@ -115,13 +121,14 @@ namespace xone {
     )
     {
 #ifdef M_DEBUG
-        Logger::log(1, "Linear Updating... Player Coord {%d, %d}\n", ctx.playerChunk.x, ctx.playerChunk.z);
-        for (auto& [k, v] : streamed) {
-            Logger::log(1, "Streamed[%d, %d] = %d\n", k.x, k.z, v.status);
-        }
+        // Logger::log(1, "Player Chunk Coord {%d, %d}\n", ctx.playerChunk.x, ctx.playerChunk.z);
+        //for (auto& [k, v] : streamed) {
+        //    Logger::log(1, "Has Streamed Record[%d, %d] = %d\n", k.x, k.z, v.status);
+        //}
 #endif
+        state_.baseX = ctx.playerChunk.x;
         requestInitialCenter(streamed, outCmds);
-        advanceFrontier(terrain, streamed, outCmds);
+        advanceFrontier(ctx, terrain, streamed, outCmds);
         enqueueEvictions(ctx.playerChunk, streamed, outCmds);
     }
 
@@ -134,15 +141,16 @@ namespace xone {
             return;
         }
 
-        const LinearWaveCoords w0 = makeLinearWave(0);
-        Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
-        Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
-        Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
+        const LinearWaveCoords w0 = makeLinearWave(0, state_.baseX);
+        //Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
+        //Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
+        //Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
         requestIfNeeded(w0.center, streamed, outCmds);
         state_.maxCenterWaveRequested = 0;
     }
 
     void LinearFlightStreamer::advanceFrontier(
+        const StreamUpdateContext& ctx,
         TerrainController& terrain,
         std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
         StreamCommandBuffer& outCmds
@@ -158,7 +166,7 @@ namespace xone {
             // region is all-points-ready, request the two side fan chunks for that wave.
             const int nextFanWave = state_.maxFanWaveRequested + 1;
             if (nextFanWave <= state_.maxCenterWaveRequested) {
-                const LinearWaveCoords wave = makeLinearWave(nextFanWave);
+                const LinearWaveCoords wave = makeLinearWave(nextFanWave, state_.baseX);
 
                 if (terrain.hasRegionReady(wave.center)) {
                     requestIfNeeded(wave.leftFan, streamed, outCmds);
@@ -174,13 +182,18 @@ namespace xone {
             if (state_.maxFanWaveRequested >= 0 &&
                 state_.maxCenterWaveRequested == state_.maxFanWaveRequested)
             {
-                const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested);
+                const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested, state_.baseX);
 
                 if (terrain.hasRegionComplete(currentFanWave.leftFan) &&
                     terrain.hasRegionComplete(currentFanWave.rightFan))
                 {
                     const int nextCenterWave = state_.maxCenterWaveRequested + 1;
-                    const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave);
+                    const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave, state_.baseX);
+
+                    const int leadZ = nextWave.center.z - ctx.playerChunk.z;
+                    if (leadZ > policy_.forwardRows) {
+                        break;
+                    }
 
                     requestIfNeeded(nextWave.center, streamed, outCmds);
                     state_.maxCenterWaveRequested = nextCenterWave;
@@ -205,6 +218,7 @@ namespace xone {
             }
 
             if (shouldEvict(coord, playerChunk)) {
+                Logger::log(1, "Evictions pending: {%d}\n", outCmds.evictCenters.size());
                 outCmds.evictCenters.push_back(coord);
             }
         }
@@ -213,10 +227,22 @@ namespace xone {
     bool LinearFlightStreamer::shouldEvict(ChunkCoord c, ChunkCoord playerChunk) const
     {
         const int dx = std::abs(c.x - playerChunk.x);
-        const int dz = std::abs(c.z - playerChunk.z);
+        const int dz = c.z - playerChunk.z;  // signed: positive = ahead, negative = behind
 
-        return dx > policy_.evictRadiusX || dz > policy_.evictRadiusZ;
+        if (dx > policy_.evictRadiusX) return true;
+        if (dz > policy_.evictRadiusZ) return true;       // too far ahead
+        if (dz < -policy_.evictBackwardZ) return true;     // too far behind
+
+        return false;
     }
+
+    void LinearFlightStreamer::evictChunks(StreamCommandBuffer& outCmds, TerrainController& terrain) 
+    {
+        for (const ChunkCoord coord : outCmds.evictCenters) {
+            terrain.evictChunk(coord);
+        }
+    }
+
 
     void LinearFlightStreamer::requestIfNeeded(
         ChunkCoord coord,
@@ -229,10 +255,11 @@ namespace xone {
             StreamedChunkState{ StreamedChunkState::Status::Requested }
         );
 
-        Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
+        // Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
 
         if (inserted) {
             outCmds.requestCenters.push_back(coord);
+            Logger::log(1, "RequestCenters {%d}\n", outCmds.requestCenters.size());
         }
     }
 

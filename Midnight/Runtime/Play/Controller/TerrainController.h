@@ -31,6 +31,7 @@ namespace aveng {
     struct LinearFlightState {
         int maxCenterWaveRequested = -1;
         int maxFanWaveRequested = -1;
+        int baseX = 0;
     };
 
     struct StreamUpdateContext {
@@ -48,7 +49,8 @@ namespace aveng {
         int forwardRows = 3;
         int backwardRows = 1;
         int evictRadiusX = 3;
-        int evictRadiusZ = 4;
+        int evictRadiusZ = 5;
+        int evictBackwardZ = 2;
     };
 
     struct AllRangeStreamPolicy {
@@ -100,6 +102,9 @@ namespace aveng {
             settingsUboSize_ = size;
         }
 
+        /* Getter */
+        float getChunkSize();
+
         /* Streaming Policy */
 
         /* Operational Requirements */
@@ -124,7 +129,7 @@ namespace aveng {
          */
         void generateChunks(ChunkCoord start_coord);
 
-        void evictChunks(ChunkCoord center);
+        void evictChunk(ChunkCoord center);
 
         // void collectRenderable();
 
