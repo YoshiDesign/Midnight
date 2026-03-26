@@ -16,21 +16,18 @@ namespace aveng {
         stop();
     }
 
-    // The worker loop
     void ThreadPoolTaskSystem::start(uint32_t threadCount){
         stopping_.store(false, std::memory_order_release);
         workers_.reserve(threadCount);
 
-        // Create worker threads. Each thread runs a loop where it waits for jobs and executes them.
         for (uint32_t i = 0; i < threadCount; ++i) {
             workers_.emplace_back([this] {
                 workerFlag_ = true;
 
-                // Prepare a scratch memory resource for every 
                 tlsScratchArena().reserve(8 * 1024 * 1024); // 8MB per thread
 
                 for (;;) {
-                    std::function<void()> job;
+                    TaskFn job;
                     {
                         std::unique_lock<std::mutex> lock(m_);
                         cv_.wait(lock, [&] { return stopping_.load(std::memory_order_acquire) || !q_.empty(); });
@@ -53,8 +50,12 @@ namespace aveng {
         workers_.clear();
     }
 
-    bool ThreadPoolTaskSystem::try_run_one_job() {
-        std::function<void()> job;
+    bool ThreadPoolTaskSystem::isWorkerThread() const noexcept {
+        return workerFlag_;
+    }
+
+    bool ThreadPoolTaskSystem::tryRunOneJob() {
+        TaskFn job;
         {
             std::lock_guard<std::mutex> lock(m_);
             if (q_.empty()) return false;
@@ -65,7 +66,7 @@ namespace aveng {
         return true;
     }
 
-    void ThreadPoolTaskSystem::enqueue(std::function<void()> job) {
+    void ThreadPoolTaskSystem::enqueue(TaskFn job) {
         {
             std::lock_guard<std::mutex> lock(m_);
             q_.push_back(std::move(job));

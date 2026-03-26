@@ -166,27 +166,36 @@ namespace aveng {
 		ErosionField* erosion = nullptr;
 		FinalMeshCPU* finalMesh = nullptr;
 
-		// Stage futures
+		// Stage futures + promises
+		// Points uses submit() directly (no upstream dep), so no promise needed.
 		std::once_flag pointsOnce;
 		std::shared_future<Points const*> pointsF;
 
+		// Stages with dependencies use promise + enqueue (non-blocking re-enqueue pattern).
+		// The promise is created in call_once and resolved when the build completes.
 		std::once_flag allPointsOnce;
 		std::shared_future<AllPoints const*> allPointsF;
+		std::shared_ptr<std::promise<AllPoints const*>> allPointsProm;
 
 		std::once_flag heightsOnce;
 		std::shared_future<HeightField const*> heightsF;
+		std::shared_ptr<std::promise<HeightField const*>> heightsProm;
 
 		std::once_flag triangOnce;
 		std::shared_future<Triangulation const*> triangF;
-
-		std::once_flag erosionOnce;
-		std::shared_future<ErosionField const*> erosionF;
-
-		std::once_flag meshOnce;
-		std::shared_future</*FinalMeshCPU const**/ bool> meshF;
+		std::shared_ptr<std::promise<Triangulation const*>> triangProm;
 
 		std::once_flag spatialOnce;
 		std::shared_future<SpatialGrid const*> spatialF;
+		std::shared_ptr<std::promise<SpatialGrid const*>> spatialProm;
+
+		std::once_flag erosionOnce;
+		std::shared_future<ErosionField const*> erosionF;
+		std::shared_ptr<std::promise<ErosionField const*>> erosionProm;
+
+		std::once_flag meshOnce;
+		std::shared_future</*FinalMeshCPU const**/ bool> meshF;
+		std::shared_ptr<std::promise<bool>> meshProm;
 
 		// New top-level renderable product
 		//std::once_flag renderableOnce;
@@ -203,6 +212,17 @@ namespace aveng {
 		// Note - SpatialGrid bounds are core + halo
 		std::optional<SpatialGrid> spatial; // Not trivially destructible!
 											// This must also remain moveable due to its usage in the StripeBucket. 
+
+		// Re-enqueue guards: prevent queue flooding when a stage defers.
+		// Each flag is CAS'd to true before enqueuing a retry, and reset to false
+		// at the start of the retried lambda.
+		std::atomic<bool> allPointsRetryQueued{ false };
+		std::atomic<bool> heightsRetryQueued{ false };
+		std::atomic<bool> triangRetryQueued{ false };
+		std::atomic<bool> spatialRetryQueued{ false };
+		std::atomic<bool> erosionRetryQueued{ false };
+		std::atomic<bool> meshRetryQueued{ false };
+		std::atomic<bool> generateRetryQueued{ false };
 
 		// Streaming / residency
 		std::atomic<int32_t> pinCount{ 0 };

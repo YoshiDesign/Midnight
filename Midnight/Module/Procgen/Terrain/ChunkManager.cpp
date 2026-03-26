@@ -25,22 +25,6 @@
 #endif
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
-// #region agent log
-#include <chrono>
-namespace { namespace dbg {
-    inline void log(const char* hyp, const char* loc, const char* msg, const char* extra = nullptr) {
-        FILE* f;
-        fopen_s(&f, "c:\\Users\\Yoshi\\dev\\Midnight\\debug-f0cdb0.log", "a");
-        if (!f) return;
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-        fprintf(f, "{\"sessionId\":\"f0cdb0\",\"hypothesisId\":\"%s\",\"location\":\"%s\","
-            "\"message\":\"%s\",\"data\":{%s},\"timestamp\":%lld}\n",
-            hyp, loc, msg, extra ? extra : "", (long long)ms);
-        fclose(f);
-    }
-}}
-// #endregion
 
 /*
 * Policy
@@ -477,176 +461,317 @@ namespace aveng {
         return out;
     }
 
-    // Consider this implementation now that we've reasoned about pinning/unpinning, 
+    // -----------------------------------------------------------------------
+    // Stage request methods
+    //
+    // Each request* method:
+    //   1. Gets/creates the record and touches lastTouchedFrame
+    //   2. Inside call_once: creates a promise, derives the future, enqueues run*Stage
+    //   3. Returns the shared_future (callers can poll with isReady or wait externally)
+    //
+    // Each run*Stage method:
+    //   1. Ensures prerequisites are requested (idempotent via their own call_once)
+    //   2. Checks prerequisite readiness via procgen::isReady()
+    //   3. If not ready: re-enqueues itself (guarded by retry flag to prevent flooding)
+    //   4. If ready: pins records, builds, resolves promise
+    // -----------------------------------------------------------------------
+
     std::shared_future</*FinalMeshCPU const**/bool> ChunkManager::requestMesh(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->meshOnce, [this, rec, frameIndex] {
-            rec->meshF = tasks_.submit([this, rec, frameIndex]() -> bool /*FinalMeshCPU const**/ {
+            procgen::traceStage(rec->coord, procgen::TerrainStage::Mesh, "request");
 
-                RecordPin pipelineHold(*this, rec); // holds across all stages
+            rec->meshProm = std::make_shared<std::promise<bool>>();
+            rec->meshF = rec->meshProm->get_future().share();
 
-                auto er = tasks_.wait(requestErosion(rec->coord, frameIndex));
-
-                return true;// buildMesh(*rec);
+            tasks_.enqueue([this, coord = rec->coord, frameIndex]() {
+                ChunkRecord* r = getOrCreateRecord(coord);
+                runMeshStage(*r, frameIndex);
             });
         });
 
-        // [!] On the main thread we would use .get() on this future, which blocks.
         return rec->meshF;
     }
 
+    void ChunkManager::runMeshStage(ChunkRecord& rec, uint64_t frameIndex) {
+        requestErosion(rec.coord, frameIndex);
+
+        if (!procgen::isReady(rec.erosionF)) {
+            procgen::traceStage(rec.coord, procgen::TerrainStage::Mesh, "defer");
+            bool expected = false;
+            if (rec.meshRetryQueued.compare_exchange_strong(expected, true)) {
+                tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
+                    ChunkRecord* again = getOrCreateRecord(coord);
+                    again->meshRetryQueued.store(false, std::memory_order_relaxed);
+                    runMeshStage(*again, frameIndex);
+                });
+            }
+            return;
+        }
+
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Mesh, "begin");
+        RecordPin hold(*this, &rec);
+        // buildMesh is currently disabled; resolve with true
+        rec.meshProm->set_value(true);
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Mesh, "complete");
+    }
+
+    // Points -- no upstream dependency, uses submit() directly
     std::shared_future<Points const*> ChunkManager::requestPoints(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
-        // std::printf("Request Points\n");
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->pointsOnce, [this, rec] {
+            procgen::traceStage(rec->coord, procgen::TerrainStage::Points, "request");
             rec->pointsF = tasks_.submit([this, rec]() -> Points const* {
-                RecordPin taskHold(*this, rec);   // Note: "neighbor sensitive" stages should pin their neighboring chunks.
-                return buildPoints(*rec);
+                RecordPin taskHold(*this, rec);
+                procgen::traceStage(rec->coord, procgen::TerrainStage::Points, "begin");
+                auto* result = buildPoints(*rec);
+                procgen::traceStage(rec->coord, procgen::TerrainStage::Points, "complete");
+                return result;
             });
         });
 
         return rec->pointsF;
     }
 
-    // AllPoints (depends on 9 point sets)
+    // AllPoints -- depends on 9 neighbor Points
     std::shared_future<AllPoints const*> ChunkManager::requestAllPoints(ChunkCoord c, uint64_t frameIndex)
     {
-        // std::printf("[%s] ChunkCoord{%d,%d} \n", __FUNCTION__, c.x, c.z);
         ChunkRecord* rec = getOrCreateRecord(c);
-        // std::printf("Request AllPoints\n");
-        //auto pointsF = requestPoints(c, frameIndex);
-
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
-        std::call_once(rec->allPointsOnce, [this, rec, /*pointsF,  */c, frameIndex] {
-            rec->allPointsF = tasks_.submit([this, rec, /*pointsF,*/ c, frameIndex]() -> AllPoints const* {
-                // Keep the center record alive while we build its AllPoints
-                RecordPin selfHold(*this, rec, frameIndex);
+        std::call_once(rec->allPointsOnce, [this, rec, c, frameIndex] {
+            procgen::traceStage(c, procgen::TerrainStage::AllPoints, "request");
 
-                // auto* points = tasks_.wait(pointsF);
+            rec->allPointsProm = std::make_shared<std::promise<AllPoints const*>>();
+            rec->allPointsF = rec->allPointsProm->get_future().share();
 
-                // 3x3 neighborhood around c
-                std::array<ChunkCoord, 9> neighbors;
-                get3x3Neighborhood(c, neighbors.data());
-
-                // Pin neighbors for the duration so their arena-backed Points can't be evicted mid-build.
-                std::array<RecordPin, 9> neighborHolds;
-                for (int i = 0; i < 9; ++i) {
-                    ChunkRecord* nrec = getOrCreateRecord(neighbors[i]);
-                    neighborHolds[i] = RecordPin(*this, nrec, frameIndex);
-                }
-
-                // Ensure neighbors' points exist
-                std::array<std::shared_future<Points const*>, 9> pf;
-                for (int i = 0; i < 9; ++i) {
-                    // // std::printf("Requesting points for neighbor: %d\n", i);
-                    pf[i] = requestPoints(neighbors[i], frameIndex); // This is safe bc requestPoints uses call_once with that stage's once-flag
-                }
-
-                // Helping wait: keep worker productive
-                for (int i = 0; i < 9; ++i) {
-                    (void)tasks_.wait(pf[i]);
-                }
-
-                return buildAllPoints(*rec);
+            tasks_.enqueue([this, coord = c, frameIndex]() {
+                ChunkRecord* r = getOrCreateRecord(coord);
+                runAllPointsStage(*r, frameIndex);
             });
         });
 
         return rec->allPointsF;
     }
 
-    // Heights - We do not need the halo-region in order to compute heights
-    // The height function will remain deterministic across world-space.
+    void ChunkManager::runAllPointsStage(ChunkRecord& rec, uint64_t frameIndex) {
+        std::array<ChunkCoord, 9> neighbors;
+        get3x3Neighborhood(rec.coord, neighbors.data());
+
+        for (int i = 0; i < 9; ++i)
+            requestPoints(neighbors[i], frameIndex);
+
+        for (int i = 0; i < 9; ++i) {
+            ChunkRecord* nrec = getOrCreateRecord(neighbors[i]);
+            if (!procgen::isReady(nrec->pointsF)) {
+                procgen::traceStage(rec.coord, procgen::TerrainStage::AllPoints, "defer");
+                bool expected = false;
+                if (rec.allPointsRetryQueued.compare_exchange_strong(expected, true)) {
+                    tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
+                        ChunkRecord* again = getOrCreateRecord(coord);
+                        again->allPointsRetryQueued.store(false, std::memory_order_relaxed);
+                        runAllPointsStage(*again, frameIndex);
+                    });
+                }
+                return;
+            }
+        }
+
+        procgen::traceStage(rec.coord, procgen::TerrainStage::AllPoints, "begin");
+
+        RecordPin selfHold(*this, &rec, frameIndex);
+        std::array<RecordPin, 9> neighborHolds;
+        for (int i = 0; i < 9; ++i) {
+            ChunkRecord* nrec = getOrCreateRecord(neighbors[i]);
+            neighborHolds[i] = RecordPin(*this, nrec, frameIndex);
+        }
+
+        AllPoints const* result = buildAllPoints(rec);
+        rec.allPointsProm->set_value(result);
+        procgen::traceStage(rec.coord, procgen::TerrainStage::AllPoints, "complete");
+    }
+
+    // Heights
     std::shared_future<HeightField const*> ChunkManager::requestHeights(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
-        // std::printf("Request Heights\n");
-
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->heightsOnce, [this, rec, frameIndex] {
-            rec->heightsF = tasks_.submit([this, rec, frameIndex]() -> HeightField const* {
-                RecordPin taskHold(*this, rec); 
-                auto allPointF = requestAllPoints(rec->coord, frameIndex);
-                auto* allP = tasks_.wait(allPointF);
-                return buildHeights(*rec);
+            procgen::traceStage(rec->coord, procgen::TerrainStage::Heights, "request");
+
+            rec->heightsProm = std::make_shared<std::promise<HeightField const*>>();
+            rec->heightsF = rec->heightsProm->get_future().share();
+
+            tasks_.enqueue([this, coord = rec->coord, frameIndex]() {
+                ChunkRecord* r = getOrCreateRecord(coord);
+                runHeightsStage(*r, frameIndex);
             });
         });
 
         return rec->heightsF;
     }
 
+    void ChunkManager::runHeightsStage(ChunkRecord& rec, uint64_t frameIndex) {
+        requestAllPoints(rec.coord, frameIndex);
+
+        if (!procgen::isReady(rec.allPointsF)) {
+            procgen::traceStage(rec.coord, procgen::TerrainStage::Heights, "defer");
+            bool expected = false;
+            if (rec.heightsRetryQueued.compare_exchange_strong(expected, true)) {
+                tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
+                    ChunkRecord* again = getOrCreateRecord(coord);
+                    again->heightsRetryQueued.store(false, std::memory_order_relaxed);
+                    runHeightsStage(*again, frameIndex);
+                });
+            }
+            return;
+        }
+
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Heights, "begin");
+        RecordPin hold(*this, &rec);
+        HeightField const* result = buildHeights(rec);
+        rec.heightsProm->set_value(result);
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Heights, "complete");
+    }
+
     // Triangulation
     std::shared_future<Triangulation const*> ChunkManager::requestTriangulation(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
-        // std::printf("Request Triangulation\n");
-
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
-        // Captured values are cheap - `this` is safe due to strict lifetime rules. Review them
         std::call_once(rec->triangOnce, [this, rec, frameIndex] {
-            rec->triangF = tasks_.submit([this, rec, frameIndex]() -> Triangulation const* {
-                RecordPin taskHold(*this, rec);   // RAII pin
-                auto heightF = requestHeights(rec->coord, frameIndex);
-                auto* heights = tasks_.wait(heightF);
-                return buildTriangulation(*rec);
+            procgen::traceStage(rec->coord, procgen::TerrainStage::Triangulation, "request");
+
+            rec->triangProm = std::make_shared<std::promise<Triangulation const*>>();
+            rec->triangF = rec->triangProm->get_future().share();
+
+            tasks_.enqueue([this, coord = rec->coord, frameIndex]() {
+                ChunkRecord* r = getOrCreateRecord(coord);
+                runTriangulationStage(*r, frameIndex);
             });
         });
 
         return rec->triangF;
     }
 
+    void ChunkManager::runTriangulationStage(ChunkRecord& rec, uint64_t frameIndex) {
+        requestHeights(rec.coord, frameIndex);
+
+        if (!procgen::isReady(rec.heightsF)) {
+            procgen::traceStage(rec.coord, procgen::TerrainStage::Triangulation, "defer");
+            bool expected = false;
+            if (rec.triangRetryQueued.compare_exchange_strong(expected, true)) {
+                tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
+                    ChunkRecord* again = getOrCreateRecord(coord);
+                    again->triangRetryQueued.store(false, std::memory_order_relaxed);
+                    runTriangulationStage(*again, frameIndex);
+                });
+            }
+            return;
+        }
+
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Triangulation, "begin");
+        RecordPin hold(*this, &rec);
+        Triangulation const* result = buildTriangulation(rec);
+        rec.triangProm->set_value(result);
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Triangulation, "complete");
+    }
+
+    // SpatialGrid
     std::shared_future<SpatialGrid const*> ChunkManager::requestSpatialGrid(ChunkCoord c, uint64_t frameIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(c);
-        // std::printf("Request SpatialGrid\n");
-
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->spatialOnce, [this, rec, frameIndex] {
-            rec->spatialF = tasks_.submit([this, rec, frameIndex]() -> SpatialGrid const* {
-                RecordPin pin(*this, rec);
-                auto triangF = requestTriangulation(rec->coord, frameIndex);
-                auto* tri = tasks_.wait(triangF);
-                SpatialGrid const* sg = buildSpatialGrid(*rec);
-                markAllPointsReady(rec->coord);
-                return sg;
+            procgen::traceStage(rec->coord, procgen::TerrainStage::SpatialGrid, "request");
+
+            rec->spatialProm = std::make_shared<std::promise<SpatialGrid const*>>();
+            rec->spatialF = rec->spatialProm->get_future().share();
+
+            tasks_.enqueue([this, coord = rec->coord, frameIndex]() {
+                ChunkRecord* r = getOrCreateRecord(coord);
+                runSpatialGridStage(*r, frameIndex);
             });
         });
 
         return rec->spatialF;
     }
 
+    void ChunkManager::runSpatialGridStage(ChunkRecord& rec, uint64_t frameIndex) {
+        requestTriangulation(rec.coord, frameIndex);
+
+        if (!procgen::isReady(rec.triangF)) {
+            procgen::traceStage(rec.coord, procgen::TerrainStage::SpatialGrid, "defer");
+            bool expected = false;
+            if (rec.spatialRetryQueued.compare_exchange_strong(expected, true)) {
+                tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
+                    ChunkRecord* again = getOrCreateRecord(coord);
+                    again->spatialRetryQueued.store(false, std::memory_order_relaxed);
+                    runSpatialGridStage(*again, frameIndex);
+                });
+            }
+            return;
+        }
+
+        procgen::traceStage(rec.coord, procgen::TerrainStage::SpatialGrid, "begin");
+        RecordPin hold(*this, &rec);
+        SpatialGrid const* sg = buildSpatialGrid(rec);
+        markAllPointsReady(rec.coord);
+        rec.spatialProm->set_value(sg);
+        procgen::traceStage(rec.coord, procgen::TerrainStage::SpatialGrid, "complete");
+    }
+
     // Erosion
     std::shared_future<ErosionField const*> ChunkManager::requestErosion(ChunkCoord c, uint64_t frameIndex) {
         auto rec = getOrCreateRecord(c);
-        // std::printf("Request Erosion\n");
-
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->erosionOnce, [this, rec, frameIndex] {
+            procgen::traceStage(rec->coord, procgen::TerrainStage::Erosion, "request");
 
-            // Get settings
             const ErosionSettings s = erosionMgr_ ? erosionMgr_->getActiveSettings() : ErosionSettings{};
 
-            // We could, of course, define these internal lambdas beforehand
-            rec->erosionF = tasks_.submit([this, rec, s, frameIndex]() -> ErosionField const* {
-                RecordPin taskHold(*this, rec);
-                auto spatialF = requestSpatialGrid(rec->coord, frameIndex);
-                auto* spatial = tasks_.wait(spatialF);
-                const ErosionField* ero = buildErosion(*rec, s);
-                markAllStagesComplete(rec->coord);
-                return ero;
-            });
+            rec->erosionProm = std::make_shared<std::promise<ErosionField const*>>();
+            rec->erosionF = rec->erosionProm->get_future().share();
 
+            tasks_.enqueue([this, coord = rec->coord, s, frameIndex]() {
+                ChunkRecord* r = getOrCreateRecord(coord);
+                runErosionStage(*r, s, frameIndex);
+            });
         });
 
         return rec->erosionF;
+    }
+
+    void ChunkManager::runErosionStage(ChunkRecord& rec, const ErosionSettings& s, uint64_t frameIndex) {
+        requestSpatialGrid(rec.coord, frameIndex);
+
+        if (!procgen::isReady(rec.spatialF)) {
+            procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "defer");
+            bool expected = false;
+            if (rec.erosionRetryQueued.compare_exchange_strong(expected, true)) {
+                tasks_.enqueue([this, coord = rec.coord, s, frameIndex]() {
+                    ChunkRecord* again = getOrCreateRecord(coord);
+                    again->erosionRetryQueued.store(false, std::memory_order_relaxed);
+                    runErosionStage(*again, s, frameIndex);
+                });
+            }
+            return;
+        }
+
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "begin");
+        RecordPin hold(*this, &rec);
+        const ErosionField* ero = buildErosion(rec, s);
+        markAllStagesComplete(rec.coord);
+        rec.erosionProm->set_value(ero);
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "complete");
     }
 
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)
@@ -1219,16 +1344,10 @@ namespace aveng {
         {
             std::scoped_lock lock(rec->renderableMutex);
 
-            // If already queued/building/ready, decide your policy.
-            // Simplest policy: don't enqueue duplicate builds if something is already in flight or done.
             if (rec->renderableState == RenderableBuildState::Queued ||
                 rec->renderableState == RenderableBuildState::Building ||
                 rec->renderableState == RenderableBuildState::Ready)
             {
-                // #region agent log
-                char b0[128]; snprintf(b0,sizeof(b0),"\"coord\":[%d,%d],\"state\":%d,\"reqId\":%llu",center.x,center.z,(int)rec->renderableState,(unsigned long long)rec->requestedRenderableId);
-                dbg::log("H1","ChunkManager.cpp:requestRenderableAsync","already_in_flight",b0);
-                // #endregion
                 return rec->requestedRenderableId;
             }
 
@@ -1237,160 +1356,144 @@ namespace aveng {
             rec->renderablePublished = false;
             shouldSubmit = true;
         }
-        // #region agent log
-        { char b1[128]; snprintf(b1,sizeof(b1),"\"coord\":[%d,%d],\"reqId\":%llu,\"frame\":%llu",center.x,center.z,(unsigned long long)requestId,(unsigned long long)frameIndex);
-          dbg::log("H2","ChunkManager.cpp:requestRenderableAsync","task_submitted",b1); }
-        // #endregion
+
         if (shouldSubmit) {
-            tasks_.submit([this, center, frameIndex, requestId]() {
+            procgen::traceStage(center, procgen::TerrainStage::Renderable, "request");
+
+            tasks_.enqueue([this, center, frameIndex, requestId]() {
                 ChunkRecord* workerRec = getOrCreateRecord(center);
                 RecordPin hold(*this, workerRec, frameIndex);
 
-                // #region agent log
-                { char b2[128]; snprintf(b2,sizeof(b2),"\"coord\":[%d,%d],\"reqId\":%llu,\"tid\":%u",center.x,center.z,(unsigned long long)requestId,(unsigned)std::hash<std::thread::id>{}(std::this_thread::get_id())%10000);
-                  dbg::log("H2","ChunkManager.cpp:requestRenderableAsync","task_started",b2); }
-                // #endregion
-
                 {
                     std::scoped_lock lock(workerRec->renderableMutex);
-
-                    // If another request superseded us before we even started, abandon.
-                    if (workerRec->requestedRenderableId != requestId) {
-                        // #region agent log
-                        dbg::log("H3","ChunkManager.cpp:requestRenderableAsync","superseded_before_start");
-                        // #endregion
+                    if (workerRec->requestedRenderableId != requestId)
                         return;
-                    }
-
                     workerRec->renderableState = RenderableBuildState::Building;
                 }
 
-                try {
-                    auto renderable = generate(center, frameIndex, requestId);
-
-                    // #region agent log
-                    { char b3[128]; snprintf(b3,sizeof(b3),"\"coord\":[%d,%d],\"reqId\":%llu,\"ok\":%s",center.x,center.z,(unsigned long long)requestId,renderable?"true":"false");
-                      dbg::log("H2","ChunkManager.cpp:requestRenderableAsync","generate_returned",b3); }
-                    // #endregion
-
-                    bool shouldPublish = false;
-
-                    {
-                        std::scoped_lock lock(workerRec->renderableMutex);
-
-                        // If stale, discard result silently.
-                        if (workerRec->requestedRenderableId != requestId) {
-                            // #region agent log
-                            dbg::log("H3","ChunkManager.cpp:requestRenderableAsync","superseded_after_generate");
-                            // #endregion
-                            return;
-                        }
-
-                        workerRec->renderableResult = std::move(renderable);
-                        workerRec->completedRenderableId = requestId;
-                        workerRec->renderableState = RenderableBuildState::Ready;
-                        workerRec->renderablePublished = true;
-                        shouldPublish = true;
-                    }
-
-                    if (shouldPublish) {
-                        // #region agent log
-                        { char b4[128]; snprintf(b4,sizeof(b4),"\"coord\":[%d,%d],\"reqId\":%llu",center.x,center.z,(unsigned long long)requestId);
-                          dbg::log("H5","ChunkManager.cpp:requestRenderableAsync","completion_pushed",b4); }
-                        // #endregion
-                        completedRenderables_.push(procgen::RenderableCompletion{
-                            .coord = center,
-                            .requestId = requestId,
-                            .success = true
-                        });
-                    }
-                }
-                catch (...) { // ugh
-                    // #region agent log
-                    { char b5[128]; snprintf(b5,sizeof(b5),"\"coord\":[%d,%d],\"reqId\":%llu",center.x,center.z,(unsigned long long)requestId);
-                      dbg::log("H3","ChunkManager.cpp:requestRenderableAsync","EXCEPTION_caught",b5); }
-                    // #endregion
-                    {
-                        std::scoped_lock lock(workerRec->renderableMutex);
-
-                        // Only mark failure if still current request
-                        if (workerRec->requestedRenderableId == requestId) {
-                            workerRec->renderableState = RenderableBuildState::Failed;
-                        }
-                    }
-
-                    completedRenderables_.push(procgen::RenderableCompletion{
-                        .coord = center,
-                        .requestId = requestId,
-                        .success = false
-                    });
-                }
+                runGenerate(center, frameIndex, requestId);
             });
         }
+        return requestId;
     }
 
     // ---------------------------------------------------------------------------
-    // Renderable assembly: 3x3 core region + 5x5 support (halo) region
+    // Renderable assembly: non-blocking
+    //
+    // Requests all 25 sub-stages (9 mesh + 16 spatial), checks readiness,
+    // re-enqueues if not all deps are satisfied. When ready, pins everything
+    // and builds the final renderable.
     // ---------------------------------------------------------------------------
 
-
-    /* meat n' potatoes */
-    std::unique_ptr<procgen::TerrainRenderable>
-        ChunkManager::generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
+    void ChunkManager::runGenerate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
     {
-        // #region agent log
-        { char bg[128]; snprintf(bg,sizeof(bg),"\"center\":[%d,%d],\"reqId\":%llu",center.x,center.z,(unsigned long long)requestId);
-          dbg::log("H2","ChunkManager.cpp:generate","enter",bg); }
-        // #endregion
+        ChunkRecord* centerRec = getOrCreateRecord(center);
+
+        // Superseded check
+        {
+            std::scoped_lock lock(centerRec->renderableMutex);
+            if (centerRec->requestedRenderableId != requestId)
+                return;
+        }
 
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors);
 
+        // Kick off all sub-stages (idempotent via their own call_once)
+        for (int i = 0; i < 9; ++i)
+            requestMesh(neighbors[i], frameIndex);
+        for (int i = 9; i < 25; ++i)
+            requestSpatialGrid(neighbors[i], frameIndex);
+
+        // Check readiness of inner 9 (mesh) and outer 16 (spatial)
+        for (int i = 0; i < 9; ++i) {
+            ChunkRecord* r = getOrCreateRecord(neighbors[i]);
+            if (!procgen::isReady(r->meshF)) {
+                procgen::traceStage(center, procgen::TerrainStage::Renderable, "defer");
+                bool expected = false;
+                if (centerRec->generateRetryQueued.compare_exchange_strong(expected, true)) {
+                    tasks_.enqueue([this, center, frameIndex, requestId]() {
+                        ChunkRecord* again = getOrCreateRecord(center);
+                        again->generateRetryQueued.store(false, std::memory_order_relaxed);
+                        runGenerate(center, frameIndex, requestId);
+                    });
+                }
+                return;
+            }
+        }
+        for (int i = 9; i < 25; ++i) {
+            ChunkRecord* r = getOrCreateRecord(neighbors[i]);
+            if (!procgen::isReady(r->spatialF)) {
+                procgen::traceStage(center, procgen::TerrainStage::Renderable, "defer");
+                bool expected = false;
+                if (centerRec->generateRetryQueued.compare_exchange_strong(expected, true)) {
+                    tasks_.enqueue([this, center, frameIndex, requestId]() {
+                        ChunkRecord* again = getOrCreateRecord(center);
+                        again->generateRetryQueued.store(false, std::memory_order_relaxed);
+                        runGenerate(center, frameIndex, requestId);
+                    });
+                }
+                return;
+            }
+        }
+
+        procgen::traceStage(center, procgen::TerrainStage::Renderable, "begin");
+
+        // All deps ready -- pin the 5x5 region and build
         std::array<RecordPin, 25> pins;
         for (int i = 0; i < 25; ++i) {
             ChunkRecord* r = getOrCreateRecord(neighbors[i]);
             pins[i] = RecordPin(*this, r, frameIndex);
         }
 
-        std::array<std::shared_future</*FinalMeshCPU const**/ bool>, 9> meshFutures;
-        for (int i = 0; i < 9; ++i) {
-            meshFutures[i] = requestMesh(neighbors[i], frameIndex);
-        }
+        try {
+            auto renderable = buildRenderablev2(center, frameIndex);
 
-        std::array<std::shared_future<SpatialGrid const*>, 16> spatialFutures;
-        for (int i = 9; i < 25; ++i) {
-            spatialFutures[i - 9] = requestSpatialGrid(neighbors[i], frameIndex);
-        }
+            bool shouldPublish = false;
+            {
+                std::scoped_lock lock(centerRec->renderableMutex);
+                if (centerRec->requestedRenderableId != requestId)
+                    return;
 
-        // #region agent log
-        { char bg2[128]; snprintf(bg2,sizeof(bg2),"\"center\":[%d,%d]",center.x,center.z);
-          dbg::log("H2","ChunkManager.cpp:generate","begin_mesh_waits",bg2); }
-        // #endregion
-        for (int i = 0; i < 9; ++i) {
-            // #region agent log
-            { char bg3[160]; snprintf(bg3,sizeof(bg3),"\"center\":[%d,%d],\"meshIdx\":%d,\"chunk\":[%d,%d]",center.x,center.z,i,neighbors[i].x,neighbors[i].z);
-              dbg::log("H2","ChunkManager.cpp:generate","mesh_wait_begin",bg3); }
-            // #endregion
-            tasks_.wait(meshFutures[i]);
-            // #region agent log
-            { char bg4[160]; snprintf(bg4,sizeof(bg4),"\"center\":[%d,%d],\"meshIdx\":%d,\"chunk\":[%d,%d]",center.x,center.z,i,neighbors[i].x,neighbors[i].z);
-              dbg::log("H2","ChunkManager.cpp:generate","mesh_wait_done",bg4); }
-            // #endregion
-        }
+                centerRec->renderableResult = std::move(renderable);
+                centerRec->completedRenderableId = requestId;
+                centerRec->renderableState = RenderableBuildState::Ready;
+                centerRec->renderablePublished = true;
+                shouldPublish = true;
+            }
 
-        // #region agent log
-        { char bg5[128]; snprintf(bg5,sizeof(bg5),"\"center\":[%d,%d]",center.x,center.z);
-          dbg::log("H2","ChunkManager.cpp:generate","begin_spatial_waits",bg5); }
-        // #endregion
-        for (int i = 0; i < 16; ++i) {
-            tasks_.wait(spatialFutures[i]);
+            if (shouldPublish) {
+                completedRenderables_.push(procgen::RenderableCompletion{
+                    .coord = center,
+                    .requestId = requestId,
+                    .success = true
+                });
+                procgen::traceStage(center, procgen::TerrainStage::Renderable, "complete");
+            }
         }
-        // #region agent log
-        { char bg6[128]; snprintf(bg6,sizeof(bg6),"\"center\":[%d,%d]",center.x,center.z);
-          dbg::log("H2","ChunkManager.cpp:generate","all_waits_done",bg6); }
-        // #endregion
+        catch (...) {
+            {
+                std::scoped_lock lock(centerRec->renderableMutex);
+                if (centerRec->requestedRenderableId == requestId) {
+                    centerRec->renderableState = RenderableBuildState::Failed;
+                }
+            }
+            completedRenderables_.push(procgen::RenderableCompletion{
+                .coord = center,
+                .requestId = requestId,
+                .success = false
+            });
+        }
+    }
 
-        return buildRenderablev2(center, frameIndex);
+    // The old synchronous generate() is replaced by runGenerate() above.
+    // Kept as a stub for any remaining callers during migration.
+    std::unique_ptr<procgen::TerrainRenderable>
+        ChunkManager::generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
+    {
+        // This path should no longer be reached -- runGenerate handles everything.
+        assert(false && "generate() is deprecated; use runGenerate() instead.");
+        return nullptr;
     }
 
     std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderablev2(ChunkCoord center, uint64_t frameIndex)

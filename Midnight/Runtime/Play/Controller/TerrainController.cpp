@@ -1,8 +1,5 @@
 #include <cstdio>
 #include <memory>
-#include <mutex>
-#include <chrono>
-#include <thread>
 #include "TerrainController.h"
 #include "Module/Procgen/Terrain/ChunkManager.h"
 #include "CoreVK/EngineDevice.h"
@@ -13,21 +10,6 @@
 #include "Module/Procgen/Rendering/VkTerrain.h"
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
-// #region agent log
-namespace { namespace dbg_tc {
-    inline void log(const char* hyp, const char* loc, const char* msg, const char* extra = nullptr) {
-        FILE* f;
-        fopen_s(&f, "c:\\Users\\Yoshi\\dev\\Midnight\\debug-f0cdb0.log", "a");
-        if (!f) return;
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-        fprintf(f, "{\"sessionId\":\"f0cdb0\",\"hypothesisId\":\"%s\",\"location\":\"%s\","
-            "\"message\":\"%s\",\"data\":{%s},\"timestamp\":%lld}\n",
-            hyp, loc, msg, extra ? extra : "", (long long)ms);
-        fclose(f);
-    }
-}}
-// #endregion
 
 
 
@@ -58,6 +40,8 @@ namespace aveng {
 
     void TerrainController::evictChunk(ChunkCoord center) {
         if (slots_.find(center) != slots_.end()) {
+
+            admission_.release(center, kSupportRadius);
 
             for (int dz = -2; dz <= 2; ++dz) {
                 for (int dx = -2; dx <= 2; ++dx) {
@@ -230,7 +214,7 @@ namespace aveng {
 
     void TerrainController::ensureChunkRequested(ChunkCoord coord)
     {
-        auto& slot = slots_[coord]; // insert-or-lookup behavior, default construction
+        auto& slot = slots_[coord];
         slot.coord = coord;
 
         if (slot.state == procgen::TerrainRuntimeState::Requested ||
@@ -238,17 +222,14 @@ namespace aveng {
             slot.state == procgen::TerrainRuntimeState::Uploading ||
             slot.state == procgen::TerrainRuntimeState::Resident)
         {
-            // #region agent log
-            { char b[128]; snprintf(b,sizeof(b),"\"coord\":[%d,%d],\"state\":%d,\"reqId\":%llu",coord.x,coord.z,(int)slot.state,(unsigned long long)slot.requestId);
-              dbg_tc::log("H1","TerrainController.cpp:ensureChunkRequested","early_return",b); }
-            // #endregion
             return;
         }
 
-        // #region agent log
-        { char b[128]; snprintf(b,sizeof(b),"\"coord\":[%d,%d],\"state\":%d,\"frame\":%llu",coord.x,coord.z,(int)slot.state,(unsigned long long)frameIndex_);
-          dbg_tc::log("H1","TerrainController.cpp:ensureChunkRequested","proceeding",b); }
-        // #endregion
+        // Gate: only admit if the 5x5 support footprint doesn't overlap an active build.
+        if (!admission_.tryAcquire(coord, kSupportRadius)) {
+            deferredRequests_.push_back(coord);
+            return;
+        }
 
         slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_);
         slot.state = procgen::TerrainRuntimeState::Requested;
@@ -258,56 +239,41 @@ namespace aveng {
     {
         chunks_->drainCompletedRenderables([this](const procgen::RenderableCompletion& completedChunk) {
 
-            // #region agent log
-            { char b[160]; snprintf(b,sizeof(b),"\"coord\":[%d,%d],\"reqId\":%llu,\"success\":%s",completedChunk.coord.x,completedChunk.coord.z,(unsigned long long)completedChunk.requestId,completedChunk.success?"true":"false");
-              dbg_tc::log("H5","TerrainController.cpp:drainCompletedTerrain","completion_received",b); }
-            // #endregion
+            // Release the admission slot so deferred requests can proceed
+            admission_.release(completedChunk.coord, kSupportRadius);
 
             auto it = slots_.find(completedChunk.coord);
-            if (it == slots_.end()) {
-                // #region agent log
-                dbg_tc::log("H5","TerrainController.cpp:drainCompletedTerrain","slot_not_found");
-                // #endregion
-                return; // no longer desired
-            }
+            if (it == slots_.end())
+                return;
 
             auto& slot = it->second;
 
-            // Ignore stale completions
-            if (slot.requestId != completedChunk.requestId) {
-                // #region agent log
-                { char b[128]; snprintf(b,sizeof(b),"\"slotReqId\":%llu,\"completionReqId\":%llu",(unsigned long long)slot.requestId,(unsigned long long)completedChunk.requestId);
-                  dbg_tc::log("H5","TerrainController.cpp:drainCompletedTerrain","reqId_mismatch",b); }
-                // #endregion
+            if (slot.requestId != completedChunk.requestId)
                 return;
-            }
 
             if (!completedChunk.success) {
-                // #region agent log
-                { char b[128]; snprintf(b,sizeof(b),"\"coord\":[%d,%d]",completedChunk.coord.x,completedChunk.coord.z);
-                  dbg_tc::log("H3","TerrainController.cpp:drainCompletedTerrain","marking_failed",b); }
-                // #endregion
                 slot.state = procgen::TerrainRuntimeState::Failed;
                 return;
             }
 
             std::unique_ptr<procgen::TerrainRenderable> cpuRenderable;
             if (!chunks_->tryTakeRenderable(completedChunk.coord, completedChunk.requestId, cpuRenderable)) {
-                // #region agent log
-                dbg_tc::log("H5","TerrainController.cpp:drainCompletedTerrain","tryTakeRenderable_failed");
-                // #endregion
                 std::printf("A potentially stale renderable was requested!\n");
                 return;
             }
 
-            // #region agent log
-            { char b[128]; snprintf(b,sizeof(b),"\"coord\":[%d,%d]",completedChunk.coord.x,completedChunk.coord.z);
-              dbg_tc::log("H5","TerrainController.cpp:drainCompletedTerrain","slot_CpuReady",b); }
-            // #endregion
-
             slot.cpuRenderable = std::move(cpuRenderable);
             slot.state = procgen::TerrainRuntimeState::CpuReady;
         });
+
+        // Retry any requests that were deferred due to region overlap
+        if (!deferredRequests_.empty()) {
+            std::vector<ChunkCoord> pending;
+            pending.swap(deferredRequests_);
+            for (const ChunkCoord& coord : pending) {
+                ensureChunkRequested(coord);
+            }
+        }
     }
 
     // Check 1 chunk - Not very useful here, honestly
@@ -364,9 +330,25 @@ namespace aveng {
         IndexBuffer::cleanup(engineDevice_, slot.gpu.draw.indexBuffer);
 
         if (slot.gpu.packed.graphicsDescriptorSet != VK_NULL_HANDLE) {
-            vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool,
-                1, &slot.gpu.packed.graphicsDescriptorSet);
+
+            vkFreeDescriptorSets(
+                engineDevice_.device(),
+                renderData_.avengTerrainLitDescriptorPool,
+                1, 
+                &slot.gpu.packed.graphicsDescriptorSet);
+
             slot.gpu.packed.graphicsDescriptorSet = VK_NULL_HANDLE;
+        }
+
+        if (slot.gpu.packed.computeDescriptorSet != VK_NULL_HANDLE) {
+
+            vkFreeDescriptorSets(
+                engineDevice_.device(), 
+                renderData_.avengTerrainComputeDescriptorPool,
+                1, 
+                &slot.gpu.packed.computeDescriptorSet);
+
+            slot.gpu.packed.computeDescriptorSet = VK_NULL_HANDLE;
         }
 
         if (slot.gpu.packed.inputSsbo.buffer != VK_NULL_HANDLE) {

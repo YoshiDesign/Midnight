@@ -9,6 +9,7 @@
 #include "Module/Procgen/Noise/Config.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Module/Procgen/Terrain/GpuResources.h"
+#include "Module/Procgen/Terrain/Control.h"
 #include "Core/Math/wyhash.h"
 
 /*
@@ -167,6 +168,15 @@ namespace aveng {
         mtools::ConcurrentQueue<procgen::RenderableCompletion> completedRenderables_;
 
         procgen::ErosionManager* erosionMgr_ = nullptr;
+
+        // Non-blocking stage runners (check deps via isReady, re-enqueue if not ready)
+        void runAllPointsStage(ChunkRecord& rec, uint64_t frameIndex);
+        void runHeightsStage(ChunkRecord& rec, uint64_t frameIndex);
+        void runTriangulationStage(ChunkRecord& rec, uint64_t frameIndex);
+        void runSpatialGridStage(ChunkRecord& rec, uint64_t frameIndex);
+        void runErosionStage(ChunkRecord& rec, const ErosionSettings& s, uint64_t frameIndex);
+        void runMeshStage(ChunkRecord& rec, uint64_t frameIndex);
+        void runGenerate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId);
 
         // Builders (run in worker threads)
         Points const*       buildPoints(ChunkRecord& r);        // alloc in final arena

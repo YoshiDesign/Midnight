@@ -3,9 +3,9 @@
 #include <vector>
 #include <future>
 #include <memory>
-// #include "Runtime/Commands/TerrainCMD.h" // TODO. Maybe...
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
+#include "Module/Procgen/Terrain/Control.h"
 #include "Module/Procgen/Types.h"
 
 // TODO - We're going to make a TerrainRenderSystem
@@ -179,6 +179,12 @@ namespace aveng {
         EngineDevice& engineDevice_;
         VkRenderData& renderData_;
         procgen::ErosionManager erosionMgr_;
+
+        // Region admission control: prevents overlapping 5x5 support footprints
+        // from being built concurrently (the primary fix for dependency starvation).
+        static constexpr int kSupportRadius = 2; // 5x5 neighborhood
+        procgen::TerrainAdmissionController admission_;
+        std::vector<ChunkCoord> deferredRequests_;
 
     };
 }

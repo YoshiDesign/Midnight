@@ -1,0 +1,178 @@
+My recommendation: store the promise/future on ChunkRecord.
+
+Why:
+
+one stage instance per record is already your model
+ChunkRecord is already persistent stage state
+retries and re-enqueues become simpler
+debugging is simpler
+you avoid threading the promise through every lambda signature
+you avoid “did this closure capture the same promise?” confusion
+
+So I would stop debating that and just do:
+
+std::shared_ptr<std::promise<AllPoints const*>> allPointsPromise;
+std::shared_future<AllPoints const*> allPointsFuture;
+
+or, if your durable product lives on the record:
+
+std::shared_ptr<std::promise<void>> allPointsPromise;
+std::shared_future<void> allPointsFuture;
+
+I actually prefer the void version for your architecture.
+
+B. Forward declarations
+
+This is not the real issue.
+
+If the record header already sees the full stage product types, fine. If not, shared_ptr<promise<T>> usually still pushes you toward a complete T where promise<T> is instantiated anyway. But this is not the design blocker.
+
+The bigger design choice is whether the future represents:
+
+ownership of the product, or
+completion of the product already stored in the record
+
+For your engine, the second is cleaner.
+
+C. Memory visibility paranoia
+
+The model’s concern here is a bit misplaced.
+
+If you do:
+
+initialize promise/future under call_once
+enqueue work after that
+later fulfill promise after writing the product
+
+then the future/promise synchronization is already the thing giving you the publish/observe relationship you care about.
+
+You do not need to build an elaborate argument around queue mutexes as the primary synchronization story.
+
+The future becoming ready is the signal.
+
+What I recommend instead
+
+Use per-stage promise + shared_future on the record, but make the future type void.
+
+Why void is cleaner
+
+Right now your durable products already live on ChunkRecord:
+
+rec.points
+rec.allPoints
+rec.heightField
+rec.triangulation
+etc.
+
+So returning shared_future<AllPoints const*> is a little redundant. It splits the truth between:
+
+the future value
+the record member
+
+That can work, but it adds mental overhead.
+
+Instead:
+
+stage writes durable product into rec
+stage resolves promise<void>
+readers wait/check shared_future<void>
+once ready, they read rec.allPoints
+
+That fits your existing architecture much better.
+
+Recommended record shape
+
+Something like this:
+
+struct ChunkRecord {
+    ChunkCoord coord{};
+
+    std::atomic<int32_t> pinCount{0};
+    std::atomic<uint64_t> lastTouchedFrame{0};
+
+    std::unique_ptr<Points>        points;
+    std::unique_ptr<AllPoints>     allPoints;
+    std::unique_ptr<HeightField>   heightField;
+    std::unique_ptr<Triangulation> triangulation;
+    std::unique_ptr<SpatialGrid>   spatialGrid;
+    std::unique_ptr<ErosionData>   erosion;
+    std::unique_ptr<FinalMeshCPU>  mesh;
+
+    std::once_flag pointsOnce;
+    std::once_flag allPointsOnce;
+    std::once_flag heightsOnce;
+    std::once_flag triangulationOnce;
+    std::once_flag spatialGridOnce;
+    std::once_flag erosionOnce;
+    std::once_flag meshOnce;
+
+    std::shared_ptr<std::promise<void>> pointsPromise;
+    std::shared_future<void> pointsFuture;
+
+    std::shared_ptr<std::promise<void>> allPointsPromise;
+    std::shared_future<void> allPointsFuture;
+
+    std::shared_ptr<std::promise<void>> heightsPromise;
+    std::shared_future<void> heightsFuture;
+
+    std::shared_ptr<std::promise<void>> triangulationPromise;
+    std::shared_future<void> triangulationFuture;
+
+    std::shared_ptr<std::promise<void>> spatialGridPromise;
+    std::shared_future<void> spatialGridFuture;
+
+    std::shared_ptr<std::promise<void>> erosionPromise;
+    std::shared_future<void> erosionFuture;
+
+    std::shared_ptr<std::promise<void>> meshPromise;
+    std::shared_future<void> meshFuture;
+
+    std::atomic<bool> allPointsRetryQueued{false};
+    std::atomic<bool> heightsRetryQueued{false};
+    std::atomic<bool> triangulationRetryQueued{false};
+    std::atomic<bool> spatialGridRetryQueued{false};
+    std::atomic<bool> erosionRetryQueued{false};
+    std::atomic<bool> meshRetryQueued{false};
+};
+
+That is boring, but boring is good here.
+
+How request methods should look
+
+Leaf stage:
+
+std::shared_future<void> ChunkManager::requestPoints(ChunkCoord coord) {
+    ChunkRecord& rec = getOrCreateRecord(coord);
+
+    std::call_once(rec.pointsOnce, [&]() {
+        rec.pointsPromise = std::make_shared<std::promise<void>>();
+        rec.pointsFuture = rec.pointsPromise->get_future().share();
+
+        tasks_.enqueue([this, coord]() {
+            ChunkRecord& r = getOrCreateRecord(coord);
+            runPointsStage(r, coord);
+        });
+    });
+
+    return rec.pointsFuture;
+}
+
+Dependent stage:
+
+std::shared_future<void> ChunkManager::requestAllPoints(ChunkCoord coord) {
+    ChunkRecord& rec = getOrCreateRecord(coord);
+
+    std::call_once(rec.allPointsOnce, [&]() {
+        rec.allPointsPromise = std::make_shared<std::promise<void>>();
+        rec.allPointsFuture = rec.allPointsPromise->get_future().share();
+
+        tasks_.enqueue([this, coord]() {
+            ChunkRecord& r = getOrCreateRecord(coord);
+            runAllPointsStage(r, coord);
+        });
+    });
+
+    return rec.allPointsFuture;
+}
+
+That’s it. No promise capture gymnastics needed.
