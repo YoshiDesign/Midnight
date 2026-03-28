@@ -211,14 +211,15 @@ namespace aveng {
     }
 
 
-    bool uploadTerrainChunkToGpu(
+    // Creates GPU-local + staging buffers, fills staging via memcpy, sets up SSBOs and
+    // descriptor sets. Does NOT record any copy commands or change slot state.
+    bool prepareChunkUpload(
         EngineDevice& engineDevice_,
         VkRenderData& renderData_,
         procgen::TerrainChunkSlot& slot,
         VkBuffer settingsUboBuffer_,
         VkDeviceSize settingsUboSize_)
     {
-
         if (!slot.cpuRenderable) {
             Logger::log(1, "%s error: slot has no cpu renderable\n", __FUNCTION__);
             return false;
@@ -229,12 +230,9 @@ namespace aveng {
             return false;
         }
 
-        slot.state = procgen::TerrainRuntimeState::Uploading;
-
         auto& cpu = *slot.cpuRenderable;
         auto& gpu = slot.gpu;
 
-        // ---- Graphics buffers (VBO / IBO) ----
         gpu.draw.vertexCount = static_cast<uint32_t>(cpu.vbo.size());
         gpu.draw.indexCount = static_cast<uint32_t>(cpu.ibo.size());
 
@@ -248,17 +246,17 @@ namespace aveng {
             return false;
         }
 
-        if (!VertexBuffer::uploadData(engineDevice_, gpu.draw.vertexBuffer, cpu.vbo)) {
-            Logger::log(1, "Failed to upload Vertex Buffer\n");
+        if (!VertexBuffer::fillStaging(engineDevice_, gpu.draw.vertexBuffer, cpu.vbo)) {
+            Logger::log(1, "Failed to fill VBO staging\n");
             return false;
         }
 
-        if (!IndexBuffer::uploadData(engineDevice_, gpu.draw.indexBuffer, cpu.ibo)) {
-            Logger::log(1, "Failed to upload Index Buffer\n");
+        if (!IndexBuffer::fillStaging(engineDevice_, gpu.draw.indexBuffer, cpu.ibo)) {
+            Logger::log(1, "Failed to fill IBO staging\n");
             return false;
         }
 
-        // ---- Compute SSBOs ----
+        // ---- Compute SSBOs (CPU-visible, no staging copy needed) ----
         const VkDeviceSize ssboAlign = engineDevice_.properties.limits.minStorageBufferOffsetAlignment;
 
         const uint32_t totalVerts = static_cast<uint32_t>(cpu.packedPositions.size());
@@ -269,9 +267,8 @@ namespace aveng {
         gpu.packed.coreVerts = coreVerts;
         gpu.packed.totalTris = totalTris;
 
-        // Input SSBO layout: [positions(vec4) | triangles(vec3/uvec3) | adjacency]
         const VkDeviceSize positionsSize = totalVerts * sizeof(glm::vec4);
-        const VkDeviceSize trianglesSize = totalTris * sizeof(glm::vec3);  // uvec3 bit-pattern through vec3
+        const VkDeviceSize trianglesSize = totalTris * sizeof(glm::vec3);
         const VkDeviceSize adjacencySize = totalVerts * sizeof(procgen::VertexAdjacency);
 
         gpu.packed.positionsOffset = 0;
@@ -285,9 +282,6 @@ namespace aveng {
             return false;
         }
 
-        // Map once and write all three regions at their aligned byte offsets.
-        // We can't use uploadSsboDataRange here because aligned offsets may not
-        // divide evenly by element size (e.g. vec3 = 12 bytes vs 256-byte alignment).
         {
             void* mapped = nullptr;
             VkResult mapResult = vmaMapMemory(engineDevice_.allocator(), gpu.packed.inputSsbo.bufferAlloc, &mapped);
@@ -308,8 +302,6 @@ namespace aveng {
             vmaUnmapMemory(engineDevice_.allocator(), gpu.packed.inputSsbo.bufferAlloc);
         }
 
-        // Output SSBO layout: [normals(vec4) | steepness(float) | weights(vec4)]
-        // Sized for core vertices only (compute only writes core outputs)
         const VkDeviceSize normalsSize = coreVerts * sizeof(glm::vec4);
         const VkDeviceSize steepnessSize = coreVerts * sizeof(float);
         const VkDeviceSize weightsSize = coreVerts * sizeof(glm::vec4);
@@ -325,27 +317,24 @@ namespace aveng {
             return false;
         }
 
-        // Write compute descriptor set for this chunk
-        if (!writeChunkComputeDescriptorSet(
-            engineDevice_,
-            renderData_,
-            gpu.packed,
-            settingsUboBuffer_,
-            settingsUboSize_))
-        {
+        if (!writeChunkComputeDescriptorSet(engineDevice_, renderData_, gpu.packed, settingsUboBuffer_, settingsUboSize_)) {
             Logger::log(1, "%s error: failed to write compute descriptor set\n", __FUNCTION__);
             return false;
         }
 
-        // Write lit graphics descriptor set (binds compute output SSBOs for the vertex shader)
-        if (!writeChunkGraphicsDescriptorSet(engineDevice_, renderData_, gpu.packed))
-        {
+        if (!writeChunkGraphicsDescriptorSet(engineDevice_, renderData_, gpu.packed)) {
             Logger::log(1, "%s error: failed to write graphics descriptor set\n", __FUNCTION__);
             return false;
         }
 
-        slot.state = procgen::TerrainRuntimeState::Resident;
         return true;
+    }
+
+    // Records VBO and IBO staging-to-device copy commands into the provided command buffer.
+    // Barriers are the caller's responsibility (batched at the end of all copies).
+    inline void recordChunkCopies(VkCommandBuffer cmd, procgen::TerrainChunkSlot& slot) {
+        VertexBuffer::recordCopy(cmd, slot.gpu.draw.vertexBuffer);
+        IndexBuffer::recordCopy(cmd, slot.gpu.draw.indexBuffer);
     }
 
 }

@@ -74,6 +74,23 @@ namespace aveng {
         Status status;
     };
 
+    struct TerrainUploadBatch {
+        VkFence fence = VK_NULL_HANDLE;
+        VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+        std::vector<ChunkCoord> inFlightSlots;
+        bool active = false;
+    };
+
+    struct DeferredGpuCleanup {
+        VkVertexBufferData vertexBuffer{};
+        VkIndexBufferData indexBuffer{};
+        VkShaderStorageBufferData inputSsbo{};
+        VkShaderStorageBufferData outputSsbo{};
+        VkDescriptorSet graphicsDescriptorSet = VK_NULL_HANDLE;
+        VkDescriptorSet computeDescriptorSet = VK_NULL_HANDLE;
+        uint64_t retireFrame = 0;
+    };
+
     /**
      * Game-facing interface for terrain generation / streaming.
      * Owns no terrain data; it just translates game intent into system work.
@@ -110,6 +127,9 @@ namespace aveng {
 
         /* Operational Requirements */
         void serviceCpuReadyChunks();
+        void retireCompletedUploads();
+        void buildAndSubmitUploadBatch();
+        void flushDeferredDeletes();
 
         void update(/*const Camera& camera*/);
 
@@ -176,7 +196,7 @@ namespace aveng {
 
         // CEO (Chunk Executive Officer)
         ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
-        const int kMaxUploadsPerFrame = 2;
+        static constexpr int kMaxChunksPerUploadBatch = 3;
         EngineDevice& engineDevice_;
         VkRenderData& renderData_;
         procgen::ErosionManager erosionMgr_;
@@ -186,6 +206,13 @@ namespace aveng {
         static constexpr int kSupportRadius = 2; // 5x5 neighborhood
         procgen::TerrainAdmissionController admission_;
         std::vector<ChunkCoord> deferredRequests_;
+
+        // Non-blocking batched GPU upload infrastructure
+        TerrainUploadBatch uploadBatch_;
+
+        // Deferred GPU resource destruction (avoids vkQueueWaitIdle during eviction)
+        std::vector<DeferredGpuCleanup> deferredCleanups_;
+        static constexpr uint64_t kDeferFrames = 3;
 
     };
 }

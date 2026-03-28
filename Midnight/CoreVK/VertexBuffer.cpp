@@ -182,8 +182,46 @@ namespace aveng {
     }
 
     void VertexBuffer::cleanup(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData) {
-        vmaDestroyBuffer(engineDevice.allocator(), vertexBufferData.stagingBuffer, vertexBufferData.stagingBufferAlloc);
-        vmaDestroyBuffer(engineDevice.allocator(), vertexBufferData.buffer, vertexBufferData.bufferAlloc);
+        if (vertexBufferData.stagingBuffer != VK_NULL_HANDLE) {
+            vmaDestroyBuffer(engineDevice.allocator(), vertexBufferData.stagingBuffer, vertexBufferData.stagingBufferAlloc);
+            vertexBufferData.stagingBuffer = VK_NULL_HANDLE;
+            vertexBufferData.stagingBufferAlloc = VK_NULL_HANDLE;
+        }
+        if (vertexBufferData.buffer != VK_NULL_HANDLE) {
+            vmaDestroyBuffer(engineDevice.allocator(), vertexBufferData.buffer, vertexBufferData.bufferAlloc);
+            vertexBufferData.buffer = VK_NULL_HANDLE;
+            vertexBufferData.bufferAlloc = VK_NULL_HANDLE;
+        }
+    }
+
+    bool VertexBuffer::fillStaging(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const std::vector<glm::vec3>& vertexData) {
+        size_t vertexDataSize = vertexData.size() * sizeof(glm::vec3);
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            Logger::log(1, "%s error: could not map memory (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        std::memcpy(data, vertexData.data(), vertexDataSize);
+        vmaUnmapMemory(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc);
+        vmaFlushAllocation(engineDevice.allocator(), vertexBufferData.stagingBufferAlloc, 0, vertexDataSize);
+        return true;
+    }
+
+    void VertexBuffer::recordCopy(VkCommandBuffer cmd, VkVertexBufferData& vertexBufferData) {
+        VkBufferCopy copyRegion{};
+        copyRegion.srcOffset = 0;
+        copyRegion.dstOffset = 0;
+        copyRegion.size = vertexBufferData.bufferSize;
+        vkCmdCopyBuffer(cmd, vertexBufferData.stagingBuffer, vertexBufferData.buffer, 1, &copyRegion);
+    }
+
+    void VertexBuffer::cleanupStaging(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData) {
+        if (vertexBufferData.stagingBuffer != VK_NULL_HANDLE) {
+            vmaDestroyBuffer(engineDevice.allocator(), vertexBufferData.stagingBuffer, vertexBufferData.stagingBufferAlloc);
+            vertexBufferData.stagingBuffer = VK_NULL_HANDLE;
+            vertexBufferData.stagingBufferAlloc = VK_NULL_HANDLE;
+        }
     }
 
 }

@@ -10,6 +10,10 @@ namespace aveng {
         static bool uploadData(EngineDevice& engineDevice, VkIndexBufferData& bufferData, VkMesh vertexData);
         static bool uploadData(EngineDevice& engineDevice, VkIndexBufferData& bufferData, std::vector<uint32_t>& indices);
         static void cleanup(EngineDevice& engineDevice, VkIndexBufferData& bufferData);
+
+        static bool fillStaging(EngineDevice& engineDevice, VkIndexBufferData& bufferData, std::vector<uint32_t>& indices);
+        static void recordCopy(VkCommandBuffer cmd, VkIndexBufferData& bufferData);
+        static void cleanupStaging(EngineDevice& engineDevice, VkIndexBufferData& bufferData);
     };
 
 }

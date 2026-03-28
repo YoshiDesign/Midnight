@@ -152,10 +152,46 @@ namespace aveng {
     }
 
     void IndexBuffer::cleanup(EngineDevice& engineDevice, VkIndexBufferData& bufferData) {
-        vmaDestroyBuffer(engineDevice.allocator(), bufferData.stagingBuffer,
-            bufferData.stagingBufferAlloc);
-        vmaDestroyBuffer(engineDevice.allocator(), bufferData.buffer,
-            bufferData.bufferAlloc);
+        if (bufferData.stagingBuffer != VK_NULL_HANDLE) {
+            vmaDestroyBuffer(engineDevice.allocator(), bufferData.stagingBuffer, bufferData.stagingBufferAlloc);
+            bufferData.stagingBuffer = VK_NULL_HANDLE;
+            bufferData.stagingBufferAlloc = nullptr;
+        }
+        if (bufferData.buffer != VK_NULL_HANDLE) {
+            vmaDestroyBuffer(engineDevice.allocator(), bufferData.buffer, bufferData.bufferAlloc);
+            bufferData.buffer = VK_NULL_HANDLE;
+            bufferData.bufferAlloc = nullptr;
+        }
+    }
+
+    bool IndexBuffer::fillStaging(EngineDevice& engineDevice, VkIndexBufferData& bufferData, std::vector<uint32_t>& indices) {
+        size_t indexDataSize = indices.size() * sizeof(uint32_t);
+        void* data;
+        VkResult result = vmaMapMemory(engineDevice.allocator(), bufferData.stagingBufferAlloc, &data);
+        if (result != VK_SUCCESS) {
+            std::printf("%s error: could not map index buffer memory (error: %i)\n", __FUNCTION__, result);
+            return false;
+        }
+        std::memcpy(data, indices.data(), indexDataSize);
+        vmaUnmapMemory(engineDevice.allocator(), bufferData.stagingBufferAlloc);
+        vmaFlushAllocation(engineDevice.allocator(), bufferData.stagingBufferAlloc, 0, indexDataSize);
+        return true;
+    }
+
+    void IndexBuffer::recordCopy(VkCommandBuffer cmd, VkIndexBufferData& bufferData) {
+        VkBufferCopy copyRegion{};
+        copyRegion.srcOffset = 0;
+        copyRegion.dstOffset = 0;
+        copyRegion.size = bufferData.bufferSize;
+        vkCmdCopyBuffer(cmd, bufferData.stagingBuffer, bufferData.buffer, 1, &copyRegion);
+    }
+
+    void IndexBuffer::cleanupStaging(EngineDevice& engineDevice, VkIndexBufferData& bufferData) {
+        if (bufferData.stagingBuffer != VK_NULL_HANDLE) {
+            vmaDestroyBuffer(engineDevice.allocator(), bufferData.stagingBuffer, bufferData.stagingBufferAlloc);
+            bufferData.stagingBuffer = VK_NULL_HANDLE;
+            bufferData.stagingBufferAlloc = nullptr;
+        }
     }
 
 }

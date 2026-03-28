@@ -18,9 +18,20 @@ namespace aveng {
 	TerrainController::TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, ChunkManager& chunks) noexcept 
         : chunks_(&chunks), engineDevice_(engineDevice), renderData_{renderData}
 	{
-        // Clearly, the Controller must outlive the Chunk Manager
 		std::printf("[%s] Constructing TerrainController\n", __FUNCTION__);
         chunks_->initManagers(&erosionMgr_);
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = 0;
+        vkCreateFence(engineDevice_.device(), &fenceInfo, nullptr, &uploadBatch_.fence);
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = engineDevice_.commandPoolGraphics();
+        allocInfo.commandBufferCount = 1;
+        vkAllocateCommandBuffers(engineDevice_.device(), &allocInfo, &uploadBatch_.cmdBuffer);
 	}
 
     TerrainController::~TerrainController() {
@@ -40,29 +51,42 @@ namespace aveng {
     }
 
     void TerrainController::evictChunk(ChunkCoord center) {
-        if (slots_.find(center) != slots_.end()) {
+        auto it = slots_.find(center);
+        if (it == slots_.end()) return;
 
-            admission_.release(center, kSupportRadius);
+        auto& slot = it->second;
 
-            for (int dz = -2; dz <= 2; ++dz) {
-                for (int dx = -2; dx <= 2; ++dx) {
-                    chunks_->evictRecord({ center.x + dx, center.z + dz });
-                }
-            }
-
-            cleanupOne(slots_.at(center));
-            slots_.erase(center);
+        if (slot.state == procgen::TerrainRuntimeState::Uploading && uploadBatch_.active) {
+            vkWaitForFences(engineDevice_.device(), 1, &uploadBatch_.fence, VK_TRUE, UINT64_MAX);
+            retireCompletedUploads();
         }
+
+        admission_.release(center, kSupportRadius);
+
+        for (int dz = -2; dz <= 2; ++dz) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                chunks_->evictRecord({ center.x + dx, center.z + dz });
+            }
+        }
+
+        DeferredGpuCleanup deferred{};
+        deferred.vertexBuffer = slot.gpu.draw.vertexBuffer;
+        deferred.indexBuffer = slot.gpu.draw.indexBuffer;
+        deferred.inputSsbo = slot.gpu.packed.inputSsbo;
+        deferred.outputSsbo = slot.gpu.packed.outputSsbo;
+        deferred.graphicsDescriptorSet = slot.gpu.packed.graphicsDescriptorSet;
+        deferred.computeDescriptorSet = slot.gpu.packed.computeDescriptorSet;
+        deferred.retireFrame = frameIndex_;
+        deferredCleanups_.push_back(deferred);
+
+        slots_.erase(center);
     }
 
     void TerrainController::update(/*const Camera& camera*/)
     {
-        // auto desired = computeDesiredChunkSet(camera);
-
-        // requestMissingChunks(desired);
+        flushDeferredDeletes();
         drainCompletedTerrain();
         serviceCpuReadyChunks();
-        
     }
 
     // Render VK
@@ -157,29 +181,84 @@ namespace aveng {
 
     void TerrainController::serviceCpuReadyChunks()
     {
-        int uploadsThisFrame = 0;
+        retireCompletedUploads();
+        buildAndSubmitUploadBatch();
+    }
+
+    void TerrainController::retireCompletedUploads()
+    {
+        if (!uploadBatch_.active) return;
+
+        if (vkGetFenceStatus(engineDevice_.device(), uploadBatch_.fence) != VK_SUCCESS) return;
+
+        for (const ChunkCoord& coord : uploadBatch_.inFlightSlots) {
+            auto it = slots_.find(coord);
+            if (it == slots_.end()) continue;
+
+            auto& slot = it->second;
+            slot.gpu.valid = true;
+            slot.cpuRenderable.reset();
+            slot.state = procgen::TerrainRuntimeState::Resident;
+
+            VertexBuffer::cleanupStaging(engineDevice_, slot.gpu.draw.vertexBuffer);
+            IndexBuffer::cleanupStaging(engineDevice_, slot.gpu.draw.indexBuffer);
+        }
+
+        uploadBatch_.inFlightSlots.clear();
+        vkResetFences(engineDevice_.device(), 1, &uploadBatch_.fence);
+        uploadBatch_.active = false;
+    }
+
+    void TerrainController::buildAndSubmitUploadBatch()
+    {
+        if (uploadBatch_.active) return;
+
+        engineDevice_.beginSingleShotCommand(uploadBatch_.cmdBuffer);
+
+        int chunksThisBatch = 0;
+
         for (auto& [coord, slot] : slots_) {
+            if (chunksThisBatch >= kMaxChunksPerUploadBatch) break;
+            if (slot.state != procgen::TerrainRuntimeState::CpuReady) continue;
 
-            // Rate limit
-            if (uploadsThisFrame >= kMaxUploadsPerFrame) { break; }
-
-            // Ignore
-            if (slot.state != procgen::TerrainRuntimeState::CpuReady) {
+            if (!prepareChunkUpload(engineDevice_, renderData_, slot, settingsUboBuffer_, settingsUboSize_)) {
+                slot.state = procgen::TerrainRuntimeState::Failed;
                 continue;
             }
 
-            // Upload and transfer state
-            if (uploadTerrainChunkToGpu(engineDevice_, renderData_, slot, settingsUboBuffer_, settingsUboSize_)) {
-                slot.gpu.valid = true;
-                slot.cpuRenderable.reset();
-            }
-            else {
-                slot.state = procgen::TerrainRuntimeState::Failed;
-            }
+            recordChunkCopies(uploadBatch_.cmdBuffer, slot);
 
-            uploadsThisFrame++;
-
+            slot.state = procgen::TerrainRuntimeState::Uploading;
+            uploadBatch_.inFlightSlots.push_back(coord);
+            chunksThisBatch++;
         }
+
+        if (uploadBatch_.inFlightSlots.empty()) {
+            vkEndCommandBuffer(uploadBatch_.cmdBuffer);
+            return;
+        }
+
+        VkMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
+
+        vkCmdPipelineBarrier(
+            uploadBatch_.cmdBuffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            0, 1, &barrier, 0, nullptr, 0, nullptr
+        );
+
+        vkEndCommandBuffer(uploadBatch_.cmdBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &uploadBatch_.cmdBuffer;
+
+        vkQueueSubmit(engineDevice_.graphicsQueue(), 1, &submitInfo, uploadBatch_.fence);
+        uploadBatch_.active = true;
     }
 
     void TerrainController::setTerrainConfig(TerrainConfig tcfg)
@@ -313,11 +392,54 @@ namespace aveng {
     //    });
     //}
 
+    void TerrainController::flushDeferredDeletes()
+    {
+        auto it = deferredCleanups_.begin();
+        while (it != deferredCleanups_.end()) {
+            if (frameIndex_ - it->retireFrame >= kDeferFrames) {
+                VertexBuffer::cleanup(engineDevice_, it->vertexBuffer);
+                IndexBuffer::cleanup(engineDevice_, it->indexBuffer);
+                if (it->inputSsbo.buffer != VK_NULL_HANDLE)
+                    vmaDestroyBuffer(engineDevice_.allocator(), it->inputSsbo.buffer, it->inputSsbo.bufferAlloc);
+                if (it->outputSsbo.buffer != VK_NULL_HANDLE)
+                    vmaDestroyBuffer(engineDevice_.allocator(), it->outputSsbo.buffer, it->outputSsbo.bufferAlloc);
+                if (it->graphicsDescriptorSet != VK_NULL_HANDLE)
+                    vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool, 1, &it->graphicsDescriptorSet);
+                if (it->computeDescriptorSet != VK_NULL_HANDLE)
+                    vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &it->computeDescriptorSet);
+                it = deferredCleanups_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
     // Cleanup all
     void TerrainController::cleanup(){
+
+        if (uploadBatch_.active) {
+            vkWaitForFences(engineDevice_.device(), 1, &uploadBatch_.fence, VK_TRUE, UINT64_MAX);
+            retireCompletedUploads();
+        }
+
+        if (uploadBatch_.fence != VK_NULL_HANDLE)
+            vkDestroyFence(engineDevice_.device(), uploadBatch_.fence, nullptr);
+        if (uploadBatch_.cmdBuffer != VK_NULL_HANDLE)
+            vkFreeCommandBuffers(engineDevice_.device(), engineDevice_.commandPoolGraphics(), 1, &uploadBatch_.cmdBuffer);
+
         for (auto& [coord, slot] : slots_) {
             cleanupOne(slot);
         }
+
+        for (auto& d : deferredCleanups_) {
+            VertexBuffer::cleanup(engineDevice_, d.vertexBuffer);
+            IndexBuffer::cleanup(engineDevice_, d.indexBuffer);
+            if (d.inputSsbo.buffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(engineDevice_.allocator(), d.inputSsbo.buffer, d.inputSsbo.bufferAlloc);
+            if (d.outputSsbo.buffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(engineDevice_.allocator(), d.outputSsbo.buffer, d.outputSsbo.bufferAlloc);
+        }
+        deferredCleanups_.clear();
 
         vkDestroyDescriptorSetLayout(engineDevice_.device(), renderData_.rdTerrainLitGraphicsDescriptorSetLayout, nullptr);
 

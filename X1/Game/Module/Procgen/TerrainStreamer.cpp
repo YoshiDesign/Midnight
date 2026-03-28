@@ -227,8 +227,8 @@ namespace xone {
             }
 
             if (shouldEvict(coord, playerChunk)) {
-                Logger::log(1, "Evictions pending: {%d}\n", outCmds.evictCenters.size());
                 outCmds.evictCenters.push_back(coord);
+                Logger::log(1, "Evictions pending: {%d}\n", outCmds.evictCenters.size());
             }
         }
     }

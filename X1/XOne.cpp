@@ -50,6 +50,7 @@ namespace xone {
 
 			// Invariant: Counter must be able to outlive all complex life on earth
 			const uint64_t engineFrame = ++engineFrameCounter_;
+			midnight.gameServices().terrain.setFrameIndex(engineFrame);
 
 			// Potentially blocking
 			glfwPollEvents();

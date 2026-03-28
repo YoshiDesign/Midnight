@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "vulkan/vulkan_core.h"
 #include "Utils/glm_includes.h"
 
 
@@ -22,6 +23,11 @@ namespace aveng {
         // Unused as far as I can tell
         static bool uploadData(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const std::vector<glm::vec3>& vetrexData); // nice
         static void cleanup(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData);
+
+        static bool fillStaging(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData, const std::vector<glm::vec3>& vertexData);
+        static void recordCopy(VkCommandBuffer cmd, VkVertexBufferData& vertexBufferData);
+        static void cleanupStaging(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData);
+
     private:
         static bool uploadToGPU(EngineDevice& engineDevice, VkVertexBufferData& vertexBufferData);
 

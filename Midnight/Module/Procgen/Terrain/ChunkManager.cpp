@@ -497,6 +497,7 @@ namespace aveng {
     }
 
     void ChunkManager::runMeshStage(ChunkRecord& rec, uint64_t frameIndex) {
+        RecordPin hold(*this, &rec, frameIndex);
         requestErosion(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.erosionF)) {
@@ -513,7 +514,6 @@ namespace aveng {
         }
 
         // procgen::traceStage((rec.coord, procgen::TerrainStage::Mesh, "begin");
-        RecordPin hold(*this, &rec);
         // buildMesh is currently disabled; resolve with true
         rec.meshProm->set_value(true);
         // procgen::traceStage((rec.coord, procgen::TerrainStage::Mesh, "complete");
@@ -564,13 +564,21 @@ namespace aveng {
         std::array<ChunkCoord, 9> neighbors;
         get3x3Neighborhood(rec.coord, neighbors.data());
 
+        // Pin self + 9 neighbors before readiness checks
+        RecordPin selfHold(*this, &rec, frameIndex);
+        ChunkRecord* nrecs[9];
+        std::array<RecordPin, 9> neighborHolds;
+        for (int i = 0; i < 9; ++i) {
+            nrecs[i] = getOrCreateRecord(neighbors[i]);
+            neighborHolds[i] = RecordPin(*this, nrecs[i], frameIndex);
+        }
+
         for (int i = 0; i < 9; ++i) {
             requestPoints(neighbors[i], frameIndex);
         }
 
         for (int i = 0; i < 9; ++i) {
-            ChunkRecord* nrec = getOrCreateRecord(neighbors[i]);
-            if (!procgen::isReady(nrec->pointsF)) {
+            if (!procgen::isReady(nrecs[i]->pointsF)) {
                 // procgen::traceStage((rec.coord, procgen::TerrainStage::AllPoints, "defer");
                 bool expected = false;
                 if (rec.allPointsRetryQueued.compare_exchange_strong(expected, true)) {
@@ -585,13 +593,6 @@ namespace aveng {
         }
 
         // procgen::traceStage((rec.coord, procgen::TerrainStage::AllPoints, "begin");
-
-        RecordPin selfHold(*this, &rec, frameIndex);
-        std::array<RecordPin, 9> neighborHolds;
-        for (int i = 0; i < 9; ++i) {
-            ChunkRecord* nrec = getOrCreateRecord(neighbors[i]);
-            neighborHolds[i] = RecordPin(*this, nrec, frameIndex);
-        }
 
         AllPoints const* result = buildAllPoints(rec);
         rec.allPointsProm->set_value(result);
@@ -619,6 +620,7 @@ namespace aveng {
     }
 
     void ChunkManager::runHeightsStage(ChunkRecord& rec, uint64_t frameIndex) {
+        RecordPin hold(*this, &rec, frameIndex);
         requestAllPoints(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.allPointsF)) {
@@ -635,7 +637,6 @@ namespace aveng {
         }
 
         // procgen::traceStage((rec.coord, procgen::TerrainStage::Heights, "begin");
-        RecordPin hold(*this, &rec);
         HeightField const* result = buildHeights(rec);
         rec.heightsProm->set_value(result);
         // procgen::traceStage((rec.coord, procgen::TerrainStage::Heights, "complete");
@@ -662,6 +663,7 @@ namespace aveng {
     }
 
     void ChunkManager::runTriangulationStage(ChunkRecord& rec, uint64_t frameIndex) {
+        RecordPin hold(*this, &rec, frameIndex);
         requestHeights(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.heightsF)) {
@@ -678,7 +680,6 @@ namespace aveng {
         }
 
         // procgen::traceStage((rec.coord, procgen::TerrainStage::Triangulation, "begin");
-        RecordPin hold(*this, &rec);
         Triangulation const* result = buildTriangulation(rec);
         rec.triangProm->set_value(result);
         // procgen::traceStage((rec.coord, procgen::TerrainStage::Triangulation, "complete");
@@ -706,6 +707,7 @@ namespace aveng {
     }
 
     void ChunkManager::runSpatialGridStage(ChunkRecord& rec, uint64_t frameIndex) {
+        RecordPin hold(*this, &rec, frameIndex);
         requestTriangulation(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.triangF)) {
@@ -725,7 +727,6 @@ namespace aveng {
         }
 
         // procgen::traceStage((rec.coord, procgen::TerrainStage::SpatialGrid, "begin");
-        RecordPin hold(*this, &rec);
         SpatialGrid const* sg = buildSpatialGrid(rec);
         markAllPointsReady(rec.coord);
         rec.spatialProm->set_value(sg);
@@ -756,6 +757,7 @@ namespace aveng {
     }
 
     void ChunkManager::runErosionStage(ChunkRecord& rec, uint64_t frameIndex) {
+        RecordPin hold(*this, &rec, frameIndex);
         requestSpatialGrid(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.spatialF)) {
@@ -772,7 +774,6 @@ namespace aveng {
         }
 
         // procgen::traceStage((rec.coord, procgen::TerrainStage::Erosion, "advance");
-        RecordPin hold(*this, &rec);
 
         bool done = advanceErosion(rec);
 
@@ -1476,6 +1477,15 @@ namespace aveng {
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors);
 
+        // Pin all 25 records BEFORE readiness checks to prevent
+        // evictRecord from destroying them while we hold raw pointers.
+        ChunkRecord* nrecs[25];
+        std::array<RecordPin, 25> pins;
+        for (int i = 0; i < 25; ++i) {
+            nrecs[i] = getOrCreateRecord(neighbors[i]);
+            pins[i] = RecordPin(*this, nrecs[i], frameIndex);
+        }
+
         // Kick off all sub-stages (idempotent via their own call_once)
         for (int i = 0; i < 9; ++i)
             requestMesh(neighbors[i], frameIndex);
@@ -1484,8 +1494,7 @@ namespace aveng {
 
         // Check readiness of inner 9 (mesh) and outer 16 (spatial)
         for (int i = 0; i < 9; ++i) {
-            ChunkRecord* r = getOrCreateRecord(neighbors[i]);
-            if (!procgen::isReady(r->meshF)) {
+            if (!procgen::isReady(nrecs[i]->meshF)) {
                 // procgen::traceStage((center, procgen::TerrainStage::Renderable, "defer");
                 bool expected = false;
                 if (centerRec->generateRetryQueued.compare_exchange_strong(expected, true)) {
@@ -1499,8 +1508,7 @@ namespace aveng {
             }
         }
         for (int i = 9; i < 25; ++i) {
-            ChunkRecord* r = getOrCreateRecord(neighbors[i]);
-            if (!procgen::isReady(r->spatialF)) {
+            if (!procgen::isReady(nrecs[i]->spatialF)) {
                 // procgen::traceStage((center, procgen::TerrainStage::Renderable, "defer");
                 bool expected = false;
                 if (centerRec->generateRetryQueued.compare_exchange_strong(expected, true)) {
@@ -1515,13 +1523,6 @@ namespace aveng {
         }
 
         // procgen::traceStage((center, procgen::TerrainStage::Renderable, "begin");
-
-        // All deps ready -- pin the 5x5 region and build
-        std::array<RecordPin, 25> pins;
-        for (int i = 0; i < 25; ++i) {
-            ChunkRecord* r = getOrCreateRecord(neighbors[i]);
-            pins[i] = RecordPin(*this, r, frameIndex);
-        }
 
         try {
             auto renderable = buildRenderablev2(center, frameIndex);
