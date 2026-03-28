@@ -27,19 +27,12 @@ namespace xone {
         aveng::ChunkCoord rightFan;
     };
 
-    inline LinearWaveCoords makeLinearWave(int k, int baseX) {
-        if (k == 0) {
-            return {
-                { baseX, 0 },
-                { baseX - 2, 2 },
-                { baseX + 2, 2 }
-            };
-        }
-
+    inline LinearWaveCoords makeLinearWave(int k, int baseX, int baseZ) {
+        const int z = baseZ + 3 * k;
         return {
-            { baseX, 3 * k },
-            { baseX - 2, 3 * k + 2 },
-            { baseX + 2, 3 * k + 2 }
+            { baseX, z },
+            { baseX - 2, z + 2 },
+            { baseX + 2, z + 2 }
         };
     }
 

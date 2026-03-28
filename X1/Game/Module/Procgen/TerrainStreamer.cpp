@@ -126,7 +126,16 @@ namespace xone {
         //    Logger::log(1, "Has Streamed Record[%d, %d] = %d\n", k.x, k.z, v.status);
         //}
 #endif
-        state_.baseX = ctx.playerChunk.x;
+        if (state_.maxCenterWaveRequested >= 0 && ctx.playerChunk.x != state_.baseX) {
+            state_.maxCenterWaveRequested = -1;
+            state_.maxFanWaveRequested = -1;
+        }
+
+        if (state_.maxCenterWaveRequested < 0) {
+            state_.baseX = ctx.playerChunk.x;
+            state_.baseZ = ctx.playerChunk.z;
+        }
+
         requestInitialCenter(streamed, outCmds);
         advanceFrontier(ctx, terrain, streamed, outCmds);
         enqueueEvictions(ctx.playerChunk, streamed, outCmds);
@@ -141,7 +150,7 @@ namespace xone {
             return;
         }
 
-        const LinearWaveCoords w0 = makeLinearWave(0, state_.baseX);
+        const LinearWaveCoords w0 = makeLinearWave(0, state_.baseX, state_.baseZ);
         //Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
         //Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
         //Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
@@ -166,7 +175,7 @@ namespace xone {
             // region is all-points-ready, request the two side fan chunks for that wave.
             const int nextFanWave = state_.maxFanWaveRequested + 1;
             if (nextFanWave <= state_.maxCenterWaveRequested) {
-                const LinearWaveCoords wave = makeLinearWave(nextFanWave, state_.baseX);
+                const LinearWaveCoords wave = makeLinearWave(nextFanWave, state_.baseX, state_.baseZ);
 
                 if (terrain.hasRegionReady(wave.center)) {
                     requestIfNeeded(wave.leftFan, streamed, outCmds);
@@ -182,13 +191,13 @@ namespace xone {
             if (state_.maxFanWaveRequested >= 0 &&
                 state_.maxCenterWaveRequested == state_.maxFanWaveRequested)
             {
-                const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested, state_.baseX);
+                const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested, state_.baseX, state_.baseZ);
 
                 if (terrain.hasRegionComplete(currentFanWave.leftFan) &&
                     terrain.hasRegionComplete(currentFanWave.rightFan))
                 {
                     const int nextCenterWave = state_.maxCenterWaveRequested + 1;
-                    const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave, state_.baseX);
+                    const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave, state_.baseX, state_.baseZ);
 
                     const int leadZ = nextWave.center.z - ctx.playerChunk.z;
                     if (leadZ > policy_.forwardRows) {

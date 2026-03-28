@@ -32,6 +32,7 @@ namespace aveng {
         int maxCenterWaveRequested = -1;
         int maxFanWaveRequested = -1;
         int baseX = 0;
+        int baseZ = 0;
     };
 
     struct StreamUpdateContext {
