@@ -740,41 +740,57 @@ namespace aveng {
         std::call_once(rec->erosionOnce, [this, rec, frameIndex] {
             procgen::traceStage(rec->coord, procgen::TerrainStage::Erosion, "request");
 
-            const ErosionSettings s = erosionMgr_ ? erosionMgr_->getActiveSettings() : ErosionSettings{};
+            // Snapshot settings into the build context (persists across retries)
+            rec->erosionCtx.settings = erosionMgr_ ? erosionMgr_->getActiveSettings() : ErosionSettings{};
 
             rec->erosionProm = std::make_shared<std::promise<ErosionField const*>>();
             rec->erosionF = rec->erosionProm->get_future().share();
 
-            tasks_.enqueue([this, coord = rec->coord, s, frameIndex]() {
+            tasks_.enqueue([this, coord = rec->coord, frameIndex]() {
                 ChunkRecord* r = getOrCreateRecord(coord);
-                runErosionStage(*r, s, frameIndex);
+                runErosionStage(*r, frameIndex);
             });
         });
 
         return rec->erosionF;
     }
 
-    void ChunkManager::runErosionStage(ChunkRecord& rec, const ErosionSettings& s, uint64_t frameIndex) {
+    void ChunkManager::runErosionStage(ChunkRecord& rec, uint64_t frameIndex) {
         requestSpatialGrid(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.spatialF)) {
-            procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "defer");
+            procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "defer-upstream");
             bool expected = false;
             if (rec.erosionRetryQueued.compare_exchange_strong(expected, true)) {
-                tasks_.enqueue([this, coord = rec.coord, s, frameIndex]() {
+                tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
                     ChunkRecord* again = getOrCreateRecord(coord);
                     again->erosionRetryQueued.store(false, std::memory_order_relaxed);
-                    runErosionStage(*again, s, frameIndex);
+                    runErosionStage(*again, frameIndex);
                 });
             }
             return;
         }
 
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "begin");
+        procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "advance");
         RecordPin hold(*this, &rec);
-        const ErosionField* ero = buildErosion(rec, s);
+
+        bool done = advanceErosion(rec);
+
+        if (!done) {
+            procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "defer-batches");
+            bool expected = false;
+            if (rec.erosionRetryQueued.compare_exchange_strong(expected, true)) {
+                tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
+                    ChunkRecord* again = getOrCreateRecord(coord);
+                    again->erosionRetryQueued.store(false, std::memory_order_relaxed);
+                    runErosionStage(*again, frameIndex);
+                });
+            }
+            return;
+        }
+
         markAllStagesComplete(rec.coord);
-        rec.erosionProm->set_value(ero);
+        rec.erosionProm->set_value(rec.erosion);
         procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "complete");
     }
 
@@ -1099,148 +1115,205 @@ namespace aveng {
 
     }
 
-    ErosionField const* ChunkManager::buildErosion(ChunkRecord& rec, const ErosionSettings& settings)
+    // -----------------------------------------------------------------------
+    // advanceErosion -- retry-driven state machine
+    // Returns true when the erosion build is complete. Returns false when
+    // batch futures are still in flight (caller should defer and re-enqueue).
+    // -----------------------------------------------------------------------
+    bool ChunkManager::advanceErosion(ChunkRecord& rec)
     {
-        // std::printf("Build Erosion\n");
-        // Erosion is call_once'd => safe to reuse rec.scratch for the whole stage
-        rec.scratch.reset(); // whatever your API is
+        using Phase = procgen::ErosionBuildContext::Phase;
+        auto& ctx = rec.erosionCtx;
+        auto& s   = ctx.settings;
 
-        auto* scratchMr = rec.scratch.mr();
-        auto* finalMr = rec.final.mr();
+        // ------ Phase: NotStarted (init) ------
+        if (ctx.phase == Phase::NotStarted) {
+            rec.scratch.reset();
+            auto* scratchMr = rec.scratch.mr();
 
-        // 1) Construct working buffers in scratch
-        procgen::ErosionWorkingSet ws(scratchMr);
+            ctx.ws = std::make_unique<procgen::ErosionWorkingSet>(scratchMr);
+            auto& ws = *ctx.ws;
 
-		// Seeds for any stochastic components in each stage
-        // ensures deterministic output per chunk, but different patterns across stages.
-        // TODO: move them elsewhere so they're not computed when the corresponding stage is disabled.
-        const uint64_t hardnessSeed = wyhash64(rec.chunkSeed, SeedTag::Hardness);
-        const uint64_t hydroSeed    = wyhash64(rec.chunkSeed, SeedTag::Hydraulic);
-		const uint64_t thermalSeed  = wyhash64(rec.chunkSeed, SeedTag::Thermal);
-		const uint64_t ridgeSeed    = wyhash64(rec.chunkSeed, SeedTag::Ridge);
-		const uint64_t smoothSeed   = wyhash64(rec.chunkSeed, SeedTag::Smooth);
+            ctx.hydroSeed   = wyhash64(rec.chunkSeed, SeedTag::Hydraulic);
+            ctx.thermalSeed = wyhash64(rec.chunkSeed, SeedTag::Thermal);
+            ctx.ridgeSeed   = wyhash64(rec.chunkSeed, SeedTag::Ridge);
 
-        // Convenient way to retrieve heights for copying
-        // const auto* hf = requestHeights(rec.coord, /*frame*/0).get(); 
-        // Use this approach (above) if we ever need to guarantee completion of all prerequisite stages.
-        // However, in our architecture we've synchronized stages so this isn't necessary.
+            auto const& heights = rec.heightField->heights;
+            const size_t N = heights.size();
 
-        // Or do something like the below snippet, to be safe, should we change our design.
-        // (void)requestHeights(rec.coord, 0 /*frameIndex*/).get(); // ensure built
-        // (void)requestAllPoints(rec.coord, 0 /*frameIndex*/).get(); // ensure built
-        //auto const& heights = rec.heightField->heights;
+            ws.workHeights.resize(N);
+            ws.delta.resize(N);
+            ws.hardness.resize(N);
 
-        // Get heights for copying.
-        auto const& heights = rec.heightField->heights;
-        const size_t N = heights.size();
-
-        // Resize to num points we're working on
-        ws.workHeights.resize(N);
-        ws.delta.resize(N);
-        ws.hardness.resize(N);
-
-        // Init working heights and deltas
-        std::copy(heights.begin(), heights.end(), ws.workHeights.begin());
-        std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
-
-        /*
-        * Signatures get a little messy here.
-        * Haste be with us.
-        */
-
-        if (settings.hardnessMapEnabled) {
-        
-            // 2) Hardness in scratch
-            procgen::ComputeHardnessMap(
-                ws.hardness, 
-			    rec.allPoints->pts, // INVARIANT REMINDER - allPoints->pts.size() == heightField->heights.size()
-                ws.workHeights,
-                settings.hardness,
-                hardnessSeed
-            );
-
-        }
-
-        if (settings.hydraulicErosionEnabled) {
-        
-            // 3) Hydraulic pass writes ws.delta, then apply into ws.workHeights
-            procgen::ComputeHydraulicErosion(
-                ws, 
-                *rec.allPoints, 
-                *rec.triangulation, 
-                rec.spatial.value(), 
-                settings.hydraulic,
-                hydroSeed,
-                tasks_
-            );
-
-            ApplyDelta(ws.workHeights, ws.delta);
+            std::copy(heights.begin(), heights.end(), ws.workHeights.begin());
             std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+
+            if (s.hardnessMapEnabled) {
+                const uint64_t hardnessSeed = wyhash64(rec.chunkSeed, SeedTag::Hardness);
+                procgen::ComputeHardnessMap(
+                    ws.hardness,
+                    rec.allPoints->pts,
+                    ws.workHeights,
+                    s.hardness,
+                    hardnessSeed
+                );
+            }
+
+            ctx.phase = Phase::HydraulicSubmitted;
+            // fall through to submit hydraulic
         }
+
+        auto& ws = *ctx.ws;
+
+        // ------ Phase: HydraulicSubmitted ------
+        if (ctx.phase == Phase::HydraulicSubmitted) {
+            if (s.hydraulicErosionEnabled) {
+                if (ctx.valueFutures.empty()) {
+                    ctx.valueFutures = procgen::SubmitHydraulicBatches(
+                        ws, *rec.allPoints, *rec.triangulation, rec.spatial.value(),
+                        s.hydraulic, ctx.hydroSeed, tasks_
+                    );
+                    if (!ctx.valueFutures.empty())
+                        return false;
+                }
+
+                if (!ctx.allValueFuturesReady())
+                    return false;
+
+                procgen::ReduceHydraulicResults(ws, ctx.valueFutures);
+                ctx.clearFutures();
+
+                ApplyDelta(ws.workHeights, ws.delta);
+                std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+            }
+
+            ctx.phase = Phase::ThermalSubmitted;
+            ctx.currentIteration = 0;
+            // fall through
+        }
+
+        // ------ Phase: ThermalSubmitted ------
+        if (ctx.phase == Phase::ThermalSubmitted) {
+            if (s.thermalErosionEnabled && s.thermal.Iterations > 0) {
+                // One-time init on first entry
+                if (ctx.currentIteration == 0 && ctx.thermalWorkers == 0) {
+                    procgen::InitThermalErosion(ws, s.thermal, ctx.thermalWorkers, ctx.thermalBatchSz);
+                }
+
+                while (ctx.currentIteration < s.thermal.Iterations) {
+                    if (ctx.valueFutures.empty()) {
+                        ctx.valueFutures = procgen::SubmitThermalIterationBatches(
+                            ws, *rec.allPoints, *rec.triangulation, s.thermal,
+                            ctx.thermalWorkers, ctx.thermalBatchSz, tasks_
+                        );
+                        if (!ctx.valueFutures.empty())
+                            return false;
+                    }
+
+                    if (!ctx.allValueFuturesReady())
+                        return false;
+
+                    procgen::ReduceThermalIteration(ws, ctx.valueFutures);
+                    ctx.clearFutures();
+
+                    ctx.currentIteration++;
+                }
+
+                procgen::FinalizeThermalDelta(ws);
+                ApplyDelta(ws.workHeights, ws.delta);
+                std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+            }
+
+            ctx.phase = Phase::RidgeSubmitted;
+            ctx.currentIteration = 0;
+            ctx.ridgeSubPhase = 0;
+            // fall through
+        }
+
+        // ------ Phase: RidgeSubmitted ------
+        if (ctx.phase == Phase::RidgeSubmitted) {
+            if (s.ridgeEnhancementEnabled && s.ridges.Iterations > 0) {
+                // One-time init on first entry
+                if (ctx.currentIteration == 0 && ctx.ridgeMaxWorkers == 0) {
+                    procgen::InitRidgeEnhancement(ws, s.ridges,
+                        ctx.ridgeMinH, ctx.ridgeMaxH, ctx.ridgeMaxWorkers);
+                }
+
+                while (ctx.currentIteration < (uint32_t)s.ridges.Iterations) {
+                    // Sub-phase 0: compute ridgeness
+                    if (ctx.ridgeSubPhase == 0) {
+                        if (ctx.voidFutures.empty()) {
+                            ctx.voidFutures = procgen::SubmitRidgenessCompute(
+                                ws, *rec.triangulation, ctx.ridgeMaxWorkers, tasks_);
+                            if (!ctx.voidFutures.empty())
+                                return false;
+                        }
+                        if (!ctx.allVoidFuturesReady())
+                            return false;
+                        ctx.clearFutures();
+                        ctx.ridgeSubPhase = 1;
+                    }
+
+                    // Sub-phase 1: copy heights
+                    if (ctx.ridgeSubPhase == 1) {
+                        if (ctx.voidFutures.empty()) {
+                            ctx.voidFutures = procgen::SubmitRidgeCopy(
+                                ws, ctx.ridgeMaxWorkers, tasks_);
+                            if (!ctx.voidFutures.empty())
+                                return false;
+                        }
+                        if (!ctx.allVoidFuturesReady())
+                            return false;
+                        ctx.clearFutures();
+                        ctx.ridgeSubPhase = 2;
+                    }
+
+                    // Sub-phase 2: apply enhancement
+                    if (ctx.ridgeSubPhase == 2) {
+                        if (ctx.voidFutures.empty()) {
+                            ctx.voidFutures = procgen::SubmitRidgeApply(
+                                ws, *rec.allPoints, s.ridges, ctx.ridgeSeed,
+                                ctx.ridgeMinH, ctx.ridgeMaxH, ctx.ridgeMaxWorkers, tasks_);
+                            if (!ctx.voidFutures.empty())
+                                return false;
+                        }
+                        if (!ctx.allVoidFuturesReady())
+                            return false;
+                        ctx.clearFutures();
+                    }
+
+                    procgen::SwapRidgeIteration(ws);
+                    ctx.currentIteration++;
+                    ctx.ridgeSubPhase = 0;
+                }
+            }
+
+            ctx.phase = Phase::Finalize;
+            // fall through
+        }
+
+        // ------ Phase: Finalize ------
+        if (ctx.phase == Phase::Finalize) {
+            if (!rec.erosion) {
+                auto alloc = std::pmr::polymorphic_allocator<ErosionField>(rec.final.mr());
+                rec.erosion = alloc.allocate(1);
+                std::construct_at(rec.erosion, rec.final.mr());
+            }
+
+            rec.erosion->eHeights.clear();
+            rec.erosion->eHeights.reserve(ws.workHeights.size());
+            rec.erosion->eHeights.insert(rec.erosion->eHeights.end(),
+                ws.workHeights.begin(), ws.workHeights.end());
 
 #ifdef M_DEBUG
-       // std::printf("Completed HydroErosion {%d, %d}\n", rec.coord.x, rec.coord.z);
-       //dumpHydraulicData(rec.coord, &ws);
+            std::printf("[Chunk Completed] {%d, %d}\n", rec.coord.x, rec.coord.z);
 #endif
 
-
-        if (settings.thermalErosionEnabled) {
-        
-            // 4) Thermal pass writes ws.delta, then apply
-            procgen::ComputeThermalErosion(
-                ws,  
-                *rec.allPoints,
-                *rec.triangulation,
-                rec.spatial.value(),
-                settings.thermal,
-                thermalSeed,
-                tasks_
-            );
-
-            ApplyDelta(ws.workHeights, ws.delta);
-            std::fill(ws.delta.begin(), ws.delta.end(), 0.0f);
+            ctx.ws.reset();
+            ctx.phase = Phase::Done;
         }
 
-
-        if (settings.ridgeEnhancementEnabled) {
-
-            // 5) Ridge enhancement can use ping-pong
-            ws.ping.resize(N);
-            ComputeRidgeEnhancement( /* WARNING: I DID NOT REVIEW THIS CODE AT ALL */
-                ws,
-                *rec.allPoints,
-                *rec.triangulation,
-                rec.spatial.value(),
-                settings.ridges,
-                ridgeSeed,
-                tasks_
-            );
-
-            ws.workHeights.swap(ws.ping);
-        }
-
-        // Allocate the published product in FINAL memory
-        // This is the pointer that the future will return
-        if (!rec.erosion) {
-            auto alloc = std::pmr::polymorphic_allocator<ErosionField>(rec.final.mr());
-            rec.erosion = alloc.allocate(1);
-            std::construct_at(rec.erosion, rec.final.mr()); // Points(mr)
-        }
-
-        // 5) Copy candidates from thread-local scratch to final arena
-		//    eHeights are the completed heights with erosion deltas applied, ready for mesh generation.
-        rec.erosion->eHeights.clear();
-        rec.erosion->eHeights.reserve(ws.workHeights.size());
-        rec.erosion->eHeights.insert(rec.erosion->eHeights.end(), ws.workHeights.begin(), ws.workHeights.end());
-
-#ifdef M_DEBUG
-        std::printf("[Chunk Completed] {%d, %d}\n", rec.coord.x, rec.coord.z);
-        //dumpChunkFinalHeightData(rec.coord, rec.erosion->eHeights);
-#endif
-
-        // 6) Done. Scratch can be reused immediately by this worker for the next job.
-        return rec.erosion;
-
+        return true;
     }
 
     FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& rec)

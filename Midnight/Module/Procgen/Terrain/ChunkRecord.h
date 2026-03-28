@@ -234,6 +234,7 @@ namespace aveng {
 
 		void discardScratchIntermediates() {
 			// reset scratch arena; product pointers become invalid, so null them
+			erosionCtx.ws.reset(); // must release before scratch.reset() invalidates the MR
 			scratch.reset(); // REQUIRED
 			points = nullptr;
 			allPoints = nullptr;

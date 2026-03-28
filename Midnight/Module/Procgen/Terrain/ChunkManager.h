@@ -174,7 +174,7 @@ namespace aveng {
         void runHeightsStage(ChunkRecord& rec, uint64_t frameIndex);
         void runTriangulationStage(ChunkRecord& rec, uint64_t frameIndex);
         void runSpatialGridStage(ChunkRecord& rec, uint64_t frameIndex);
-        void runErosionStage(ChunkRecord& rec, const ErosionSettings& s, uint64_t frameIndex);
+        void runErosionStage(ChunkRecord& rec, uint64_t frameIndex);
         void runMeshStage(ChunkRecord& rec, uint64_t frameIndex);
         void runGenerate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId);
 
@@ -184,7 +184,7 @@ namespace aveng {
         HeightField const*  buildHeights(ChunkRecord& r);       // alloc in scratch
         Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
 		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
-        ErosionField const* buildErosion(ChunkRecord& r, const ErosionSettings& settings);       // alloc in scratch
+        bool advanceErosion(ChunkRecord& r);  // retry-driven state machine; returns true when complete
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
         std::unique_ptr<procgen::TerrainRenderable> buildRenderablev2(ChunkCoord center, uint64_t frameIndex);
         std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);

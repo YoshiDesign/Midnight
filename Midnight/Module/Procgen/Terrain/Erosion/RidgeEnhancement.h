@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+#include <vector>
+#include <future>
 
 namespace aveng {
     struct AllPoints;
@@ -13,14 +15,44 @@ namespace aveng {
 namespace procgen {
     struct ErosionWorkingSet;
 
-    void ComputeRidgeEnhancement(
+    // Prepare working set for ridge enhancement iterations.
+    // Computes min/max heights and returns the effective maxWorkers.
+    void InitRidgeEnhancement(
         ErosionWorkingSet& ws,
-        const aveng::AllPoints& allPts,
-        const aveng::Triangulation& tri,
-        const aveng::SpatialGrid& /*sg*/,
         const aveng::RidgeParams& cfg,
-        uint64_t ridgeSeed, // The thermal seed is unused bc there's no rng here. We could add some jitter/noise or other behaviors in the future.
+        float& outMinH,
+        float& outMaxH,
+        uint32_t& outMaxWorkers
+    );
+
+    // Sub-phase 0: compute ridgeness values into ws.delta (parallel).
+    std::vector<std::shared_future<void>> SubmitRidgenessCompute(
+        ErosionWorkingSet& ws,
+        const aveng::Triangulation& tri,
+        uint32_t maxWorkers,
         aveng::ITaskSystem& tasks
     );
+
+    // Sub-phase 1: copy ws.workHeights into ws.ping (parallel).
+    std::vector<std::shared_future<void>> SubmitRidgeCopy(
+        ErosionWorkingSet& ws,
+        uint32_t maxWorkers,
+        aveng::ITaskSystem& tasks
+    );
+
+    // Sub-phase 2: apply ridge boost + noise into ws.ping (parallel).
+    std::vector<std::shared_future<void>> SubmitRidgeApply(
+        ErosionWorkingSet& ws,
+        const aveng::AllPoints& allPts,
+        const aveng::RidgeParams& cfg,
+        uint64_t ridgeSeed,
+        float minH,
+        float maxH,
+        uint32_t maxWorkers,
+        aveng::ITaskSystem& tasks
+    );
+
+    // Swap ping <-> workHeights after one iteration completes.
+    void SwapRidgeIteration(ErosionWorkingSet& ws);
 
 }

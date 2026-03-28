@@ -5,9 +5,6 @@
 #include "Core/Math/Math.h"
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Rng.h"
-// #include "Runtime/Threading/Scratch.h"
-// #include "Runtime/Memory/ChunkArena.h" // Including this here causes a TU mega-collision
-#include "Module/Procgen/Rng.h"
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/Delaunay.h"
 #include "Module/Procgen/SpatialGrid.h"
@@ -23,7 +20,7 @@
 *   Reduction only touches tiles that were hit
 * -Per-thread (not per-batch) deltas
 *   Instead of 30 full deltas, have W full deltas (one per worker thread), reuse them
-*   Each task writes into its thread’s delta
+*   Each task writes into its thread's delta
 *   Then reduce W deltas (W << numBatches)
 *   Still bandwidth heavy, but much less than 30×N
 */
@@ -56,14 +53,12 @@ namespace procgen::detail {
         const aveng::BaryWeights& w
     )
     {
-        // safety: clamp weights if your barycentric can slightly overshoot
         const FPTYPE wa = w.wa, wb = w.wb, wc = w.wc;
         return wa * hardness[a] + wb * hardness[b] + wc * hardness[c];
     }
 
     // Move direction update (unit step length preserved)
     void UpdateDirectionUnitStep(procgen::Droplet& d, aveng::Vec2 gradDownhill, const aveng::HydraulicErosionParams& cfg) {
-        // Paper-style: dirNew = dirOld*inertia - grad*(1-inertia), then normalize (magnitude 1)
         const FPTYPE pin = cfg.inertia;
         aveng::Vec2 dirNew{
             d.dir.x * pin - gradDownhill.x * (1.0f - pin),
@@ -90,8 +85,7 @@ namespace procgen::detail {
 
 namespace procgen {
 
-    // ---- The actual pass ----
-    void ComputeHydraulicErosion(
+    std::vector<std::shared_future<std::vector<float>>> SubmitHydraulicBatches(
         procgen::ErosionWorkingSet& ws,
         const aveng::AllPoints& allPts,
         const aveng::Triangulation& tri,
@@ -100,19 +94,18 @@ namespace procgen {
         uint64_t hydroSeed,
         aveng::ITaskSystem& tasks
     ) {
-        const size_t N = allPts.pts.size(); // assuming AllPoints::pts is a vector<Vec2> in WORLD space
-        if (N == 0) return;
+        const size_t N = allPts.pts.size();
 
-        // Ensure scratch buffers are sized
         ws.delta.assign(N, 0.0f);
         if (ws.workHeights.size() != N) {
-            // caller typically pre-fills workHeights from HeightField; this is defensive
             ws.workHeights.resize(N, 0.0f);
         }
         if (ws.hardness.size() != N) {
-            // hardness should be computed before this pass; defensive default
             ws.hardness.resize(N, 0.0f);
         }
+
+        std::vector<std::shared_future<std::vector<FPTYPE>>> futures;
+        if (N == 0) return futures;
 
         const auto bounds = sg.worldBounds;
         const FPTYPE margin = std::max(0.0f, cfg.spawnMargin);
@@ -122,33 +115,21 @@ namespace procgen {
         const FPTYPE spawnMinZ = bounds.minZ + margin;
         const FPTYPE spawnMaxZ = bounds.maxZ - margin;
 
-        // If margin is too large, fall back to full bounds (don’t crash / don’t spawn NaNs)
         const bool spawnOk = (spawnMaxX > spawnMinX) && (spawnMaxZ > spawnMinZ);
         const FPTYPE aMinX = spawnOk ? spawnMinX : bounds.minX;
         const FPTYPE aMaxX = spawnOk ? spawnMaxX : bounds.maxX;
         const FPTYPE aMinZ = spawnOk ? spawnMinZ : bounds.minZ;
         const FPTYPE aMaxZ = spawnOk ? spawnMaxZ : bounds.maxZ;
 
-        // Work constants
         const FPTYPE oneMinusEvap = 1.0f - cfg.pEvaporation;
 
-        // Batch scheduling
         const uint32_t total = cfg.numDroplets;
-
-        // Hard cap on hydraulic parallelism
         const uint32_t maxTasks = cfg.maxWorkers;
-
-        // Don’t spawn more tasks than droplets
         const uint32_t numBatches = std::min(maxTasks, total);
-
-        // Now derive batch size from desired task count
         const uint32_t batchSize = (total + numBatches - 1u) / numBatches;
 
-        // Each task returns a full-size local delta array (simple + deterministic; optimize later with tiling/sparse).
-        std::vector<std::shared_future<std::vector<FPTYPE>>> futures;
         futures.reserve(numBatches);
 
-        // Capture read-only spans for speed
         const FPTYPE* heights = ws.workHeights.data();
         const FPTYPE* hard = ws.hardness.data();
 
@@ -156,59 +137,26 @@ namespace procgen {
             const uint32_t begin = b * batchSize;
             const uint32_t end = std::min(total, begin + batchSize);
 
-            // TODO : I don't think we're using thread local scratch allocation
-            // futures.push_back(tasks.submit([=, &allPts, &tri, &sg, &cfg]() -> std::vector<FPTYPE> {
-            auto getErosionDeltas = [=, &allPts, &tri, &sg, &cfg](){
-
-                /*
-                    TODO: Debugging
-                    Use null_memory_resource() to catch heap allocation
-                */
-
-                // Get per-worker scratch
-                //aveng::ChunkArena& arena = aveng::tlsScratchArena();
-                //if (!arena.mr()) {
-                //    // once per thread; pick a size you like
-                //    arena.reserve(3 * 1024 * 1024); // example: 3MB
-                //}
-                //arena.reset(); // IMPORTANT: wipe previous task allocations on this worker
-
-                //std::pmr::memory_resource* mr = arena.mr();
+            futures.push_back(tasks.submit([=, &allPts, &tri, &sg, &cfg]() -> std::vector<FPTYPE> {
 
                 std::vector<FPTYPE> localDelta;
                 localDelta.assign(allPts.pts.size(), 0.0f);
 
                 for (uint32_t di = begin; di < end; ++di) {
 
-                    uint64_t s = aveng::wyhash64(hydroSeed, uint64_t(di)); // per-droplet stream seed
-                    // spawn
+                    uint64_t s = aveng::wyhash64(hydroSeed, uint64_t(di));
                     FPTYPE rx = aveng::u24_to_f01(aveng::wyrand(&s));
                     FPTYPE rz = aveng::u24_to_f01(aveng::wyrand(&s));
-                    //aveng::SplitMix64 rng(aveng::wyhash64(hydroSeed, uint64_t(di))); OLD - not about it
-
-                    /*
-                    * NOTE: If we ever need more random numbers than just a handful,
-                    * the xoshiro approach (SplitMix64) is (apparently) much cleaner
-                    */
 
                     Droplet d;
                     d.water = cfg.initWater;
                     d.vel = cfg.initVel;
-                    d.sediment = 0.0f; // Note, initializing with 0 sediment
+                    d.sediment = 0.0f;
                     d.capacity = cfg.pCapacity;
                     d.alive = true;
                     d.pos = { aMinX + (aMaxX - aMinX) * rx,
                               aMinZ + (aMaxZ - aMinZ) * rz };
 
-                    // Old - Initial direction (unit)
-                    //aveng::Vec2 rdir{
-                    //    rx * 2.0f - 1.0f,
-                    //    rz * 2.0f - 1.0f
-                    //};
-                    //d.dir = rdir.normalizedOr(aveng::Vec2{ 1,0 });
-
-                    // New - uses wyrand. This loop should typically execute no more than twice, average.
-                    aveng::Vec2 v;
                     for (;;) {
                         FPTYPE x = aveng::randSigned(s);
                         FPTYPE y = aveng::randSigned(s);
@@ -216,7 +164,7 @@ namespace procgen {
                         FPTYPE r2 = x * x + y * y;
 
                         if (r2 > 1e-12f && r2 <= 1.0f) {
-                            FPTYPE invLen = 1.0f / std::sqrt(r2); // "what the fuck"
+                            FPTYPE invLen = 1.0f / std::sqrt(r2);
                             d.dir.x = x * invLen;
                             d.dir.y = y * invLen;
                             break;
@@ -226,61 +174,49 @@ namespace procgen {
                     for (uint32_t step = 0; step < cfg.maxSteps; ++step) {
                         if (!d.alive) { break; }
 
-                        // Locate current triangle
                         auto [t1, ok1] = sg.LocateTriangle(d.pos.x, d.pos.y);
                         if (!ok1) { d.alive = false; break; }
 
-                        // Barycentric at current position
                         aveng::BaryWeights w1{};
                         if (!aveng::Barycentric(allPts, tri, t1, d.pos, w1)) { d.alive = false; break; }
 
-                        // Sample height at current position
                         FPTYPE h1 = 0.f;
                         if (!aveng::SampleScalar(allPts, tri, t1, d.pos, heights, allPts.pts.size(), h1)) {
                             d.alive = false; break;
                         }
 
-                        // Triangle gradient (constant over triangle)
                         FPTYPE dhdx = 0.f, dhdz = 0.f;
                         if (!aveng::TriangleGradient(allPts, tri, t1, heights, allPts.pts.size(), dhdx, dhdz)) {
                             d.alive = false; break;
                         }
 
-                        // Gradient points uphill; we want downhill motion, so gradDownhill = (-dhdx, -dhdz)
                         aveng::Vec2 gradDownhill{ -dhdx, -dhdz };
                         detail::UpdateDirectionUnitStep(d, gradDownhill, cfg);
 
-                        // Unit step (paper intent): pos += dir
                         const aveng::Vec2 oldPos = d.pos;
                         d.pos = { d.pos.x + d.dir.x, d.pos.y + d.dir.y };
 
-                        // Locate new triangle after move
                         auto [t2, ok2] = sg.LocateTriangle(d.pos.x, d.pos.y);
                         if (!ok2) { d.alive = false; break; }
 
-                        // Sample height at new position
                         FPTYPE h2 = 0.f;
                         if (!aveng::SampleScalar(allPts, tri, t2, d.pos, heights, allPts.pts.size(), h2)) {
                             d.alive = false; break;
                         }
                         
-                        // Barycentric at new position (only needed for uphill logic; cheap enough to compute once)
                         aveng::BaryWeights w2{};
                         if (!aveng::Barycentric(allPts, tri, t2, d.pos, w2)) {
                             d.alive = false; break;
                         }
                         
-                        const FPTYPE hdiff = h2 - h1; // <0 downhill
+                        const FPTYPE hdiff = h2 - h1;
 
-                        // Tri vertex indices
                         const auto& T1 = tri.tris[t1];
                         const auto& T2 = tri.tris[t2];
                         const aveng::SiteIndex A1 = T1.A, B1 = T1.B, C1 = T1.C;
                         const aveng::SiteIndex A2 = T2.A, B2 = T2.B, C2 = T2.C;
 
-                        // ----- Erode / deposit -----
                         if (hdiff < 0.0f) {
-                            // Capacity = max(-hdiff, minSlope) * vel * water * pCapacity
                             const FPTYPE slopeTerm = std::max(-hdiff, cfg.pMinSlope);
                             d.capacity = slopeTerm * d.vel * d.water * cfg.pCapacity;
 
@@ -296,11 +232,8 @@ namespace procgen {
 
                             if (d.capacity > d.sediment) {
                                 toErode = (d.capacity - d.sediment) * cfg.pErosion;
-
-                                // Clamp by local relief (prevents “pulling” more than descended this step)
                                 toErode = std::min(toErode, -hdiff);
 
-                                // Hardness scaling: harder erodes less (hardness assumed [0..1])
                                 const FPTYPE avgH = detail::AvgHardnessTri(std::span<const FPTYPE>(hard, allPts.pts.size()),
                                    A1, B1, C1, w1);
                                 toErode *= (1.0f - avgH);
@@ -321,9 +254,7 @@ namespace procgen {
                             }
                         }
                         else if (hdiff > 0.0f) {
-                            // Uphill: deposit to fill. (Prototype logic preserved.)
                             if (hdiff > d.sediment) {
-                                // Drop all sediment at source triangle
                                 localDelta[A1] += w1.wa * d.sediment;
                                 localDelta[B1] += w1.wb * d.sediment;
                                 localDelta[C1] += w1.wc * d.sediment;
@@ -339,26 +270,17 @@ namespace procgen {
                                 if (d.sediment < 1e-6f) {
                                     d.sediment = 0.f;
                                     d.vel = 0.f;
-                                    // keep direction as-is; if you want “settling”, you can zero dir
                                 }
                             }
                         }
-                        else {
-                            // Flat: no material change (but still evaporate / possibly kill)
-                        }
 
-                        // ----- Velocity + evaporation -----
-                        // Downhill accelerates: use (-hdiff)
                         d.vel = std::sqrt(std::max(0.0f, d.vel * d.vel + (-hdiff) * cfg.gravity));
 
-                        // Base evaporation
                         d.water *= oneMinusEvap;
 
-                        // Extra evaporation if slope ~ 0 and capacity ~ 0 (requested)
-                        // Use gradient magnitude as a stronger flatness signal than hdiff alone.
                         const FPTYPE slopeMag = std::sqrt(dhdx * dhdx + dhdz * dhdz);
                         if (slopeMag < cfg.flatSlopeEps && d.capacity < cfg.flatCapEps) {
-                            d.water *= (1.0f - cfg.flatExtraEvap); // "drastically increase"
+                            d.water *= (1.0f - cfg.flatExtraEvap);
                         }
 
                         if (d.water < 1e-6f) {
@@ -366,34 +288,30 @@ namespace procgen {
                             break;
                         }
 
-                        // Optional: if we failed to move meaningfully, prevent infinite "sticking"
-                        // (unit step avoids this, so likely unnecessary)
                         (void)oldPos;
-                        (void)A2; (void)B2; (void)C2; // T2 indices reserved for future inter-tri deposition variants
+                        (void)A2; (void)B2; (void)C2;
                     }
                 }
 
                 return localDelta;
-            };
-
-            auto delts = getErosionDeltas();
-
-            for (size_t i = 0; i < N; ++i) {
-                ws.delta[i] += delts[i];
-            }
+            }));
         }
 
-        // Reduce all local deltas into ws.delta (NOT single-threaded reduction at the moment)
-        // (You can parallelize the reduction later by chunking the index range.)
-        //for (auto& fut : futures) {
-        //     /* std::vector<FPTYPE> */ auto local = tasks.wait(fut);
-        //    // accumulate
-        //    for (size_t i = 0; i < N; ++i) {
-        //        ws.delta[i] += local[i];
-        //    }
-        //}
+        return futures;
+    }
 
+    void ReduceHydraulicResults(
+        ErosionWorkingSet& ws,
+        std::vector<std::shared_future<std::vector<float>>>& batchFutures
+    ) {
+        const size_t N = ws.delta.size();
 
+        for (auto& f : batchFutures) {
+            const std::vector<float>& local = f.get();
+            for (size_t i = 0; i < N; ++i) {
+                ws.delta[i] += local[i];
+            }
+        }
     }
 
 }
