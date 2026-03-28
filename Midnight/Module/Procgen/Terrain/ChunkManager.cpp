@@ -482,7 +482,7 @@ namespace aveng {
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->meshOnce, [this, rec, frameIndex] {
-            procgen::traceStage(rec->coord, procgen::TerrainStage::Mesh, "request");
+            // procgen::traceStage((rec->coord, procgen::TerrainStage::Mesh, "request");
 
             rec->meshProm = std::make_shared<std::promise<bool>>();
             rec->meshF = rec->meshProm->get_future().share();
@@ -500,7 +500,7 @@ namespace aveng {
         requestErosion(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.erosionF)) {
-            procgen::traceStage(rec.coord, procgen::TerrainStage::Mesh, "defer");
+            // procgen::traceStage((rec.coord, procgen::TerrainStage::Mesh, "defer");
             bool expected = false;
             if (rec.meshRetryQueued.compare_exchange_strong(expected, true)) {
                 tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
@@ -512,11 +512,11 @@ namespace aveng {
             return;
         }
 
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Mesh, "begin");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Mesh, "begin");
         RecordPin hold(*this, &rec);
         // buildMesh is currently disabled; resolve with true
         rec.meshProm->set_value(true);
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Mesh, "complete");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Mesh, "complete");
     }
 
     // Points -- no upstream dependency, uses submit() directly
@@ -526,12 +526,12 @@ namespace aveng {
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->pointsOnce, [this, rec] {
-            procgen::traceStage(rec->coord, procgen::TerrainStage::Points, "request");
+            // procgen::traceStage((rec->coord, procgen::TerrainStage::Points, "request");
             rec->pointsF = tasks_.submit([this, rec]() -> Points const* {
                 RecordPin taskHold(*this, rec);
-                procgen::traceStage(rec->coord, procgen::TerrainStage::Points, "begin");
+                // procgen::traceStage((rec->coord, procgen::TerrainStage::Points, "begin");
                 auto* result = buildPoints(*rec);
-                procgen::traceStage(rec->coord, procgen::TerrainStage::Points, "complete");
+                // procgen::traceStage((rec->coord, procgen::TerrainStage::Points, "complete");
                 return result;
             });
         });
@@ -546,7 +546,7 @@ namespace aveng {
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->allPointsOnce, [this, rec, c, frameIndex] {
-            procgen::traceStage(c, procgen::TerrainStage::AllPoints, "request");
+            // procgen::traceStage((c, procgen::TerrainStage::AllPoints, "request");
 
             rec->allPointsProm = std::make_shared<std::promise<AllPoints const*>>();
             rec->allPointsF = rec->allPointsProm->get_future().share();
@@ -571,7 +571,7 @@ namespace aveng {
         for (int i = 0; i < 9; ++i) {
             ChunkRecord* nrec = getOrCreateRecord(neighbors[i]);
             if (!procgen::isReady(nrec->pointsF)) {
-                procgen::traceStage(rec.coord, procgen::TerrainStage::AllPoints, "defer");
+                // procgen::traceStage((rec.coord, procgen::TerrainStage::AllPoints, "defer");
                 bool expected = false;
                 if (rec.allPointsRetryQueued.compare_exchange_strong(expected, true)) {
                     tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
@@ -584,7 +584,7 @@ namespace aveng {
             }
         }
 
-        procgen::traceStage(rec.coord, procgen::TerrainStage::AllPoints, "begin");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::AllPoints, "begin");
 
         RecordPin selfHold(*this, &rec, frameIndex);
         std::array<RecordPin, 9> neighborHolds;
@@ -595,7 +595,7 @@ namespace aveng {
 
         AllPoints const* result = buildAllPoints(rec);
         rec.allPointsProm->set_value(result);
-        procgen::traceStage(rec.coord, procgen::TerrainStage::AllPoints, "complete");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::AllPoints, "complete");
     }
 
     // Heights
@@ -604,7 +604,7 @@ namespace aveng {
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->heightsOnce, [this, rec, frameIndex] {
-            procgen::traceStage(rec->coord, procgen::TerrainStage::Heights, "request");
+            // procgen::traceStage((rec->coord, procgen::TerrainStage::Heights, "request");
 
             rec->heightsProm = std::make_shared<std::promise<HeightField const*>>();
             rec->heightsF = rec->heightsProm->get_future().share();
@@ -622,7 +622,7 @@ namespace aveng {
         requestAllPoints(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.allPointsF)) {
-            procgen::traceStage(rec.coord, procgen::TerrainStage::Heights, "defer");
+            // procgen::traceStage((rec.coord, procgen::TerrainStage::Heights, "defer");
             bool expected = false;
             if (rec.heightsRetryQueued.compare_exchange_strong(expected, true)) {
                 tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
@@ -634,11 +634,11 @@ namespace aveng {
             return;
         }
 
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Heights, "begin");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Heights, "begin");
         RecordPin hold(*this, &rec);
         HeightField const* result = buildHeights(rec);
         rec.heightsProm->set_value(result);
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Heights, "complete");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Heights, "complete");
     }
 
     // Triangulation
@@ -647,7 +647,7 @@ namespace aveng {
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->triangOnce, [this, rec, frameIndex] {
-            procgen::traceStage(rec->coord, procgen::TerrainStage::Triangulation, "request");
+            // procgen::traceStage((rec->coord, procgen::TerrainStage::Triangulation, "request");
 
             rec->triangProm = std::make_shared<std::promise<Triangulation const*>>();
             rec->triangF = rec->triangProm->get_future().share();
@@ -665,7 +665,7 @@ namespace aveng {
         requestHeights(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.heightsF)) {
-            procgen::traceStage(rec.coord, procgen::TerrainStage::Triangulation, "defer");
+            // procgen::traceStage((rec.coord, procgen::TerrainStage::Triangulation, "defer");
             bool expected = false;
             if (rec.triangRetryQueued.compare_exchange_strong(expected, true)) {
                 tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
@@ -677,11 +677,11 @@ namespace aveng {
             return;
         }
 
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Triangulation, "begin");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Triangulation, "begin");
         RecordPin hold(*this, &rec);
         Triangulation const* result = buildTriangulation(rec);
         rec.triangProm->set_value(result);
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Triangulation, "complete");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Triangulation, "complete");
     }
 
     // SpatialGrid
@@ -691,7 +691,7 @@ namespace aveng {
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->spatialOnce, [this, rec, frameIndex] {
-            procgen::traceStage(rec->coord, procgen::TerrainStage::SpatialGrid, "request");
+            // procgen::traceStage((rec->coord, procgen::TerrainStage::SpatialGrid, "request");
 
             rec->spatialProm = std::make_shared<std::promise<SpatialGrid const*>>();
             rec->spatialF = rec->spatialProm->get_future().share();
@@ -709,7 +709,7 @@ namespace aveng {
         requestTriangulation(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.triangF)) {
-            procgen::traceStage(rec.coord, procgen::TerrainStage::SpatialGrid, "defer");
+            // procgen::traceStage((rec.coord, procgen::TerrainStage::SpatialGrid, "defer");
             
             // Atomic set to `true` - thread claims the retry
             bool expected = false;
@@ -724,12 +724,12 @@ namespace aveng {
             return;
         }
 
-        procgen::traceStage(rec.coord, procgen::TerrainStage::SpatialGrid, "begin");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::SpatialGrid, "begin");
         RecordPin hold(*this, &rec);
         SpatialGrid const* sg = buildSpatialGrid(rec);
         markAllPointsReady(rec.coord);
         rec.spatialProm->set_value(sg);
-        procgen::traceStage(rec.coord, procgen::TerrainStage::SpatialGrid, "complete");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::SpatialGrid, "complete");
     }
 
     // Erosion
@@ -738,7 +738,7 @@ namespace aveng {
         rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
 
         std::call_once(rec->erosionOnce, [this, rec, frameIndex] {
-            procgen::traceStage(rec->coord, procgen::TerrainStage::Erosion, "request");
+            // procgen::traceStage((rec->coord, procgen::TerrainStage::Erosion, "request");
 
             // Snapshot settings into the build context (persists across retries)
             rec->erosionCtx.settings = erosionMgr_ ? erosionMgr_->getActiveSettings() : ErosionSettings{};
@@ -759,7 +759,7 @@ namespace aveng {
         requestSpatialGrid(rec.coord, frameIndex);
 
         if (!procgen::isReady(rec.spatialF)) {
-            procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "defer-upstream");
+            // procgen::traceStage((rec.coord, procgen::TerrainStage::Erosion, "defer-upstream");
             bool expected = false;
             if (rec.erosionRetryQueued.compare_exchange_strong(expected, true)) {
                 tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
@@ -771,13 +771,13 @@ namespace aveng {
             return;
         }
 
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "advance");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Erosion, "advance");
         RecordPin hold(*this, &rec);
 
         bool done = advanceErosion(rec);
 
         if (!done) {
-            procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "defer-batches");
+            // procgen::traceStage((rec.coord, procgen::TerrainStage::Erosion, "defer-batches");
             bool expected = false;
             if (rec.erosionRetryQueued.compare_exchange_strong(expected, true)) {
                 tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
@@ -791,7 +791,7 @@ namespace aveng {
 
         markAllStagesComplete(rec.coord);
         rec.erosionProm->set_value(rec.erosion);
-        procgen::traceStage(rec.coord, procgen::TerrainStage::Erosion, "complete");
+        // procgen::traceStage((rec.coord, procgen::TerrainStage::Erosion, "complete");
     }
 
     Points const* ChunkManager::buildPoints(ChunkRecord& rec)
@@ -1435,7 +1435,7 @@ namespace aveng {
         }
 
         if (shouldSubmit) {
-            procgen::traceStage(center, procgen::TerrainStage::Renderable, "request");
+            // procgen::traceStage((center, procgen::TerrainStage::Renderable, "request");
 
             tasks_.enqueue([this, center, frameIndex, requestId]() {
                 ChunkRecord* workerRec = getOrCreateRecord(center);
@@ -1486,7 +1486,7 @@ namespace aveng {
         for (int i = 0; i < 9; ++i) {
             ChunkRecord* r = getOrCreateRecord(neighbors[i]);
             if (!procgen::isReady(r->meshF)) {
-                procgen::traceStage(center, procgen::TerrainStage::Renderable, "defer");
+                // procgen::traceStage((center, procgen::TerrainStage::Renderable, "defer");
                 bool expected = false;
                 if (centerRec->generateRetryQueued.compare_exchange_strong(expected, true)) {
                     tasks_.enqueue([this, center, frameIndex, requestId]() {
@@ -1501,7 +1501,7 @@ namespace aveng {
         for (int i = 9; i < 25; ++i) {
             ChunkRecord* r = getOrCreateRecord(neighbors[i]);
             if (!procgen::isReady(r->spatialF)) {
-                procgen::traceStage(center, procgen::TerrainStage::Renderable, "defer");
+                // procgen::traceStage((center, procgen::TerrainStage::Renderable, "defer");
                 bool expected = false;
                 if (centerRec->generateRetryQueued.compare_exchange_strong(expected, true)) {
                     tasks_.enqueue([this, center, frameIndex, requestId]() {
@@ -1514,7 +1514,7 @@ namespace aveng {
             }
         }
 
-        procgen::traceStage(center, procgen::TerrainStage::Renderable, "begin");
+        // procgen::traceStage((center, procgen::TerrainStage::Renderable, "begin");
 
         // All deps ready -- pin the 5x5 region and build
         std::array<RecordPin, 25> pins;
@@ -1545,7 +1545,7 @@ namespace aveng {
                     .requestId = requestId,
                     .success = true
                 });
-                procgen::traceStage(center, procgen::TerrainStage::Renderable, "complete");
+                // procgen::traceStage((center, procgen::TerrainStage::Renderable, "complete");
             }
         }
         catch (...) {
