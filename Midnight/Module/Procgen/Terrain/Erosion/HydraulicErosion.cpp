@@ -157,7 +157,8 @@ namespace procgen {
             const uint32_t end = std::min(total, begin + batchSize);
 
             // TODO : I don't think we're using thread local scratch allocation
-            futures.push_back(tasks.submit([=, &allPts, &tri, &sg, &cfg]() -> std::vector<FPTYPE> {
+            // futures.push_back(tasks.submit([=, &allPts, &tri, &sg, &cfg]() -> std::vector<FPTYPE> {
+            auto getErosionDeltas = [=, &allPts, &tri, &sg, &cfg](){
 
                 /*
                     TODO: Debugging
@@ -373,23 +374,26 @@ namespace procgen {
                 }
 
                 return localDelta;
-            }));
+            };
+
+            auto delts = getErosionDeltas();
+
+            for (size_t i = 0; i < N; ++i) {
+                ws.delta[i] += delts[i];
+            }
         }
 
         // Reduce all local deltas into ws.delta (NOT single-threaded reduction at the moment)
         // (You can parallelize the reduction later by chunking the index range.)
-        for (auto& fut : futures) {
-             /* std::vector<FPTYPE> */ auto local = tasks.wait(fut);
-            // accumulate
-            for (size_t i = 0; i < N; ++i) {
-                ws.delta[i] += local[i];
-            }
-        }
-
-        //// Apply delta into workHeights (in-place)
-        //for (size_t i = 0; i < N; ++i) {
-        //    ws.workHeights[i] += ws.delta[i];
+        //for (auto& fut : futures) {
+        //     /* std::vector<FPTYPE> */ auto local = tasks.wait(fut);
+        //    // accumulate
+        //    for (size_t i = 0; i < N; ++i) {
+        //        ws.delta[i] += local[i];
+        //    }
         //}
+
+
     }
 
 }

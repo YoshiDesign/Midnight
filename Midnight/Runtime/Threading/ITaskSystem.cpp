@@ -31,7 +31,7 @@ namespace aveng {
                     {
                         std::unique_lock<std::mutex> lock(m_);
                         cv_.wait(lock, [&] { return stopping_.load(std::memory_order_acquire) || !q_.empty(); });
-                        if (stopping_.load(std::memory_order_acquire) && q_.empty()) return;
+                        if (stopping_.load(std::memory_order_acquire) && q_.empty()) { return; }
                         job = std::move(q_.front());
                         q_.pop_front();
                     }
@@ -45,7 +45,7 @@ namespace aveng {
         stopping_.store(true, std::memory_order_release);
         cv_.notify_all();
         for (auto& t : workers_) {
-            if (t.joinable()) t.join();
+            if (t.joinable()) { t.join(); }
         }
         workers_.clear();
     }

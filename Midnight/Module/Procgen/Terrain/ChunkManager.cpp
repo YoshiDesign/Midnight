@@ -387,7 +387,7 @@ namespace aveng {
     void ChunkManager::markAllPointsReady(ChunkCoord coord) {
         std::lock_guard<std::mutex> lock(allPointsReadyMut_);
         allPointsReady_.insert(coord);
-        Logger::log(1, "READY {%d, %d}\n", coord.x, coord.z);
+        // Logger::log(1, "READY {%d, %d}\n", coord.x, coord.z);
     }
 
     void ChunkManager::clearAllPointsReady(ChunkCoord coord) {
@@ -564,8 +564,9 @@ namespace aveng {
         std::array<ChunkCoord, 9> neighbors;
         get3x3Neighborhood(rec.coord, neighbors.data());
 
-        for (int i = 0; i < 9; ++i)
+        for (int i = 0; i < 9; ++i) {
             requestPoints(neighbors[i], frameIndex);
+        }
 
         for (int i = 0; i < 9; ++i) {
             ChunkRecord* nrec = getOrCreateRecord(neighbors[i]);
@@ -709,10 +710,13 @@ namespace aveng {
 
         if (!procgen::isReady(rec.triangF)) {
             procgen::traceStage(rec.coord, procgen::TerrainStage::SpatialGrid, "defer");
+            
+            // Atomic set to `true` - thread claims the retry
             bool expected = false;
             if (rec.spatialRetryQueued.compare_exchange_strong(expected, true)) {
                 tasks_.enqueue([this, coord = rec.coord, frameIndex]() {
                     ChunkRecord* again = getOrCreateRecord(coord);
+                    // Reset the atomic retry flag
                     again->spatialRetryQueued.store(false, std::memory_order_relaxed);
                     runSpatialGridStage(*again, frameIndex);
                 });

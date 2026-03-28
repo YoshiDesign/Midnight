@@ -31,15 +31,15 @@ namespace xone {
         if (k == 0) {
             return {
                 { baseX, 0 },
-                { baseX - 3, 2 },
-                { baseX + 3, 2 }
+                { baseX - 2, 2 },
+                { baseX + 2, 2 }
             };
         }
 
         return {
             { baseX, 3 * k },
-            { baseX - 3, 3 * k + 2 },
-            { baseX + 3, 3 * k + 2 }
+            { baseX - 2, 3 * k + 2 },
+            { baseX + 2, 3 * k + 2 }
         };
     }
 

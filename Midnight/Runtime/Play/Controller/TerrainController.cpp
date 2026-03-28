@@ -35,6 +35,7 @@ namespace aveng {
 
     // Direct access to generate a chunk for debugging/editor
     void TerrainController::generateChunks(ChunkCoord start_coord) {
+        Logger::log(1, "Start {%d, %d}\tFrameIndex", start_coord.x, start_coord.z, frameIndex_);
         ensureChunkRequested(start_coord);
     }
 

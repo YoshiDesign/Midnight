@@ -46,7 +46,7 @@ namespace aveng {
 
     struct LinearStreamPolicy {
         int lateralRadius = 1;
-        int forwardRows = 6;
+        int forwardRows = 9;
         int backwardRows = 1;
         int evictRadiusX = 6;
         // int evictRadiusZ = 7;

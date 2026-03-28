@@ -11,6 +11,7 @@
 #include "Runtime/Memory/ChunkArena.h"
 #include "Module/Procgen/Terrain/GpuResources.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
+#include "Module/Procgen/Terrain/Erosion/Data.h"
 namespace aveng {
 	/*
 	* PMR usage -
@@ -213,8 +214,11 @@ namespace aveng {
 		std::optional<SpatialGrid> spatial; // Not trivially destructible!
 											// This must also remain moveable due to its usage in the StripeBucket. 
 
+		// Erosion sub-stage state machine (persists across retry-enqueue cycles)
+		procgen::ErosionBuildContext erosionCtx;
+
 		// Re-enqueue guards: prevent queue flooding when a stage defers.
-		// Each flag is CAS'd to true before enqueuing a retry, and reset to false
+		// Each flag is CAS'd (Compare & Swap) to true before enqueuing a retry, and reset to false
 		// at the start of the retried lambda.
 		std::atomic<bool> allPointsRetryQueued{ false };
 		std::atomic<bool> heightsRetryQueued{ false };

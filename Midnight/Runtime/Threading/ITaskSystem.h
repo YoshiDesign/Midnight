@@ -70,7 +70,7 @@ namespace aveng {
 #ifndef NDEBUG
             // During migration this will fire on any unconverted stage chains.
             // Convert the caller to the re-enqueue pattern, then this goes away.
-            // assert(false && "Worker thread called blocking wait(). Convert to re-enqueue pattern.");
+            assert(false && "Worker thread called blocking wait(). Convert to re-enqueue pattern.");
 #endif
             // Helping-wait fallback (safe for leaf-level parallel compute)
             while (fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
