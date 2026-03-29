@@ -311,16 +311,43 @@ namespace aveng {
 
 		int rdFieldOfView = 60;
 
-		float rdDrawTime = 0.0f;
-		float rdFrameTime = 0.0f; // AvengFrame.h
-		float rdComputeTime = 0.0f;
-		float rdMatrixGenerateTime = 0.0f;
-		float rdUploadSSBO1Time = 0.0f;
-		float rdUploadSSBO2Time = 0.0f;
-		float rdUploadToUBOTime = 0.0f;
-		float rdUIGenerateTime = 0.0f;
-		float rdUIDrawTime = 0.0f;
-		float rdFramePacketTime = 0.0f;
+		float rdDrawTime = 0.f;
+		float rdFrameTime = 0.f; // AvengFrame.h
+		float rdComputeTime = 0.f;
+		float rdMatrixGenerateTime = 0.f;
+		float rdUploadSSBO1Time = 0.f;
+		float rdUploadSSBO2Time = 0.f;
+		float rdUploadToUBOTime = 0.f;
+		float rdUIGenerateTime = 0.f;
+		float rdUIDrawTime = 0.f;
+		float rdFramePacketTime = 0.f;
+
+		// Terrain Control Timings
+		float rdTerrainBufferTimeInit;	// Vulkan GPU Upload process 
+		float rdTerrainBufferTimeInitMAX = 0.f;	
+		float rdTerrainCleanupOneTime;	// Vulkan GPU Cleanup process 
+		float rdTerrainCleanupOneTimeMAX = 0.f;
+		float rdTerrainCopyBufferTime;			// Vulkan GPU Cleanup process 
+		float rdTerrainCopyBufferTimeMAX = 0.f;
+		float rdTerrainVboIboTime = 0.f;		// CPU-side VBO/IBO creation time
+		float rdTerrainVboIboTimeMAX = 0.f;
+		float rdTerrainSsbo1Time = 0.f;			// Compute SSBO Input
+		float rdTerrainSsbo1TimeMAX = 0.f;
+		float rdTerrainSsbo2Time = 0.f;			// Compute SSBO Output
+		float rdTerrainSsbo2TimeMAX = 0.f;
+		float rdTerrainDescriptor1WriterTime = 0.f;	// Terrain Descriptor Set writer
+		float rdTerrainDescriptor1WriterTimeMAX = 0.f;
+		float rdTerrainDescriptor2WriterTime = 0.f;	// Terrain Descriptor Set writer
+		float rdTerrainDescriptor2WriterTimeMAX = 0.f;
+		float rdqueueSubmitTimer = 0.f;
+		float rdqueueSubmitTimerMAX = 0.f;
+		float rdTerrainRetireTime = 0.f;
+		float rdTerrainRetireTimeMAX = 0.f;
+		float rdTerrainDrainTime = 0.f;
+		float rdTerrainDrainTimeMAX = 0.f;
+		float rdTerrainCleanupDeferredDeletesTime = 0.f;
+		float rdTerrainCleanupDeferredDeletesTimeMAX = 0.f;
+
 
 		int rdMoveForward = 0;
 		int rdMoveRight = 0;

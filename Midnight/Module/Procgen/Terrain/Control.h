@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 #include "Module/Procgen/Types.h"
+#include "Utils/Logger.h"
 
 namespace procgen {
 
@@ -110,7 +111,9 @@ namespace procgen {
                     return false;
                 }
             }
+            aveng::Logger::log(1, "tryAcquire: Acquired!\n");
             active_.push_back(incoming);
+            aveng::Logger::log(1, "New Active Size: %d\n", active_.size());
             return true;
         }
 
@@ -122,7 +125,9 @@ namespace procgen {
                         && r.center.z == center.z 
                         && r.radius == supportRadius;
                 });
+            aveng::Logger::log(1, "release: Releasing! {%d, %d}\n", center.x, center.z);
             active_.erase(it, active_.end());
+            aveng::Logger::log(1, "Active Size: %d\n", active_.size());
         }
 
     private:

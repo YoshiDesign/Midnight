@@ -61,6 +61,7 @@ namespace aveng {
 		bool show_input_panel = false;
         bool show_all_cameras = false;
         bool show_trs_panel = false;
+        bool show_terrain_timers = false;
 
 	private:
 		// EngineDevice& device;

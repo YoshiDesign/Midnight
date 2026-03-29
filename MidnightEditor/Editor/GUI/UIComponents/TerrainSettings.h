@@ -5,13 +5,71 @@
 #include "Editor/GUI/imgui_internal.h"
 #include "Editor/GUI/ImGuiFileDialog.h"
 #include "Editor/EditorData.h"
-
+#include "CoreVK/VkRenderData.h"
 namespace aveng {
 
-	inline void DisplayTerrainSettings(EditorData& editorData) {
+    inline void DisplayTerrainTimers(VkRenderData& renderData) {
+        ImGui::Text("Total Buffer + Descriptor:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainBufferTimeInitMAX);
+
+        ImGui::Separator();
+
+        ImGui::Text("1. VBO / IBO Init + Copy:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainVboIboTimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainVboIboTime);
+
+        ImGui::Text("2. Compute SSBO1 CPU Input:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainSsbo1TimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainSsbo1Time);
+
+        ImGui::Text("3. Compute SSBO2 GPU Resident Init:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainSsbo2TimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainSsbo2Time);
+
+        ImGui::Text("4. Descriptors Alloc+Write+Update:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainDescriptor1WriterTimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainDescriptor1WriterTime);
+
+        ImGui::Text("5. VBO/IBO recordCopy:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainCopyBufferTimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainCopyBufferTime);
+        
+        ImGui::Text("6. Gfx Queue Submit:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdqueueSubmitTimerMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdqueueSubmitTimer);
+
+        ImGui::Separator();
+
+        ImGui::Text("Deferred Deletion:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainCleanupDeferredDeletesTimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainCleanupDeferredDeletesTime);
+   
+        ImGui::Text("1-Chunk Retire:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainRetireTimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainRetireTime);
+   
+        ImGui::Text("1-Chunk Drain:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainDrainTimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainDrainTime);
+   
+    }
+
+	inline void DisplayTerrainSettings(EditorData& editorData, bool* show_terrain_timers) {
         if (ImGui::BeginTabItem("Terrain")) {
             static int terrainChunkX = 0;
             static int terrainChunkZ = 0;
+
+            ImGui::Checkbox("Terrain Timers", show_terrain_timers);
 
             ImGui::Text("Generate Terrain");
 

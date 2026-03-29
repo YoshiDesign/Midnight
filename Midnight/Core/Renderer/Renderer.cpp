@@ -1976,6 +1976,7 @@ namespace aveng {
 		vkUpdateDescriptorSets(engineDevice.device(), 1, &write, 0, nullptr);
 	}
 
+	// Currently for the Debug pipeline. See VkTerrain.h for the lit pipe
 	void Renderer::updateTerrainDescriptorSets(int frameIndex) {
 
 		VkDescriptorBufferInfo viewProjInfo{};

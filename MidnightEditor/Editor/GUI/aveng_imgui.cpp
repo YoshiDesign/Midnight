@@ -539,7 +539,7 @@ namespace aveng {
                     ImGui::EndTabItem();
                 }
 
-                DisplayTerrainSettings(editorData);
+                DisplayTerrainSettings(editorData, &show_terrain_timers);
 
                 ImGui::EndTabBar();
             }
@@ -553,6 +553,11 @@ namespace aveng {
             ImGui::Text("A: \t%d", inputState.keyDown[GLFW_KEY_A]);
             ImGui::Text("S: \t%d", inputState.keyDown[GLFW_KEY_S]);
             ImGui::Text("D: \t%d", inputState.keyDown[GLFW_KEY_D]);
+            ImGui::End();
+        }
+        if (show_terrain_timers) {
+            ImGui::Begin("Terrain Timing");
+            DisplayTerrainTimers(renderData);
             ImGui::End();
         }
 

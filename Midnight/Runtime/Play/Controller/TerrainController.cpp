@@ -194,9 +194,28 @@ namespace aveng {
 
     void TerrainController::retireCompletedUploads()
     {
-        if (!uploadBatch_.active) { return; }
+#ifdef M_DEBUG
+        retireTimer.start();
+#endif
+        if (!uploadBatch_.active) { 
+#ifdef M_DEBUG
+            renderData_.rdTerrainRetireTime = retireTimer.stop();
+            if (renderData_.rdTerrainRetireTime > renderData_.rdTerrainRetireTimeMAX) {
+                renderData_.rdTerrainRetireTimeMAX = renderData_.rdTerrainRetireTime;
+            }
+#endif
+            return; 
+        }
 
-        if (vkGetFenceStatus(engineDevice_.device(), uploadBatch_.fence) != VK_SUCCESS) { return; }
+        if (vkGetFenceStatus(engineDevice_.device(), uploadBatch_.fence) != VK_SUCCESS) { 
+#ifdef M_DEBUG
+            renderData_.rdTerrainRetireTime = retireTimer.stop();
+            if (renderData_.rdTerrainRetireTime > renderData_.rdTerrainRetireTimeMAX) {
+                renderData_.rdTerrainRetireTimeMAX = renderData_.rdTerrainRetireTime;
+            }
+#endif
+            return; 
+        }
 
         for (const ChunkCoord& coord : uploadBatch_.inFlightSlots) {
             auto it = slots_.find(coord);
@@ -214,6 +233,14 @@ namespace aveng {
         uploadBatch_.inFlightSlots.clear();
         vkResetFences(engineDevice_.device(), 1, &uploadBatch_.fence);
         uploadBatch_.active = false;
+
+#ifdef M_DEBUG
+        renderData_.rdTerrainRetireTime = retireTimer.stop();
+        if (renderData_.rdTerrainRetireTime > renderData_.rdTerrainRetireTimeMAX) {
+            renderData_.rdTerrainRetireTimeMAX = renderData_.rdTerrainRetireTime;
+        }
+#endif
+
     }
 
     void TerrainController::buildAndSubmitUploadBatch()
@@ -227,14 +254,30 @@ namespace aveng {
         for (auto& [coord, slot] : slots_) {
             if (chunksThisBatch >= kMaxChunksPerUploadBatch) { break; }
             if (slot.state != procgen::TerrainRuntimeState::CpuReady) { continue; }
-
+#ifdef M_DEBUG
+            // Buffer + Descriptor Init Timing
+            vkBufferInitTimer.start();
+#endif
             if (!prepareChunkUpload(engineDevice_, renderData_, slot, settingsUboBuffer_, settingsUboSize_)) {
                 slot.state = procgen::TerrainRuntimeState::Failed;
                 continue;
             }
+#ifdef M_DEBUG
+            renderData_.rdTerrainBufferTimeInit = vkBufferInitTimer.stop();
+            if (renderData_.rdTerrainBufferTimeInit > renderData_.rdTerrainBufferTimeInitMAX) {
+                renderData_.rdTerrainBufferTimeInitMAX = renderData_.rdTerrainBufferTimeInit;
+            }
+            vkCopyBufferTimer.start();
+#endif
 
             recordChunkCopies(uploadBatch_.cmdBuffer, slot);
-
+#ifdef M_DEBUG
+            // Copy Buffer Timing
+            renderData_.rdTerrainCopyBufferTime = vkCopyBufferTimer.stop();
+            if (renderData_.rdTerrainCopyBufferTime > renderData_.rdTerrainCopyBufferTimeMAX) {
+                renderData_.rdTerrainCopyBufferTimeMAX = renderData_.rdTerrainCopyBufferTime;
+            }
+#endif
             slot.state = procgen::TerrainRuntimeState::Uploading;
             uploadBatch_.inFlightSlots.push_back(coord);
             chunksThisBatch++;
@@ -246,7 +289,11 @@ namespace aveng {
         }
 
         //
-        submitTerrainQueue(engineDevice_, uploadBatch_);
+        submitTerrainQueue(engineDevice_, uploadBatch_
+#ifdef M_DEBUG
+			, renderData_
+#endif
+        );
     }
 
     void TerrainController::setTerrainConfig(TerrainConfig tcfg)
@@ -286,7 +333,7 @@ namespace aveng {
         slot.coord = coord;
 
         if (slot.state == procgen::TerrainRuntimeState::Requested ||
-            slot.state == procgen::TerrainRuntimeState::CpuReady ||
+            slot.state == procgen::TerrainRuntimeState::CpuReady  ||
             slot.state == procgen::TerrainRuntimeState::Uploading ||
             slot.state == procgen::TerrainRuntimeState::Resident)
         {
@@ -308,6 +355,9 @@ namespace aveng {
 
     void TerrainController::drainCompletedTerrain()
     {
+#ifdef M_DEBUG
+        drainTimer.start();
+#endif
         // Lambda function forwarded to the ConcurrentQueue of renderables ready to go.
         chunks_->drainCompletedRenderables([this](const procgen::RenderableCompletion& completedChunk) {
 
@@ -320,20 +370,48 @@ namespace aveng {
             admission_.release(completedChunk.coord, kSupportRadius);
 
             auto it = slots_.find(completedChunk.coord);
-            if (it == slots_.end()) { return; }
+            if (it == slots_.end()) { 
+#ifdef M_DEBUG
+                renderData_.rdTerrainDrainTime = drainTimer.stop();
+                if (renderData_.rdTerrainDrainTime > renderData_.rdTerrainDrainTimeMAX) {
+                    renderData_.rdTerrainDrainTimeMAX = renderData_.rdTerrainDrainTime;
+                }
+#endif
+                return; 
+            }
 
             auto& slot = it->second;
 
-            if (slot.requestId != completedChunk.requestId) { return; }
+            if (slot.requestId != completedChunk.requestId) { 
+#ifdef M_DEBUG
+                renderData_.rdTerrainDrainTime = drainTimer.stop();
+                if (renderData_.rdTerrainDrainTime > renderData_.rdTerrainDrainTimeMAX) {
+                    renderData_.rdTerrainDrainTimeMAX = renderData_.rdTerrainDrainTime;
+                }
+#endif
+                return; 
+            }
                 
             if (!completedChunk.success) {
                 slot.state = procgen::TerrainRuntimeState::Failed;
+#ifdef M_DEBUG
+                renderData_.rdTerrainDrainTime = drainTimer.stop();
+                if (renderData_.rdTerrainDrainTime > renderData_.rdTerrainDrainTimeMAX) {
+                    renderData_.rdTerrainDrainTimeMAX = renderData_.rdTerrainDrainTime;
+                }
+#endif
                 return;
             }
 
             std::unique_ptr<procgen::TerrainRenderable> cpuRenderable;
             if (!chunks_->tryTakeRenderable(completedChunk.coord, completedChunk.requestId, cpuRenderable)) {
                 std::printf("A potentially stale renderable was requested!\n");
+#ifdef M_DEBUG
+                renderData_.rdTerrainDrainTime = drainTimer.stop();
+                if (renderData_.rdTerrainDrainTime > renderData_.rdTerrainDrainTimeMAX) {
+                    renderData_.rdTerrainDrainTimeMAX = renderData_.rdTerrainDrainTime;
+                }
+#endif
                 return;
             }
 
@@ -341,6 +419,13 @@ namespace aveng {
             slot.state = procgen::TerrainRuntimeState::CpuReady;
 
         });
+
+#ifdef M_DEBUG
+        renderData_.rdTerrainDrainTime = drainTimer.stop();
+        if (renderData_.rdTerrainDrainTime > renderData_.rdTerrainDrainTimeMAX) {
+            renderData_.rdTerrainDrainTimeMAX = renderData_.rdTerrainDrainTime;
+        }
+#endif
 
 		// Retry any requests that were deferred due to region overlap - See: First Concurrency guard in ensureChunkRequested()
         if (!deferredRequests_.empty()) {
@@ -391,6 +476,11 @@ namespace aveng {
 
     void TerrainController::flushDeferredDeletes()
     {
+
+#ifdef M_DEBUG
+        vkCleanupDeferredDeletesTimer.start();
+#endif
+
         auto it = deferredCleanups_.begin();
 
         while (it != deferredCleanups_.end()) {
@@ -421,6 +511,12 @@ namespace aveng {
                 ++it;
             }
         }
+#ifdef M_DEBUG
+        renderData_.rdTerrainCleanupDeferredDeletesTime = vkCleanupDeferredDeletesTimer.stop();
+        if (renderData_.rdTerrainCleanupDeferredDeletesTime > renderData_.rdTerrainCleanupDeferredDeletesTimeMAX) {
+            renderData_.rdTerrainCleanupDeferredDeletesTimeMAX = renderData_.rdTerrainCleanupDeferredDeletesTime;
+        }
+#endif
     }
 
     // Cleanup all
@@ -461,6 +557,7 @@ namespace aveng {
     }
 
     void TerrainController::cleanupOne(procgen::TerrainChunkSlot& slot) {
+
         VertexBuffer::cleanup(engineDevice_, slot.gpu.draw.vertexBuffer);
         IndexBuffer::cleanup(engineDevice_, slot.gpu.draw.indexBuffer);
 
@@ -495,6 +592,7 @@ namespace aveng {
         if (slot.gpu.packed.outputSsbo.buffer != VK_NULL_HANDLE) {
             ShaderStorageBuffer::destroy(engineDevice_, slot.gpu.packed.outputSsbo);
         }
+
     }
 
 }

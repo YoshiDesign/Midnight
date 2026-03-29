@@ -8,6 +8,7 @@
 #include "Module/Procgen/Terrain/Control.h"
 #include "Module/Procgen/Rendering/VkTerrain.h"
 #include "Module/Procgen/Types.h"
+#include "Utils/Timer.h"
 
 // TODO - We're going to make a TerrainRenderSystem
 #include <vulkan/vulkan_core.h>
@@ -203,7 +204,12 @@ namespace aveng {
         VkBuffer settingsUboBuffer_ = VK_NULL_HANDLE;
         VkDeviceSize settingsUboSize_ = 0;
 
-       
+        Timer vkBufferInitTimer{};
+        Timer vkCleanupOneTimer{};
+        Timer vkCleanupDeferredDeletesTimer{};
+        Timer vkCopyBufferTimer{};
+        Timer retireTimer{};
+        Timer drainTimer{};
 
         // Dummy
         uint64_t frameIndex_ = 0;
