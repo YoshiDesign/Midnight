@@ -50,14 +50,21 @@ namespace aveng {
 
     void TerrainController::evictChunk(ChunkCoord center) {
         auto it = slots_.find(center);
-        if (it == slots_.end()) return;
+        if (it == slots_.end()) { return; }
 
         auto& slot = it->second;
 
+        // This should NEVER occur. This would break the invariance provided by the `TerrainAdmissionController` and our overall architecture
         if (slot.state == procgen::TerrainRuntimeState::Uploading && uploadBatch_.active) {
-            Logger::log(1, "Waiting......");
-            vkWaitForFences(engineDevice_.device(), 1, &uploadBatch_.fence, VK_TRUE, UINT64_MAX);
-            retireCompletedUploads();
+			throw std::runtime_error("Attempting to evict a chunk which is currently uploading.");
+            //Logger::log(1, "Waiting......");
+            //// Fallback synchronization point - stalls our async design
+            //vkWaitForFences(engineDevice_.device(), 1, &uploadBatch_.fence, VK_TRUE, UINT64_MAX);
+            //retireCompletedUploads();
+            /**
+            *   Note: deferred resource reclamation and slot eviction intent
+            *   don't necessarily need to be coupled.
+            */
         }
 
         admission_.release(center, kSupportRadius);

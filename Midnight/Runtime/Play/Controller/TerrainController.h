@@ -25,18 +25,30 @@ namespace aveng {
     * - When completed work becomes usable
     * - When old GPU resources are actually safe to destroy
     * 
+    * The recurring engine ideas are:
+    * - work admission       [Requested, Deferred]
+    * - in-flight tracking   [Building]
+    * - async completion     [CpuReady] 
+    * - residency state      [Resident]
+    * - deferred destruction [Retired, Destroyed]
+    * - budget enforcement
+    * 
+    * This is just the first place I'm utilizing this philosophy
+    * 
     * This results in:
     * - frame-budgeted work
     * - asynchronous resource lifetime management
     * - admission / backpressure control
     * - GPU pipeline latency awareness
     * 
-    * Frame Pacing Helpers:
+    * Implemented Principles:
     * ## `deferredCleanups_` - frame-latency-aware cleanup. 
     * Destruction is also work, and on the GPU it has timing constraints. 
     * We do not want to use vkQueueWaitIdle to clean up evicted chunks.
     * (i.e.) If a chunk was recently used by commands the GPU may still be executing, then destroying 
     * its buffers immediately is dangerous unless you force a hard sync like vkQueueWaitIdle.
+    * 
+    * TODO: Document the rest
     */
 
     // Forward declarations to keep compile-times sane.
