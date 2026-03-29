@@ -173,5 +173,6 @@ namespace aveng {
             size_t bufferSize);
 
         static void cleanup(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData);
+        static void destroy(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData);
     };
 }

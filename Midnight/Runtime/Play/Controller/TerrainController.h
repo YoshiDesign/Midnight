@@ -6,6 +6,7 @@
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Module/Procgen/Terrain/Control.h"
+#include "Module/Procgen/Rendering/VkTerrain.h"
 #include "Module/Procgen/Types.h"
 
 // TODO - We're going to make a TerrainRenderSystem
@@ -16,6 +17,27 @@ namespace procgen {
 }
 
 namespace aveng {
+
+    /*
+    * The TerrainController is a scheduler, in charge of:
+    * - What work is allowed to begin
+    * - What work is currently in flight
+    * - When completed work becomes usable
+    * - When old GPU resources are actually safe to destroy
+    * 
+    * This results in:
+    * - frame-budgeted work
+    * - asynchronous resource lifetime management
+    * - admission / backpressure control
+    * - GPU pipeline latency awareness
+    * 
+    * Frame Pacing Helpers:
+    * ## `deferredCleanups_` - frame-latency-aware cleanup. 
+    * Destruction is also work, and on the GPU it has timing constraints. 
+    * We do not want to use vkQueueWaitIdle to clean up evicted chunks.
+    * (i.e.) If a chunk was recently used by commands the GPU may still be executing, then destroying 
+    * its buffers immediately is dangerous unless you force a hard sync like vkQueueWaitIdle.
+    */
 
     // Forward declarations to keep compile-times sane.
     struct FinalMeshCPU;
@@ -72,23 +94,6 @@ namespace aveng {
             Evicting
         };
         Status status;
-    };
-
-    struct TerrainUploadBatch {
-        VkFence fence = VK_NULL_HANDLE;
-        VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-        std::vector<ChunkCoord> inFlightSlots;
-        bool active = false;
-    };
-
-    struct DeferredGpuCleanup {
-        VkVertexBufferData vertexBuffer{};
-        VkIndexBufferData indexBuffer{};
-        VkShaderStorageBufferData inputSsbo{};
-        VkShaderStorageBufferData outputSsbo{};
-        VkDescriptorSet graphicsDescriptorSet = VK_NULL_HANDLE;
-        VkDescriptorSet computeDescriptorSet = VK_NULL_HANDLE;
-        uint64_t retireFrame = 0;
     };
 
     /**

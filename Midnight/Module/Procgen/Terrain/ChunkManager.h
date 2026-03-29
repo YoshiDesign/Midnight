@@ -187,7 +187,7 @@ namespace aveng {
         bool advanceErosion(ChunkRecord& r);  // retry-driven state machine; returns true when complete
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
         std::unique_ptr<procgen::TerrainRenderable> buildRenderablev2(ChunkCoord center, uint64_t frameIndex);
-        std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);
+        // std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);
 
         ThreadPoolTaskSystem& tasks_;
         TerrainConfig cfg_; // Note that this differs from our prototype, where each Chunk owned its own config

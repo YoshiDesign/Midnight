@@ -89,14 +89,26 @@ namespace procgen {
         return !(sepX || sepZ);
     }
 
+    /*
+    * Admission Control - how much concurrency is allowed to enter the terrain pipeline. 
+    * (Correctness and backpressure for the TerrainController)
+    * The purpose of this is to prevent the terrain system from becoming self destructive under load.
+    * Because: NOT ALL PARALLEL WORK IS GOOD PARALLEL WORK (contention, dependency cycles, dupe's, etc.)
+    * 
+    * Current Policy Detail:
+    * Only lets a region begin if its support footprint does not overlap another active build.
+    * Otherwise defer it.
+    */
     class TerrainAdmissionController {
     public:
+
         bool tryAcquire(aveng::ChunkCoord center, int supportRadius) {
             std::lock_guard<std::mutex> lock(mut_);
             ActiveRegion incoming{ center, supportRadius };
             for (const auto& r : active_) {
-                if (regionsOverlap(r, incoming))
+                if (regionsOverlap(r, incoming)) {
                     return false;
+                }
             }
             active_.push_back(incoming);
             return true;
@@ -107,7 +119,7 @@ namespace procgen {
             auto it = std::remove_if(active_.begin(), active_.end(),
                 [&](const ActiveRegion& r) {
                     return r.center.x == center.x
-                        && r.center.z == center.z
+                        && r.center.z == center.z 
                         && r.radius == supportRadius;
                 });
             active_.erase(it, active_.end());

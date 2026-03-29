@@ -3,6 +3,9 @@
 #include "BasicTerrainAsset.h"
 #include "CoreVK/VkRenderData.h"
 #include "CoreVK/EngineDevice.h"
+#include "CoreVK/VertexBuffer.h"
+#include "CoreVK/IndexBuffer.h"
+#include "CoreVK/AvengStorageBuffer.h"
 #include "Utils/Logger.h"
 
 /* 
@@ -23,7 +26,24 @@ namespace {
 
 namespace aveng {
 
-    bool writeChunkGraphicsDescriptorSet(
+    struct TerrainUploadBatch {
+        VkFence fence = VK_NULL_HANDLE;
+        VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+        std::vector<ChunkCoord> inFlightSlots;
+        bool active = false;
+    };
+
+    struct DeferredGpuCleanup {
+        VkVertexBufferData vertexBuffer{};
+        VkIndexBufferData indexBuffer{};
+        VkShaderStorageBufferData inputSsbo{};
+        VkShaderStorageBufferData outputSsbo{};
+        VkDescriptorSet graphicsDescriptorSet = VK_NULL_HANDLE;
+        VkDescriptorSet computeDescriptorSet = VK_NULL_HANDLE;
+        uint64_t retireFrame = 0;
+    };
+
+    inline bool writeChunkGraphicsDescriptorSet(
         EngineDevice& engineDevice_,
         VkRenderData& renderData_,
         procgen::TerrainPackedGpuData& packed
@@ -213,7 +233,7 @@ namespace aveng {
 
     // Creates GPU-local + staging buffers, fills staging via memcpy, sets up SSBOs and
     // descriptor sets. Does NOT record any copy commands or change slot state.
-    bool prepareChunkUpload(
+    inline bool prepareChunkUpload(
         EngineDevice& engineDevice_,
         VkRenderData& renderData_,
         procgen::TerrainChunkSlot& slot,
@@ -328,6 +348,31 @@ namespace aveng {
         }
 
         return true;
+    }
+
+    inline void submitTerrainQueue(EngineDevice& engineDevice, TerrainUploadBatch& uploadBatch) {
+        VkMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
+
+        vkCmdPipelineBarrier(
+            uploadBatch.cmdBuffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            0, 1, &barrier, 0, nullptr, 0, nullptr
+        );
+
+        vkEndCommandBuffer(uploadBatch.cmdBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &uploadBatch.cmdBuffer;
+
+        vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, uploadBatch.fence);
+        uploadBatch.active = true;
+
     }
 
     // Records VBO and IBO staging-to-device copy commands into the provided command buffer.

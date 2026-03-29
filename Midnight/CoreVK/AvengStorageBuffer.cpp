@@ -261,4 +261,8 @@ namespace aveng {
         }
         vmaDestroyBuffer(engineDevice.allocator(), SSBOData.buffer, SSBOData.bufferAlloc);
     }
+
+    void ShaderStorageBuffer::destroy(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData) {
+        vmaDestroyBuffer(engineDevice.allocator(), SSBOData.buffer, SSBOData.bufferAlloc);
+    }
 }

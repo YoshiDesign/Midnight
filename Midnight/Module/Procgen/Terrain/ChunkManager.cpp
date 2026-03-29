@@ -1792,6 +1792,26 @@ namespace aveng {
         align.coreMaxXZ = coreMax;
         align.supportMinXZ = suppMin;
         align.supportMaxXZ = suppMax;
+
+        Logger::log(1, "Completed Packing\n\
+                Verts Size: %d\n\
+                IBO Size: %d\n\
+                TriAdj Size: %d\n\
+                Packed Positions: %d\n\
+                Packed Triangles: %d\n\
+                Total: %d\n",
+            totalCoreVerts * sizeof(glm::vec3),
+            renderable->ibo.size() * sizeof(uint32_t),
+            totalVerts * sizeof(VertexAdjacency),
+            renderable->packedPositions.size() * sizeof(glm::vec4),
+            renderable->packedTriangles.size() * sizeof(glm::vec3),
+            totalCoreVerts * sizeof(glm::vec3) +
+            renderable->ibo.size() * sizeof(uint32_t) +
+            totalVerts * sizeof(VertexAdjacency) +
+            renderable->packedPositions.size() * sizeof(glm::vec4) +
+            renderable->packedTriangles.size() * sizeof(glm::vec3)
+        );
+
 #if M_DEBUG
         //std::printf(
         //    "Renderable {%d,%d}: coreTris=%zu haloTris=%zu total=%zu\n",
@@ -1815,285 +1835,285 @@ namespace aveng {
 
     }
 
-    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderable(ChunkCoord center, uint64_t frameIndex)
-    {
-        using namespace procgen;
+    //std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderable(ChunkCoord center, uint64_t frameIndex)
+    //{
+    //    using namespace procgen;
 
-        ChunkCoord neighbors[25];
-        get5x5Neighborhood(center, neighbors); // Guarantees 3x3 is [0-8]
+    //    ChunkCoord neighbors[25];
+    //    get5x5Neighborhood(center, neighbors); // Guarantees 3x3 is [0-8]
 
-        // Collect chunk records (all should exist and be populated by now)
-        std::array<ChunkRecord*, 25> recs{};
-        for (int i = 0; i < 25; ++i) {
-            recs[i] = getOrCreateRecord(neighbors[i]);
-        }
+    //    // Collect chunk records (all should exist and be populated by now)
+    //    std::array<ChunkRecord*, 25> recs{};
+    //    for (int i = 0; i < 25; ++i) {
+    //        recs[i] = getOrCreateRecord(neighbors[i]);
+    //    }
 
-        auto renderable = std::make_unique<TerrainRenderable>();
-        renderable->center = center;
+    //    auto renderable = std::make_unique<TerrainRenderable>();
+    //    renderable->center = center;
 
-        // Compute world bounds for core 3x3 and support 5x5
-        const float cs = cfg_.chunkSize;
-        const glm::vec2 coreMin = { (center.x - 1) * cs, (center.z - 1) * cs };
-        const glm::vec2 coreMax = { (center.x + 2) * cs, (center.z + 2) * cs };
-        const glm::vec2 suppMin = { (center.x - 2) * cs, (center.z - 2) * cs };
-        const glm::vec2 suppMax = { (center.x + 3) * cs, (center.z + 3) * cs };
+    //    // Compute world bounds for core 3x3 and support 5x5
+    //    const float cs = cfg_.chunkSize;
+    //    const glm::vec2 coreMin = { (center.x - 1) * cs, (center.z - 1) * cs };
+    //    const glm::vec2 coreMax = { (center.x + 2) * cs, (center.z + 2) * cs };
+    //    const glm::vec2 suppMin = { (center.x - 2) * cs, (center.z - 2) * cs };
+    //    const glm::vec2 suppMax = { (center.x + 3) * cs, (center.z + 3) * cs };
 
-        // ----- Pass 1: Build global vertex remap -----
-        // We need a global vertex index for every unique (chunk, localSiteIdx) pair.
-        // Layout: [3x3 core verts | 3x3 halo verts | outer-16 all verts]
-        //          ^-- "core" for alignment --^  ^-- "halo" for alignment --^
+    //    // ----- Pass 1: Build global vertex remap -----
+    //    // We need a global vertex index for every unique (chunk, localSiteIdx) pair.
+    //    // Layout: [3x3 core verts | 3x3 halo verts | outer-16 all verts]
+    //    //          ^-- "core" for alignment --^  ^-- "halo" for alignment --^
 
-        // TODO: convert to scratch 
-        struct ChunkVertexInfo {
-            uint32_t globalBase = 0;
-            uint32_t coreCount  = 0;
-            uint32_t totalCount = 0;
-        };
-        std::array<ChunkVertexInfo, 25> chunkInfo{};
+    //    // TODO: convert to scratch 
+    //    struct ChunkVertexInfo {
+    //        uint32_t globalBase = 0;
+    //        uint32_t coreCount  = 0;
+    //        uint32_t totalCount = 0;
+    //    };
+    //    std::array<ChunkVertexInfo, 25> chunkInfo{};
 
-        // Count vertices
-        uint32_t totalCoreVerts = 0;
-        uint32_t totalHaloVerts = 0;
+    //    // Count vertices
+    //    uint32_t totalCoreVerts = 0;
+    //    uint32_t totalHaloVerts = 0;
 
-        // Inner 3x3: core verts go to the core section, non-core go to halo
-        for (int i = 0; i < 9; ++i) {
-            auto* ap = recs[i]->allPoints;
-            if (!ap) { continue; }
-            chunkInfo[i].coreCount  = static_cast<uint32_t>(ap->coreIdx.size());
-            chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
-            totalCoreVerts += chunkInfo[i].coreCount;
-            totalHaloVerts += (chunkInfo[i].totalCount - chunkInfo[i].coreCount);
-        }
+    //    // Inner 3x3: core verts go to the core section, non-core go to halo
+    //    for (int i = 0; i < 9; ++i) {
+    //        auto* ap = recs[i]->allPoints;
+    //        if (!ap) { continue; }
+    //        chunkInfo[i].coreCount  = static_cast<uint32_t>(ap->coreIdx.size());
+    //        chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
+    //        totalCoreVerts += chunkInfo[i].coreCount;
+    //        totalHaloVerts += (chunkInfo[i].totalCount - chunkInfo[i].coreCount);
+    //    }
 
-        // Outer 16: all their verts are halo/support
-        for (int i = 9; i < 25; ++i) {
-            auto* ap = recs[i]->allPoints;
-            if (!ap) { continue; }
-            chunkInfo[i].coreCount  = 0; // No contribution to inner 3x3 core region
-            chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
-            totalHaloVerts += chunkInfo[i].totalCount;
-        }
+    //    // Outer 16: all their verts are halo/support
+    //    for (int i = 9; i < 25; ++i) {
+    //        auto* ap = recs[i]->allPoints;
+    //        if (!ap) { continue; }
+    //        chunkInfo[i].coreCount  = 0; // No contribution to inner 3x3 core region
+    //        chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
+    //        totalHaloVerts += chunkInfo[i].totalCount;
+    //    }
 
-        const uint32_t totalVerts = totalCoreVerts + totalHaloVerts;
+    //    const uint32_t totalVerts = totalCoreVerts + totalHaloVerts;
 
-        // Assign global base offsets
-        // Core region: pack 3x3 core verts contiguously
-        uint32_t coreOffset = 0;
-        for (int i = 0; i < 9; ++i) {
-            chunkInfo[i].globalBase = coreOffset; // base for this chunk's core verts
-            coreOffset += chunkInfo[i].coreCount;
-        }
+    //    // Assign global base offsets
+    //    // Core region: pack 3x3 core verts contiguously
+    //    uint32_t coreOffset = 0;
+    //    for (int i = 0; i < 9; ++i) {
+    //        chunkInfo[i].globalBase = coreOffset; // base for this chunk's core verts
+    //        coreOffset += chunkInfo[i].coreCount;
+    //    }
 
-        // Halo region: pack 3x3 halo verts, then outer-16 verts
-        uint32_t haloOffset = totalCoreVerts;
-        // (We'll assign individual halo offsets per chunk during the packing pass)
+    //    // Halo region: pack 3x3 halo verts, then outer-16 verts
+    //    uint32_t haloOffset = totalCoreVerts;
+    //    // (We'll assign individual halo offsets per chunk during the packing pass)
 
-        // ----- Pass 2: Pack positions and build per-chunk old2global remap -----
-        renderable->packedPositions.resize(totalVerts);
+    //    // ----- Pass 2: Pack positions and build per-chunk old2global remap -----
+    //    renderable->packedPositions.resize(totalVerts);
 
-        // Per-chunk remap: chunk-local site index -> global vertex index
-        // We use a vector of vectors (stack allocated in terms of references)
-        std::vector<std::vector<uint32_t>> old2global(25);
+    //    // Per-chunk remap: chunk-local site index -> global vertex index
+    //    // We use a vector of vectors (stack allocated in terms of references)
+    //    std::vector<std::vector<uint32_t>> old2global(25);
 
-        for (int i = 0; i < 25; ++i) {
-            auto* ap = recs[i]->allPoints;
-            if (!ap) continue;
+    //    for (int i = 0; i < 25; ++i) {
+    //        auto* ap = recs[i]->allPoints;
+    //        if (!ap) continue;
 
-            const auto& pts = ap->pts;
-            const auto& coreIdx = ap->coreIdx;
-            const size_t nPts = pts.size();
-            const auto& eHeights = (i < 9 && recs[i]->erosion) ? recs[i]->erosion->eHeights
-                                                               : recs[i]->heightField->heights;
+    //        const auto& pts = ap->pts;
+    //        const auto& coreIdx = ap->coreIdx;
+    //        const size_t nPts = pts.size();
+    //        const auto& eHeights = (i < 9 && recs[i]->erosion) ? recs[i]->erosion->eHeights
+    //                                                           : recs[i]->heightField->heights;
 
-            // Create a mapping to translate local chunk points to a global index
-            constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
-            old2global[i].resize(nPts, UNMAPPED);
+    //        // Create a mapping to translate local chunk points to a global index
+    //        constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
+    //        old2global[i].resize(nPts, UNMAPPED);
 
-            // Build core membership for this chunk
-            std::vector<uint8_t> isCore(nPts, 0);
-            if (i < 9) {
-                for (uint32_t ci : coreIdx) {
-                    // Flag generated core points of the 3x3 region
-                    isCore[ci] = 1;
-                }
-            }
+    //        // Build core membership for this chunk
+    //        std::vector<uint8_t> isCore(nPts, 0);
+    //        if (i < 9) {
+    //            for (uint32_t ci : coreIdx) {
+    //                // Flag generated core points of the 3x3 region
+    //                isCore[ci] = 1;
+    //            }
+    //        }
 
-            // Region delineation
-            if (i < 9) {
-                // Inner 3x3: core verts get the core base, halo verts get halo base
-                uint32_t localCoreOff = chunkInfo[i].globalBase;
-                for (uint32_t ci : coreIdx) {
-                    uint32_t gIdx = localCoreOff++;
-                    old2global[i][ci] = gIdx;
-                    renderable->packedPositions[gIdx] = glm::vec4(pts[ci].x, -eHeights[ci], pts[ci].y, 1.0f);
-                }
-                for (size_t si = 0; si < nPts; ++si) {
-                    if (!isCore[si]) {
-                        uint32_t gIdx = haloOffset++;
-                        old2global[i][si] = gIdx;
-                        renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
-                    }
-                }
-            } else {
-                // Outer 16: all verts go to halo section
-                for (size_t si = 0; si < nPts; ++si) {
-                    uint32_t gIdx = haloOffset++;
-                    old2global[i][si] = gIdx;
-                    renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
-                }
-            }
-        }
+    //        // Region delineation
+    //        if (i < 9) {
+    //            // Inner 3x3: core verts get the core base, halo verts get halo base
+    //            uint32_t localCoreOff = chunkInfo[i].globalBase;
+    //            for (uint32_t ci : coreIdx) {
+    //                uint32_t gIdx = localCoreOff++;
+    //                old2global[i][ci] = gIdx;
+    //                renderable->packedPositions[gIdx] = glm::vec4(pts[ci].x, -eHeights[ci], pts[ci].y, 1.0f);
+    //            }
+    //            for (size_t si = 0; si < nPts; ++si) {
+    //                if (!isCore[si]) {
+    //                    uint32_t gIdx = haloOffset++;
+    //                    old2global[i][si] = gIdx;
+    //                    renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
+    //                }
+    //            }
+    //        } else {
+    //            // Outer 16: all verts go to halo section
+    //            for (size_t si = 0; si < nPts; ++si) {
+    //                uint32_t gIdx = haloOffset++;
+    //                old2global[i][si] = gIdx;
+    //                renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
+    //            }
+    //        }
+    //    }
 
-        // ----- Pass 3: Pack triangles [core | halo] with rebased indices -----
-        // First pass: count core vs halo triangles
-        uint32_t totalCoreTris = 0;
-        uint32_t totalHaloTris = 0;
+    //    // ----- Pass 3: Pack triangles [core | halo] with rebased indices -----
+    //    // First pass: count core vs halo triangles
+    //    uint32_t totalCoreTris = 0;
+    //    uint32_t totalHaloTris = 0;
 
-        for (int i = 0; i < 25; ++i) {
-            auto* tri = recs[i]->triangulation;
-            if (!tri) continue;
+    //    for (int i = 0; i < 25; ++i) {
+    //        auto* tri = recs[i]->triangulation;
+    //        if (!tri) continue;
 
-            auto* ap = recs[i]->allPoints;
-            if (!ap) continue;
+    //        auto* ap = recs[i]->allPoints;
+    //        if (!ap) continue;
 
-            const size_t nPts = ap->pts.size();
-            std::vector<uint8_t> isCore(nPts, 0);
-            if (i < 9) {
-                for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
-            }
+    //        const size_t nPts = ap->pts.size();
+    //        std::vector<uint8_t> isCore(nPts, 0);
+    //        if (i < 9) {
+    //            for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
+    //        }
 
-            for (const auto& t : tri->tris) {
-                if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
-                    ++totalCoreTris;
-                } else {
-                    ++totalHaloTris;
-                }
-            }
-        }
+    //        for (const auto& t : tri->tris) {
+    //            if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
+    //                ++totalCoreTris;
+    //            } else {
+    //                ++totalHaloTris;
+    //            }
+    //        }
+    //    }
 
-        const uint32_t totalTris = totalCoreTris + totalHaloTris;
-        renderable->packedTriangles.resize(totalTris);
+    //    const uint32_t totalTris = totalCoreTris + totalHaloTris;
+    //    renderable->packedTriangles.resize(totalTris);
 
-        uint32_t coreTriOffset = 0;
-        uint32_t haloTriOffset = totalCoreTris;
+    //    uint32_t coreTriOffset = 0;
+    //    uint32_t haloTriOffset = totalCoreTris;
 
-        for (int i = 0; i < 25; ++i) {
-            auto* tri = recs[i]->triangulation;
-            if (!tri) { continue; }
+    //    for (int i = 0; i < 25; ++i) {
+    //        auto* tri = recs[i]->triangulation;
+    //        if (!tri) { continue; }
 
-            auto* ap = recs[i]->allPoints;
-            if (!ap) { continue; }
+    //        auto* ap = recs[i]->allPoints;
+    //        if (!ap) { continue; }
 
-            const size_t nPts = ap->pts.size();
-            std::vector<uint8_t> isCore(nPts, 0);
-            if (i < 9) {
-                for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
-            }
+    //        const size_t nPts = ap->pts.size();
+    //        std::vector<uint8_t> isCore(nPts, 0);
+    //        if (i < 9) {
+    //            for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
+    //        }
 
-            for (const auto& t : tri->tris) {
-                uint32_t gA = old2global[i][t.A];
-                uint32_t gB = old2global[i][t.B];
-                uint32_t gC = old2global[i][t.C];
+    //        for (const auto& t : tri->tris) {
+    //            uint32_t gA = old2global[i][t.A];
+    //            uint32_t gB = old2global[i][t.B];
+    //            uint32_t gC = old2global[i][t.C];
 
-                if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
-                    renderable->packedTriangles[coreTriOffset++] = packTriIndices(gA, gB, gC);
-                } else {
-                    renderable->packedTriangles[haloTriOffset++] = packTriIndices(gA, gB, gC);
-                }
-            }
-        }
+    //            if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
+    //                renderable->packedTriangles[coreTriOffset++] = packTriIndices(gA, gB, gC);
+    //            } else {
+    //                renderable->packedTriangles[haloTriOffset++] = packTriIndices(gA, gB, gC);
+    //            }
+    //        }
+    //    }
 
-        // ----- Pass 4: Build adjacency [core | halo] -----
-        renderable->packedAdjacency.resize(totalVerts);
-        std::memset(renderable->packedAdjacency.data(), 0, totalVerts * sizeof(VertexAdjacency));
+    //    // ----- Pass 4: Build adjacency [core | halo] -----
+    //    renderable->packedAdjacency.resize(totalVerts);
+    //    std::memset(renderable->packedAdjacency.data(), 0, totalVerts * sizeof(VertexAdjacency));
 
-        // We need to iterate triangles again with the global triangle index
-        // to assign globally-rebased triangle IDs to each vertex's adjacency.
-        coreTriOffset = 0;
-        haloTriOffset = totalCoreTris;
+    //    // We need to iterate triangles again with the global triangle index
+    //    // to assign globally-rebased triangle IDs to each vertex's adjacency.
+    //    coreTriOffset = 0;
+    //    haloTriOffset = totalCoreTris;
 
-        for (int i = 0; i < 25; ++i) {
-            auto* tri = recs[i]->triangulation;
-            if (!tri) continue;
+    //    for (int i = 0; i < 25; ++i) {
+    //        auto* tri = recs[i]->triangulation;
+    //        if (!tri) continue;
 
-            auto* ap = recs[i]->allPoints;
-            if (!ap) continue;
+    //        auto* ap = recs[i]->allPoints;
+    //        if (!ap) continue;
 
-            const size_t nPts = ap->pts.size();
-            std::vector<uint8_t> isCore(nPts, 0);
-            if (i < 9) {
-                for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
-            }
+    //        const size_t nPts = ap->pts.size();
+    //        std::vector<uint8_t> isCore(nPts, 0);
+    //        if (i < 9) {
+    //            for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
+    //        }
 
-            for (const auto& t : tri->tris) {
-                uint32_t gA = old2global[i][t.A];
-                uint32_t gB = old2global[i][t.B];
-                uint32_t gC = old2global[i][t.C];
+    //        for (const auto& t : tri->tris) {
+    //            uint32_t gA = old2global[i][t.A];
+    //            uint32_t gB = old2global[i][t.B];
+    //            uint32_t gC = old2global[i][t.C];
 
-                uint32_t globalTriIdx;
-                if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
-                    globalTriIdx = coreTriOffset++;
-                } else {
-                    globalTriIdx = haloTriOffset++;
-                }
+    //            uint32_t globalTriIdx;
+    //            if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
+    //                globalTriIdx = coreTriOffset++;
+    //            } else {
+    //                globalTriIdx = haloTriOffset++;
+    //            }
 
-                const uint32_t verts[3] = { gA, gB, gC };
-                for (int k = 0; k < 3; ++k) {
-                    auto& adj = renderable->packedAdjacency[verts[k]];
-                    if (adj.count < MAX_ADJACENT_TRIS) {
-                        adj.triangleIndices[adj.count++] = globalTriIdx;
-                    }
-                }
-            }
-        }
+    //            const uint32_t verts[3] = { gA, gB, gC };
+    //            for (int k = 0; k < 3; ++k) {
+    //                auto& adj = renderable->packedAdjacency[verts[k]];
+    //                if (adj.count < MAX_ADJACENT_TRIS) {
+    //                    adj.triangleIndices[adj.count++] = globalTriIdx;
+    //                }
+    //            }
+    //        }
+    //    }
 
-        // ----- Pass 5: Build VBO and IBO (3x3 core only) -----
-        // VBO = the core positions (already packed at indices [0..totalCoreVerts))
-        renderable->vbo.resize(totalCoreVerts);
-        for (uint32_t v = 0; v < totalCoreVerts; ++v) {
-            renderable->vbo[v] = renderable->packedPositions[v];
-            glm::vec3 vert = renderable->packedPositions[v];
-            //if (v > 4000) {
-            //    std::printf("V1 vbo[%d] = {%f, %f, %f}\n", v, vert.x, vert.y, vert.z);
-            //}
-        }
+    //    // ----- Pass 5: Build VBO and IBO (3x3 core only) -----
+    //    // VBO = the core positions (already packed at indices [0..totalCoreVerts))
+    //    renderable->vbo.resize(totalCoreVerts);
+    //    for (uint32_t v = 0; v < totalCoreVerts; ++v) {
+    //        renderable->vbo[v] = renderable->packedPositions[v];
+    //        glm::vec3 vert = renderable->packedPositions[v];
+    //        //if (v > 4000) {
+    //        //    std::printf("V1 vbo[%d] = {%f, %f, %f}\n", v, vert.x, vert.y, vert.z);
+    //        //}
+    //    }
 
-        // IBO = core triangles with indices remapped into VBO space
-        // Core triangles already reference global indices [0..totalCoreVerts),
-        // and VBO is a direct copy of that range, so VBO-local index = global index.
-        renderable->ibo.reserve(totalCoreTris * 3);
-        for (uint32_t ti = 0; ti < totalCoreTris; ++ti) {
-            const glm::vec3& packed = renderable->packedTriangles[ti];
-            uint32_t a, b, c;
-            std::memcpy(&a, &packed.x, sizeof(uint32_t));
-            std::memcpy(&b, &packed.y, sizeof(uint32_t));
-            std::memcpy(&c, &packed.z, sizeof(uint32_t));
-            renderable->ibo.push_back(a);
-            renderable->ibo.push_back(b);
-            renderable->ibo.push_back(c);
-        }
+    //    // IBO = core triangles with indices remapped into VBO space
+    //    // Core triangles already reference global indices [0..totalCoreVerts),
+    //    // and VBO is a direct copy of that range, so VBO-local index = global index.
+    //    renderable->ibo.reserve(totalCoreTris * 3);
+    //    for (uint32_t ti = 0; ti < totalCoreTris; ++ti) {
+    //        const glm::vec3& packed = renderable->packedTriangles[ti];
+    //        uint32_t a, b, c;
+    //        std::memcpy(&a, &packed.x, sizeof(uint32_t));
+    //        std::memcpy(&b, &packed.y, sizeof(uint32_t));
+    //        std::memcpy(&c, &packed.z, sizeof(uint32_t));
+    //        renderable->ibo.push_back(a);
+    //        renderable->ibo.push_back(b);
+    //        renderable->ibo.push_back(c);
+    //    }
 
-        // ----- Fill alignment UBO -----
-        auto& align = renderable->alignment;
-        align.baseCorePosition  = 0;
-        align.countCorePosition = totalCoreVerts;
-        align.countHaloPosition = totalHaloVerts;
+    //    // ----- Fill alignment UBO -----
+    //    auto& align = renderable->alignment;
+    //    align.baseCorePosition  = 0;
+    //    align.countCorePosition = totalCoreVerts;
+    //    align.countHaloPosition = totalHaloVerts;
 
-        align.baseCoreTriangle  = 0;
-        align.countCoreTriangle = totalCoreTris;
-        align.countHaloTriangle = totalHaloTris;
+    //    align.baseCoreTriangle  = 0;
+    //    align.countCoreTriangle = totalCoreTris;
+    //    align.countHaloTriangle = totalHaloTris;
 
-        align.baseCoreAdjacency  = 0;
-        align.countCoreAdjacency = totalCoreVerts;
-        align.countHaloAdjacency = totalHaloVerts;
+    //    align.baseCoreAdjacency  = 0;
+    //    align.countCoreAdjacency = totalCoreVerts;
+    //    align.countHaloAdjacency = totalHaloVerts;
 
-        align.coreMinXZ    = coreMin;
-        align.coreMaxXZ    = coreMax;
-        align.supportMinXZ = suppMin;
-        align.supportMaxXZ = suppMax;
+    //    align.coreMinXZ    = coreMin;
+    //    align.coreMaxXZ    = coreMax;
+    //    align.supportMinXZ = suppMin;
+    //    align.supportMaxXZ = suppMax;
 
-        return renderable;
-    }
+    //    return renderable;
+    //}
 
     bool ChunkManager::tryTakeRenderable(
         ChunkCoord center,

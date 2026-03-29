@@ -7,7 +7,6 @@
 #include "CoreVK/IndexBuffer.h"
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/AvengStorageBuffer.h"
-#include "Module/Procgen/Rendering/VkTerrain.h"
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 
@@ -43,7 +42,6 @@ namespace aveng {
         frameIndex_ = frameIndex;
     }
 
-
     // Direct access to generate a chunk for debugging/editor
     void TerrainController::generateChunks(ChunkCoord start_coord) {
         Logger::log(1, "Start {%d, %d}\tFrameIndex", start_coord.x, start_coord.z, frameIndex_);
@@ -57,6 +55,7 @@ namespace aveng {
         auto& slot = it->second;
 
         if (slot.state == procgen::TerrainRuntimeState::Uploading && uploadBatch_.active) {
+            Logger::log(1, "Waiting......");
             vkWaitForFences(engineDevice_.device(), 1, &uploadBatch_.fence, VK_TRUE, UINT64_MAX);
             retireCompletedUploads();
         }
@@ -69,6 +68,7 @@ namespace aveng {
             }
         }
 
+        // TODO - Another declaration for a local tmp...
         DeferredGpuCleanup deferred{};
         deferred.vertexBuffer = slot.gpu.draw.vertexBuffer;
         deferred.indexBuffer = slot.gpu.draw.indexBuffer;
@@ -187,13 +187,13 @@ namespace aveng {
 
     void TerrainController::retireCompletedUploads()
     {
-        if (!uploadBatch_.active) return;
+        if (!uploadBatch_.active) { return; }
 
-        if (vkGetFenceStatus(engineDevice_.device(), uploadBatch_.fence) != VK_SUCCESS) return;
+        if (vkGetFenceStatus(engineDevice_.device(), uploadBatch_.fence) != VK_SUCCESS) { return; }
 
         for (const ChunkCoord& coord : uploadBatch_.inFlightSlots) {
             auto it = slots_.find(coord);
-            if (it == slots_.end()) continue;
+            if (it == slots_.end()) { continue; }
 
             auto& slot = it->second;
             slot.gpu.valid = true;
@@ -211,15 +211,15 @@ namespace aveng {
 
     void TerrainController::buildAndSubmitUploadBatch()
     {
-        if (uploadBatch_.active) return;
+        if (uploadBatch_.active) { return; }
 
         engineDevice_.beginSingleShotCommand(uploadBatch_.cmdBuffer);
 
         int chunksThisBatch = 0;
 
         for (auto& [coord, slot] : slots_) {
-            if (chunksThisBatch >= kMaxChunksPerUploadBatch) break;
-            if (slot.state != procgen::TerrainRuntimeState::CpuReady) continue;
+            if (chunksThisBatch >= kMaxChunksPerUploadBatch) { break; }
+            if (slot.state != procgen::TerrainRuntimeState::CpuReady) { continue; }
 
             if (!prepareChunkUpload(engineDevice_, renderData_, slot, settingsUboBuffer_, settingsUboSize_)) {
                 slot.state = procgen::TerrainRuntimeState::Failed;
@@ -238,27 +238,8 @@ namespace aveng {
             return;
         }
 
-        VkMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
-
-        vkCmdPipelineBarrier(
-            uploadBatch_.cmdBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-            0, 1, &barrier, 0, nullptr, 0, nullptr
-        );
-
-        vkEndCommandBuffer(uploadBatch_.cmdBuffer);
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &uploadBatch_.cmdBuffer;
-
-        vkQueueSubmit(engineDevice_.graphicsQueue(), 1, &submitInfo, uploadBatch_.fence);
-        uploadBatch_.active = true;
+        //
+        submitTerrainQueue(engineDevice_, uploadBatch_);
     }
 
     void TerrainController::setTerrainConfig(TerrainConfig tcfg)
@@ -305,8 +286,11 @@ namespace aveng {
             return;
         }
 
+        // First Concurrency Guard: Queue an active request - do not allow overlapping chunks to generate simultaneously
         // Gate: only admit if the 5x5 support footprint doesn't overlap an active build.
         if (!admission_.tryAcquire(coord, kSupportRadius)) {
+            // Unable to push onto admission_.active, so we push to the deferred stack
+            // which will be retried after 
             deferredRequests_.push_back(coord);
             return;
         }
@@ -317,20 +301,24 @@ namespace aveng {
 
     void TerrainController::drainCompletedTerrain()
     {
+        // Lambda function forwarded to the ConcurrentQueue of renderables ready to go.
         chunks_->drainCompletedRenderables([this](const procgen::RenderableCompletion& completedChunk) {
+
+            /*
+             * At this point we're only processing chunks within admission_.active
+             * This is an implication of the architecture around this Controller.
+             */
 
             // Release the admission slot so deferred requests can proceed
             admission_.release(completedChunk.coord, kSupportRadius);
 
             auto it = slots_.find(completedChunk.coord);
-            if (it == slots_.end())
-                return;
+            if (it == slots_.end()) { return; }
 
             auto& slot = it->second;
 
-            if (slot.requestId != completedChunk.requestId)
-                return;
-
+            if (slot.requestId != completedChunk.requestId) { return; }
+                
             if (!completedChunk.success) {
                 slot.state = procgen::TerrainRuntimeState::Failed;
                 return;
@@ -344,10 +332,12 @@ namespace aveng {
 
             slot.cpuRenderable = std::move(cpuRenderable);
             slot.state = procgen::TerrainRuntimeState::CpuReady;
+
         });
 
-        // Retry any requests that were deferred due to region overlap
+		// Retry any requests that were deferred due to region overlap - See: First Concurrency guard in ensureChunkRequested()
         if (!deferredRequests_.empty()) {
+			// TODO - No need to initialize a vector here every time - Just keep it around and clear it.
             std::vector<ChunkCoord> pending;
             pending.swap(deferredRequests_);
             for (const ChunkCoord& coord : pending) {
@@ -395,18 +385,30 @@ namespace aveng {
     void TerrainController::flushDeferredDeletes()
     {
         auto it = deferredCleanups_.begin();
+
         while (it != deferredCleanups_.end()) {
+
             if (frameIndex_ - it->retireFrame >= kDeferFrames) {
+
                 VertexBuffer::cleanup(engineDevice_, it->vertexBuffer);
                 IndexBuffer::cleanup(engineDevice_, it->indexBuffer);
-                if (it->inputSsbo.buffer != VK_NULL_HANDLE)
-                    vmaDestroyBuffer(engineDevice_.allocator(), it->inputSsbo.buffer, it->inputSsbo.bufferAlloc);
-                if (it->outputSsbo.buffer != VK_NULL_HANDLE)
-                    vmaDestroyBuffer(engineDevice_.allocator(), it->outputSsbo.buffer, it->outputSsbo.bufferAlloc);
-                if (it->graphicsDescriptorSet != VK_NULL_HANDLE)
+
+                if (it->inputSsbo.buffer != VK_NULL_HANDLE) {
+                    ShaderStorageBuffer::destroy(engineDevice_, it->inputSsbo);
+                }
+                if (it->outputSsbo.buffer != VK_NULL_HANDLE) {
+                    ShaderStorageBuffer::destroy(engineDevice_, it->outputSsbo);
+                }
+
+                // These descriptor set cleanups are technically optional since the sets 
+                // will be implicitly freed when the pool is destroyed, 
+                // but it's good practice/acceptable to clean up explicitly
+                if (it->graphicsDescriptorSet != VK_NULL_HANDLE) {
                     vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool, 1, &it->graphicsDescriptorSet);
-                if (it->computeDescriptorSet != VK_NULL_HANDLE)
+                }
+                if (it->computeDescriptorSet != VK_NULL_HANDLE) {
                     vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &it->computeDescriptorSet);
+                }
                 it = deferredCleanups_.erase(it);
             } else {
                 ++it;
@@ -434,11 +436,14 @@ namespace aveng {
         for (auto& d : deferredCleanups_) {
             VertexBuffer::cleanup(engineDevice_, d.vertexBuffer);
             IndexBuffer::cleanup(engineDevice_, d.indexBuffer);
-            if (d.inputSsbo.buffer != VK_NULL_HANDLE)
-                vmaDestroyBuffer(engineDevice_.allocator(), d.inputSsbo.buffer, d.inputSsbo.bufferAlloc);
-            if (d.outputSsbo.buffer != VK_NULL_HANDLE)
-                vmaDestroyBuffer(engineDevice_.allocator(), d.outputSsbo.buffer, d.outputSsbo.bufferAlloc);
+            if (d.inputSsbo.buffer != VK_NULL_HANDLE) {
+                ShaderStorageBuffer::destroy(engineDevice_, d.inputSsbo);
+            }
+            if (d.outputSsbo.buffer != VK_NULL_HANDLE) {
+                ShaderStorageBuffer::destroy(engineDevice_, d.outputSsbo);
+            }
         }
+
         deferredCleanups_.clear();
 
         vkDestroyDescriptorSetLayout(engineDevice_.device(), renderData_.rdTerrainLitGraphicsDescriptorSetLayout, nullptr);
@@ -452,6 +457,9 @@ namespace aveng {
         VertexBuffer::cleanup(engineDevice_, slot.gpu.draw.vertexBuffer);
         IndexBuffer::cleanup(engineDevice_, slot.gpu.draw.indexBuffer);
 
+		// These descriptor set cleanups are technically optional since the sets 
+        // will be implicitly freed when the pool is destroyed, 
+        // but it's good practice/acceptable to clean up explicitly
         if (slot.gpu.packed.graphicsDescriptorSet != VK_NULL_HANDLE) {
 
             vkFreeDescriptorSets(
@@ -475,10 +483,10 @@ namespace aveng {
         }
 
         if (slot.gpu.packed.inputSsbo.buffer != VK_NULL_HANDLE) {
-            ShaderStorageBuffer::cleanup(engineDevice_, slot.gpu.packed.inputSsbo);
+            ShaderStorageBuffer::destroy(engineDevice_, slot.gpu.packed.inputSsbo);
         }
         if (slot.gpu.packed.outputSsbo.buffer != VK_NULL_HANDLE) {
-            ShaderStorageBuffer::cleanup(engineDevice_, slot.gpu.packed.outputSsbo);
+            ShaderStorageBuffer::destroy(engineDevice_, slot.gpu.packed.outputSsbo);
         }
     }
 

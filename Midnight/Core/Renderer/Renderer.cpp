@@ -1708,8 +1708,12 @@ namespace aveng {
 		poolInfo.pPoolSizes = poolSizes;
 		poolInfo.maxSets = MAX_TERRAIN_CHUNKS;
 
-		VkResult result = vkCreateDescriptorPool(engineDevice.device(), &poolInfo, nullptr,
+		VkResult result = vkCreateDescriptorPool(
+			engineDevice.device(), 
+			&poolInfo, 
+			nullptr,
 			&renderData.avengTerrainComputeDescriptorPool);
+
 		if (result != VK_SUCCESS) {
 			Logger::log(1, "%s error: could not create terrain compute descriptor pool (error: %i)\n", __FUNCTION__, result);
 			return false;
