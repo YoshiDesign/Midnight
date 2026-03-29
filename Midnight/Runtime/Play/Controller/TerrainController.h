@@ -7,6 +7,7 @@
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Module/Procgen/Terrain/Control.h"
 #include "Module/Procgen/Rendering/VkTerrain.h"
+#include "Module/Procgen/Rendering/TerrainResourcePool.h"
 #include "Module/Procgen/Types.h"
 #include "Utils/Timer.h"
 
@@ -16,6 +17,23 @@
 namespace procgen {
     struct TerrainRenderable;
 }
+
+/**
+ * Notes about the new resource pool:
+ * The pool is not pre-populated -- it's a recycling pool that starts empty and fills up organically as chunks complete their lifecycle. Here's the flow:
+
+Cold start (pool empty): The very first wave of chunks will always hit the "fall back to init" path because there's nothing to recycle yet. This is expected -- the first N chunks pay the full vmaCreateBuffer cost just like they do today.
+
+Steady state (pool warm): Once the player starts moving and chunks cycle through eviction, buffers flow into the pool from two sources:
+
+retireCompletedUploads -- when a GPU upload fence signals, the CPU renderable (with its ~2MB of vectors) gets its vectors cleared and the empty shell is pushed into pool_.renderables. This avoids the cost of deallocating and reallocating the TerrainRenderable struct itself.
+
+flushDeferredDeletes -- when an evicted chunk's deferred frame count elapses (after kDeferFrames), its VBO, IBO, input SSBO, and output SSBO structs get moved into pool_.vbo, pool_.ibo, etc. instead of being destroyed. The Vulkan handles survive -- device buffer, staging buffer, VMA allocations -- all still valid.
+
+Then when prepareChunkUpload runs for the next incoming chunk, it checks the pool first. If there's a buffer whose bufferSize >= needed, it grabs it. The existing Vulkan allocation is reused: fillStaging just maps the same staging buffer and overwrites its contents, recordCopy copies to the same device buffer. Zero vmaCreateBuffer / vmaDestroyBuffer calls on the hot path.
+
+So the lifecycle looks like:
+ */
 
 namespace aveng {
 
@@ -236,6 +254,9 @@ namespace aveng {
         // Deferred GPU resource destruction (avoids vkQueueWaitIdle during eviction)
         std::vector<DeferredGpuCleanup> deferredCleanups_;
         static constexpr uint64_t kDeferFrames = 3;
+
+        // Recycling pool for Vulkan buffers and CPU renderables
+        TerrainResourcePool pool_;
 
     };
 }

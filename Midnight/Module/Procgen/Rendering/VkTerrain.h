@@ -1,6 +1,7 @@
 #pragma once
 #include "vulkan/vulkan_core.h"
 #include "BasicTerrainAsset.h"
+#include "TerrainResourcePool.h"
 #include "CoreVK/VkRenderData.h"
 #include "CoreVK/EngineDevice.h"
 #include "CoreVK/VertexBuffer.h"
@@ -236,14 +237,16 @@ namespace aveng {
     }
 
 
-    // Creates GPU-local + staging buffers, fills staging via memcpy, sets up SSBOs and
-    // descriptor sets. Does NOT record any copy commands or change slot state.
+    // Creates GPU-local + staging buffers (or acquires recycled ones from pool),
+    // fills staging via memcpy, sets up SSBOs and descriptor sets.
+    // Does NOT record any copy commands or change slot state.
     inline bool prepareChunkUpload(
         EngineDevice& engineDevice,
         VkRenderData& renderData,
         procgen::TerrainChunkSlot& slot,
         VkBuffer settingsUboBuffer_,
-        VkDeviceSize settingsUboSize_)
+        VkDeviceSize settingsUboSize_,
+        TerrainResourcePool& pool)
     {
         if (!slot.cpuRenderable) {
             Logger::log(1, "%s error: slot has no cpu renderable\n", __FUNCTION__);
@@ -261,6 +264,9 @@ namespace aveng {
         gpu.draw.vertexCount = static_cast<uint32_t>(cpu.vbo.size());
         gpu.draw.indexCount = static_cast<uint32_t>(cpu.ibo.size());
 
+        const unsigned int vboSize = static_cast<unsigned int>(cpu.vbo.size() * sizeof(glm::vec3));
+        const size_t iboSize = cpu.ibo.size() * sizeof(uint32_t);
+
 #ifdef M_DEBUG
         Timer vboIboTimer{};
         Timer ssbo1Timer{};
@@ -269,16 +275,27 @@ namespace aveng {
 		Timer descriptor2Timer{};
         vboIboTimer.start();
 #endif
-        /* Q: Why do we use staging buffers here?? This is not what we do in aveng_model.cpp */
 
-        if (!VertexBuffer::init(engineDevice, gpu.draw.vertexBuffer, cpu.vbo.size() * sizeof(glm::vec3))) {
-            Logger::log(1, "Failed to init Vertex buffer\n");
-            return false;
+        // VBO: try pool first, fall back to init
+        if (!pool.vbo.empty() && pool.vbo.back().bufferSize >= vboSize) {
+            gpu.draw.vertexBuffer = pool.vbo.back();
+            pool.vbo.pop_back();
+        } else {
+            if (!VertexBuffer::init(engineDevice, gpu.draw.vertexBuffer, vboSize)) {
+                Logger::log(1, "Failed to init Vertex buffer\n");
+                return false;
+            }
         }
 
-        if (!IndexBuffer::init(engineDevice, gpu.draw.indexBuffer, cpu.ibo.size() * sizeof(uint32_t))) {
-            Logger::log(1, "Failed to init Index buffer\n");
-            return false;
+        // IBO: try pool first, fall back to init
+        if (!pool.ibo.empty() && pool.ibo.back().bufferSize >= iboSize) {
+            gpu.draw.indexBuffer = pool.ibo.back();
+            pool.ibo.pop_back();
+        } else {
+            if (!IndexBuffer::init(engineDevice, gpu.draw.indexBuffer, iboSize)) {
+                Logger::log(1, "Failed to init Index buffer\n");
+                return false;
+            }
         }
 
         if (!VertexBuffer::fillStaging(engineDevice, gpu.draw.vertexBuffer, cpu.vbo)) {
@@ -322,9 +339,16 @@ namespace aveng {
 #ifdef M_DEBUG
         ssbo1Timer.start();
 #endif
-        if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.inputSsbo, MapMode::OnDemand, ResidentMode::CPU, inputTotalSize)) {
-            Logger::log(1, "%s error: could not create terrain input SSBO\n", __FUNCTION__);
-            return false;
+
+        // Input SSBO: try pool first, fall back to init
+        if (!pool.inputSsbo.empty() && pool.inputSsbo.back().bufferSize >= static_cast<size_t>(inputTotalSize)) {
+            gpu.packed.inputSsbo = pool.inputSsbo.back();
+            pool.inputSsbo.pop_back();
+        } else {
+            if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.inputSsbo, MapMode::OnDemand, ResidentMode::CPU, inputTotalSize)) {
+                Logger::log(1, "%s error: could not create terrain input SSBO\n", __FUNCTION__);
+                return false;
+            }
         }
 
         {
@@ -368,9 +392,15 @@ namespace aveng {
         ssbo2Timer.start();
 #endif
 
-        if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.outputSsbo, MapMode::GpuOnly, ResidentMode::GPU, outputTotalSize)) {
-            Logger::log(1, "%s error: could not create terrain output SSBO\n", __FUNCTION__);
-            return false;
+        // Output SSBO: try pool first (GPU-only, no mapping needed), fall back to init
+        if (!pool.outputSsbo.empty() && pool.outputSsbo.back().bufferSize >= static_cast<size_t>(outputTotalSize)) {
+            gpu.packed.outputSsbo = pool.outputSsbo.back();
+            pool.outputSsbo.pop_back();
+        } else {
+            if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.outputSsbo, MapMode::GpuOnly, ResidentMode::GPU, outputTotalSize)) {
+                Logger::log(1, "%s error: could not create terrain output SSBO\n", __FUNCTION__);
+                return false;
+            }
         }
 
 #ifdef M_DEBUG
@@ -457,6 +487,9 @@ namespace aveng {
 
     // Records VBO and IBO staging-to-device copy commands into the provided command buffer.
     // Barriers are the caller's responsibility (batched at the end of all copies).
+    // V1: recordCopy copies the full bufferSize (allocation size), not the actual data size.
+    // With recycled oversized buffers this copies stale trailing bytes -- safe because the
+    // GPU only reads up to vertexCount/indexCount, but wastes a small amount of transfer bandwidth.
     inline void recordChunkCopies(VkCommandBuffer cmd, procgen::TerrainChunkSlot& slot) {
         VertexBuffer::recordCopy(cmd, slot.gpu.draw.vertexBuffer);
         IndexBuffer::recordCopy(cmd, slot.gpu.draw.indexBuffer);

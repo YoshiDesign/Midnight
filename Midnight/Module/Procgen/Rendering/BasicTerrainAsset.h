@@ -73,13 +73,6 @@ namespace procgen {
 	struct RenderableCompletion
 	{
 		aveng::ChunkCoord coord;
-		uint64_t requestId; // Build generation id
-		bool success;
-	};
-
-	struct RenderableCompletion_ALT
-	{
-		aveng::ChunkCoord coord;
 		uint64_t requestId;
 		bool success;
 		std::unique_ptr<TerrainRenderable> renderable;

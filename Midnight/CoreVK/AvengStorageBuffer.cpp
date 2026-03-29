@@ -48,7 +48,7 @@ namespace aveng {
             SSBOData.isHostCoherent = (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
         }
 
-        if (resMode == ResidentMode::GPU) Logger::log(1, "--- Created GPU-ONLY Resident!\n");
+        // if (resMode == ResidentMode::GPU) Logger::log(1, "--- Created GPU-ONLY Resident!\n");
         //Logger::log(1, "%s: created SSBO of size %i\nResident of:\t%d\nCoherence:\t%d\n", __FUNCTION__, bufferSize, resMode, SSBOData.isHostCoherent);
 
         return true;
@@ -64,7 +64,7 @@ namespace aveng {
         }
 
         if ((bufferData.size() * sizeof(glm::mat4)) > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::mat4)));
+            //Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::mat4)));
             return true;
         }
 
@@ -92,7 +92,7 @@ namespace aveng {
         }
 
         if ((bufferData.size() * sizeof(MnMaterial)) > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(MnMaterial)));
+            //Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(MnMaterial)));
             return true;
         }
 
@@ -120,7 +120,7 @@ namespace aveng {
         }
 
         if ((bufferData.size() * sizeof(MnMaterialExt)) > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(MnMaterialExt)));
+            //Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(MnMaterialExt)));
             return true;
         }
 
@@ -148,7 +148,7 @@ namespace aveng {
         }
 
         if ((bufferData.size() * sizeof(int32_t)) > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(int32_t)));
+            // Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(int32_t)));
             return true;
         }
 
@@ -176,7 +176,7 @@ namespace aveng {
         }
 
         if ((bufferData.size() * sizeof(glm::vec2)) > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::vec2)));
+            //Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::vec2)));
             return true;
         }
 
@@ -208,7 +208,7 @@ namespace aveng {
         }
 
         if ((bufferData.size() * sizeof(NodeTransformData)) > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(NodeTransformData)));
+            // Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(NodeTransformData)));
             return true;
         }
 
@@ -233,7 +233,7 @@ namespace aveng {
         }
 
         if ((bufferData.size() * sizeof(glm::mat4)) > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::mat4)));
+            // Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, (bufferData.size() * sizeof(glm::mat4)));
             return true;
         }
 
@@ -248,7 +248,7 @@ namespace aveng {
 
     bool ShaderStorageBuffer::checkForResize(EngineDevice& engineDevice, VkShaderStorageBufferData& SSBOData, size_t bufferSize) {
         if (bufferSize > SSBOData.bufferSize) {
-            Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, bufferSize);
+            // Logger::log(1, "%s: resize SSBO %p from %i to %i bytes\n", __FUNCTION__, SSBOData.buffer, SSBOData.bufferSize, bufferSize);
             return true;
         }
         return false;

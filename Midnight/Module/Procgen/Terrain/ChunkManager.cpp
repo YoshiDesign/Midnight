@@ -1307,7 +1307,7 @@ namespace aveng {
                 ws.workHeights.begin(), ws.workHeights.end());
 
 #ifdef M_DEBUG
-            std::printf("[Chunk Completed] {%d, %d}\n", rec.coord.x, rec.coord.z);
+            // std::printf("[Chunk Completed] {%d, %d}\n", rec.coord.x, rec.coord.z);
 #endif
 
             ctx.ws.reset();
@@ -1533,7 +1533,6 @@ namespace aveng {
                 if (centerRec->requestedRenderableId != requestId)
                     return;
 
-                centerRec->renderableResult = std::move(renderable);
                 centerRec->completedRenderableId = requestId;
                 centerRec->renderableState = RenderableBuildState::Ready;
                 centerRec->renderablePublished = true;
@@ -1544,9 +1543,9 @@ namespace aveng {
                 completedRenderables_.push(procgen::RenderableCompletion{
                     .coord = center,
                     .requestId = requestId,
-                    .success = true
+                    .success = true,
+                    .renderable = std::move(renderable)
                 });
-                // procgen::traceStage((center, procgen::TerrainStage::Renderable, "complete");
             }
         }
         catch (...) {
@@ -1559,7 +1558,8 @@ namespace aveng {
             completedRenderables_.push(procgen::RenderableCompletion{
                 .coord = center,
                 .requestId = requestId,
-                .success = false
+                .success = false,
+                .renderable = nullptr
             });
         }
     }
@@ -1793,24 +1793,24 @@ namespace aveng {
         align.supportMinXZ = suppMin;
         align.supportMaxXZ = suppMax;
 
-        Logger::log(1, "Completed Packing\n\
-                Verts Size: %d\n\
-                IBO Size: %d\n\
-                TriAdj Size: %d\n\
-                Packed Positions: %d\n\
-                Packed Triangles: %d\n\
-                Total: %d\n",
-            totalCoreVerts * sizeof(glm::vec3),
-            renderable->ibo.size() * sizeof(uint32_t),
-            totalVerts * sizeof(VertexAdjacency),
-            renderable->packedPositions.size() * sizeof(glm::vec4),
-            renderable->packedTriangles.size() * sizeof(glm::vec3),
-            totalCoreVerts * sizeof(glm::vec3) +
-            renderable->ibo.size() * sizeof(uint32_t) +
-            totalVerts * sizeof(VertexAdjacency) +
-            renderable->packedPositions.size() * sizeof(glm::vec4) +
-            renderable->packedTriangles.size() * sizeof(glm::vec3)
-        );
+        //Logger::log(1, "Completed Packing\n\
+        //        Verts Size: %d\n\
+        //        IBO Size: %d\n\
+        //        TriAdj Size: %d\n\
+        //        Packed Positions: %d\n\
+        //        Packed Triangles: %d\n\
+        //        Total: %d\n",
+        //    totalCoreVerts * sizeof(glm::vec3),
+        //    renderable->ibo.size() * sizeof(uint32_t),
+        //    totalVerts * sizeof(VertexAdjacency),
+        //    renderable->packedPositions.size() * sizeof(glm::vec4),
+        //    renderable->packedTriangles.size() * sizeof(glm::vec3),
+        //    totalCoreVerts * sizeof(glm::vec3) +
+        //    renderable->ibo.size() * sizeof(uint32_t) +
+        //    totalVerts * sizeof(VertexAdjacency) +
+        //    renderable->packedPositions.size() * sizeof(glm::vec4) +
+        //    renderable->packedTriangles.size() * sizeof(glm::vec3)
+        //);
 
 #if M_DEBUG
         //std::printf(

@@ -114,6 +114,9 @@ namespace aveng {
 
         /* Render Target & Completion Queue Drain */
         uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex);
+
+        // DEPRECATED: renderable is now carried directly in RenderableCompletion.
+        // Kept for reference; no longer called from the drain path.
         bool tryTakeRenderable(ChunkCoord center, uint64_t requestId,
             std::unique_ptr<procgen::TerrainRenderable>& out);
 

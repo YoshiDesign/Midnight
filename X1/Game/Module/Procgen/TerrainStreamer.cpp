@@ -23,7 +23,7 @@ namespace xone {
         , linear_(policy.linear)
         , allRange_(policy.allRange)
     {
-        Logger::log(1, "TerrainStreamer Initialized\n");
+        // Logger::log(1, "TerrainStreamer Initialized\n");
     }
 
     void TerrainStreamer::setPolicy(const TerrainStreamPolicy& policy)
@@ -53,12 +53,12 @@ namespace xone {
 
         switch (policy_.mode) {
         case TerrainStreamMode::LinearFlight:
-            // Logger::log(1, "Updating with LinearFlight Policy");
+            // // Logger::log(1, "Updating with LinearFlight Policy");
             linear_.update(ctx, terrain_, streamed_, cmds);
             break;
 
         case TerrainStreamMode::AllRange:
-            Logger::log(1, "Updating with AllRange Policy");
+            // Logger::log(1, "Updating with AllRange Policy");
             allRange_.update(ctx, terrain_, streamed_, cmds);
             break;
         }
@@ -82,7 +82,7 @@ namespace xone {
     void TerrainStreamer::applyRequests(const std::vector<ChunkCoord>& centers, uint64_t frameIndex)
     {
         for (const ChunkCoord& c : centers) {
-            // Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
+            // // Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
             terrain_.generateChunks(c);
         }
     }
@@ -121,9 +121,9 @@ namespace xone {
     )
     {
 #ifdef M_DEBUG
-        // Logger::log(1, "Player Chunk Coord {%d, %d}\n", ctx.playerChunk.x, ctx.playerChunk.z);
+        // // Logger::log(1, "Player Chunk Coord {%d, %d}\n", ctx.playerChunk.x, ctx.playerChunk.z);
         //for (auto& [k, v] : streamed) {
-        //    Logger::log(1, "Has Streamed Record[%d, %d] = %d\n", k.x, k.z, v.status);
+        //    // Logger::log(1, "Has Streamed Record[%d, %d] = %d\n", k.x, k.z, v.status);
         //}
 #endif
         if (state_.maxCenterWaveRequested >= 0 && ctx.playerChunk.x != state_.baseX) {
@@ -151,9 +151,9 @@ namespace xone {
         }
 
         const LinearWaveCoords w0 = makeLinearWave(0, state_.baseX, state_.baseZ);
-        //Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
-        //Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
-        //Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
+        //// Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
+        //// Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
+        //// Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
         requestIfNeeded(w0.center, streamed, outCmds);
         state_.maxCenterWaveRequested = 0;
     }
@@ -228,7 +228,7 @@ namespace xone {
 
             if (shouldEvict(coord, playerChunk)) {
                 outCmds.evictCenters.push_back(coord);
-                Logger::log(1, "Evictions pending: {%d}\n", outCmds.evictCenters.size());
+                // Logger::log(1, "Evictions pending: {%d}\n", outCmds.evictCenters.size());
             }
         }
     }
@@ -264,11 +264,11 @@ namespace xone {
             StreamedChunkState{ StreamedChunkState::Status::Requested }
         );
 
-        // Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
+        // // Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
 
         if (inserted) {
             outCmds.requestCenters.push_back(coord);
-            Logger::log(1, "RequestCenters {%d}\n", outCmds.requestCenters.size());
+            // Logger::log(1, "RequestCenters {%d}\n", outCmds.requestCenters.size());
         }
     }
 
@@ -283,7 +283,7 @@ namespace xone {
         StreamCommandBuffer& outCmds
     )
     {
-        Logger::log(1, "AllRangeStreamer::update()\n");
+        // Logger::log(1, "AllRangeStreamer::update()\n");
         // Stub for later.
     }
 
