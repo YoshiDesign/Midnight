@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <span>
 #include <stdint.h>
 #include <unordered_set>
 #include "Runtime/Threading/ITaskSystem.h"
@@ -113,7 +114,8 @@ namespace aveng {
         void initManagers(procgen::ErosionManager* er);
 
         /* Render Target & Completion Queue Drain */
-        uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex);
+        uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex,
+            std::unique_ptr<procgen::TerrainRenderable> recycled = nullptr);
 
         // DEPRECATED: renderable is now carried directly in RenderableCompletion.
         // Kept for reference; no longer called from the drain path.
@@ -189,7 +191,8 @@ namespace aveng {
 		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
         bool advanceErosion(ChunkRecord& r);  // retry-driven state machine; returns true when complete
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
-        std::unique_ptr<procgen::TerrainRenderable> buildRenderablev2(ChunkCoord center, uint64_t frameIndex);
+        std::unique_ptr<procgen::TerrainRenderable> buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
+            std::span<ChunkRecord*, 25> recs);
         // std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);
 
         ThreadPoolTaskSystem& tasks_;

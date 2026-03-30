@@ -1412,7 +1412,8 @@ namespace aveng {
     }
 
     /* Async */
-    uint64_t ChunkManager::requestRenderableAsync(ChunkCoord center, uint64_t frameIndex)
+    uint64_t ChunkManager::requestRenderableAsync(ChunkCoord center, uint64_t frameIndex,
+        std::unique_ptr<procgen::TerrainRenderable> recycled)
     {
         ChunkRecord* rec = getOrCreateRecord(center);
 
@@ -1432,6 +1433,7 @@ namespace aveng {
             requestId = ++rec->requestedRenderableId;
             rec->renderableState = RenderableBuildState::Queued;
             rec->renderablePublished = false;
+            rec->recycledRenderable = std::move(recycled);
             shouldSubmit = true;
         }
 
@@ -1525,7 +1527,7 @@ namespace aveng {
         // procgen::traceStage((center, procgen::TerrainStage::Renderable, "begin");
 
         try {
-            auto renderable = buildRenderablev2(center, frameIndex);
+            auto renderable = buildRenderablev2(center, frameIndex, nrecs);
 
             bool shouldPublish = false;
             {
@@ -1574,19 +1576,17 @@ namespace aveng {
         return nullptr;
     }
 
-    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderablev2(ChunkCoord center, uint64_t frameIndex)
+    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
+        std::span<ChunkRecord*, 25> recs)
     {
         using namespace procgen;
 
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors); // inner 3x3 = [0..8]
 
-        std::array<ChunkRecord*, 25> recs{};
-        for (int i = 0; i < 25; ++i) {
-            recs[i] = getOrCreateRecord(neighbors[i]);
-        }
-
-        auto renderable = std::make_unique<TerrainRenderable>();
+        auto renderable = recs[4]->recycledRenderable
+            ? std::move(recs[4]->recycledRenderable)
+            : std::make_unique<TerrainRenderable>();
         renderable->center = center;
 
         const float cs = cfg_.chunkSize;

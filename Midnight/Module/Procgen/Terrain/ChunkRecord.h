@@ -208,6 +208,7 @@ namespace aveng {
 		uint64_t requestedRenderableId = 0;   // increment whenever a new build is requested
 		uint64_t completedRenderableId = 0;   // request id that produced current result
 		std::unique_ptr<procgen::TerrainRenderable> renderableResult;
+		std::unique_ptr<procgen::TerrainRenderable> recycledRenderable;
 		bool renderablePublished = false; // optional; mostly useful for debugging
 
 		// Note - SpatialGrid bounds are core + halo

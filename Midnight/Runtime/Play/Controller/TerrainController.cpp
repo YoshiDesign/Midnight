@@ -10,6 +10,20 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 
+/**
+* Note on Mesh Assembly and recycled resources:
+* Calls during mesh assembly reuse that capacity without heap allocation 
+* (terrain chunks produce similarly-sized data). If no recycled renderable is available (cold start), 
+* a fresh one is allocated.
+* After building, the completed renderable is pushed onto the ConcurrentQueue<RenderableCompletion> with a success flag.
+* 
+* Some helpful terminology:
+* - Retired: Acknowledging that a GPU upload has finished and
+* transitioning the chunk from Uploading to Resident. It's the moment 
+* the CPU confirms the GPU is done with the transfer and the chunk is safe to render
+* 
+* - In flight: The GPU is processing the data it needs, initializing buffers, etc.
+*/
 
 
 namespace aveng {
@@ -48,6 +62,10 @@ namespace aveng {
         ensureChunkRequested(start_coord);
     }
 
+    // @Step 7 - When the streamer determines a chunk is out of range, it evicts.
+    // The slot's GPU resource handles (VBO, IBO, input SSBO, output SSBO, descriptor sets) are copied into a DeferredGpuCleanup.
+    // The slot is erased immediately, but the VK resources are not destroyed yet. Not just due to the recycle strat,
+    // but because the GPU could still be using them.
     void TerrainController::evictChunk(ChunkCoord center) {
         auto it = slots_.find(center);
         if (it == slots_.end()) { return; }
@@ -96,7 +114,7 @@ namespace aveng {
         serviceCpuReadyChunks();
     }
 
-    // Render VK
+    // @Step 6: Render the completed work for all Resident chunks
     void TerrainController::render(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex)
     {
 
@@ -192,6 +210,23 @@ namespace aveng {
         buildAndSubmitUploadBatch();
     }
 
+    /**
+    * @Step 5:
+    * `retireCompletedUploads` (called every frame) does 3 things:
+    * 
+    * 1. Checks the fence -- 
+    * vkGetFenceStatus polls whether the GPU has finished executing the upload command buffer. 
+    * If the fence hasn't signaled, the function returns immediately
+    * 
+    * 2. Transitions slot state -- 
+    * Each chunk in the batch goes from Uploading to Resident, and gpu.valid is set to true. 
+    * From this point forward, the render loop will draw this chunk.
+    *
+    * 3.Releases the CPU renderable -- 
+    * The cpuRenderable (the ~2MB of vertex/index/adjacency vectors that were memcpy'd into 
+    * staging buffers during upload prep) is no longer needed. It's recycled via 
+    * `recycleRenderable` (vectors cleared, shell pushed to pool)
+    */
     void TerrainController::retireCompletedUploads()
     {
 #ifdef M_DEBUG
@@ -217,6 +252,8 @@ namespace aveng {
             return; 
         }
 
+        // The GPU upload fence has signaled, the batch is now retired and the slot transitioned to Resident
+        // given that it's had its `slot.gpu.valid` bool set to `true`
         for (const ChunkCoord& coord : uploadBatch_.inFlightSlots) {
             auto it = slots_.find(coord);
             if (it == slots_.end()) { continue; }
@@ -225,21 +262,11 @@ namespace aveng {
             slot.gpu.valid = true;
             slot.state = procgen::TerrainRuntimeState::Resident;
 
-            if (slot.cpuRenderable) {
-                if (pool_.renderables.size() < TerrainResourcePool::kMaxPooledRenderables) {
-                    slot.cpuRenderable->vbo.clear();
-                    slot.cpuRenderable->ibo.clear();
-                    slot.cpuRenderable->packedPositions.clear();
-                    slot.cpuRenderable->packedTriangles.clear();
-                    slot.cpuRenderable->packedAdjacency.clear();
-                    pool_.renderables.push_back(std::move(slot.cpuRenderable));
-                } else {
-                    slot.cpuRenderable.reset();
-                }
-            }
+            // Recycle resources to avoid future VMA allocations
+            recycleRenderable(std::move(slot.cpuRenderable));
 
-            // Staging buffers stay attached to device buffers -- recycled together
-            // as whole structs when the chunk enters the pool via deferred delete.
+            // Staging buffers stay attached to device buffers -- recycled together when the chunk
+            // is eventually evicted (@Step 8)
         }
 
         uploadBatch_.inFlightSlots.clear();
@@ -255,6 +282,15 @@ namespace aveng {
 
     }
 
+    /**
+    * @Step 4: GPU Upload
+    * When a buffer is acquired from the pool, its Vulkan handles are reused wholesale -- 
+    * device buffer, staging buffer, VMA allocation all still valid. fillStaging maps the 
+    * existing staging buffer and overwrites its contents. recordCopy copies staging to device. 
+    * Zero vmaCreateBuffer/vmaDestroyBuffer on the hot path.
+    * 
+    * The entire batch is submitted with a single vkQueueSubmit behind a fence. Slot state transitions to Uploading
+    */
     void TerrainController::buildAndSubmitUploadBatch()
     {
         if (uploadBatch_.active) { return; }
@@ -339,6 +375,11 @@ namespace aveng {
         return base;
     }
 
+    /*
+    * @Step 1 `ensureChunkRequested`: The TerrainController creates (or finds) a slot in slots_ for the requested coordinate. 
+    * It first checks the admission controller to ensure this chunk's 5x5 support footprint doesn't 
+    * overlap any chunk currently being built (our concurrency guardian)
+    */
     void TerrainController::ensureChunkRequested(ChunkCoord coord)
     {
         auto& slot = slots_[coord];
@@ -361,31 +402,61 @@ namespace aveng {
             return;
         }
 
-        slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_);
+        std::unique_ptr<procgen::TerrainRenderable> recycled;
+        if (!pool_.renderables.empty()) {
+            recycled = std::move(pool_.renderables.back());
+            pool_.renderables.pop_back();
+        }
+
+        /** 
+         * @Step 2 -  Async Generation - 
+         * The recycled renderable is stored on the center ChunkRecord under `renderableMutex` 
+         * The renderable lives on the record and survives any number of retry-enqueue cycles in `runGenerate`.
+         * `runGenerate` runs on a worker thread. It resolves all 25 ChunkRecord pointers for the 5x5 neighborhood, 
+         * pins them (preventing eviction), kicks off all sub-stages and polls for readiness.
+         * If dependencies aren't satisfied, it re-enqueues itself via CAS-guarded retry.
+         */
+        slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_, std::move(recycled));
         slot.state = procgen::TerrainRuntimeState::Requested;
     }
 
+    /* called every frame */
     void TerrainController::drainCompletedTerrain()
     {
 #ifdef M_DEBUG
         drainTimer.start();
 #endif
+        /** 
+         * @Step 3: Collect completed renderables. If the slot is gone (evicted between build and drain) 
+         * or the requestId is stale (superseded by a newer request), the renderable is recycled back to the 
+         * pool instead of being silently destroyed. When the local deque destructs at the end of drain, all 
+         * unique_ptr members are null -- zero debug-heap work.
+         * After draining, admission is released and any deferred requests (from @Step 1) are retried.
+         */
         chunks_->drainCompletedRenderables([this](procgen::RenderableCompletion& completedChunk) {
 
             admission_.release(completedChunk.coord, kSupportRadius);
 
+            auto renderable = std::move(completedChunk.renderable);
+
             auto it = slots_.find(completedChunk.coord);
-            if (it == slots_.end()) { return; }
+            if (it == slots_.end()) {
+                recycleRenderable(std::move(renderable));
+                return;
+            }
 
             auto& slot = it->second;
-            if (slot.requestId != completedChunk.requestId) { return; }
+            if (slot.requestId != completedChunk.requestId) {
+                recycleRenderable(std::move(renderable));
+                return;
+            }
 
-            if (!completedChunk.success || !completedChunk.renderable) {
+            if (!completedChunk.success || !renderable) {
                 slot.state = procgen::TerrainRuntimeState::Failed;
                 return;
             }
 
-            slot.cpuRenderable = std::move(completedChunk.renderable);
+            slot.cpuRenderable = std::move(renderable);
             slot.state = procgen::TerrainRuntimeState::CpuReady;
         });
 
@@ -423,6 +494,13 @@ namespace aveng {
             && chunks_->isRegionAllStagesComplete(center);
     }
 
+    /** 
+    * @Step 8
+    * `flushDeferredDeletes` (called every frame) handles the gap between when the CPU decides a chunk should be evicted 
+    * and when it's actually safe to reclaim that chunk's GPU resources. Waits for `kDeferFrames` to pass based
+    * on the `retireFrame` of cleanup struct. Descriptor sets are freed but buffers return to the pool.
+    * These pooled buffers will be reused in @Step 4 the next time prepareChunkUpload runs.
+    */
     void TerrainController::flushDeferredDeletes()
     {
 
@@ -462,7 +540,18 @@ namespace aveng {
 #endif
     }
 
-    // Cleanup all -- correct shutdown ordering for pool-based resource management
+    void TerrainController::recycleRenderable(std::unique_ptr<procgen::TerrainRenderable> r) {
+        if (!r) return;
+        r->vbo.clear();
+        r->ibo.clear();
+        r->packedPositions.clear();
+        r->packedTriangles.clear();
+        r->packedAdjacency.clear();
+        if (pool_.renderables.size() < TerrainResourcePool::kMaxPooledRenderables)
+            pool_.renderables.push_back(std::move(r));
+    }
+
+    // Cleanup all -- Funnels all resources into pool objects and then destroys from there.
     void TerrainController::cleanup(){
 
         // 1. Wait for in-flight GPU work

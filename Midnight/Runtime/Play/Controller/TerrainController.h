@@ -203,6 +203,8 @@ namespace aveng {
 
     private:
 
+        void recycleRenderable(std::unique_ptr<procgen::TerrainRenderable> r);
+
         /* ChunkCoord represents the center of a 3x3 renderable region,
          * though we actually receive data for a 5x5 region to support compute.
          * Compute dispatch only needs to occur once the renderable is completed
