@@ -19,7 +19,7 @@ namespace aveng {
         std::vector<VkShaderStorageBufferData>   outputSsbo;
         std::vector<std::unique_ptr<procgen::TerrainRenderable>> renderables;
 
-        static constexpr size_t kMaxPooledRenderables = 8;
+        static constexpr size_t kMaxPooledRenderables = 32;
 
         void destroyAll(EngineDevice& engineDevice) {
             for (auto& v : vbo)         VertexBuffer::cleanup(engineDevice, v);

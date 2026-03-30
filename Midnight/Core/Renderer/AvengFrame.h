@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 #include "CoreVK/VkRenderData.h"
 #include "Utils/Timer.h"
 #include "Utils/glm_includes.h"
@@ -56,5 +57,7 @@ namespace aveng {
 		Editor* pEditor; // fwd declare
 
 		Timer mComputeTimer{};
+		Timer mTerrainTickTimer{};
+		std::chrono::steady_clock::time_point frameStartTime_{};
 	};
 }

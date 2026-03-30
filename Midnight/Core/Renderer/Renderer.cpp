@@ -362,6 +362,7 @@ namespace aveng {
 		// Wait for both fences to be signaled before getting the new framebuffer image
 		// Re-enabled compute fence to ensure compute command buffer is safe to reuse
 		std::vector<VkFence> waitFences = { renderData.rdComputeFence.at(currentFrameIndex), renderData.rdRenderFence.at(currentFrameIndex)};
+		// mFenceWaitTimer.start();
 		VkResult result = vkWaitForFences(
 			engineDevice.device(),
 			static_cast<uint32_t>(waitFences.size()),
@@ -369,6 +370,19 @@ namespace aveng {
 			VK_TRUE,
 			UINT64_MAX
 		);
+		//renderData.rdFenceWaitTime = mFenceWaitTimer.stop();
+		//if (renderData.rdFenceWaitTime > renderData.rdFenceWaitTimeMAX) {
+		//	renderData.rdFenceWaitTimeMAX = renderData.rdFenceWaitTime;
+		//	std::printf("[Renderer] Fence wait stall New Max: %.2f ms\n", renderData.rdFenceWaitTimeMAX);
+		//	fflush(stdout);
+		//}
+		//if (renderData.rdFenceWaitTime > 2.0f) {
+		//	std::printf("[Renderer] Fence wait stall: %.2f ms | activeUploads: %d, cpuReady: %d\n",
+		//		renderData.rdFenceWaitTime,
+		//		terrainController_.countActiveUploads(),
+		//		terrainController_.countCpuReadySlots());
+		//	fflush(stdout);
+		//}
 
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: waiting for fences failed (error: %i)\n", __FUNCTION__, result);
@@ -376,6 +390,7 @@ namespace aveng {
 		}
 		
 		// Acquire an image from the swap chain
+		// mAcquireTimer.start();
 		result = vkAcquireNextImageKHR(
 			engineDevice.device(),
 			aveng_swapchain->getSwapchain(),
@@ -384,6 +399,16 @@ namespace aveng {
 			VK_NULL_HANDLE,
 			&currentImageIndex
 		);
+		//renderData.rdAcquireTime = mAcquireTimer.stop();
+		//if (renderData.rdAcquireTime > renderData.rdAcquireTimeMAX) {
+		//	renderData.rdAcquireTimeMAX = renderData.rdAcquireTime;
+		//	std::printf("[Renderer] Acquire stall New Max: %.2f ms\n", renderData.rdAcquireTimeMAX);
+		//	fflush(stdout);
+		//}
+		//if (renderData.rdAcquireTime > 2.0f) {
+		//	std::printf("[Renderer] Acquire stall: %.2f ms\n", renderData.rdAcquireTime);
+		//	fflush(stdout);
+		//}
 
 		// This error will occur after window resize
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -401,6 +426,7 @@ namespace aveng {
 		// Wait for any previous frame that was using this swapchain image to complete
 		// This handles the case where frame-in-flight index != swapchain image index
 		if (renderData.rdImagesInFlight[currentImageIndex] != VK_NULL_HANDLE) {
+			//mAcquireTimer.start();
 			result = vkWaitForFences(
 				engineDevice.device(),
 				1,
@@ -408,6 +434,16 @@ namespace aveng {
 				VK_TRUE,
 				UINT64_MAX
 			);
+			//renderData.rdImageFenceWaitTime = mAcquireTimer.stop();
+			//if (renderData.rdImageFenceWaitTime > renderData.rdImageFenceWaitTimeMAX) {
+			//	renderData.rdImageFenceWaitTimeMAX = renderData.rdImageFenceWaitTime;
+			//	std::printf("[Renderer] Image fence stall New Max: %.2f ms\n", renderData.rdImageFenceWaitTimeMAX);
+			//	fflush(stdout);
+			//}
+			//if (renderData.rdImageFenceWaitTime > 2.0f) {
+			//	std::printf("[Renderer] Image fence stall: %.2f ms\n", renderData.rdImageFenceWaitTime);
+			//	fflush(stdout);
+			//}
 			if (result != VK_SUCCESS) {
 				std::printf("%s error: waiting for image fence failed (error: %i)\n", __FUNCTION__, result);
 				throw std::runtime_error("waiting for image fence failed");
@@ -1210,11 +1246,15 @@ namespace aveng {
 		return true;
 	}
 
+	void Renderer::tickTerrain()
+	{
+		terrainController_.tick();
+	}
+
 	void Renderer::renderTerrain()
 	{
 
 		if (1) {
-			terrainController_.update();
 			terrainController_.renderDebug(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengBasicTerrainPipeline,
@@ -1222,7 +1262,6 @@ namespace aveng {
 			);
 		}
 		else {
-			terrainController_.update();
 			terrainController_.render(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),
 				renderData.rdAvengTerrainLitPipeline,

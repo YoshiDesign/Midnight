@@ -95,16 +95,8 @@ namespace xone {
                 continue;
             }
 
-            it->second.status = StreamedChunkState::Status::Evicting;
-            pendingEvictions_.push_back(c);
-        }
-
-        if (pendingEvictions_.size() >= 3) {
-            for (const ChunkCoord& c : pendingEvictions_) {
-                terrain_.evictChunk(c);
-                streamed_.erase(c);
-            }
-            pendingEvictions_.clear();
+            terrain_.evictChunk(c);
+            streamed_.erase(it);
         }
     }
 
@@ -126,14 +118,16 @@ namespace xone {
         //    // Logger::log(1, "Has Streamed Record[%d, %d] = %d\n", k.x, k.z, v.status);
         //}
 #endif
-        if (state_.maxCenterWaveRequested >= 0 && ctx.playerChunk.x != state_.baseX) {
-            state_.maxCenterWaveRequested = -1;
-            state_.maxFanWaveRequested = -1;
-        }
-
-        if (state_.maxCenterWaveRequested < 0) {
+        if (!state_.initialized) {
             state_.baseX = ctx.playerChunk.x;
             state_.baseZ = ctx.playerChunk.z;
+            state_.initialized = true;
+        }
+        else if (ctx.playerChunk.x != state_.baseX) {
+            state_.baseX = ctx.playerChunk.x;
+            // baseZ intentionally preserved -- forward wave progress is kept
+            state_.maxCenterWaveRequested = -1;
+            state_.maxFanWaveRequested = -1;
         }
 
         requestInitialCenter(streamed, outCmds);
@@ -187,14 +181,16 @@ namespace xone {
             }
 
             // Rule 2:
-            // Once both fan regions' full 5x5 support have completed erosion, request the next center wave.
+            // Once both fan regions' 5x5 support have completed spatial grids, request the next center wave.
+            // The next center's runGenerate handles its own mesh-readiness checks internally via CAS retry,
+            // so we only need the support region's spatial data to be available, not the full pipeline.
             if (state_.maxFanWaveRequested >= 0 &&
                 state_.maxCenterWaveRequested == state_.maxFanWaveRequested)
             {
                 const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested, state_.baseX, state_.baseZ);
 
-                if (terrain.hasRegionComplete(currentFanWave.leftFan) &&
-                    terrain.hasRegionComplete(currentFanWave.rightFan))
+                if (terrain.hasRegionReady(currentFanWave.leftFan) &&
+                    terrain.hasRegionReady(currentFanWave.rightFan))
                 {
                     const int nextCenterWave = state_.maxCenterWaveRequested + 1;
                     const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave, state_.baseX, state_.baseZ);

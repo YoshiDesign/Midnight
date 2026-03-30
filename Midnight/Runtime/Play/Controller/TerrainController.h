@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstdint>
 #include <vector>
 #include <future>
@@ -86,6 +87,7 @@ namespace aveng {
         int maxFanWaveRequested = -1;
         int baseX = 0;
         int baseZ = 0;
+        bool initialized = false;
     };
 
     struct StreamUpdateContext {
@@ -167,6 +169,7 @@ namespace aveng {
         void buildAndSubmitUploadBatch();
         void flushDeferredDeletes();
 
+        void tick();
         void update(/*const Camera& camera*/);
 
         void render(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex);
@@ -197,6 +200,9 @@ namespace aveng {
         bool hasAllPointsReady(const ChunkCoord coord) noexcept ;
         bool hasRegionReady(ChunkCoord center) noexcept;
         bool hasRegionComplete(ChunkCoord center) noexcept;
+
+        int countActiveUploads() const;
+        int countCpuReadySlots() const;
 
         // Expose what was last requested for debug overlays, etc.
         // std::unique_ptr<procgen::TerrainRenderable> const& lastRequestedRenderable() const noexcept;
@@ -231,6 +237,8 @@ namespace aveng {
         Timer retireTimer{};
         Timer drainTimer{};
 
+        Timer tickPhaseTimer_{};
+
         // Dummy
         uint64_t frameIndex_ = 0;
 
@@ -250,8 +258,8 @@ namespace aveng {
         procgen::TerrainAdmissionController admission_;
         std::vector<ChunkCoord> deferredRequests_;
 
-        // Non-blocking batched GPU upload infrastructure
-        TerrainUploadBatch uploadBatch_;
+        // Non-blocking batched GPU upload infrastructure (one per frame-in-flight)
+        std::array<TerrainUploadBatch, 3> uploadBatches_;
 
         // Deferred GPU resource destruction (avoids vkQueueWaitIdle during eviction)
         std::vector<DeferredGpuCleanup> deferredCleanups_;

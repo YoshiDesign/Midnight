@@ -113,6 +113,11 @@ namespace aveng {
         /* Managers */
         void initManagers(procgen::ErosionManager* er);
 
+        void setAdmissionController(procgen::TerrainAdmissionController* ac, int supportRadius) {
+            admissionCtl_ = ac;
+            admissionRadius_ = supportRadius;
+        }
+
         /* Render Target & Completion Queue Drain */
         uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex,
             std::unique_ptr<procgen::TerrainRenderable> recycled = nullptr);
@@ -171,6 +176,9 @@ namespace aveng {
         void initManagerDefaults();
 
         mtools::ConcurrentQueue<procgen::RenderableCompletion> completedRenderables_;
+
+        procgen::TerrainAdmissionController* admissionCtl_ = nullptr;
+        int admissionRadius_ = 0;
 
         procgen::ErosionManager* erosionMgr_ = nullptr;
 

@@ -117,7 +117,8 @@ namespace aveng {
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
         if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            imageCount = std::max(uint32_t{ 3 }, swapChainSupport.capabilities.minImageCount + 1);
+            imageCount = std::max(static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT + 1),
+                                  swapChainSupport.capabilities.minImageCount + 1);
         }
         
         if (swapChainSupport.capabilities.maxImageCount > 0 && 
@@ -998,12 +999,12 @@ namespace aveng {
     VkPresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) 
     {
         // Pro-Tip: VK_PRESENT_MODE_MAILBOX_KHR is probably the most efficient, but more energy intensive so it might not be well suited for mobile applications.
-        //for (const auto& availablePresentMode : availablePresentModes) {
-        //    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-        //        std::cout << "Present mode: Mailbox" << std::endl;
-        //        return availablePresentMode;
-        //    }
-        //}
+        for (const auto& availablePresentMode : availablePresentModes) {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                std::cout << "Present mode: Mailbox" << std::endl;
+                return availablePresentMode;
+            }
+        }
 
          // Pro-Tip: Immediate mode will not work on most mobile devices
          //for (const auto &availablePresentMode : availablePresentModes) {

@@ -1,0 +1,69 @@
+# LATER SAMPLE
+[Renderer] Image fence stall: 22.40 ms
+[Renderer] Image fence stall: 6.98 ms
+[Frame] tickTerrain: 7.56 ms
+[Frame] tickTerrain: 4.47 ms
+[Renderer] Image fence stall: 2.15 ms
+[Renderer] Image fence stall: 26.29 ms
+[Renderer] Image fence stall: 40.28 ms
+[Renderer] Image fence stall: 14.69 ms
+[Renderer] Image fence stall: 9.65 ms
+[Renderer] Image fence stall: 13.09 ms
+[Renderer] Image fence stall: 14.35 ms
+[Renderer] Image fence stall: 14.17 ms
+[Renderer] Image fence stall: 14.18 ms
+[Renderer] Image fence stall: 5.16 ms
+[Renderer] Image fence stall: 18.94 ms
+[Renderer] Image fence stall: 22.81 ms
+[Renderer] Image fence stall: 10.24 ms
+[Renderer] Image fence stall: 18.84 ms
+[Renderer] Image fence stall: 10.35 ms
+[Renderer] Image fence stall: 24.77 ms
+[Renderer] Fence wait stall: 4.57 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Image fence stall: 45.07 ms
+[Renderer] Image fence stall: 11.39 ms
+[Renderer] Image fence stall: 19.64 ms
+[Frame] tickTerrain: 2.45 ms
+[Renderer] Image fence stall: 36.00 ms
+[Renderer] Image fence stall: 4.65 ms
+[Renderer] Image fence stall: 43.55 ms
+[Frame] tickTerrain: 2.99 ms
+
+# FIRST STALL
+[Renderer] Image fence stall: 23.77 ms
+[Renderer] Image fence stall: 22.97 ms
+[Renderer] Image fence stall: 23.09 ms
+[Renderer] Image fence stall: 25.61 ms
+[Renderer] Image fence stall: 24.98 ms
+[Renderer] Fence wait stall New Max: 6.74 ms
+[Renderer] Fence wait stall: 6.74 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall New Max: 7.18 ms
+[Renderer] Fence wait stall: 7.18 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall New Max: 16.33 ms
+[Renderer] Fence wait stall: 16.33 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall: 14.16 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall New Max: 17.85 ms
+[Renderer] Fence wait stall: 17.85 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall: 12.04 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall: 15.26 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall: 16.78 ms | activeUploads: 0, cpuReady: 0
+[Renderer] Fence wait stall: 9.40 ms | activeUploads: 1, cpuReady: 0
+[Renderer] Image fence stall: 36.58 ms
+[Renderer] Image fence stall: 24.16 ms
+[Renderer] Image fence stall: 22.50 ms
+[Renderer] Image fence stall: 20.99 ms
+
+# IDLE
+[Renderer] Image fence stall: 26.66 ms
+[Renderer] Image fence stall: 21.60 ms
+[Renderer] Image fence stall: 24.16 ms
+[Renderer] Image fence stall: 26.40 ms
+[Renderer] Image fence stall: 22.03 ms
+[Renderer] Image fence stall: 24.29 ms
+[Renderer] Image fence stall: 16.02 ms
+[Renderer] Image fence stall New Max: 73.86 ms
+[Renderer] Image fence stall: 73.86 ms
+[Renderer] Image fence stall: 30.68 ms
+[Renderer] Image fence stall: 29.47 ms
+[Renderer] Image fence stall: 18.96 ms
+[Renderer] Image fence stall: 22.83 ms

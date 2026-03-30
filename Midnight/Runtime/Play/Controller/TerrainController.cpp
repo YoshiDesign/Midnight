@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdio>
 #include <memory>
 #include "TerrainController.h"
@@ -33,18 +34,21 @@ namespace aveng {
 	{
 		std::printf("[%s] Constructing TerrainController\n", __FUNCTION__);
         chunks_->initManagers(&erosionMgr_);
+        chunks_->setAdmissionController(&admission_, kSupportRadius);
 
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = 0;
-        vkCreateFence(engineDevice_.device(), &fenceInfo, nullptr, &uploadBatch_.fence);
+        for (size_t i = 0; i < uploadBatches_.size(); ++i) {
+            VkFenceCreateInfo fenceInfo{};
+            fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+            vkCreateFence(engineDevice_.device(), &fenceInfo, nullptr, &uploadBatches_[i].fence);
 
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = engineDevice_.commandPoolGraphics();
-        allocInfo.commandBufferCount = 1;
-        vkAllocateCommandBuffers(engineDevice_.device(), &allocInfo, &uploadBatch_.cmdBuffer);
+            VkCommandBufferAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            allocInfo.commandPool = engineDevice_.commandPoolGraphics();
+            allocInfo.commandBufferCount = 1;
+            vkAllocateCommandBuffers(engineDevice_.device(), &allocInfo, &uploadBatches_[i].cmdBuffer);
+        }
 	}
 
     TerrainController::~TerrainController() {
@@ -72,17 +76,15 @@ namespace aveng {
 
         auto& slot = it->second;
 
-        // This should NEVER occur. This would break the invariance provided by the `TerrainAdmissionController` and our overall architecture
-        if (slot.state == procgen::TerrainRuntimeState::Uploading && uploadBatch_.active) {
-			throw std::runtime_error("Attempting to evict a chunk which is currently uploading.");
-            //Logger::log(1, "Waiting......");
-            //// Fallback synchronization point - stalls our async design
-            //vkWaitForFences(engineDevice_.device(), 1, &uploadBatch_.fence, VK_TRUE, UINT64_MAX);
-            //retireCompletedUploads();
-            /**
-            *   Note: deferred resource reclamation and slot eviction intent
-            *   don't necessarily need to be coupled.
-            */
+        if (slot.state == procgen::TerrainRuntimeState::Uploading) {
+            for (const auto& batch : uploadBatches_) {
+                if (!batch.active) continue;
+                for (const auto& c : batch.inFlightSlots) {
+                    if (c.x == center.x && c.z == center.z) {
+                        throw std::runtime_error("Attempting to evict a chunk which is currently uploading.");
+                    }
+                }
+            }
         }
 
         admission_.release(center, kSupportRadius);
@@ -107,11 +109,31 @@ namespace aveng {
         slots_.erase(center);
     }
 
+    void TerrainController::tick()
+    {
+        tickPhaseTimer_.start();
+        flushDeferredDeletes();
+        float flushTime = tickPhaseTimer_.stop();
+
+        tickPhaseTimer_.start();
+        drainCompletedTerrain();
+        float drainTime = tickPhaseTimer_.stop();
+
+        tickPhaseTimer_.start();
+        serviceCpuReadyChunks();
+        float serviceTime = tickPhaseTimer_.stop();
+
+        float total = flushTime + drainTime + serviceTime;
+        if (total > 2.0f) {
+            std::printf("[TerrainController::tick] %.2f ms (flush: %.2f, drain: %.2f, service: %.2f)\n",
+                total, flushTime, drainTime, serviceTime);
+            fflush(stdout);
+        }
+    }
+
     void TerrainController::update(/*const Camera& camera*/)
     {
-        flushDeferredDeletes();
-        drainCompletedTerrain();
-        serviceCpuReadyChunks();
+        tick();
     }
 
     // @Step 6: Render the completed work for all Resident chunks
@@ -210,6 +232,24 @@ namespace aveng {
         buildAndSubmitUploadBatch();
     }
 
+    int TerrainController::countActiveUploads() const
+    {
+        int count = 0;
+        for (const auto& batch : uploadBatches_) {
+            if (batch.active) ++count;
+        }
+        return count;
+    }
+
+    int TerrainController::countCpuReadySlots() const
+    {
+        int count = 0;
+        for (const auto& [coord, slot] : slots_) {
+            if (slot.state == procgen::TerrainRuntimeState::CpuReady) ++count;
+        }
+        return count;
+    }
+
     /**
     * @Step 5:
     * `retireCompletedUploads` (called every frame) does 3 things:
@@ -232,46 +272,27 @@ namespace aveng {
 #ifdef M_DEBUG
         retireTimer.start();
 #endif
-        if (!uploadBatch_.active) { 
-#ifdef M_DEBUG
-            renderData_.rdTerrainRetireTime = retireTimer.stop();
-            if (renderData_.rdTerrainRetireTime > renderData_.rdTerrainRetireTimeMAX) {
-                renderData_.rdTerrainRetireTimeMAX = renderData_.rdTerrainRetireTime;
+        for (auto& batch : uploadBatches_) {
+            if (!batch.active) { continue; }
+
+            if (vkGetFenceStatus(engineDevice_.device(), batch.fence) != VK_SUCCESS) {
+                continue;
             }
-#endif
-            return; 
-        }
 
-        if (vkGetFenceStatus(engineDevice_.device(), uploadBatch_.fence) != VK_SUCCESS) { 
-#ifdef M_DEBUG
-            renderData_.rdTerrainRetireTime = retireTimer.stop();
-            if (renderData_.rdTerrainRetireTime > renderData_.rdTerrainRetireTimeMAX) {
-                renderData_.rdTerrainRetireTimeMAX = renderData_.rdTerrainRetireTime;
+            for (const ChunkCoord& coord : batch.inFlightSlots) {
+                auto it = slots_.find(coord);
+                if (it == slots_.end()) { continue; }
+
+                auto& slot = it->second;
+                slot.gpu.valid = true;
+                slot.state = procgen::TerrainRuntimeState::Resident;
+
+                recycleRenderable(std::move(slot.cpuRenderable));
             }
-#endif
-            return; 
+
+            batch.inFlightSlots.clear();
+            batch.active = false;
         }
-
-        // The GPU upload fence has signaled, the batch is now retired and the slot transitioned to Resident
-        // given that it's had its `slot.gpu.valid` bool set to `true`
-        for (const ChunkCoord& coord : uploadBatch_.inFlightSlots) {
-            auto it = slots_.find(coord);
-            if (it == slots_.end()) { continue; }
-
-            auto& slot = it->second;
-            slot.gpu.valid = true;
-            slot.state = procgen::TerrainRuntimeState::Resident;
-
-            // Recycle resources to avoid future VMA allocations
-            recycleRenderable(std::move(slot.cpuRenderable));
-
-            // Staging buffers stay attached to device buffers -- recycled together when the chunk
-            // is eventually evicted (@Step 8)
-        }
-
-        uploadBatch_.inFlightSlots.clear();
-        vkResetFences(engineDevice_.device(), 1, &uploadBatch_.fence);
-        uploadBatch_.active = false;
 
 #ifdef M_DEBUG
         renderData_.rdTerrainRetireTime = retireTimer.stop();
@@ -293,9 +314,22 @@ namespace aveng {
     */
     void TerrainController::buildAndSubmitUploadBatch()
     {
-        if (uploadBatch_.active) { return; }
+        const int batchIdx = static_cast<int>(frameIndex_ % renderData_.MAX_FRAMES_IN_FLIGHT);
+        auto& batch = uploadBatches_[batchIdx];
 
-        engineDevice_.beginSingleShotCommand(uploadBatch_.cmdBuffer);
+        if (batch.active) { return; }
+
+#ifdef M_DEBUG
+        if (batch.fence != VK_NULL_HANDLE) {
+            VkResult fenceStatus = vkGetFenceStatus(engineDevice_.device(), batch.fence);
+            if (fenceStatus == VK_NOT_READY) {
+                std::printf("[TerrainController] BUG: uploadBatch[%d].cmdBuffer reuse attempted while fence is still unsignaled!\n", batchIdx);
+                assert(false && "Upload command buffer reuse before fence signaled");
+            }
+        }
+#endif
+
+        engineDevice_.beginSingleShotCommand(batch.cmdBuffer);
 
         int chunksThisBatch = 0;
 
@@ -303,7 +337,6 @@ namespace aveng {
             if (chunksThisBatch >= kMaxChunksPerUploadBatch) { break; }
             if (slot.state != procgen::TerrainRuntimeState::CpuReady) { continue; }
 #ifdef M_DEBUG
-            // Buffer + Descriptor Init Timing
             vkBufferInitTimer.start();
 #endif
             if (!prepareChunkUpload(engineDevice_, renderData_, slot, settingsUboBuffer_, settingsUboSize_, pool_)) {
@@ -318,26 +351,28 @@ namespace aveng {
             vkCopyBufferTimer.start();
 #endif
 
-            recordChunkCopies(uploadBatch_.cmdBuffer, slot);
+            recordChunkCopies(batch.cmdBuffer, slot);
 #ifdef M_DEBUG
-            // Copy Buffer Timing
             renderData_.rdTerrainCopyBufferTime = vkCopyBufferTimer.stop();
             if (renderData_.rdTerrainCopyBufferTime > renderData_.rdTerrainCopyBufferTimeMAX) {
                 renderData_.rdTerrainCopyBufferTimeMAX = renderData_.rdTerrainCopyBufferTime;
             }
 #endif
             slot.state = procgen::TerrainRuntimeState::Uploading;
-            uploadBatch_.inFlightSlots.push_back(coord);
+            batch.inFlightSlots.push_back(coord);
             chunksThisBatch++;
         }
 
-        if (uploadBatch_.inFlightSlots.empty()) {
-            vkEndCommandBuffer(uploadBatch_.cmdBuffer);
+        if (batch.inFlightSlots.empty()) {
+            vkEndCommandBuffer(batch.cmdBuffer);
             return;
         }
 
-        //
-        submitTerrainQueue(engineDevice_, uploadBatch_
+        vkResetFences(engineDevice_.device(), 1, &batch.fence);
+
+        /* The TerrainController owns the upload batch and the command buffer, so it's responsible for submitting it. */
+        /* This also ensures that the GPU is busy before the renderPasses begin, and not just idle. */
+        submitTerrainQueue(engineDevice_, batch
 #ifdef M_DEBUG
 			, renderData_
 #endif
@@ -434,8 +469,6 @@ namespace aveng {
          * After draining, admission is released and any deferred requests (from @Step 1) are retried.
          */
         chunks_->drainCompletedRenderables([this](procgen::RenderableCompletion& completedChunk) {
-
-            admission_.release(completedChunk.coord, kSupportRadius);
 
             auto renderable = std::move(completedChunk.renderable);
 
@@ -554,17 +587,21 @@ namespace aveng {
     // Cleanup all -- Funnels all resources into pool objects and then destroys from there.
     void TerrainController::cleanup(){
 
-        // 1. Wait for in-flight GPU work
-        if (uploadBatch_.active) {
-            vkWaitForFences(engineDevice_.device(), 1, &uploadBatch_.fence, VK_TRUE, UINT64_MAX);
-            retireCompletedUploads();
+        // 1. Wait for all in-flight upload batches
+        for (auto& batch : uploadBatches_) {
+            if (batch.active) {
+                vkWaitForFences(engineDevice_.device(), 1, &batch.fence, VK_TRUE, UINT64_MAX);
+            }
         }
+        retireCompletedUploads();
 
-        // 2. Destroy fence and command buffer
-        if (uploadBatch_.fence != VK_NULL_HANDLE)
-            vkDestroyFence(engineDevice_.device(), uploadBatch_.fence, nullptr);
-        if (uploadBatch_.cmdBuffer != VK_NULL_HANDLE)
-            vkFreeCommandBuffers(engineDevice_.device(), engineDevice_.commandPoolGraphics(), 1, &uploadBatch_.cmdBuffer);
+        // 2. Destroy fences and command buffers
+        for (auto& batch : uploadBatches_) {
+            if (batch.fence != VK_NULL_HANDLE)
+                vkDestroyFence(engineDevice_.device(), batch.fence, nullptr);
+            if (batch.cmdBuffer != VK_NULL_HANDLE)
+                vkFreeCommandBuffers(engineDevice_.device(), engineDevice_.commandPoolGraphics(), 1, &batch.cmdBuffer);
+        }
 
         // 3. Recycle all slot resources into pool (free descriptor sets immediately)
         for (auto& [coord, slot] : slots_) {

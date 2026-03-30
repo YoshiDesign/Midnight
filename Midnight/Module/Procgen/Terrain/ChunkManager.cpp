@@ -1542,6 +1542,10 @@ namespace aveng {
             }
 
             if (shouldPublish) {
+                if (admissionCtl_) {
+                    admissionCtl_->release(center, admissionRadius_);
+                }
+
                 completedRenderables_.push(procgen::RenderableCompletion{
                     .coord = center,
                     .requestId = requestId,
@@ -1551,12 +1555,18 @@ namespace aveng {
             }
         }
         catch (...) {
+            // PEPPYYYY!!!!
             {
                 std::scoped_lock lock(centerRec->renderableMutex);
                 if (centerRec->requestedRenderableId == requestId) {
                     centerRec->renderableState = RenderableBuildState::Failed;
                 }
             }
+
+            if (admissionCtl_) {
+                admissionCtl_->release(center, admissionRadius_);
+            }
+
             completedRenderables_.push(procgen::RenderableCompletion{
                 .coord = center,
                 .requestId = requestId,

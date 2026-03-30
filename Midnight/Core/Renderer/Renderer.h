@@ -138,6 +138,7 @@ namespace aveng {
 			VkPipeline basicPipeline,
 			VkPipeline animationPipeline);
 
+		void tickTerrain();
 		void renderTerrain();
 
 		void reset_timers();
@@ -207,6 +208,8 @@ namespace aveng {
 		VkResult result;
 
 		Timer mDrawTimer{};
+		Timer mFenceWaitTimer{};
+		Timer mAcquireTimer{};
 		Timer mUploadToUBOTimer{};
 		Timer mUploadToSSBO1Timer{};
 		Timer mUploadToSSBO2Timer{};

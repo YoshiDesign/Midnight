@@ -1,6 +1,6 @@
 #pragma once
 #include <mutex>
-#include <deque>
+#include <vector>
 namespace mtools {
     template <typename T>
     class ConcurrentQueue
@@ -17,29 +17,28 @@ namespace mtools {
             std::scoped_lock lock(mutex_);
             if (queue_.empty()) return false;
             out = std::move(queue_.front());
-            queue_.pop_front();
+            // O(n)! Dequeue was faster but caused realocation churn. Time this
+            queue_.erase(queue_.begin());
             return true;
         }
-        
-        /* This doesn't need to be templated and can hinder perf */
+
         template <typename Fn>
         void drain(Fn&& fn)
         {
-            // Swap the queue to a local w/ a lock
-            std::deque<T> local;
             {
                 std::scoped_lock lock(mutex_);
-                local.swap(queue_);
+                scratch_.swap(queue_);
             }
 
-            // `item` is our completed terrain chunk (Terrain Generator)
-            for (auto& item : local) {
+            for (auto& item : scratch_) {
                 fn(item);
             }
+            scratch_.clear();
         }
 
     private:
         std::mutex mutex_;
-        std::deque<T> queue_;
+        std::vector<T> queue_;
+        std::vector<T> scratch_; // reused across drain calls -- no per-frame alloc
     };
 }
