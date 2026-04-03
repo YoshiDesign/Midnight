@@ -98,5 +98,8 @@
     <ClInclude Include="Game\Module\Procgen\TerrainStreamer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Module\Procgen\Helpers\Helpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

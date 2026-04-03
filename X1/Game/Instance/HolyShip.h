@@ -13,8 +13,8 @@ namespace xone {
         explicit HolyShip(PlayManager& play, const aveng::GameServices& gs) 
             : play_(play), 
             gs_(gs), 
-            terrainStream_(gs_.terrain, aveng::TerrainStreamPolicy{}
-        ) {}
+            terrainStream_(gs_.terrain, aveng::TerrainStreamPolicy{}) 
+        {}
 
         std::string name() const override { return "HolyShip"; }
 

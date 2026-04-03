@@ -172,6 +172,9 @@ namespace aveng {
 		std::once_flag pointsOnce;
 		std::shared_future<Points const*> pointsF;
 
+
+		/* TODO - Why are all of these promises shared_ptr? */
+
 		// Stages with dependencies use promise + enqueue (non-blocking re-enqueue pattern).
 		// The promise is created in call_once and resolved when the build completes.
 		std::once_flag allPointsOnce;
@@ -207,7 +210,7 @@ namespace aveng {
 		RenderableBuildState renderableState = RenderableBuildState::None;
 		uint64_t requestedRenderableId = 0;   // increment whenever a new build is requested
 		uint64_t completedRenderableId = 0;   // request id that produced current result
-		std::unique_ptr<procgen::TerrainRenderable> renderableResult;
+		std::unique_ptr<procgen::TerrainRenderable> renderableResult; // UNUSED
 		std::unique_ptr<procgen::TerrainRenderable> recycledRenderable;
 		bool renderablePublished = false; // optional; mostly useful for debugging
 

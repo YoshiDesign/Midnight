@@ -278,6 +278,7 @@ namespace aveng {
 
         // VBO: try pool first, fall back to init
         if (!pool.vbo.empty() && pool.vbo.back().bufferSize >= vboSize) {
+            Logger::log(1, "Initializing New VBO...........\n");
             gpu.draw.vertexBuffer = pool.vbo.back();
             pool.vbo.pop_back();
         } else {
@@ -289,6 +290,7 @@ namespace aveng {
 
         // IBO: try pool first, fall back to init
         if (!pool.ibo.empty() && pool.ibo.back().bufferSize >= iboSize) {
+            Logger::log(1, "Initializing New IBO..........\n");
             gpu.draw.indexBuffer = pool.ibo.back();
             pool.ibo.pop_back();
         } else {
@@ -345,6 +347,7 @@ namespace aveng {
             gpu.packed.inputSsbo = pool.inputSsbo.back();
             pool.inputSsbo.pop_back();
         } else {
+            Logger::log(1, "Initializing New SSBO..........\n");
             if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.inputSsbo, MapMode::OnDemand, ResidentMode::CPU, inputTotalSize)) {
                 Logger::log(1, "%s error: could not create terrain input SSBO\n", __FUNCTION__);
                 return false;
@@ -397,6 +400,7 @@ namespace aveng {
             gpu.packed.outputSsbo = pool.outputSsbo.back();
             pool.outputSsbo.pop_back();
         } else {
+            Logger::log(1, "Initializing New Output SSBO..........\n");
             if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.outputSsbo, MapMode::GpuOnly, ResidentMode::GPU, outputTotalSize)) {
                 Logger::log(1, "%s error: could not create terrain output SSBO\n", __FUNCTION__);
                 return false;

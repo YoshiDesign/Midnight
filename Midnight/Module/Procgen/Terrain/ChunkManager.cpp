@@ -367,32 +367,32 @@ namespace aveng {
      * If we tighten up streaming policy we could maybe factor out the mutex
      * but that's beyond micro-optimizing at the moment.
      */
-    bool ChunkManager::isAllPointsReady(const ChunkCoord coord) const {
-        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
-        return allPointsReady_.find(coord) != allPointsReady_.end();
+    bool ChunkManager::isSpatialGridReady(const ChunkCoord coord) const {
+        std::lock_guard<std::mutex> lock(allSpatialGridReadyMut_);
+        return allSpatialGridReady_.find(coord) != allSpatialGridReady_.end();
     }
 
-    bool ChunkManager::isRegionAllPointsReady(ChunkCoord center) const {
+    bool ChunkManager::isRegionSpatialGridReady(ChunkCoord center) const {
         ChunkCoord region[25];
         get5x5Neighborhood(center, region);
 
-        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
+        std::lock_guard<std::mutex> lock(allSpatialGridReadyMut_);
         for (int i = 0; i < 25; ++i) {
-            if (allPointsReady_.find(region[i]) == allPointsReady_.end())
+            if (allSpatialGridReady_.find(region[i]) == allSpatialGridReady_.end())
                 return false;
         }
         return true;
     }
 
-    void ChunkManager::markAllPointsReady(ChunkCoord coord) {
-        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
-        allPointsReady_.insert(coord);
+    void ChunkManager::markSpatialGridReady(ChunkCoord coord) {
+        std::lock_guard<std::mutex> lock(allSpatialGridReadyMut_);
+        allSpatialGridReady_.insert(coord);
         // Logger::log(1, "READY {%d, %d}\n", coord.x, coord.z);
     }
 
-    void ChunkManager::clearAllPointsReady(ChunkCoord coord) {
-        std::lock_guard<std::mutex> lock(allPointsReadyMut_);
-        allPointsReady_.erase(coord);
+    void ChunkManager::clearSpatialGridReady(ChunkCoord coord) {
+        std::lock_guard<std::mutex> lock(allSpatialGridReadyMut_);
+        allSpatialGridReady_.erase(coord);
     }
 
     bool ChunkManager::isRegionAllStagesComplete(ChunkCoord center) const {
@@ -728,7 +728,7 @@ namespace aveng {
 
         // procgen::traceStage((rec.coord, procgen::TerrainStage::SpatialGrid, "begin");
         SpatialGrid const* sg = buildSpatialGrid(rec);
-        markAllPointsReady(rec.coord);
+        markSpatialGridReady(rec.coord);
         rec.spatialProm->set_value(sg);
         // procgen::traceStage((rec.coord, procgen::TerrainStage::SpatialGrid, "complete");
     }
@@ -1436,7 +1436,7 @@ namespace aveng {
             rec->recycledRenderable = std::move(recycled);
             shouldSubmit = true;
         }
-
+        // Technically, if we reach this point, this will never be false
         if (shouldSubmit) {
             // procgen::traceStage((center, procgen::TerrainStage::Renderable, "request");
 
@@ -1469,7 +1469,7 @@ namespace aveng {
     {
         ChunkRecord* centerRec = getOrCreateRecord(center);
 
-        // Superseded check
+        // TODO : Validate the real necessity here
         {
             std::scoped_lock lock(centerRec->renderableMutex);
             if (centerRec->requestedRenderableId != requestId)
@@ -1478,6 +1478,20 @@ namespace aveng {
 
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors);
+
+        /*
+        * TODO - The fact that ChunkRecord* nrecs[25]; is initialized
+        * locally irks me. We use std::move on its 4th index (center chunk)
+        * in the buildRenderableV2 method to return the packed renderable, 
+        * so the pattern is convenient, but is there a better way to do this?
+        * 
+        * Maybe the ChunkManager could organize chunks differently.
+        * Instead of our StripeBucket, what if chunks existed in localized
+        * 5x5 groups, since they're uploaded that way.
+        * 
+        * Note: this is the 2nd time in this call-stack that we've used
+        * getOrCreateRecord to retrieve the center chunk.
+        */
 
         // Pin all 25 records BEFORE readiness checks to prevent
         // evictRecord from destroying them while we hold raw pointers.
@@ -1527,13 +1541,15 @@ namespace aveng {
         // procgen::traceStage((center, procgen::TerrainStage::Renderable, "begin");
 
         try {
+            // Note: renderable is the result of moving ownership of nrecs[4]
             auto renderable = buildRenderablev2(center, frameIndex, nrecs);
 
             bool shouldPublish = false;
             {
                 std::scoped_lock lock(centerRec->renderableMutex);
-                if (centerRec->requestedRenderableId != requestId)
+                if (centerRec->requestedRenderableId != requestId) {
                     return;
+                }
 
                 centerRec->completedRenderableId = requestId;
                 centerRec->renderableState = RenderableBuildState::Ready;
@@ -1546,11 +1562,12 @@ namespace aveng {
                     admissionCtl_->release(center, admissionRadius_);
                 }
 
+                // Push onto the ConcurrentQueue
                 completedRenderables_.push(procgen::RenderableCompletion{
                     .coord = center,
                     .requestId = requestId,
                     .success = true,
-                    .renderable = std::move(renderable)
+                    .renderable = std::move(renderable) // 2nd move for this guy
                 });
             }
         }
@@ -1594,9 +1611,15 @@ namespace aveng {
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors); // inner 3x3 = [0..8]
 
+        /*
+        * TODO - This renderable comes from an array of 
+        */
+
+        // Center chunk coord is at [4]
         auto renderable = recs[4]->recycledRenderable
             ? std::move(recs[4]->recycledRenderable)
             : std::make_unique<TerrainRenderable>();
+
         renderable->center = center;
 
         const float cs = cfg_.chunkSize;
@@ -1845,317 +1868,36 @@ namespace aveng {
 
     }
 
-    //std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderable(ChunkCoord center, uint64_t frameIndex)
+    //bool ChunkManager::tryTakeRenderable(
+    //    ChunkCoord center,
+    //    uint64_t requestId,
+    //    std::unique_ptr<procgen::TerrainRenderable>& out)
     //{
-    //    using namespace procgen;
+    //    ChunkRecord* rec = getOrCreateRecord(center);
+    //    if (!rec) { return false; }
 
-    //    ChunkCoord neighbors[25];
-    //    get5x5Neighborhood(center, neighbors); // Guarantees 3x3 is [0-8]
+    //    std::scoped_lock lock(rec->renderableMutex);
 
-    //    // Collect chunk records (all should exist and be populated by now)
-    //    std::array<ChunkRecord*, 25> recs{};
-    //    for (int i = 0; i < 25; ++i) {
-    //        recs[i] = getOrCreateRecord(neighbors[i]);
+    //    if (rec->renderableState != RenderableBuildState::Ready) {
+    //        return false;
     //    }
 
-    //    auto renderable = std::make_unique<TerrainRenderable>();
-    //    renderable->center = center;
-
-    //    // Compute world bounds for core 3x3 and support 5x5
-    //    const float cs = cfg_.chunkSize;
-    //    const glm::vec2 coreMin = { (center.x - 1) * cs, (center.z - 1) * cs };
-    //    const glm::vec2 coreMax = { (center.x + 2) * cs, (center.z + 2) * cs };
-    //    const glm::vec2 suppMin = { (center.x - 2) * cs, (center.z - 2) * cs };
-    //    const glm::vec2 suppMax = { (center.x + 3) * cs, (center.z + 3) * cs };
-
-    //    // ----- Pass 1: Build global vertex remap -----
-    //    // We need a global vertex index for every unique (chunk, localSiteIdx) pair.
-    //    // Layout: [3x3 core verts | 3x3 halo verts | outer-16 all verts]
-    //    //          ^-- "core" for alignment --^  ^-- "halo" for alignment --^
-
-    //    // TODO: convert to scratch 
-    //    struct ChunkVertexInfo {
-    //        uint32_t globalBase = 0;
-    //        uint32_t coreCount  = 0;
-    //        uint32_t totalCount = 0;
-    //    };
-    //    std::array<ChunkVertexInfo, 25> chunkInfo{};
-
-    //    // Count vertices
-    //    uint32_t totalCoreVerts = 0;
-    //    uint32_t totalHaloVerts = 0;
-
-    //    // Inner 3x3: core verts go to the core section, non-core go to halo
-    //    for (int i = 0; i < 9; ++i) {
-    //        auto* ap = recs[i]->allPoints;
-    //        if (!ap) { continue; }
-    //        chunkInfo[i].coreCount  = static_cast<uint32_t>(ap->coreIdx.size());
-    //        chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
-    //        totalCoreVerts += chunkInfo[i].coreCount;
-    //        totalHaloVerts += (chunkInfo[i].totalCount - chunkInfo[i].coreCount);
+    //    if (rec->completedRenderableId != requestId) {
+    //        return false; // stale completion or newer request replaced it
     //    }
 
-    //    // Outer 16: all their verts are halo/support
-    //    for (int i = 9; i < 25; ++i) {
-    //        auto* ap = recs[i]->allPoints;
-    //        if (!ap) { continue; }
-    //        chunkInfo[i].coreCount  = 0; // No contribution to inner 3x3 core region
-    //        chunkInfo[i].totalCount = static_cast<uint32_t>(ap->pts.size());
-    //        totalHaloVerts += chunkInfo[i].totalCount;
+    //    if (!rec->renderableResult) {
+    //        return false;
     //    }
 
-    //    const uint32_t totalVerts = totalCoreVerts + totalHaloVerts;
+    //    out = std::move(rec->renderableResult);
 
-    //    // Assign global base offsets
-    //    // Core region: pack 3x3 core verts contiguously
-    //    uint32_t coreOffset = 0;
-    //    for (int i = 0; i < 9; ++i) {
-    //        chunkInfo[i].globalBase = coreOffset; // base for this chunk's core verts
-    //        coreOffset += chunkInfo[i].coreCount;
-    //    }
+    //    // Keep or clear state depending on caching policy.
+    //    rec->renderableState = RenderableBuildState::None;
+    //    rec->renderablePublished = false;
 
-    //    // Halo region: pack 3x3 halo verts, then outer-16 verts
-    //    uint32_t haloOffset = totalCoreVerts;
-    //    // (We'll assign individual halo offsets per chunk during the packing pass)
-
-    //    // ----- Pass 2: Pack positions and build per-chunk old2global remap -----
-    //    renderable->packedPositions.resize(totalVerts);
-
-    //    // Per-chunk remap: chunk-local site index -> global vertex index
-    //    // We use a vector of vectors (stack allocated in terms of references)
-    //    std::vector<std::vector<uint32_t>> old2global(25);
-
-    //    for (int i = 0; i < 25; ++i) {
-    //        auto* ap = recs[i]->allPoints;
-    //        if (!ap) continue;
-
-    //        const auto& pts = ap->pts;
-    //        const auto& coreIdx = ap->coreIdx;
-    //        const size_t nPts = pts.size();
-    //        const auto& eHeights = (i < 9 && recs[i]->erosion) ? recs[i]->erosion->eHeights
-    //                                                           : recs[i]->heightField->heights;
-
-    //        // Create a mapping to translate local chunk points to a global index
-    //        constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
-    //        old2global[i].resize(nPts, UNMAPPED);
-
-    //        // Build core membership for this chunk
-    //        std::vector<uint8_t> isCore(nPts, 0);
-    //        if (i < 9) {
-    //            for (uint32_t ci : coreIdx) {
-    //                // Flag generated core points of the 3x3 region
-    //                isCore[ci] = 1;
-    //            }
-    //        }
-
-    //        // Region delineation
-    //        if (i < 9) {
-    //            // Inner 3x3: core verts get the core base, halo verts get halo base
-    //            uint32_t localCoreOff = chunkInfo[i].globalBase;
-    //            for (uint32_t ci : coreIdx) {
-    //                uint32_t gIdx = localCoreOff++;
-    //                old2global[i][ci] = gIdx;
-    //                renderable->packedPositions[gIdx] = glm::vec4(pts[ci].x, -eHeights[ci], pts[ci].y, 1.0f);
-    //            }
-    //            for (size_t si = 0; si < nPts; ++si) {
-    //                if (!isCore[si]) {
-    //                    uint32_t gIdx = haloOffset++;
-    //                    old2global[i][si] = gIdx;
-    //                    renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
-    //                }
-    //            }
-    //        } else {
-    //            // Outer 16: all verts go to halo section
-    //            for (size_t si = 0; si < nPts; ++si) {
-    //                uint32_t gIdx = haloOffset++;
-    //                old2global[i][si] = gIdx;
-    //                renderable->packedPositions[gIdx] = glm::vec4(pts[si].x, -eHeights[si], pts[si].y, 1.0f);
-    //            }
-    //        }
-    //    }
-
-    //    // ----- Pass 3: Pack triangles [core | halo] with rebased indices -----
-    //    // First pass: count core vs halo triangles
-    //    uint32_t totalCoreTris = 0;
-    //    uint32_t totalHaloTris = 0;
-
-    //    for (int i = 0; i < 25; ++i) {
-    //        auto* tri = recs[i]->triangulation;
-    //        if (!tri) continue;
-
-    //        auto* ap = recs[i]->allPoints;
-    //        if (!ap) continue;
-
-    //        const size_t nPts = ap->pts.size();
-    //        std::vector<uint8_t> isCore(nPts, 0);
-    //        if (i < 9) {
-    //            for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
-    //        }
-
-    //        for (const auto& t : tri->tris) {
-    //            if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
-    //                ++totalCoreTris;
-    //            } else {
-    //                ++totalHaloTris;
-    //            }
-    //        }
-    //    }
-
-    //    const uint32_t totalTris = totalCoreTris + totalHaloTris;
-    //    renderable->packedTriangles.resize(totalTris);
-
-    //    uint32_t coreTriOffset = 0;
-    //    uint32_t haloTriOffset = totalCoreTris;
-
-    //    for (int i = 0; i < 25; ++i) {
-    //        auto* tri = recs[i]->triangulation;
-    //        if (!tri) { continue; }
-
-    //        auto* ap = recs[i]->allPoints;
-    //        if (!ap) { continue; }
-
-    //        const size_t nPts = ap->pts.size();
-    //        std::vector<uint8_t> isCore(nPts, 0);
-    //        if (i < 9) {
-    //            for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
-    //        }
-
-    //        for (const auto& t : tri->tris) {
-    //            uint32_t gA = old2global[i][t.A];
-    //            uint32_t gB = old2global[i][t.B];
-    //            uint32_t gC = old2global[i][t.C];
-
-    //            if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
-    //                renderable->packedTriangles[coreTriOffset++] = packTriIndices(gA, gB, gC);
-    //            } else {
-    //                renderable->packedTriangles[haloTriOffset++] = packTriIndices(gA, gB, gC);
-    //            }
-    //        }
-    //    }
-
-    //    // ----- Pass 4: Build adjacency [core | halo] -----
-    //    renderable->packedAdjacency.resize(totalVerts);
-    //    std::memset(renderable->packedAdjacency.data(), 0, totalVerts * sizeof(VertexAdjacency));
-
-    //    // We need to iterate triangles again with the global triangle index
-    //    // to assign globally-rebased triangle IDs to each vertex's adjacency.
-    //    coreTriOffset = 0;
-    //    haloTriOffset = totalCoreTris;
-
-    //    for (int i = 0; i < 25; ++i) {
-    //        auto* tri = recs[i]->triangulation;
-    //        if (!tri) continue;
-
-    //        auto* ap = recs[i]->allPoints;
-    //        if (!ap) continue;
-
-    //        const size_t nPts = ap->pts.size();
-    //        std::vector<uint8_t> isCore(nPts, 0);
-    //        if (i < 9) {
-    //            for (uint32_t ci : ap->coreIdx) isCore[ci] = 1;
-    //        }
-
-    //        for (const auto& t : tri->tris) {
-    //            uint32_t gA = old2global[i][t.A];
-    //            uint32_t gB = old2global[i][t.B];
-    //            uint32_t gC = old2global[i][t.C];
-
-    //            uint32_t globalTriIdx;
-    //            if (i < 9 && isCore[t.A] && isCore[t.B] && isCore[t.C]) {
-    //                globalTriIdx = coreTriOffset++;
-    //            } else {
-    //                globalTriIdx = haloTriOffset++;
-    //            }
-
-    //            const uint32_t verts[3] = { gA, gB, gC };
-    //            for (int k = 0; k < 3; ++k) {
-    //                auto& adj = renderable->packedAdjacency[verts[k]];
-    //                if (adj.count < MAX_ADJACENT_TRIS) {
-    //                    adj.triangleIndices[adj.count++] = globalTriIdx;
-    //                }
-    //            }
-    //        }
-    //    }
-
-    //    // ----- Pass 5: Build VBO and IBO (3x3 core only) -----
-    //    // VBO = the core positions (already packed at indices [0..totalCoreVerts))
-    //    renderable->vbo.resize(totalCoreVerts);
-    //    for (uint32_t v = 0; v < totalCoreVerts; ++v) {
-    //        renderable->vbo[v] = renderable->packedPositions[v];
-    //        glm::vec3 vert = renderable->packedPositions[v];
-    //        //if (v > 4000) {
-    //        //    std::printf("V1 vbo[%d] = {%f, %f, %f}\n", v, vert.x, vert.y, vert.z);
-    //        //}
-    //    }
-
-    //    // IBO = core triangles with indices remapped into VBO space
-    //    // Core triangles already reference global indices [0..totalCoreVerts),
-    //    // and VBO is a direct copy of that range, so VBO-local index = global index.
-    //    renderable->ibo.reserve(totalCoreTris * 3);
-    //    for (uint32_t ti = 0; ti < totalCoreTris; ++ti) {
-    //        const glm::vec3& packed = renderable->packedTriangles[ti];
-    //        uint32_t a, b, c;
-    //        std::memcpy(&a, &packed.x, sizeof(uint32_t));
-    //        std::memcpy(&b, &packed.y, sizeof(uint32_t));
-    //        std::memcpy(&c, &packed.z, sizeof(uint32_t));
-    //        renderable->ibo.push_back(a);
-    //        renderable->ibo.push_back(b);
-    //        renderable->ibo.push_back(c);
-    //    }
-
-    //    // ----- Fill alignment UBO -----
-    //    auto& align = renderable->alignment;
-    //    align.baseCorePosition  = 0;
-    //    align.countCorePosition = totalCoreVerts;
-    //    align.countHaloPosition = totalHaloVerts;
-
-    //    align.baseCoreTriangle  = 0;
-    //    align.countCoreTriangle = totalCoreTris;
-    //    align.countHaloTriangle = totalHaloTris;
-
-    //    align.baseCoreAdjacency  = 0;
-    //    align.countCoreAdjacency = totalCoreVerts;
-    //    align.countHaloAdjacency = totalHaloVerts;
-
-    //    align.coreMinXZ    = coreMin;
-    //    align.coreMaxXZ    = coreMax;
-    //    align.supportMinXZ = suppMin;
-    //    align.supportMaxXZ = suppMax;
-
-    //    return renderable;
+    //    return true;
     //}
-
-    bool ChunkManager::tryTakeRenderable(
-        ChunkCoord center,
-        uint64_t requestId,
-        std::unique_ptr<procgen::TerrainRenderable>& out)
-    {
-        ChunkRecord* rec = getOrCreateRecord(center);
-        if (!rec) { return false; }
-
-        std::scoped_lock lock(rec->renderableMutex);
-
-        if (rec->renderableState != RenderableBuildState::Ready) {
-            return false;
-        }
-
-        if (rec->completedRenderableId != requestId) {
-            return false; // stale completion or newer request replaced it
-        }
-
-        if (!rec->renderableResult) {
-            return false;
-        }
-
-        out = std::move(rec->renderableResult);
-
-        // Keep or clear state depending on caching policy.
-        rec->renderableState = RenderableBuildState::None;
-        rec->renderablePublished = false;
-
-        return true;
-    }
-
 
     /* Lifetime saftey features & eviction policy (below) */
 
@@ -2199,7 +1941,7 @@ namespace aveng {
                     const uint64_t age = (frameIndex >= last) ? (frameIndex - last) : 0;
 
                     if (pins == 0 && age > ageFrames) {
-                        clearAllPointsReady(rec->coord);
+                        clearSpatialGridReady(rec->coord);
                         clearAllStagesComplete(rec->coord);
                         // Move the chunk record out of its bucket
                         // into a local that won't survive out of scope.
@@ -2229,7 +1971,7 @@ namespace aveng {
             ChunkRecord* rec = it->second.get();
             if (rec->pinCount.load(std::memory_order_relaxed) != 0) return false;
 
-            clearAllPointsReady(coord);
+            clearSpatialGridReady(coord);
             clearAllStagesComplete(coord);
             toFree = std::move(it->second);
             bucket.map.erase(it);

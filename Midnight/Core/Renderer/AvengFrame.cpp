@@ -9,6 +9,7 @@
 #include "CoreVK/Resources/platform.h"
 #include "Runtime/Play/Controller/TerrainController.h"
 #include <cassert>
+#include <cstdio>
 
 namespace aveng {
 

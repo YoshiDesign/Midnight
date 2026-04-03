@@ -124,8 +124,8 @@ namespace aveng {
 
         // DEPRECATED: renderable is now carried directly in RenderableCompletion.
         // Kept for reference; no longer called from the drain path.
-        bool tryTakeRenderable(ChunkCoord center, uint64_t requestId,
-            std::unique_ptr<procgen::TerrainRenderable>& out);
+        /*bool tryTakeRenderable(ChunkCoord center, uint64_t requestId,
+            std::unique_ptr<procgen::TerrainRenderable>& out);*/
 
         // Used after generation to acquire completed renderable 3x3 regions
         template <typename Fn>
@@ -134,8 +134,8 @@ namespace aveng {
             completedRenderables_.drain(std::forward<Fn>(fn));
         }
 
-        bool isAllPointsReady(const ChunkCoord coord) const;
-        bool isRegionAllPointsReady(ChunkCoord center) const;
+        bool isSpatialGridReady(const ChunkCoord coord) const;
+        bool isRegionSpatialGridReady(ChunkCoord center) const;
         bool isRegionAllStagesComplete(ChunkCoord center) const;
 
         // Used during generation to acquire the record we need
@@ -163,8 +163,8 @@ namespace aveng {
         }
 
     private:
-        void markAllPointsReady(ChunkCoord coord);
-        void clearAllPointsReady(ChunkCoord coord);
+        void markSpatialGridReady(ChunkCoord coord);
+        void clearSpatialGridReady(ChunkCoord coord);
         void markAllStagesComplete(ChunkCoord coord);
         void clearAllStagesComplete(ChunkCoord coord);
 
@@ -213,8 +213,8 @@ namespace aveng {
 
         // Safe for parallel operations spanning overlapping regions
         // If we need to change which stage this implies that's super easy. For now its AllPoints generation.
-        mutable std::mutex allPointsReadyMut_;
-        std::unordered_set<ChunkCoord, ChunkCoordHash> allPointsReady_;
+        mutable std::mutex allSpatialGridReadyMut_;
+        std::unordered_set<ChunkCoord, ChunkCoordHash> allSpatialGridReady_;
 
         mutable std::mutex allStagesCompleteMut_;
         std::unordered_set<ChunkCoord, ChunkCoordHash> allStagesComplete_;

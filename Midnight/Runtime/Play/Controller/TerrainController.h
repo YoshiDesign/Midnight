@@ -101,12 +101,13 @@ namespace aveng {
     };
 
     struct LinearStreamPolicy {
-        int lateralRadius = 1;
-        int forwardRows = 9;
-        int backwardRows = 1;
-        int evictRadiusX = 6;
-        // int evictRadiusZ = 7;
-        int evictBackwardZ = 2;
+        int lateralRadius{ 1 };
+        int forwardRows{ 6 };
+        int backwardRows { 1 };
+        int evictRadiusX { 4 };
+        // int evictRadiusZ {7};
+        int evictBackwardZ { 2 };
+        int kMaxRequests { 2 }; // 2 requests max per frame
     };
 
     struct AllRangeStreamPolicy {
@@ -161,6 +162,8 @@ namespace aveng {
         /* Getter */
         float getChunkSize();
 
+        void setDrawCenter(glm::vec3 worldPos) noexcept;
+
         /* Streaming Policy */
 
         /* Operational Requirements */
@@ -197,12 +200,14 @@ namespace aveng {
 
         void drainCompletedTerrain();
 
-        bool hasAllPointsReady(const ChunkCoord coord) noexcept ;
+        bool hasSpatialGridReady(const ChunkCoord coord) noexcept ;
         bool hasRegionReady(ChunkCoord center) noexcept;
         bool hasRegionComplete(ChunkCoord center) noexcept;
 
+        // Diagnostics for frame pacing
         int countActiveUploads() const;
         int countCpuReadySlots() const;
+        int countResidentSlots() const;
 
         // Expose what was last requested for debug overlays, etc.
         // std::unique_ptr<procgen::TerrainRenderable> const& lastRequestedRenderable() const noexcept;
@@ -219,8 +224,8 @@ namespace aveng {
 
         std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash> managed_;
         ChunkCoord currentCenter_;
-        TerrainStreamMode currentMode_;
 
+        TerrainStreamMode currentMode_;
         TerrainStreamPolicy policy_{};
 
         VkBasicTerrainPushConstant pc;
@@ -236,25 +241,26 @@ namespace aveng {
         Timer vkCopyBufferTimer{};
         Timer retireTimer{};
         Timer drainTimer{};
-
         Timer tickPhaseTimer_{};
 
         // Dummy
         uint64_t frameIndex_ = 0;
 
+        static constexpr uint64_t kDeferFrames = 3;
+        static constexpr int kMaxChunksPerUploadBatch = 3;
+        static constexpr int kDrawRadius = 1;
+        static constexpr int kSupportRadius = 2; // 5x5 neighborhood
 
         // std::unique_ptr<procgen::TerrainRenderable> lastRequested_;
 
         // CEO (Chunk Executive Officer)
         ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
-        static constexpr int kMaxChunksPerUploadBatch = 3;
         EngineDevice& engineDevice_;
         VkRenderData& renderData_;
         procgen::ErosionManager erosionMgr_;
 
         // Region admission control: prevents overlapping 5x5 support footprints
         // from being built concurrently (the primary fix for dependency starvation).
-        static constexpr int kSupportRadius = 2; // 5x5 neighborhood
         procgen::TerrainAdmissionController admission_;
         std::vector<ChunkCoord> deferredRequests_;
 
@@ -263,7 +269,6 @@ namespace aveng {
 
         // Deferred GPU resource destruction (avoids vkQueueWaitIdle during eviction)
         std::vector<DeferredGpuCleanup> deferredCleanups_;
-        static constexpr uint64_t kDeferFrames = 3;
 
         // Recycling pool for Vulkan buffers and CPU renderables
         TerrainResourcePool pool_;

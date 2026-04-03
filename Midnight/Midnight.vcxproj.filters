@@ -1532,6 +1532,12 @@
     <ClInclude Include="Module\Procgen\Rendering\VkTerrain.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Module\Procgen\Terrain\Control.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\Rendering\TerrainResourcePool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="vendor\glm\detail\func_common.inl">

@@ -172,6 +172,7 @@
     <ClInclude Include="Game\Instance\HolyShip.h" />
     <ClInclude Include="Game\Instance\Starfield.h" />
     <ClInclude Include="Game\Math\aveng_math.h" />
+    <ClInclude Include="Game\Module\Procgen\Helpers\Helpers.h" />
     <ClInclude Include="Game\Module\Procgen\TerrainStreamer.h" />
     <ClInclude Include="Game\Player\Action.h" />
     <ClInclude Include="Game\Player\Command.h" />

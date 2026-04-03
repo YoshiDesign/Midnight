@@ -362,7 +362,7 @@ namespace aveng {
 		// Wait for both fences to be signaled before getting the new framebuffer image
 		// Re-enabled compute fence to ensure compute command buffer is safe to reuse
 		std::vector<VkFence> waitFences = { renderData.rdComputeFence.at(currentFrameIndex), renderData.rdRenderFence.at(currentFrameIndex)};
-		// mFenceWaitTimer.start();
+		mFenceWaitTimer.start();
 		VkResult result = vkWaitForFences(
 			engineDevice.device(),
 			static_cast<uint32_t>(waitFences.size()),
@@ -370,19 +370,7 @@ namespace aveng {
 			VK_TRUE,
 			UINT64_MAX
 		);
-		//renderData.rdFenceWaitTime = mFenceWaitTimer.stop();
-		//if (renderData.rdFenceWaitTime > renderData.rdFenceWaitTimeMAX) {
-		//	renderData.rdFenceWaitTimeMAX = renderData.rdFenceWaitTime;
-		//	std::printf("[Renderer] Fence wait stall New Max: %.2f ms\n", renderData.rdFenceWaitTimeMAX);
-		//	fflush(stdout);
-		//}
-		//if (renderData.rdFenceWaitTime > 2.0f) {
-		//	std::printf("[Renderer] Fence wait stall: %.2f ms | activeUploads: %d, cpuReady: %d\n",
-		//		renderData.rdFenceWaitTime,
-		//		terrainController_.countActiveUploads(),
-		//		terrainController_.countCpuReadySlots());
-		//	fflush(stdout);
-		//}
+		renderData.rdFenceWaitTime = mFenceWaitTimer.stop();
 
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: waiting for fences failed (error: %i)\n", __FUNCTION__, result);
@@ -426,7 +414,7 @@ namespace aveng {
 		// Wait for any previous frame that was using this swapchain image to complete
 		// This handles the case where frame-in-flight index != swapchain image index
 		if (renderData.rdImagesInFlight[currentImageIndex] != VK_NULL_HANDLE) {
-			//mAcquireTimer.start();
+			mAcquireTimer.start();
 			result = vkWaitForFences(
 				engineDevice.device(),
 				1,
@@ -434,7 +422,7 @@ namespace aveng {
 				VK_TRUE,
 				UINT64_MAX
 			);
-			//renderData.rdImageFenceWaitTime = mAcquireTimer.stop();
+			renderData.rdImageFenceWaitTime = mAcquireTimer.stop();
 			//if (renderData.rdImageFenceWaitTime > renderData.rdImageFenceWaitTimeMAX) {
 			//	renderData.rdImageFenceWaitTimeMAX = renderData.rdImageFenceWaitTime;
 			//	std::printf("[Renderer] Image fence stall New Max: %.2f ms\n", renderData.rdImageFenceWaitTimeMAX);
@@ -1253,6 +1241,7 @@ namespace aveng {
 
 	void Renderer::renderTerrain()
 	{
+		terrainController_.setDrawCenter(cameraManager.active().transform.translation);
 
 		if (1) {
 			terrainController_.renderDebug(

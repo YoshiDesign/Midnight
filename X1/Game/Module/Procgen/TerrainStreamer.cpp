@@ -1,18 +1,10 @@
 #include "TerrainStreamer.h"
+#include "Game/Module/Procgen/Helpers/Helpers.h"
 #include "Utils/Logger.h"
 
 namespace xone {
 
     using namespace aveng;
-
-    /*
-    * Operational Success Criteria:
-    *   update() is called every frame
-    *   Terrain.hasAllPointsReady(coord) eventually flips to true for requested chunks.
-    *   Streamed remains the authoritative dedupe set for already-requested centers.
-    *   MakeLinearWave(n) produces the intended forward progression pattern.
-    *   Eviction does not remove chunks too aggressively before downstream waves can use them.
-    */
 
     TerrainStreamer::TerrainStreamer(
         TerrainController& terrain,
@@ -89,14 +81,16 @@ namespace xone {
 
     void TerrainStreamer::applyEvictions(const std::vector<ChunkCoord>& evictCenters)
     {
+        int evicted = 0;
         for (const ChunkCoord& c : evictCenters) {
+            if (evicted >= kMaxEvictionsPerFrame) break;
+
             auto it = streamed_.find(c);
-            if (it == streamed_.end()) {
-                continue;
-            }
+            if (it == streamed_.end()) continue;
 
             terrain_.evictChunk(c);
             streamed_.erase(it);
+            ++evicted;
         }
     }
 
@@ -118,19 +112,35 @@ namespace xone {
         //    // Logger::log(1, "Has Streamed Record[%d, %d] = %d\n", k.x, k.z, v.status);
         //}
 #endif
+
+        /*
+        * ctx contains the player's current chunk coordinate.
+        * Here we're synchronizing this to the LinearFlightStreamer's state_
+        */
+
+        // Acquire stream starting point
         if (!state_.initialized) {
             state_.baseX = ctx.playerChunk.x;
             state_.baseZ = ctx.playerChunk.z;
             state_.initialized = true;
         }
-        else if (ctx.playerChunk.x != state_.baseX) {
+
+        // Update the authoritative state
+        if (ctx.playerChunk.x != state_.baseX) {
             state_.baseX = ctx.playerChunk.x;
             // baseZ intentionally preserved -- forward wave progress is kept
             state_.maxCenterWaveRequested = -1;
             state_.maxFanWaveRequested = -1;
         }
 
-        requestInitialCenter(streamed, outCmds);
+        if (ctx.playerChunk.z != state_.baseZ) {
+            state_.baseZ = ctx.playerChunk.z;
+        }
+
+        // Request chunks based on (X % 3 == 0 || Z % 3 == 0)
+        if (state_.maxCenterWaveRequested < 0) {
+            requestInitialCenter(streamed, outCmds);
+        }
         advanceFrontier(ctx, terrain, streamed, outCmds);
         enqueueEvictions(ctx.playerChunk, streamed, outCmds);
     }
@@ -140,16 +150,15 @@ namespace xone {
         StreamCommandBuffer& outCmds
     )
     {
-        if (state_.maxCenterWaveRequested >= 0) {
-            return;
-        }
 
+        // Designate the first set of chunkCoords to be generated.
         const LinearWaveCoords w0 = makeLinearWave(0, state_.baseX, state_.baseZ);
         //// Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
         //// Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
         //// Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
         requestIfNeeded(w0.center, streamed, outCmds);
-        state_.maxCenterWaveRequested = 0;
+        // increment
+        state_.maxCenterWaveRequested = 0; 
     }
 
     void LinearFlightStreamer::advanceFrontier(
@@ -159,18 +168,34 @@ namespace xone {
         StreamCommandBuffer& outCmds
     )
     {
+
         bool progressed = false;
+        int iter = 0;
+
+        ChunkCoord nearestCenter = procgen::centerOfRegion_linearPolicy_wrap(ctx.playerChunk.x, ctx.playerChunk.z);
 
         do {
             progressed = false;
 
+            //if (iter++ == policy_.kMaxRequests) { break; }
+            // Updated Algo:
+            /// Get the players chunk X/Z
+            /// 
+            /// - Using the new algo, derive the central chunk based on the player's region
+            /// - 
+            /// 
+            /// Invariant: We only request chunks from centers that are at least 3 units apart
+            
+
             // Rule 1:
-            // If the next center wave has already been requested and its entire 5x5 support
-            // region is all-points-ready, request the two side fan chunks for that wave.
+            // Request the two side fan chunks for that wave once the center is ready enough.
             const int nextFanWave = state_.maxFanWaveRequested + 1;
             if (nextFanWave <= state_.maxCenterWaveRequested) {
+
+                // Based on the player's current state_.baseX/Z - Create a LinearWaveCoords based on that location
                 const LinearWaveCoords wave = makeLinearWave(nextFanWave, state_.baseX, state_.baseZ);
 
+                // Check that an entire 5x5 region has completed up to the spatial grid
                 if (terrain.hasRegionReady(wave.center)) {
                     requestIfNeeded(wave.leftFan, streamed, outCmds);
                     requestIfNeeded(wave.rightFan, streamed, outCmds);
@@ -189,6 +214,7 @@ namespace xone {
             {
                 const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested, state_.baseX, state_.baseZ);
 
+                // Check that an entire 5x5 region has completed up to the spatial grid
                 if (terrain.hasRegionReady(currentFanWave.leftFan) &&
                     terrain.hasRegionReady(currentFanWave.rightFan))
                 {
@@ -248,7 +274,7 @@ namespace xone {
         }
     }
 
-
+    /* Add to the command's requestCenters. Requests are assumed to be validated given regional readiness */
     void LinearFlightStreamer::requestIfNeeded(
         ChunkCoord coord,
         std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
@@ -260,8 +286,10 @@ namespace xone {
             StreamedChunkState{ StreamedChunkState::Status::Requested }
         );
 
-        // // Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
+        // Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
 
+        // Note: requestCenters can be either from the center of the wave or either of its fans,
+        // It just means the central chunk being requested in the 5x5 (total) region
         if (inserted) {
             outCmds.requestCenters.push_back(coord);
             // Logger::log(1, "RequestCenters {%d}\n", outCmds.requestCenters.size());

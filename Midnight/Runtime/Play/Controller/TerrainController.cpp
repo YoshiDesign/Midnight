@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <memory>
 #include "TerrainController.h"
@@ -151,6 +152,12 @@ namespace aveng {
                 continue;
             }
 
+            int dx = coord.x - currentCenter_.x;
+            int dz = coord.z - currentCenter_.z;
+            if (dx > kDrawRadius || dx < -kDrawRadius ||
+                dz > kDrawRadius || dz < -kDrawRadius)
+                continue;
+
             if (slot.gpu.packed.graphicsDescriptorSet == VK_NULL_HANDLE) {
                 continue;
             }
@@ -182,7 +189,7 @@ namespace aveng {
         }
     }
     
-    // RenderVK
+    //
     void TerrainController::renderDebug(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex)
     {
 
@@ -200,6 +207,12 @@ namespace aveng {
             if (!slot.gpu.valid || slot.gpu.draw.indexCount == 0) {
                 continue;
             }
+
+            int dx = coord.x - currentCenter_.x;
+            int dz = coord.z - currentCenter_.z;
+            if (dx > kDrawRadius || dx < -kDrawRadius ||
+                dz > kDrawRadius || dz < -kDrawRadius)
+                continue;
 
             glm::mat4 modelMat{ 1.0 };
 
@@ -246,6 +259,15 @@ namespace aveng {
         int count = 0;
         for (const auto& [coord, slot] : slots_) {
             if (slot.state == procgen::TerrainRuntimeState::CpuReady) ++count;
+        }
+        return count;
+    }
+
+    int TerrainController::countResidentSlots() const
+    {
+        int count = 0;
+        for (const auto& [coord, slot] : slots_) {
+            if (slot.state == procgen::TerrainRuntimeState::Resident) ++count;
         }
         return count;
     }
@@ -398,6 +420,11 @@ namespace aveng {
         return chunks_->chunkSize();
     }
 
+    void TerrainController::setDrawCenter(glm::vec3 worldPos) noexcept {
+        currentCenter_.x = static_cast<int32_t>(std::floor(worldPos.x / chunks_->chunkSize()));
+        currentCenter_.z = static_cast<int32_t>(std::floor(worldPos.z / chunks_->chunkSize()));
+    }
+
     //bool TerrainController::
 
     //std::unique_ptr<procgen::TerrainRenderable> const& TerrainController::lastRequestedRenderable() const noexcept {
@@ -512,18 +539,18 @@ namespace aveng {
     }
 
     // Check 1 chunk - Not very useful here, honestly
-    bool TerrainController::hasAllPointsReady(const ChunkCoord coord) noexcept {
-        return chunks_->isAllPointsReady(coord);
+    bool TerrainController::hasSpatialGridReady(const ChunkCoord coord) noexcept {
+        return chunks_->isSpatialGridReady(coord);
     }
 
     // Check that an entire 5x5 region has completed up to the spatial grid
     bool TerrainController::hasRegionReady(ChunkCoord center) noexcept {
-        return chunks_->isRegionAllPointsReady(center);
+        return chunks_->isRegionSpatialGridReady(center);
     }
 
     // Check that an entire 5x5 region has completed up to the spatial grid and its inner 3x3 has fully completed
     bool TerrainController::hasRegionComplete(ChunkCoord center) noexcept {
-        return chunks_->isRegionAllPointsReady(center)
+        return chunks_->isRegionSpatialGridReady(center)
             && chunks_->isRegionAllStagesComplete(center);
     }
 
@@ -548,15 +575,22 @@ namespace aveng {
 
                 pool_.vbo.push_back(std::move(entry.vertexBuffer));
                 pool_.ibo.push_back(std::move(entry.indexBuffer));
-                if (entry.inputSsbo.buffer != VK_NULL_HANDLE)
-                    pool_.inputSsbo.push_back(std::move(entry.inputSsbo));
-                if (entry.outputSsbo.buffer != VK_NULL_HANDLE)
-                    pool_.outputSsbo.push_back(std::move(entry.outputSsbo));
 
-                if (entry.graphicsDescriptorSet != VK_NULL_HANDLE)
+                if (entry.inputSsbo.buffer != VK_NULL_HANDLE) {
+                    pool_.inputSsbo.push_back(std::move(entry.inputSsbo));
+                }
+
+                if (entry.outputSsbo.buffer != VK_NULL_HANDLE) {
+                    pool_.outputSsbo.push_back(std::move(entry.outputSsbo));
+                }
+
+                if (entry.graphicsDescriptorSet != VK_NULL_HANDLE) {
                     vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool, 1, &entry.graphicsDescriptorSet);
-                if (entry.computeDescriptorSet != VK_NULL_HANDLE)
+                }
+
+                if (entry.computeDescriptorSet != VK_NULL_HANDLE) {
                     vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &entry.computeDescriptorSet);
+                }
 
                 // O(1) swap-and-pop removal
                 deferredCleanups_[i] = std::move(deferredCleanups_.back());
@@ -565,6 +599,24 @@ namespace aveng {
                 ++i;
             }
         }
+
+        while (pool_.vbo.size() > TerrainResourcePool::kMaxPooledBuffers) {
+            VertexBuffer::cleanup(engineDevice_, pool_.vbo.back());
+            pool_.vbo.pop_back();
+        }
+        while (pool_.ibo.size() > TerrainResourcePool::kMaxPooledBuffers) {
+            IndexBuffer::cleanup(engineDevice_, pool_.ibo.back());
+            pool_.ibo.pop_back();
+        }
+        while (pool_.inputSsbo.size() > TerrainResourcePool::kMaxPooledBuffers) {
+            ShaderStorageBuffer::destroy(engineDevice_, pool_.inputSsbo.back());
+            pool_.inputSsbo.pop_back();
+        }
+        while (pool_.outputSsbo.size() > TerrainResourcePool::kMaxPooledBuffers) {
+            ShaderStorageBuffer::destroy(engineDevice_, pool_.outputSsbo.back());
+            pool_.outputSsbo.pop_back();
+        }
+
 #ifdef M_DEBUG
         renderData_.rdTerrainCleanupDeferredDeletesTime = vkCleanupDeferredDeletesTimer.stop();
         if (renderData_.rdTerrainCleanupDeferredDeletesTime > renderData_.rdTerrainCleanupDeferredDeletesTimeMAX) {
@@ -580,8 +632,9 @@ namespace aveng {
         r->packedPositions.clear();
         r->packedTriangles.clear();
         r->packedAdjacency.clear();
-        if (pool_.renderables.size() < TerrainResourcePool::kMaxPooledRenderables)
+        if (pool_.renderables.size() < TerrainResourcePool::kMaxPooledRenderables) {
             pool_.renderables.push_back(std::move(r));
+        }
     }
 
     // Cleanup all -- Funnels all resources into pool objects and then destroys from there.
@@ -593,42 +646,62 @@ namespace aveng {
                 vkWaitForFences(engineDevice_.device(), 1, &batch.fence, VK_TRUE, UINT64_MAX);
             }
         }
+
         retireCompletedUploads();
 
         // 2. Destroy fences and command buffers
         for (auto& batch : uploadBatches_) {
-            if (batch.fence != VK_NULL_HANDLE)
+            if (batch.fence != VK_NULL_HANDLE) {
                 vkDestroyFence(engineDevice_.device(), batch.fence, nullptr);
-            if (batch.cmdBuffer != VK_NULL_HANDLE)
+            }
+
+            if (batch.cmdBuffer != VK_NULL_HANDLE) {
                 vkFreeCommandBuffers(engineDevice_.device(), engineDevice_.commandPoolGraphics(), 1, &batch.cmdBuffer);
+            }
         }
 
         // 3. Recycle all slot resources into pool (free descriptor sets immediately)
         for (auto& [coord, slot] : slots_) {
             pool_.vbo.push_back(std::move(slot.gpu.draw.vertexBuffer));
             pool_.ibo.push_back(std::move(slot.gpu.draw.indexBuffer));
-            if (slot.gpu.packed.inputSsbo.buffer != VK_NULL_HANDLE)
+
+            if (slot.gpu.packed.inputSsbo.buffer != VK_NULL_HANDLE) {
                 pool_.inputSsbo.push_back(std::move(slot.gpu.packed.inputSsbo));
-            if (slot.gpu.packed.outputSsbo.buffer != VK_NULL_HANDLE)
+            }
+
+            if (slot.gpu.packed.outputSsbo.buffer != VK_NULL_HANDLE) {
                 pool_.outputSsbo.push_back(std::move(slot.gpu.packed.outputSsbo));
-            if (slot.gpu.packed.graphicsDescriptorSet != VK_NULL_HANDLE)
+            }
+
+            if (slot.gpu.packed.graphicsDescriptorSet != VK_NULL_HANDLE) {
                 vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool, 1, &slot.gpu.packed.graphicsDescriptorSet);
-            if (slot.gpu.packed.computeDescriptorSet != VK_NULL_HANDLE)
+            }
+            
+            if (slot.gpu.packed.computeDescriptorSet != VK_NULL_HANDLE) {
                 vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &slot.gpu.packed.computeDescriptorSet);
+            }
         }
 
         // 4. Recycle all deferred cleanup resources into pool (free descriptor sets immediately)
         for (auto& d : deferredCleanups_) {
             pool_.vbo.push_back(std::move(d.vertexBuffer));
             pool_.ibo.push_back(std::move(d.indexBuffer));
-            if (d.inputSsbo.buffer != VK_NULL_HANDLE)
+
+            if (d.inputSsbo.buffer != VK_NULL_HANDLE) {
                 pool_.inputSsbo.push_back(std::move(d.inputSsbo));
-            if (d.outputSsbo.buffer != VK_NULL_HANDLE)
+            }
+
+            if (d.outputSsbo.buffer != VK_NULL_HANDLE) {
                 pool_.outputSsbo.push_back(std::move(d.outputSsbo));
-            if (d.graphicsDescriptorSet != VK_NULL_HANDLE)
+            }
+
+            if (d.graphicsDescriptorSet != VK_NULL_HANDLE) {
                 vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool, 1, &d.graphicsDescriptorSet);
-            if (d.computeDescriptorSet != VK_NULL_HANDLE)
+            }
+
+            if (d.computeDescriptorSet != VK_NULL_HANDLE) {
                 vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &d.computeDescriptorSet);
+            }
         }
         deferredCleanups_.clear();
 

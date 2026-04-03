@@ -27,12 +27,14 @@ namespace xone {
         aveng::ChunkCoord rightFan;
     };
 
+    // Determine the required set of renderable coordinate based on X/Z
     inline LinearWaveCoords makeLinearWave(int k, int baseX, int baseZ) {
+        /* `k` represents the wave pattern as though it has been enumerated from the start. */
         const int z = baseZ + 3 * k;
         return {
             { baseX, z },
-            { baseX - 2, z + 2 },
-            { baseX + 2, z + 2 }
+            { baseX - 3, z + 3 },
+            { baseX + 3, z + 3 }
         };
     }
 
@@ -134,6 +136,8 @@ namespace xone {
     private:
         void applyRequests(const std::vector<aveng::ChunkCoord>& centers, uint64_t frameIndex);
         void applyEvictions(const std::vector<aveng::ChunkCoord>& evictCenters);
+
+        static constexpr int kMaxEvictionsPerFrame = 2;
 
     private:
         aveng::TerrainController& terrain_;

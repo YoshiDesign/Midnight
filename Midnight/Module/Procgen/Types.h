@@ -15,7 +15,7 @@ namespace aveng {
 	using SiteIndex = uint32_t;
 	static constexpr EdgeIndex kInvalidEdge = -1; // NOTE - These wrap... bc their types are uint32_t. I oops'd, but we can scale to 64 if we really need validity at that scale.
 	static constexpr TriIndex  kInvalidTri = -1;  // NOTE - So be consistently aware of this subtle alarm bell.
-
+	static constexpr uint8_t chunk_center_spacing = 3;
 
 	const enum Border {
 		Border_None = 0,

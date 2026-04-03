@@ -312,10 +312,12 @@
     <ClInclude Include="Module\Procgen\Noise\Config.h" />
     <ClInclude Include="Module\Procgen\Noise\Functions.h" />
     <ClInclude Include="Module\Procgen\Rendering\BasicTerrainAsset.h" />
+    <ClInclude Include="Module\Procgen\Rendering\TerrainResourcePool.h" />
     <ClInclude Include="Module\Procgen\Rng.h" />
     <ClInclude Include="Module\Procgen\SpatialGrid.h" />
     <ClInclude Include="Module\Procgen\Terrain\ChunkManager.h" />
     <ClInclude Include="Module\Procgen\Terrain\ChunkRecord.h" />
+    <ClInclude Include="Module\Procgen\Terrain\Control.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\Data.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\ErosionManager.h" />
