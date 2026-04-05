@@ -131,8 +131,6 @@ namespace aveng {
      * Owns no terrain data; it just translates game intent into system work.
      */
     class TerrainController {
-    private:
-        static ChunkCoord offsetCoord(ChunkCoord base, int dx, int dz) noexcept;
 
     public:
         explicit TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, ChunkManager& chunks) noexcept;
@@ -159,6 +157,7 @@ namespace aveng {
         float getChunkSize();
 
         void setDrawCenter(glm::vec3 worldPos) noexcept;
+        const ChunkCoord getDrawCenter() { return currentCenter_; };
 
         /* Streaming Policy */
 

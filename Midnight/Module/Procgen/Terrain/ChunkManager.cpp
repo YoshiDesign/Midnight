@@ -420,18 +420,20 @@ namespace aveng {
     //
     ChunkRecord* ChunkManager::getOrCreateRecord(ChunkCoord coord)
     {
-        //std::printf("%s [%d, %d]\n", __FUNCTION__, coord.x, coord.z);
         const size_t hash = ChunkCoordHash{}(coord); // turns (x,z) into a size_t
-        // Note: This only looks at the lowest 6 bits of the final hash. We use the MurmurHash3 algorithm for this.
-        // const size_t stripeIdx = hash % STRIPES; // Determine which bucket's map the record ends up in - index will always be [0, STRIPES)
+        
 #ifdef MIDNIGHT_WYHASH
         const size_t stripeIdx = stripeIndexwh(coord);
 #else
-        const size_t stripeIdx = hash & (STRIPES - 1); // Use bitwise AND to get the lowest 6 bits - faster than % but only works if STRIPES is a power of two (it is)
+        const size_t stripeIdx = hash & (STRIPES - 1);
 #endif
         auto& bucket = records_[stripeIdx];
 
-        // Nifty RAII lock_guard
+        // Nifty RAII lock_guard - 
+        // Note: This is a contentious thing to do when generating in parallel
+        // TODO: Consider a higher level invariant to prevent this necessity at all
+        // assuming this lock is only here to prevent the usual concurrency pitfalls.
+        // Either way this class needs an audit in safety overkill
         std::lock_guard<std::mutex> lock(bucket.mut);
 
         // Insert the key if it's missing, with a null unique_ptr placeholder.
@@ -1317,99 +1319,99 @@ namespace aveng {
         return true;
     }
 
-    FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& rec)
-    {
-        if( rec.points == nullptr 
-         || rec.allPoints == nullptr
-         || rec.heightField == nullptr
-         || rec.triangulation == nullptr
-         || rec.erosion == nullptr
-        ) { return nullptr; }
+    //FinalMeshCPU const* ChunkManager::buildMesh(ChunkRecord& rec)
+    //{
+    //    if( rec.points == nullptr 
+    //     || rec.allPoints == nullptr
+    //     || rec.heightField == nullptr
+    //     || rec.triangulation == nullptr
+    //     || rec.erosion == nullptr
+    //    ) { return nullptr; }
 
-        const auto& pts       = rec.allPoints->pts;
-        const auto& coreIdx   = rec.allPoints->coreIdx;
-        const auto& triangles = rec.triangulation->tris;
-        const auto& eHeights  = rec.erosion->eHeights;
-        const size_t totalPts = pts.size();
-        const size_t numCoreVerts = coreIdx.size();
+    //    const auto& pts       = rec.allPoints->pts;
+    //    const auto& coreIdx   = rec.allPoints->coreIdx;
+    //    const auto& triangles = rec.triangulation->tris;
+    //    const auto& eHeights  = rec.erosion->eHeights;
+    //    const size_t totalPts = pts.size();
+    //    const size_t numCoreVerts = coreIdx.size();
 
-        // Allocate FinalMeshCPU in durable (final) arena
-        if (!rec.finalMesh) {
-            auto alloc = std::pmr::polymorphic_allocator<FinalMeshCPU>(rec.final.mr());
-            rec.finalMesh = alloc.allocate(1);
-            std::construct_at(rec.finalMesh, rec.final.mr());
-        }
-        FinalMeshCPU& mesh = *rec.finalMesh;
+    //    // Allocate FinalMeshCPU in durable (final) arena
+    //    if (!rec.finalMesh) {
+    //        auto alloc = std::pmr::polymorphic_allocator<FinalMeshCPU>(rec.final.mr());
+    //        rec.finalMesh = alloc.allocate(1);
+    //        std::construct_at(rec.finalMesh, rec.final.mr());
+    //    }
+    //    FinalMeshCPU& mesh = *rec.finalMesh;
 
-        // -- Core membership mask (flat, no hashing) --
-        std::pmr::vector<uint8_t> isCore(totalPts, uint8_t(0), tlsScratchArena().mr());
-        for (uint32_t ci : coreIdx) {
-            // for 4-5k points this is trivially expensive
-            // but there should be a faster way to fill a vector with 1's
-            isCore[ci] = 1;
-        }
+    //    // -- Core membership mask (flat, no hashing) --
+    //    std::pmr::vector<uint8_t> isCore(totalPts, uint8_t(0), tlsScratchArena().mr());
+    //    for (uint32_t ci : coreIdx) {
+    //        // for 4-5k points this is trivially expensive
+    //        // but there should be a faster way to fill a vector with 1's
+    //        isCore[ci] = 1;
+    //    }
 
-        // -- old2new remap: global site index -> core-only VBO index --
-        constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
-        std::pmr::vector<uint32_t> old2new(
-            totalPts, 
-            UNMAPPED,
-            tlsScratchArena().mr()
-        );
+    //    // -- old2new remap: global site index -> core-only VBO index --
+    //    constexpr uint32_t UNMAPPED = std::numeric_limits<uint32_t>::max();
+    //    std::pmr::vector<uint32_t> old2new(
+    //        totalPts, 
+    //        UNMAPPED,
+    //        tlsScratchArena().mr()
+    //    );
 
-        // 1a. VBO positions (core only)
-        mesh.vbo_positions.clear();
-        mesh.vbo_positions.reserve(numCoreVerts);
-        for (uint32_t ci : coreIdx) {
-            old2new[ci] = static_cast<uint32_t>(mesh.vbo_positions.size());
-            mesh.vbo_positions.push_back(glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y));
-        }
+    //    // 1a. VBO positions (core only)
+    //    mesh.vbo_positions.clear();
+    //    mesh.vbo_positions.reserve(numCoreVerts);
+    //    for (uint32_t ci : coreIdx) {
+    //        old2new[ci] = static_cast<uint32_t>(mesh.vbo_positions.size());
+    //        mesh.vbo_positions.push_back(glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y));
+    //    }
 
-        // 1b/1c. IBO indices + tris (core triangles only)
-        mesh.ibo_indices.clear();
-        mesh.tris.clear();
-        mesh.ibo_indices.reserve(triangles.size() * 3);
-        mesh.tris.reserve(triangles.size());
+    //    // 1b/1c. IBO indices + tris (core triangles only)
+    //    mesh.ibo_indices.clear();
+    //    mesh.tris.clear();
+    //    mesh.ibo_indices.reserve(triangles.size() * 3);
+    //    mesh.tris.reserve(triangles.size());
 
-        for (const auto& tri : triangles) {
-            if (!(isCore[tri.A] && isCore[tri.B] && isCore[tri.C])) { continue; }
+    //    for (const auto& tri : triangles) {
+    //        if (!(isCore[tri.A] && isCore[tri.B] && isCore[tri.C])) { continue; }
 
-            mesh.ibo_indices.push_back(old2new[tri.A]);
-            mesh.ibo_indices.push_back(old2new[tri.B]);
-            mesh.ibo_indices.push_back(old2new[tri.C]);
+    //        mesh.ibo_indices.push_back(old2new[tri.A]);
+    //        mesh.ibo_indices.push_back(old2new[tri.B]);
+    //        mesh.ibo_indices.push_back(old2new[tri.C]);
 
-            mesh.tris.push_back(packTriIndices(old2new[tri.A], old2new[tri.B], old2new[tri.C]));
-        }
+    //        mesh.tris.push_back(packTriIndices(old2new[tri.A], old2new[tri.B], old2new[tri.C]));
+    //    }
 
-        // 1d. Packed positions: [core..., halo...]
-        mesh.packed_positions.clear();
-        mesh.packed_positions.reserve(totalPts);
-        for (uint32_t ci : coreIdx) {
-            mesh.packed_positions.push_back(glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y));
-        }
-        for (size_t i = 0; i < totalPts; ++i) {
-            if (!isCore[i]) {
-                mesh.packed_positions.push_back(glm::vec3(pts[i].x, -eHeights[i], pts[i].y));
-            }
-        }
+    //    // 1d. Packed positions: [core..., halo...]
+    //    mesh.packed_positions.clear();
+    //    mesh.packed_positions.reserve(totalPts);
+    //    for (uint32_t ci : coreIdx) {
+    //        mesh.packed_positions.push_back(glm::vec3(pts[ci].x, -eHeights[ci], pts[ci].y));
+    //    }
+    //    for (size_t i = 0; i < totalPts; ++i) {
+    //        if (!isCore[i]) {
+    //            mesh.packed_positions.push_back(glm::vec3(pts[i].x, -eHeights[i], pts[i].y));
+    //        }
+    //    }
 
-        // 1e. Adjacency: one entry per vertex (core + halo), triangle indices are chunk-local
-        mesh.adjacency.clear();
-        mesh.adjacency.resize(totalPts);
-        std::memset(mesh.adjacency.data(), 0, totalPts * sizeof(procgen::VertexAdjacency));
+    //    // 1e. Adjacency: one entry per vertex (core + halo), triangle indices are chunk-local
+    //    mesh.adjacency.clear();
+    //    mesh.adjacency.resize(totalPts);
+    //    std::memset(mesh.adjacency.data(), 0, totalPts * sizeof(procgen::VertexAdjacency));
 
-        for (uint32_t ti = 0; ti < static_cast<uint32_t>(triangles.size()); ++ti) {
-            const SiteIndex verts[3] = { triangles[ti].A, triangles[ti].B, triangles[ti].C };
-            for (int k = 0; k < 3; ++k) {
-                auto& adj = mesh.adjacency[verts[k]];
-                if (adj.count < procgen::MAX_ADJACENT_TRIS) {
-                    adj.triangleIndices[adj.count++] = ti;
-                }
-            }
-        }
+    //    for (uint32_t ti = 0; ti < static_cast<uint32_t>(triangles.size()); ++ti) {
+    //        const SiteIndex verts[3] = { triangles[ti].A, triangles[ti].B, triangles[ti].C };
+    //        for (int k = 0; k < 3; ++k) {
+    //            auto& adj = mesh.adjacency[verts[k]];
+    //            if (adj.count < procgen::MAX_ADJACENT_TRIS) {
+    //                adj.triangleIndices[adj.count++] = ti;
+    //            }
+    //        }
+    //    }
 
-        return rec.finalMesh;
-    }
+    //    return rec.finalMesh;
+    //}
 
     /* Async */
     uint64_t ChunkManager::requestRenderableAsync(ChunkCoord center, uint64_t frameIndex,
@@ -1470,6 +1472,8 @@ namespace aveng {
 
         // TODO : Validate the real necessity here
         {
+            // Lots of contention here: we call runGenerate 25x per chunk (for a clean chunk w/ no overlap)
+            //std::printf("[ChunkManager] Locking: centerRec->renderableMutex\n");
             std::scoped_lock lock(centerRec->renderableMutex);
             if (centerRec->requestedRenderableId != requestId)
                 return;
@@ -1502,10 +1506,12 @@ namespace aveng {
         }
 
         // Kick off all sub-stages (idempotent via their own call_once)
-        for (int i = 0; i < 9; ++i)
+        for (int i = 0; i < 9; ++i) {
             requestMesh(neighbors[i], frameIndex);
-        for (int i = 9; i < 25; ++i)
+        }
+        for (int i = 9; i < 25; ++i) {
             requestSpatialGrid(neighbors[i], frameIndex);
+        }
 
         // Check readiness of inner 9 (mesh) and outer 16 (spatial)
         for (int i = 0; i < 9; ++i) {

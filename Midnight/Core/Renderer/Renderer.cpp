@@ -1236,13 +1236,12 @@ namespace aveng {
 
 	void Renderer::tickTerrain()
 	{
+		terrainController_.setDrawCenter(cameraManager.active().transform.translation);
 		terrainController_.tick();
 	}
 
 	void Renderer::renderTerrain()
 	{
-		terrainController_.setDrawCenter(cameraManager.active().transform.translation);
-
 		if (1) {
 			terrainController_.renderDebug(
 				renderData.rdCommandBuffersGraphics.at(currentFrameIndex),

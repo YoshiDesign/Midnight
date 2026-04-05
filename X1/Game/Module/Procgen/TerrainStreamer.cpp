@@ -37,7 +37,7 @@ namespace xone {
     void TerrainStreamer::update(const AvengCamera& cam, uint64_t frameIndex)
     {
         StreamUpdateContext ctx{
-            worldToChunk(cam.transform().translation),
+            terrain_.getDrawCenter(),
             frameIndex
         };
 
@@ -59,18 +59,6 @@ namespace xone {
         applyEvictions(cmds.evictCenters);
     }
 
-    ChunkCoord TerrainStreamer::worldToChunk(glm::vec3 pos) const
-    {
-
-        float chunk_size = terrain_.getChunkSize();
-
-        // Assuming x/z world plane and chunk coordinates are based on floor division.
-        const int cx = static_cast<int>(std::floor(pos.x / chunk_size));
-        const int cz = static_cast<int>(std::floor(pos.z / chunk_size));
-
-        return { cx, cz };
-    }
-
     void TerrainStreamer::applyRequests(const std::vector<ChunkCoord>& centers, uint64_t frameIndex)
     {
         for (const ChunkCoord& c : centers) {
@@ -83,10 +71,10 @@ namespace xone {
     {
         int evicted = 0;
         for (const ChunkCoord& c : evictCenters) {
-            if (evicted >= kMaxEvictionsPerFrame) break;
+            if (evicted >= kMaxEvictionsPerFrame) { break; }
 
             auto it = streamed_.find(c);
-            if (it == streamed_.end()) continue;
+            if (it == streamed_.end()) { continue; }
 
             terrain_.evictChunk(c);
             streamed_.erase(it);
@@ -150,14 +138,11 @@ namespace xone {
         StreamCommandBuffer& outCmds
     )
     {
-
         // Designate the first set of chunkCoords to be generated.
         const LinearWaveCoords w0 = makeLinearWave(0, state_.baseX, state_.baseZ);
-        //// Logger::log(1, "Center: {%d,%d}\n", w0.center.x, w0.center.z);
-        //// Logger::log(1, "LeftFan: {%d,%d}\n", w0.leftFan.x, w0.leftFan.z);
-        //// Logger::log(1, "RightFan: {%d,%d}\n", w0.rightFan.x, w0.rightFan.z);
+
         requestIfNeeded(w0.center, streamed, outCmds);
-        // increment
+
         state_.maxCenterWaveRequested = 0; 
     }
 
@@ -174,6 +159,8 @@ namespace xone {
 
         ChunkCoord nearestCenter = procgen::centerOfRegion_linearPolicy_wrap(ctx.playerChunk.x, ctx.playerChunk.z);
 
+        std::printf("Nearest Center: {%d, %d}\n", nearestCenter.x, nearestCenter.z);
+
         do {
             progressed = false;
 
@@ -181,11 +168,10 @@ namespace xone {
             // Updated Algo:
             /// Get the players chunk X/Z
             /// 
-            /// - Using the new algo, derive the central chunk based on the player's region
+            /// - Using the new algo, derive the closest central (chunkX/Z%3 == 0) chunk based on the player's region
             /// - 
             /// 
             /// Invariant: We only request chunks from centers that are at least 3 units apart
-            
 
             // Rule 1:
             // Request the two side fan chunks for that wave once the center is ready enough.
@@ -279,13 +265,10 @@ namespace xone {
             StreamedChunkState{ StreamedChunkState::Status::Requested }
         );
 
-        // Logger::log(1, "Request center chunk? <%s>", inserted ? "true" : "false");
 
-        // Note: requestCenters can be either from the center of the wave or either of its fans,
-        // It just means the central chunk being requested in the 5x5 (total) region
         if (inserted) {
+            Logger::log(1, "[LinearFlightStreamer] Adding Request Cmd for {%d, %d}", coord.x, coord.z);
             outCmds.requestCenters.push_back(coord);
-            // Logger::log(1, "RequestCenters {%d}\n", outCmds.requestCenters.size());
         }
     }
 

@@ -140,13 +140,6 @@ namespace aveng {
 	// A registry of stage products + futures + residency
 	struct ChunkRecord {
 
-		/*
-		 * NOTE: This code was generated under these very open-ended assumptions:
-		 *	1. you want each stage to be a "published product" inside the chunk record, not necessarily outside the chunk,
-		 *	2. and you want a uniform pattern so that adding/removing stages doesn’t change concurrency wiring style.
-		 * This makes the procedural generation pipeline very easy to extend while in development.
-		 */
-
 		ChunkCoord coord{};
 		Bounds2 coreBounds{}; // World space bounds for the chunk area
 		float halo = 0.f;
@@ -157,7 +150,7 @@ namespace aveng {
 		// - (T3) final: durable outputs (mesh + gameplay outputs)
 		ChunkArena final;	// Tier 3
 		ChunkArena scratch; // Tier 2
-		// Tier 1 is thread-local scratch allocation
+		// Tier 1 is thread-local scratch
 
 		// Arenas own the memory; record lifetime owns arenas.
 		Points* points = nullptr;
@@ -200,10 +193,6 @@ namespace aveng {
 		std::once_flag meshOnce;
 		std::shared_future</*FinalMeshCPU const**/ bool> meshF;
 		std::shared_ptr<std::promise<bool>> meshProm;
-
-		// New top-level renderable product
-		//std::once_flag renderableOnce;
-		//std::shared_future<void> renderableBuildF;
 
 		// ---- top-level packed renderable state ----
 		mutable std::mutex renderableMutex;

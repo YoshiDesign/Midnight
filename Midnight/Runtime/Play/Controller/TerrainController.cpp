@@ -472,18 +472,6 @@ namespace aveng {
         );
     }
 
-    //bool TerrainController::
-
-    //std::unique_ptr<procgen::TerrainRenderable> const& TerrainController::lastRequestedRenderable() const noexcept {
-    //    return lastRequested_;
-    //}
-
-    ChunkCoord TerrainController::offsetCoord(ChunkCoord base, int dx, int dz) noexcept {
-        base.x += dx;
-        base.z += dz;
-        return base;
-    }
-
     /*
     * @Step 1 `ensureChunkRequested`: Allocates a slot from the registry and submits
     * an async renderable build. The admission controller ensures this chunk's 5x5 
@@ -510,6 +498,9 @@ namespace aveng {
          * The worker thread writes directly into this renderable. Completion is signaled
          * via a lightweight CompletionNotice containing the slot index.
          */
+#ifdef M_DEBUG
+        assert(slot.coord == coord && "slot coord mismatch\n");
+#endif
         slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_, &slot.renderable, idx);
         slot.state = procgen::TerrainRuntimeState::Requested;
     }

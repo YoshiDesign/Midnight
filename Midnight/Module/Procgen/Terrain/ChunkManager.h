@@ -192,7 +192,7 @@ namespace aveng {
         Triangulation const* buildTriangulation(ChunkRecord& r); // alloc in scratch
 		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
         bool advanceErosion(ChunkRecord& r);  // retry-driven state machine; returns true when complete
-        FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
+        // FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
         void buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
             std::span<ChunkRecord*, 25> recs);
         // std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);

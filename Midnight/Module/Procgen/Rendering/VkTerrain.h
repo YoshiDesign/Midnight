@@ -320,13 +320,13 @@ namespace aveng {
 		if (renderData.rdTerrainVboIboTime > renderData.rdTerrainVboIboTimeMAX) {
             renderData.rdTerrainVboIboTimeMAX = renderData.rdTerrainVboIboTime;
         }
-        assert(cpu.alignment.baseCorePosition  > 0  &&  "[1] missing cpu alignment value baseCorePosition");
-        assert(cpu.alignment.countCorePosition > 0 && "[2] missing cpu alignment value countCorePosition");
-        assert(cpu.alignment.countHaloPosition > 0 && "[3] missing cpu alignment value countHaloPosition");
-        assert(cpu.alignment.baseCoreTriangle > 0 && "[4] missing cpu alignment value baseCoreTriangle");
-        assert(cpu.alignment.countCoreTriangle > 0 && "[5] missing cpu alignment value countCoreTriangle");
-        assert(cpu.alignment.countHaloTriangle > 0 && "[6] missing cpu alignment value countHaloTriangle");
-        assert(cpu.alignment.baseCoreAdjacency > 0 && "[7] missing cpu alignment value baseCoreAdjacency");
+        assert(cpu.alignment.baseCorePosition == 0  && "[1] missing cpu alignment value baseCorePosition");
+        assert(cpu.alignment.countCorePosition > 0  && "[2] missing cpu alignment value countCorePosition");
+        assert(cpu.alignment.countHaloPosition > 0  && "[3] missing cpu alignment value countHaloPosition");
+        assert(cpu.alignment.baseCoreTriangle == 0  && "[4] missing cpu alignment value baseCoreTriangle");
+        assert(cpu.alignment.countCoreTriangle > 0  && "[5] missing cpu alignment value countCoreTriangle");
+        assert(cpu.alignment.countHaloTriangle > 0  && "[6] missing cpu alignment value countHaloTriangle");
+        assert(cpu.alignment.baseCoreAdjacency == 0 && "[7] missing cpu alignment value baseCoreAdjacency");
         assert(cpu.alignment.countCoreAdjacency > 0 && "[8] missing cpu alignment value countCoreAdjacency");
         assert(cpu.alignment.countHaloAdjacency > 0 && "[9] missing cpu alignment value countHaloAdjacency");
 #endif
