@@ -114,19 +114,57 @@ namespace aveng {
         ensureChunkRequested(start_coord);
     }
 
+    uint32_t TerrainController::allocateSlot(ChunkCoord coord) {
+        uint32_t idx;
+        if (!freeSlots_.empty()) {
+            // Free slots are LIFO
+            idx = freeSlots_.back();
+            freeSlots_.pop_back();
+        }
+        else {
+            idx = static_cast<uint32_t>(slots_.size());
+            slots_.emplace_back(); // init
+        }
+
+        // Some setup
+        slots_[idx].coord = coord;
+        slots_[idx].state = procgen::TerrainRuntimeState::Unrequested;
+
+        // Map coord to index
+        coordToSlot_[coord] = idx;
+        return idx;
+    }
+
+    void TerrainController::releaseSlot(uint32_t idx) {
+        auto& slot = slots_[idx];
+#ifdef M_DEBUG
+        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
+            "Cannot release a slot while a worker thread holds a pointer to its renderable");
+#endif
+        coordToSlot_.erase(slot.coord);
+        slot.renderable.resetKeepCapacity();
+        slot.state = procgen::TerrainRuntimeState::Unrequested;
+        slot.coord = {};
+        slot.requestId = 0;
+        slot.gpu = {};
+        slot.gpuHandle = {};
+        freeSlots_.push_back(idx);
+    }
+
     // @Step 7 - When the streamer determines a chunk is out of range, it evicts.
     // The slot's GPU resource handles (VBO, IBO, input SSBO, output SSBO, descriptor sets) are copied into a DeferredGpuCleanup.
     // The slot is released to the free-list, but the VK resources are not destroyed yet, in case they're still in use
     void TerrainController::evictChunk(ChunkCoord center) {
+        evictionTimer.start();
         auto it = coordToSlot_.find(center);
         if (it == coordToSlot_.end()) { return; }
 
         uint32_t idx = it->second;
         auto& slot = slots_[idx];
+
 #ifdef M_DEBUG
         assert(slot.state != procgen::TerrainRuntimeState::Requested &&
                "Cannot evict a slot while a worker thread holds a pointer to its renderable");
-#endif
 
         if (slot.state == procgen::TerrainRuntimeState::Uploading) {
             for (const auto& batch : uploadBatches_) {
@@ -138,6 +176,7 @@ namespace aveng {
                 }
             }
         }
+#endif
 
         admission_.release(center, kSupportRadius);
 
@@ -147,6 +186,8 @@ namespace aveng {
             }
         }
 
+        // Move the retiree's vulkan resources into a deffered cleanup struct
+        // TODO: Maybe just push the resources back onto the pool. This strategy predates the reusable pool resources
         DeferredGpuCleanup deferred{};
         deferred.vertexBuffer = slot.gpu.draw.vertexBuffer;
         deferred.indexBuffer = slot.gpu.draw.indexBuffer;
@@ -158,6 +199,13 @@ namespace aveng {
         deferredCleanups_.push_back(deferred);
 
         releaseSlot(idx);
+
+#ifdef M_DEBUG
+        renderData_.rdTerrainEvictionTime = evictionTimer.stop();
+        if (renderData_.rdTerrainEvictionTime > renderData_.rdTerrainEvictionTimeMAX) {
+            renderData_.rdTerrainEvictionTimeMAX = renderData_.rdTerrainEvictionTime;
+        }
+#endif
     }
 
     // @Step 6: Render the completed work for all Resident chunks
@@ -301,7 +349,7 @@ namespace aveng {
     * 
     * 1. Checks the fence -- 
     * vkGetFenceStatus polls whether the GPU has finished executing the upload command buffer. 
-    * If the fence hasn't signaled, the function returns immediately
+    * If the fence hasn't signaled, the iteration continues
     * 
     * 2. Transitions slot state -- 
     * Each chunk in the batch goes from Uploading to Resident, and gpu.valid is set to true. 
@@ -328,7 +376,7 @@ namespace aveng {
                 auto& slot = slots_[idx];
                 slot.gpu.valid = true;
                 slot.state = procgen::TerrainRuntimeState::Resident;
-                slot.renderable.resetKeepCapacity(); // This also happens when we request a chunk
+                slot.renderable.resetKeepCapacity();
             }
 
             batch.inFlightSlots.clear();
@@ -346,15 +394,16 @@ namespace aveng {
 
     /**
     * @Step 4: GPU Upload
-    * When a buffer is acquired from the pool, its Vulkan handles are reused wholesale -- 
+    * When a buffer is acquired from the pool, its Vulkan handles are reused -- 
     * device buffer, staging buffer, VMA allocation all still valid. fillStaging maps the 
     * existing staging buffer and overwrites its contents. recordCopy copies staging to device. 
-    * Zero vmaCreateBuffer/vmaDestroyBuffer on the hot path.
+    * No calls to vmaCreateBuffer/vmaDestroyBuffer on the hot path.
     * 
     * The entire batch is submitted with a single vkQueueSubmit behind a fence. Slot state transitions to Uploading
     */
     void TerrainController::buildAndSubmitUploadBatch()
     {
+        // Buffering
         const int batchIdx = static_cast<int>(frameIndex_ % renderData_.MAX_FRAMES_IN_FLIGHT);
         auto& batch = uploadBatches_[batchIdx];
 
@@ -378,6 +427,7 @@ namespace aveng {
             if (chunksThisBatch >= kMaxChunksPerUploadBatch) { break; }
             auto& slot = slots_[i];
             if (slot.state != procgen::TerrainRuntimeState::CpuReady) { continue; }
+            // TODO : Remember that this is just 1 iteration's time 
 #ifdef M_DEBUG
             vkBufferInitTimer.start();
 #endif
@@ -406,6 +456,7 @@ namespace aveng {
         }
 
         if (batch.inFlightSlots.empty()) {
+            // Nothing happened
             vkEndCommandBuffer(batch.cmdBuffer);
             return;
         }
@@ -441,6 +492,9 @@ namespace aveng {
     void TerrainController::ensureChunkRequested(ChunkCoord coord)
     {
         if (!admission_.tryAcquire(coord, kSupportRadius)) {
+            // Requested, but the admission controller deems we're not ready for another request.
+            // This happens due to two requests including overlapping regions.
+            // Deferred requests are still considered "active" regions within the admission controller.
             deferredRequests_.push_back(coord);
             return;
         }
@@ -448,8 +502,10 @@ namespace aveng {
         uint32_t idx = allocateSlot(coord);
         auto& slot = slots_[idx];
 
+        std::printf("[TerrainController] Creating renderable at slot[%d]\n", idx);
+
         /** 
-         * @Step 2 - Async Generation -
+         * @Step 2 - Async Generation
          * A raw pointer to the slot's inline renderable is passed to the ChunkManager.
          * The worker thread writes directly into this renderable. Completion is signaled
          * via a lightweight CompletionNotice containing the slot index.
@@ -465,14 +521,18 @@ namespace aveng {
         drainTimer.start();
 #endif
         /** 
-         * @Step 3: Process completion notices. O(1) slot access via slotIndex.
+         * @Step 3: The lambda itself is a simple O(1), but the concurrent queue processes in O(n).
          * No ownership transfers -- the renderable was written in-place by the worker.
          * After draining, any deferred requests (from @Step 1) are retried.
+         * `notice` represents an item from the queue
          */
         chunks_->drainCompletedRenderables([this](const procgen::CompletionNotice& notice) {
             auto& slot = slots_[notice.slotIndex];
-            if (slot.requestId != notice.requestId)
-                return;
+            if (slot.requestId != notice.requestId) {
+                throw std::runtime_error("slot index does not match completion notice");
+            }
+
+            // This slot is now targeted for rendering, or it failed
             slot.state = notice.success
                 ? procgen::TerrainRuntimeState::CpuReady
                 : procgen::TerrainRuntimeState::Failed;
@@ -524,6 +584,7 @@ namespace aveng {
         vkCleanupDeferredDeletesTimer.start();
 #endif
 
+        // TODO: This may actually be wiser to perform when we retire slots
         size_t i = 0;
         while (i < deferredCleanups_.size()) {
             if (frameIndex_ - deferredCleanups_[i].retireFrame >= kDeferFrames) {
@@ -579,37 +640,6 @@ namespace aveng {
             renderData_.rdTerrainCleanupDeferredDeletesTimeMAX = renderData_.rdTerrainCleanupDeferredDeletesTime;
         }
 #endif
-    }
-
-    uint32_t TerrainController::allocateSlot(ChunkCoord coord) {
-        uint32_t idx;
-        if (!freeSlots_.empty()) {
-            idx = freeSlots_.back();
-            freeSlots_.pop_back();
-        } else {
-            idx = static_cast<uint32_t>(slots_.size());
-            slots_.emplace_back();
-        }
-        slots_[idx].coord = coord;
-        slots_[idx].state = procgen::TerrainRuntimeState::Unrequested;
-        coordToSlot_[coord] = idx;
-        return idx;
-    }
-
-    void TerrainController::releaseSlot(uint32_t idx) {
-        auto& slot = slots_[idx];
-#ifdef M_DEBUG
-        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
-               "Cannot release a slot while a worker thread holds a pointer to its renderable");
-#endif
-        coordToSlot_.erase(slot.coord);
-        slot.renderable.resetKeepCapacity();
-        slot.state = procgen::TerrainRuntimeState::Unrequested;
-        slot.coord = {};
-        slot.requestId = 0;
-        slot.gpu = {};
-        slot.gpuHandle = {};
-        freeSlots_.push_back(idx);
     }
 
     // Cleanup all -- Funnels all resources into pool objects and then destroys from there.

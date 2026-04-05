@@ -999,12 +999,12 @@ namespace aveng {
     VkPresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) 
     {
         // Pro-Tip: VK_PRESENT_MODE_MAILBOX_KHR is probably the most efficient, but more energy intensive so it might not be well suited for mobile applications.
-        for (const auto& availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                std::cout << "Present mode: Mailbox" << std::endl;
-                return availablePresentMode;
-            }
-        }
+        //for (const auto& availablePresentMode : availablePresentModes) {
+        //    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        //        std::cout << "Present mode: Mailbox" << std::endl;
+        //        return availablePresentMode;
+        //    }
+        //}
 
          // Pro-Tip: Immediate mode will not work on most mobile devices
          //for (const auto &availablePresentMode : availablePresentModes) {

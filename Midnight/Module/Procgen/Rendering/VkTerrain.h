@@ -259,7 +259,7 @@ namespace aveng {
         gpu.draw.vertexCount = static_cast<uint32_t>(cpu.vbo.size());
         gpu.draw.indexCount = static_cast<uint32_t>(cpu.ibo.size());
 
-        const unsigned int vboSize = static_cast<unsigned int>(cpu.vbo.size() * sizeof(glm::vec3));
+        const uint32_t vboSize = cpu.vbo.size() * sizeof(glm::vec3);
         const size_t iboSize = cpu.ibo.size() * sizeof(uint32_t);
 
 #ifdef M_DEBUG
@@ -277,6 +277,11 @@ namespace aveng {
             gpu.draw.vertexBuffer = pool.vbo.back();
             pool.vbo.pop_back();
         } else {
+
+            if (!pool.vbo.empty() && pool.vbo.size() > 3) {
+                pool.vbo.pop_back();
+            }
+
             if (!VertexBuffer::init(engineDevice, gpu.draw.vertexBuffer, vboSize)) {
                 Logger::log(1, "Failed to init Vertex buffer\n");
                 return false;
@@ -289,6 +294,11 @@ namespace aveng {
             gpu.draw.indexBuffer = pool.ibo.back();
             pool.ibo.pop_back();
         } else {
+
+            if (!pool.ibo.empty() && pool.ibo.size() > 3) {
+                pool.ibo.pop_back();
+            }
+
             if (!IndexBuffer::init(engineDevice, gpu.draw.indexBuffer, iboSize)) {
                 Logger::log(1, "Failed to init Index buffer\n");
                 return false;
@@ -310,6 +320,15 @@ namespace aveng {
 		if (renderData.rdTerrainVboIboTime > renderData.rdTerrainVboIboTimeMAX) {
             renderData.rdTerrainVboIboTimeMAX = renderData.rdTerrainVboIboTime;
         }
+        assert(cpu.alignment.baseCorePosition  > 0  &&  "[1] missing cpu alignment value baseCorePosition");
+        assert(cpu.alignment.countCorePosition > 0 && "[2] missing cpu alignment value countCorePosition");
+        assert(cpu.alignment.countHaloPosition > 0 && "[3] missing cpu alignment value countHaloPosition");
+        assert(cpu.alignment.baseCoreTriangle > 0 && "[4] missing cpu alignment value baseCoreTriangle");
+        assert(cpu.alignment.countCoreTriangle > 0 && "[5] missing cpu alignment value countCoreTriangle");
+        assert(cpu.alignment.countHaloTriangle > 0 && "[6] missing cpu alignment value countHaloTriangle");
+        assert(cpu.alignment.baseCoreAdjacency > 0 && "[7] missing cpu alignment value baseCoreAdjacency");
+        assert(cpu.alignment.countCoreAdjacency > 0 && "[8] missing cpu alignment value countCoreAdjacency");
+        assert(cpu.alignment.countHaloAdjacency > 0 && "[9] missing cpu alignment value countHaloAdjacency");
 #endif
 
         // ---- Compute SSBOs (CPU-visible, no staging copy needed) ----
@@ -338,10 +357,15 @@ namespace aveng {
 #endif
 
         // Input SSBO: try pool first, fall back to init
-        if (!pool.inputSsbo.empty() && pool.inputSsbo.back().bufferSize >= static_cast<size_t>(inputTotalSize)) {
+        if (!pool.inputSsbo.empty() && pool.inputSsbo.back().bufferSize >= inputTotalSize) {
             gpu.packed.inputSsbo = pool.inputSsbo.back();
             pool.inputSsbo.pop_back();
         } else {
+
+            if (!pool.inputSsbo.empty() && pool.inputSsbo.size() > 3) {
+                pool.inputSsbo.pop_back();
+            }
+
             Logger::log(1, "Initializing New SSBO..........\n");
             if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.inputSsbo, MapMode::OnDemand, ResidentMode::CPU, inputTotalSize)) {
                 Logger::log(1, "%s error: could not create terrain input SSBO\n", __FUNCTION__);
@@ -395,6 +419,11 @@ namespace aveng {
             gpu.packed.outputSsbo = pool.outputSsbo.back();
             pool.outputSsbo.pop_back();
         } else {
+
+            if (!pool.outputSsbo.empty() && pool.outputSsbo.size() > 3) {
+                pool.outputSsbo.pop_back();
+            }
+
             Logger::log(1, "Initializing New Output SSBO..........\n");
             if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.outputSsbo, MapMode::GpuOnly, ResidentMode::GPU, outputTotalSize)) {
                 Logger::log(1, "%s error: could not create terrain output SSBO\n", __FUNCTION__);

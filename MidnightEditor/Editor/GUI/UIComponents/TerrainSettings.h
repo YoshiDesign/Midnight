@@ -51,6 +51,11 @@ namespace aveng {
         ImGui::SameLine();
         ImGui::Text("%.6f", renderData.rdTerrainCleanupDeferredDeletesTimeMAX);
         ImGui::Text("Current: \t%.6f", renderData.rdTerrainCleanupDeferredDeletesTime);
+
+        ImGui::Text("Eviction:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainEvictionTimeMAX);
+        ImGui::Text("Current: \t%.6f", renderData.rdTerrainEvictionTime);
    
         ImGui::Text("1-Chunk Retire:\t");
         ImGui::SameLine();

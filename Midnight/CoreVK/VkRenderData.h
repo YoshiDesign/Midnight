@@ -43,7 +43,7 @@ namespace aveng {
 	};
 
 	struct VkVertexBufferData {
-		unsigned int bufferSize = 0;
+		VkDeviceSize bufferSize = 0;
 		void* data = nullptr;
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = VK_NULL_HANDLE;
@@ -52,7 +52,7 @@ namespace aveng {
 	};
 
 	struct VkIndexBufferData {
-		size_t bufferSize = 0;
+		VkDeviceSize bufferSize = 0;
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
 		VkBuffer stagingBuffer = VK_NULL_HANDLE;
@@ -60,7 +60,7 @@ namespace aveng {
 	};
 
 	struct VkUniformBufferData {
-		size_t bufferSize = 0;
+		VkDeviceSize bufferSize = 0;
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
 		void* mapped = nullptr; // Used when persistently mapped
@@ -70,7 +70,7 @@ namespace aveng {
 	};
 
 	struct VkShaderStorageBufferData {
-		size_t bufferSize = 0;
+		VkDeviceSize bufferSize = 0;
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VmaAllocation bufferAlloc = nullptr;
 		void* mapped = nullptr;
@@ -347,6 +347,8 @@ namespace aveng {
 		float rdTerrainDrainTimeMAX = 0.f;
 		float rdTerrainCleanupDeferredDeletesTime = 0.f;
 		float rdTerrainCleanupDeferredDeletesTimeMAX = 0.f;
+		float rdTerrainEvictionTime = 0.f;
+		float rdTerrainEvictionTimeMAX = 0.f;
 
 		// Frame-level fence wait timing (diagnostic)
 		float rdFenceWaitTime = 0.f;

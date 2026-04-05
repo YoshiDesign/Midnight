@@ -221,6 +221,20 @@ namespace aveng {
         std::unordered_map<ChunkCoord, uint32_t, ChunkCoordHash> coordToSlot_;
         std::vector<uint32_t> freeSlots_;
 
+        // Region admission control: prevents overlapping 5x5 support footprints
+        // from being built concurrently (the primary fix for dependency starvation).
+        procgen::TerrainAdmissionController admission_;
+        std::vector<ChunkCoord> deferredRequests_;
+
+        // Non-blocking batched GPU upload infrastructure (Buffered: one per frame-in-flight)
+        std::array<TerrainUploadBatch, 3> uploadBatches_;
+
+        // Deferred GPU resource destruction (avoids vkQueueWaitIdle during eviction)
+        std::vector<DeferredGpuCleanup> deferredCleanups_;
+
+        // Recycling pool for Vulkan buffers and CPU renderables
+        TerrainResourcePool pool_;
+
         std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash> managed_;
         ChunkCoord currentCenter_;
 
@@ -230,7 +244,7 @@ namespace aveng {
         VkBasicTerrainPushConstant pc;
         VkBasicTerrainDebugPC dpc;
 
-        // Shared terrain compute settings UBO (owned by Renderer)
+        // Shared terrain compute settings UBO (owned by Renderer!)
         VkBuffer settingsUboBuffer_ = VK_NULL_HANDLE;
         VkDeviceSize settingsUboSize_ = 0;
 
@@ -241,6 +255,7 @@ namespace aveng {
         Timer retireTimer{};
         Timer drainTimer{};
         Timer tickPhaseTimer_{};
+        Timer evictionTimer{};
 
         // Dummy
         uint64_t frameIndex_ = 0;
@@ -257,20 +272,6 @@ namespace aveng {
         EngineDevice& engineDevice_;
         VkRenderData& renderData_;
         procgen::ErosionManager erosionMgr_;
-
-        // Region admission control: prevents overlapping 5x5 support footprints
-        // from being built concurrently (the primary fix for dependency starvation).
-        procgen::TerrainAdmissionController admission_;
-        std::vector<ChunkCoord> deferredRequests_;
-
-        // Non-blocking batched GPU upload infrastructure (one per frame-in-flight)
-        std::array<TerrainUploadBatch, 3> uploadBatches_;
-
-        // Deferred GPU resource destruction (avoids vkQueueWaitIdle during eviction)
-        std::vector<DeferredGpuCleanup> deferredCleanups_;
-
-        // Recycling pool for Vulkan buffers and CPU renderables
-        TerrainResourcePool pool_;
 
     };
 }

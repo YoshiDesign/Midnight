@@ -168,6 +168,7 @@ namespace aveng {
         /* Params, stage managers and Configs */
         void initManagerDefaults();
 
+        // The concurrent queue processes our completion signals.
         mtools::ConcurrentQueue<procgen::CompletionNotice> completedRenderables_;
 
         procgen::TerrainAdmissionController* admissionCtl_ = nullptr;

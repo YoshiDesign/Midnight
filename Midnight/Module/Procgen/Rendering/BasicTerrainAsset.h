@@ -64,7 +64,7 @@ namespace procgen {
 		std::vector<glm::vec3>        packedTriangles;  // Site-index triples (bit-pattern uint32 in float, read as uvec3 on GPU)
 		std::vector<VertexAdjacency>  packedAdjacency;  // Per-vertex incident triangle list
 
-		// Alignment metadata (still useful for SSBO packing and descriptor offset computation)
+		// Alignment metadata UBO (still useful for SSBO packing and descriptor offset computation)
 		aveng::BasicTerrainAlignmentData alignment{};
 
 		aveng::ChunkCoord center{};
