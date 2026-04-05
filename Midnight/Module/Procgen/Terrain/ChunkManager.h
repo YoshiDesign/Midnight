@@ -120,14 +120,8 @@ namespace aveng {
 
         /* Render Target & Completion Queue Drain */
         uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex,
-            std::unique_ptr<procgen::TerrainRenderable> recycled = nullptr);
+            procgen::TerrainRenderable* target, uint32_t slotIndex);
 
-        // DEPRECATED: renderable is now carried directly in RenderableCompletion.
-        // Kept for reference; no longer called from the drain path.
-        /*bool tryTakeRenderable(ChunkCoord center, uint64_t requestId,
-            std::unique_ptr<procgen::TerrainRenderable>& out);*/
-
-        // Used after generation to acquire completed renderable 3x3 regions
         template <typename Fn>
         void drainCompletedRenderables(Fn&& fn)
         {
@@ -168,14 +162,13 @@ namespace aveng {
         void markAllStagesComplete(ChunkCoord coord);
         void clearAllStagesComplete(ChunkCoord coord);
 
-        // Sync Build Method
-        std::unique_ptr<procgen::TerrainRenderable>
-        generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId);
+        // Sync Build Method (deprecated -- use runGenerate)
+        void generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId);
 
         /* Params, stage managers and Configs */
         void initManagerDefaults();
 
-        mtools::ConcurrentQueue<procgen::RenderableCompletion> completedRenderables_;
+        mtools::ConcurrentQueue<procgen::CompletionNotice> completedRenderables_;
 
         procgen::TerrainAdmissionController* admissionCtl_ = nullptr;
         int admissionRadius_ = 0;
@@ -199,7 +192,7 @@ namespace aveng {
 		SpatialGrid const*  buildSpatialGrid(ChunkRecord& r);   // value owned by record
         bool advanceErosion(ChunkRecord& r);  // retry-driven state machine; returns true when complete
         FinalMeshCPU const* buildMesh(ChunkRecord& r);          // alloc in final
-        std::unique_ptr<procgen::TerrainRenderable> buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
+        void buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
             std::span<ChunkRecord*, 25> recs);
         // std::unique_ptr<procgen::TerrainRenderable> buildRenderable(ChunkCoord center, uint64_t frameIndex);
 

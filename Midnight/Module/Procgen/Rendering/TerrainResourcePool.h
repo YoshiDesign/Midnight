@@ -1,12 +1,9 @@
 #pragma once
 #include <vector>
-#include <memory>
 #include "CoreVK/VkRenderData.h"
 #include "CoreVK/VertexBuffer.h"
 #include "CoreVK/IndexBuffer.h"
 #include "CoreVK/AvengStorageBuffer.h"
-
-namespace procgen { struct TerrainRenderable; }
 
 namespace aveng {
 
@@ -17,9 +14,7 @@ namespace aveng {
         std::vector<VkIndexBufferData>           ibo;
         std::vector<VkShaderStorageBufferData>   inputSsbo;
         std::vector<VkShaderStorageBufferData>   outputSsbo;
-        std::vector<std::unique_ptr<procgen::TerrainRenderable>> renderables;
 
-        static constexpr size_t kMaxPooledRenderables = 32;
         static constexpr size_t kMaxPooledBuffers = 16;
 
         void destroyAll(EngineDevice& engineDevice) {
@@ -31,7 +26,6 @@ namespace aveng {
             ibo.clear();
             inputSsbo.clear();
             outputSsbo.clear();
-            renderables.clear();
         }
     };
 

@@ -1,7 +1,6 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
-#include <memory>
 #include "TerrainController.h"
 #include "Module/Procgen/Terrain/ChunkManager.h"
 #include "CoreVK/EngineDevice.h"
@@ -13,11 +12,11 @@
 #include <stdio.h>
 
 /**
-* Note on Mesh Assembly and recycled resources:
-* Calls during mesh assembly reuse that capacity without heap allocation 
-* (terrain chunks produce similarly-sized data). If no recycled renderable is available (cold start), 
-* a fresh one is allocated.
-* After building, the completed renderable is pushed onto the ConcurrentQueue<RenderableCompletion> with a success flag.
+* Note on Mesh Assembly:
+* Renderables live inline in the slots_ vector at stable addresses. Workers write directly
+* into the slot's renderable via raw pointer. Completion is signaled via a lightweight
+* CompletionNotice (slot index + requestId + success). Vector capacities are preserved
+* across reuse, so repeated generation is allocation-free after warmup.
 * 
 * Some helpful terminology:
 * - Retired: Acknowledging that a GPU upload has finished and
@@ -56,60 +55,6 @@ namespace aveng {
         cleanup();
     }
 
-    // TODO - this isn't the only mgr which will need a frame index. Put it in 1 place and read it every frame.
-    void TerrainController::setFrameIndex(uint64_t frameIndex) noexcept {
-        frameIndex_ = frameIndex;
-    }
-
-    // Direct access to generate a chunk for debugging/editor
-    void TerrainController::generateChunks(ChunkCoord start_coord) {
-        //Logger::log(1, "Start {%d, %d}\tFrameIndex", start_coord.x, start_coord.z, frameIndex_);
-        ensureChunkRequested(start_coord);
-    }
-
-    // @Step 7 - When the streamer determines a chunk is out of range, it evicts.
-    // The slot's GPU resource handles (VBO, IBO, input SSBO, output SSBO, descriptor sets) are copied into a DeferredGpuCleanup.
-    // The slot is erased immediately, but the VK resources are not destroyed yet. Not just due to the recycle strat,
-    // but because the GPU could still be using them.
-    void TerrainController::evictChunk(ChunkCoord center) {
-        auto it = slots_.find(center);
-        if (it == slots_.end()) { return; }
-
-        auto& slot = it->second;
-
-        if (slot.state == procgen::TerrainRuntimeState::Uploading) {
-            for (const auto& batch : uploadBatches_) {
-                if (!batch.active) continue;
-                for (const auto& c : batch.inFlightSlots) {
-                    if (c.x == center.x && c.z == center.z) {
-                        throw std::runtime_error("Attempting to evict a chunk which is currently uploading.");
-                    }
-                }
-            }
-        }
-
-        admission_.release(center, kSupportRadius);
-
-        for (int dz = -2; dz <= 2; ++dz) {
-            for (int dx = -2; dx <= 2; ++dx) {
-                chunks_->evictRecord({ center.x + dx, center.z + dz });
-            }
-        }
-
-        // TODO - Another declaration for a local tmp...
-        DeferredGpuCleanup deferred{};
-        deferred.vertexBuffer = slot.gpu.draw.vertexBuffer;
-        deferred.indexBuffer = slot.gpu.draw.indexBuffer;
-        deferred.inputSsbo = slot.gpu.packed.inputSsbo;
-        deferred.outputSsbo = slot.gpu.packed.outputSsbo;
-        deferred.graphicsDescriptorSet = slot.gpu.packed.graphicsDescriptorSet;
-        deferred.computeDescriptorSet = slot.gpu.packed.computeDescriptorSet;
-        deferred.retireFrame = frameIndex_;
-        deferredCleanups_.push_back(deferred);
-
-        slots_.erase(center);
-    }
-
     void TerrainController::tick()
     {
         tickPhaseTimer_.start();
@@ -132,9 +77,87 @@ namespace aveng {
         }
     }
 
-    void TerrainController::update(/*const Camera& camera*/)
+    void TerrainController::setTerrainConfig(TerrainConfig tcfg)
     {
-        tick();
+        chunks_->setGlobalConfig(tcfg);
+    }
+
+    void TerrainController::setTerrainNoiseParams(noise::NoiseParams noise)
+    {
+        chunks_->setNoiseParams(noise);
+    }
+
+    void TerrainController::setTerrainWeatheringParams(ErosionSettings erosion)
+    {
+        chunks_->setErosionParameters(erosion);
+    }
+
+    float TerrainController::getChunkSize() {
+        return chunks_->chunkSize();
+    }
+
+    // This is currently only used by our rudimentary chunk culling
+    // The terrain streamer also does this, maybe merge the two (TODO)
+    void TerrainController::setDrawCenter(glm::vec3 worldPos) noexcept {
+        currentCenter_.x = static_cast<int32_t>(std::floor(worldPos.x / chunks_->chunkSize()));
+        currentCenter_.z = static_cast<int32_t>(std::floor(worldPos.z / chunks_->chunkSize()));
+    }
+
+    // TODO - this isn't the only mgr which will need a frame index. Put it in 1 place and read it every frame.
+    void TerrainController::setFrameIndex(uint64_t frameIndex) noexcept {
+        frameIndex_ = frameIndex;
+    }
+
+    // Direct access to generate a chunk for debugging/editor
+    void TerrainController::generateChunks(ChunkCoord start_coord) {
+        //Logger::log(1, "Start {%d, %d}\tFrameIndex", start_coord.x, start_coord.z, frameIndex_);
+        ensureChunkRequested(start_coord);
+    }
+
+    // @Step 7 - When the streamer determines a chunk is out of range, it evicts.
+    // The slot's GPU resource handles (VBO, IBO, input SSBO, output SSBO, descriptor sets) are copied into a DeferredGpuCleanup.
+    // The slot is released to the free-list, but the VK resources are not destroyed yet, in case they're still in use
+    void TerrainController::evictChunk(ChunkCoord center) {
+        auto it = coordToSlot_.find(center);
+        if (it == coordToSlot_.end()) { return; }
+
+        uint32_t idx = it->second;
+        auto& slot = slots_[idx];
+#ifdef M_DEBUG
+        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
+               "Cannot evict a slot while a worker thread holds a pointer to its renderable");
+#endif
+
+        if (slot.state == procgen::TerrainRuntimeState::Uploading) {
+            for (const auto& batch : uploadBatches_) {
+                if (!batch.active) continue;
+                for (uint32_t batchIdx : batch.inFlightSlots) {
+                    if (batchIdx == idx) {
+                        throw std::runtime_error("Attempting to evict a chunk which is currently uploading.");
+                    }
+                }
+            }
+        }
+
+        admission_.release(center, kSupportRadius);
+
+        for (int dz = -2; dz <= 2; ++dz) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                chunks_->evictRecord({ center.x + dx, center.z + dz });
+            }
+        }
+
+        DeferredGpuCleanup deferred{};
+        deferred.vertexBuffer = slot.gpu.draw.vertexBuffer;
+        deferred.indexBuffer = slot.gpu.draw.indexBuffer;
+        deferred.inputSsbo = slot.gpu.packed.inputSsbo;
+        deferred.outputSsbo = slot.gpu.packed.outputSsbo;
+        deferred.graphicsDescriptorSet = slot.gpu.packed.graphicsDescriptorSet;
+        deferred.computeDescriptorSet = slot.gpu.packed.computeDescriptorSet;
+        deferred.retireFrame = frameIndex_;
+        deferredCleanups_.push_back(deferred);
+
+        releaseSlot(idx);
     }
 
     // @Step 6: Render the completed work for all Resident chunks
@@ -143,7 +166,7 @@ namespace aveng {
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-        for (auto const& [coord, slot] : slots_) {
+        for (const auto& slot : slots_) {
             if (slot.state != procgen::TerrainRuntimeState::Resident) {
                 continue;
             }
@@ -152,17 +175,18 @@ namespace aveng {
                 continue;
             }
 
-            int dx = coord.x - currentCenter_.x;
-            int dz = coord.z - currentCenter_.z;
+            // Rudimentary culling - This refers to chunk-space coordinates
+            int dx = slot.coord.x - currentCenter_.x;
+            int dz = slot.coord.z - currentCenter_.z;
             if (dx > kDrawRadius || dx < -kDrawRadius ||
-                dz > kDrawRadius || dz < -kDrawRadius)
+                dz > kDrawRadius || dz < -kDrawRadius) {
                 continue;
+            }
 
             if (slot.gpu.packed.graphicsDescriptorSet == VK_NULL_HANDLE) {
                 continue;
             }
 
-            // Bind per-chunk graphics descriptor set at set 1
             VkDescriptorSet chunkSets[] = { slot.gpu.packed.graphicsDescriptorSet };
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                 renderData_.rdTerrainLitPipelineLayout, 1, 1, chunkSets, 0, nullptr);
@@ -189,7 +213,6 @@ namespace aveng {
         }
     }
     
-    //
     void TerrainController::renderDebug(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex)
     {
 
@@ -199,7 +222,7 @@ namespace aveng {
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData_.rdAvengBasicTerrainPipelineLayout, 
                                 0, 1, renderSets, 0, nullptr);
 
-        for (auto const& [coord, slot] : slots_) {
+        for (const auto& slot : slots_) {
             if (slot.state != procgen::TerrainRuntimeState::Resident) {
                 continue;
             }
@@ -208,11 +231,13 @@ namespace aveng {
                 continue;
             }
 
-            int dx = coord.x - currentCenter_.x;
-            int dz = coord.z - currentCenter_.z;
+            // Rudimentary culling - This refers to chunk-space coordinates
+            int dx = slot.coord.x - currentCenter_.x;
+            int dz = slot.coord.z - currentCenter_.z;
             if (dx > kDrawRadius || dx < -kDrawRadius ||
-                dz > kDrawRadius || dz < -kDrawRadius)
+                dz > kDrawRadius || dz < -kDrawRadius) {
                 continue;
+            }
 
             glm::mat4 modelMat{ 1.0 };
 
@@ -220,14 +245,12 @@ namespace aveng {
 
             vkCmdPushConstants(
                 cmd,
-                renderData_.rdAvengBasicTerrainPipelineLayout, // or your unified layout, whichever created basicPipeline
+                renderData_.rdAvengBasicTerrainPipelineLayout,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                 0,
                 sizeof(VkBasicTerrainDebugPC),
                 &dpc
             );
-
-            // fn(coord, slot);
 
             VkBuffer vb = slot.gpu.draw.vertexBuffer.buffer;
             VkDeviceSize offsets[] = { 0 };
@@ -257,7 +280,7 @@ namespace aveng {
     int TerrainController::countCpuReadySlots() const
     {
         int count = 0;
-        for (const auto& [coord, slot] : slots_) {
+        for (const auto& slot : slots_) {
             if (slot.state == procgen::TerrainRuntimeState::CpuReady) ++count;
         }
         return count;
@@ -266,7 +289,7 @@ namespace aveng {
     int TerrainController::countResidentSlots() const
     {
         int count = 0;
-        for (const auto& [coord, slot] : slots_) {
+        for (const auto& slot : slots_) {
             if (slot.state == procgen::TerrainRuntimeState::Resident) ++count;
         }
         return count;
@@ -284,10 +307,10 @@ namespace aveng {
     * Each chunk in the batch goes from Uploading to Resident, and gpu.valid is set to true. 
     * From this point forward, the render loop will draw this chunk.
     *
-    * 3.Releases the CPU renderable -- 
-    * The cpuRenderable (the ~2MB of vertex/index/adjacency vectors that were memcpy'd into 
-    * staging buffers during upload prep) is no longer needed. It's recycled via 
-    * `recycleRenderable` (vectors cleared, shell pushed to pool)
+    * 3. Releases CPU renderable data -- 
+    * The renderable vectors (~2MB of vertex/index/adjacency data that were memcpy'd into 
+    * staging buffers during upload prep) are no longer needed. resetKeepCapacity() clears
+    * them while preserving allocation capacity for the next use of this slot.
     */
     void TerrainController::retireCompletedUploads()
     {
@@ -301,15 +324,11 @@ namespace aveng {
                 continue;
             }
 
-            for (const ChunkCoord& coord : batch.inFlightSlots) {
-                auto it = slots_.find(coord);
-                if (it == slots_.end()) { continue; }
-
-                auto& slot = it->second;
+            for (uint32_t idx : batch.inFlightSlots) {
+                auto& slot = slots_[idx];
                 slot.gpu.valid = true;
                 slot.state = procgen::TerrainRuntimeState::Resident;
-
-                recycleRenderable(std::move(slot.cpuRenderable));
+                slot.renderable.resetKeepCapacity(); // This also happens when we request a chunk
             }
 
             batch.inFlightSlots.clear();
@@ -355,8 +374,9 @@ namespace aveng {
 
         int chunksThisBatch = 0;
 
-        for (auto& [coord, slot] : slots_) {
+        for (uint32_t i = 0; i < static_cast<uint32_t>(slots_.size()); ++i) {
             if (chunksThisBatch >= kMaxChunksPerUploadBatch) { break; }
+            auto& slot = slots_[i];
             if (slot.state != procgen::TerrainRuntimeState::CpuReady) { continue; }
 #ifdef M_DEBUG
             vkBufferInitTimer.start();
@@ -381,7 +401,7 @@ namespace aveng {
             }
 #endif
             slot.state = procgen::TerrainRuntimeState::Uploading;
-            batch.inFlightSlots.push_back(coord);
+            batch.inFlightSlots.push_back(i);
             chunksThisBatch++;
         }
 
@@ -401,30 +421,6 @@ namespace aveng {
         );
     }
 
-    void TerrainController::setTerrainConfig(TerrainConfig tcfg)
-    {
-        chunks_->setGlobalConfig(tcfg);   
-    }
-
-    void TerrainController::setTerrainNoiseParams(noise::NoiseParams noise)
-    {
-        chunks_->setNoiseParams(noise);
-    }
-
-    void TerrainController::setTerrainWeatheringParams(ErosionSettings erosion)
-    {
-        chunks_->setErosionParameters(erosion);
-    }
-
-    float TerrainController::getChunkSize() {
-        return chunks_->chunkSize();
-    }
-
-    void TerrainController::setDrawCenter(glm::vec3 worldPos) noexcept {
-        currentCenter_.x = static_cast<int32_t>(std::floor(worldPos.x / chunks_->chunkSize()));
-        currentCenter_.z = static_cast<int32_t>(std::floor(worldPos.z / chunks_->chunkSize()));
-    }
-
     //bool TerrainController::
 
     //std::unique_ptr<procgen::TerrainRenderable> const& TerrainController::lastRequestedRenderable() const noexcept {
@@ -438,47 +434,27 @@ namespace aveng {
     }
 
     /*
-    * @Step 1 `ensureChunkRequested`: The TerrainController creates (or finds) a slot in slots_ for the requested coordinate. 
-    * It first checks the admission controller to ensure this chunk's 5x5 support footprint doesn't 
-    * overlap any chunk currently being built (our concurrency guardian)
+    * @Step 1 `ensureChunkRequested`: Allocates a slot from the registry and submits
+    * an async renderable build. The admission controller ensures this chunk's 5x5 
+    * support footprint doesn't overlap any chunk currently being built.
     */
     void TerrainController::ensureChunkRequested(ChunkCoord coord)
     {
-        auto& slot = slots_[coord];
-        slot.coord = coord;
-
-        if (slot.state == procgen::TerrainRuntimeState::Requested ||
-            slot.state == procgen::TerrainRuntimeState::CpuReady  ||
-            slot.state == procgen::TerrainRuntimeState::Uploading ||
-            slot.state == procgen::TerrainRuntimeState::Resident)
-        {
-            return;
-        }
-
-        // First Concurrency Guard: Queue an active request - do not allow overlapping chunks to generate simultaneously
-        // Gate: only admit if the 5x5 support footprint doesn't overlap an active build.
         if (!admission_.tryAcquire(coord, kSupportRadius)) {
-            // Unable to push onto admission_.active, so we push to the deferred stack
-            // which will be retried after 
             deferredRequests_.push_back(coord);
             return;
         }
 
-        std::unique_ptr<procgen::TerrainRenderable> recycled;
-        if (!pool_.renderables.empty()) {
-            recycled = std::move(pool_.renderables.back());
-            pool_.renderables.pop_back();
-        }
+        uint32_t idx = allocateSlot(coord);
+        auto& slot = slots_[idx];
 
         /** 
-         * @Step 2 -  Async Generation - 
-         * The recycled renderable is stored on the center ChunkRecord under `renderableMutex` 
-         * The renderable lives on the record and survives any number of retry-enqueue cycles in `runGenerate`.
-         * `runGenerate` runs on a worker thread. It resolves all 25 ChunkRecord pointers for the 5x5 neighborhood, 
-         * pins them (preventing eviction), kicks off all sub-stages and polls for readiness.
-         * If dependencies aren't satisfied, it re-enqueues itself via CAS-guarded retry.
+         * @Step 2 - Async Generation -
+         * A raw pointer to the slot's inline renderable is passed to the ChunkManager.
+         * The worker thread writes directly into this renderable. Completion is signaled
+         * via a lightweight CompletionNotice containing the slot index.
          */
-        slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_, std::move(recycled));
+        slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_, &slot.renderable, idx);
         slot.state = procgen::TerrainRuntimeState::Requested;
     }
 
@@ -489,35 +465,17 @@ namespace aveng {
         drainTimer.start();
 #endif
         /** 
-         * @Step 3: Collect completed renderables. If the slot is gone (evicted between build and drain) 
-         * or the requestId is stale (superseded by a newer request), the renderable is recycled back to the 
-         * pool instead of being silently destroyed. When the local deque destructs at the end of drain, all 
-         * unique_ptr members are null -- zero debug-heap work.
-         * After draining, admission is released and any deferred requests (from @Step 1) are retried.
+         * @Step 3: Process completion notices. O(1) slot access via slotIndex.
+         * No ownership transfers -- the renderable was written in-place by the worker.
+         * After draining, any deferred requests (from @Step 1) are retried.
          */
-        chunks_->drainCompletedRenderables([this](procgen::RenderableCompletion& completedChunk) {
-
-            auto renderable = std::move(completedChunk.renderable);
-
-            auto it = slots_.find(completedChunk.coord);
-            if (it == slots_.end()) {
-                recycleRenderable(std::move(renderable));
+        chunks_->drainCompletedRenderables([this](const procgen::CompletionNotice& notice) {
+            auto& slot = slots_[notice.slotIndex];
+            if (slot.requestId != notice.requestId)
                 return;
-            }
-
-            auto& slot = it->second;
-            if (slot.requestId != completedChunk.requestId) {
-                recycleRenderable(std::move(renderable));
-                return;
-            }
-
-            if (!completedChunk.success || !renderable) {
-                slot.state = procgen::TerrainRuntimeState::Failed;
-                return;
-            }
-
-            slot.cpuRenderable = std::move(renderable);
-            slot.state = procgen::TerrainRuntimeState::CpuReady;
+            slot.state = notice.success
+                ? procgen::TerrainRuntimeState::CpuReady
+                : procgen::TerrainRuntimeState::Failed;
         });
 
 #ifdef M_DEBUG
@@ -527,9 +485,7 @@ namespace aveng {
         }
 #endif
 
-		// Retry any requests that were deferred due to region overlap - See: First Concurrency guard in ensureChunkRequested()
         if (!deferredRequests_.empty()) {
-			// TODO - No need to initialize a vector here every time - Just keep it around and clear it.
             std::vector<ChunkCoord> pending;
             pending.swap(deferredRequests_);
             for (const ChunkCoord& coord : pending) {
@@ -625,16 +581,35 @@ namespace aveng {
 #endif
     }
 
-    void TerrainController::recycleRenderable(std::unique_ptr<procgen::TerrainRenderable> r) {
-        if (!r) return;
-        r->vbo.clear();
-        r->ibo.clear();
-        r->packedPositions.clear();
-        r->packedTriangles.clear();
-        r->packedAdjacency.clear();
-        if (pool_.renderables.size() < TerrainResourcePool::kMaxPooledRenderables) {
-            pool_.renderables.push_back(std::move(r));
+    uint32_t TerrainController::allocateSlot(ChunkCoord coord) {
+        uint32_t idx;
+        if (!freeSlots_.empty()) {
+            idx = freeSlots_.back();
+            freeSlots_.pop_back();
+        } else {
+            idx = static_cast<uint32_t>(slots_.size());
+            slots_.emplace_back();
         }
+        slots_[idx].coord = coord;
+        slots_[idx].state = procgen::TerrainRuntimeState::Unrequested;
+        coordToSlot_[coord] = idx;
+        return idx;
+    }
+
+    void TerrainController::releaseSlot(uint32_t idx) {
+        auto& slot = slots_[idx];
+#ifdef M_DEBUG
+        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
+               "Cannot release a slot while a worker thread holds a pointer to its renderable");
+#endif
+        coordToSlot_.erase(slot.coord);
+        slot.renderable.resetKeepCapacity();
+        slot.state = procgen::TerrainRuntimeState::Unrequested;
+        slot.coord = {};
+        slot.requestId = 0;
+        slot.gpu = {};
+        slot.gpuHandle = {};
+        freeSlots_.push_back(idx);
     }
 
     // Cleanup all -- Funnels all resources into pool objects and then destroys from there.
@@ -661,7 +636,9 @@ namespace aveng {
         }
 
         // 3. Recycle all slot resources into pool (free descriptor sets immediately)
-        for (auto& [coord, slot] : slots_) {
+        for (auto& slot : slots_) {
+            if (slot.state == procgen::TerrainRuntimeState::Unrequested) continue;
+
             pool_.vbo.push_back(std::move(slot.gpu.draw.vertexBuffer));
             pool_.ibo.push_back(std::move(slot.gpu.draw.indexBuffer));
 

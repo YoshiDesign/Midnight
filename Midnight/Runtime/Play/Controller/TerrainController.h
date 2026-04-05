@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include <future>
-#include <memory>
+#include <unordered_map>
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Module/Procgen/Terrain/Control.h"
@@ -15,10 +15,6 @@
 // TODO - We're going to make a TerrainRenderSystem
 #include <vulkan/vulkan_core.h>
 
-namespace procgen {
-    struct TerrainRenderable;
-}
-
 /**
  * Notes about the new resource pool:
  * The pool is not pre-populated -- it's a recycling pool that starts empty and fills up organically as chunks complete their lifecycle. Here's the flow:
@@ -27,7 +23,7 @@ Cold start (pool empty): The very first wave of chunks will always hit the "fall
 
 Steady state (pool warm): Once the player starts moving and chunks cycle through eviction, buffers flow into the pool from two sources:
 
-retireCompletedUploads -- when a GPU upload fence signals, the CPU renderable (with its ~2MB of vectors) gets its vectors cleared and the empty shell is pushed into pool_.renderables. This avoids the cost of deallocating and reallocating the TerrainRenderable struct itself.
+retireCompletedUploads -- when a GPU upload fence signals, the renderable's vectors are cleared (preserving capacity) via resetKeepCapacity(). The slot is ready for reuse without any heap allocation.
 
 flushDeferredDeletes -- when an evicted chunk's deferred frame count elapses (after kDeferFrames), its VBO, IBO, input SSBO, and output SSBO structs get moved into pool_.vbo, pool_.ibo, etc. instead of being destroyed. The Vulkan handles survive -- device buffer, staging buffer, VMA allocations -- all still valid.
 
@@ -173,7 +169,6 @@ namespace aveng {
         void flushDeferredDeletes();
 
         void tick();
-        void update(/*const Camera& camera*/);
 
         void render(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex);
         void renderDebug(VkCommandBuffer cmd, VkPipeline pipeline, int currentFrameIndex);
@@ -214,13 +209,17 @@ namespace aveng {
 
     private:
 
-        void recycleRenderable(std::unique_ptr<procgen::TerrainRenderable> r);
+        uint32_t allocateSlot(ChunkCoord coord);
+        void releaseSlot(uint32_t idx);
 
-        /* ChunkCoord represents the center of a 3x3 renderable region,
-         * though we actually receive data for a 5x5 region to support compute.
-         * Compute dispatch only needs to occur once the renderable is completed
+        /* Contiguous slot storage with index-based access.
+         * coordToSlot_ resolves coord-based lookups (eviction, etc).
+         * freeSlots_ recycles indices so the vector never grows during gameplay.
+         * Exactly how our model instances work.
          */
-        std::unordered_map<ChunkCoord, procgen::TerrainChunkSlot, ChunkCoordHash> slots_;
+        std::vector<procgen::TerrainChunkSlot> slots_;
+        std::unordered_map<ChunkCoord, uint32_t, ChunkCoordHash> coordToSlot_;
+        std::vector<uint32_t> freeSlots_;
 
         std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash> managed_;
         ChunkCoord currentCenter_;

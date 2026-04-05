@@ -267,13 +267,6 @@ namespace xone {
         return false;
     }
 
-    void LinearFlightStreamer::evictChunks(StreamCommandBuffer& outCmds, TerrainController& terrain) 
-    {
-        for (const ChunkCoord coord : outCmds.evictCenters) {
-            terrain.evictChunk(coord);
-        }
-    }
-
     /* Add to the command's requestCenters. Requests are assumed to be validated given regional readiness */
     void LinearFlightStreamer::requestIfNeeded(
         ChunkCoord coord,

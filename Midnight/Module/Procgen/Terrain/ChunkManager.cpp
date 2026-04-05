@@ -1413,7 +1413,7 @@ namespace aveng {
 
     /* Async */
     uint64_t ChunkManager::requestRenderableAsync(ChunkCoord center, uint64_t frameIndex,
-        std::unique_ptr<procgen::TerrainRenderable> recycled)
+        procgen::TerrainRenderable* target, uint32_t slotIndex)
     {
         ChunkRecord* rec = getOrCreateRecord(center);
 
@@ -1433,13 +1433,12 @@ namespace aveng {
             requestId = ++rec->requestedRenderableId;
             rec->renderableState = RenderableBuildState::Queued;
             rec->renderablePublished = false;
-            rec->recycledRenderable = std::move(recycled);
+            rec->renderableTarget = target;
+            rec->slotIndex = slotIndex;
             shouldSubmit = true;
         }
-        // Technically, if we reach this point, this will never be false
-        if (shouldSubmit) {
-            // procgen::traceStage((center, procgen::TerrainStage::Renderable, "request");
 
+        if (shouldSubmit) {
             tasks_.enqueue([this, center, frameIndex, requestId]() {
                 ChunkRecord* workerRec = getOrCreateRecord(center);
                 RecordPin hold(*this, workerRec, frameIndex);
@@ -1541,10 +1540,10 @@ namespace aveng {
         // procgen::traceStage((center, procgen::TerrainStage::Renderable, "begin");
 
         try {
-            // Note: renderable is the result of moving ownership of nrecs[4]
-            auto renderable = buildRenderablev2(center, frameIndex, nrecs);
+            buildRenderablev2(center, frameIndex, nrecs);
 
             bool shouldPublish = false;
+            uint32_t slotIdx = 0;
             {
                 std::scoped_lock lock(centerRec->renderableMutex);
                 if (centerRec->requestedRenderableId != requestId) {
@@ -1554,6 +1553,7 @@ namespace aveng {
                 centerRec->completedRenderableId = requestId;
                 centerRec->renderableState = RenderableBuildState::Ready;
                 centerRec->renderablePublished = true;
+                slotIdx = centerRec->slotIndex;
                 shouldPublish = true;
             }
 
@@ -1562,48 +1562,41 @@ namespace aveng {
                     admissionCtl_->release(center, admissionRadius_);
                 }
 
-                // Push onto the ConcurrentQueue
-                completedRenderables_.push(procgen::RenderableCompletion{
-                    .coord = center,
+                completedRenderables_.push(procgen::CompletionNotice{
+                    .slotIndex = slotIdx,
                     .requestId = requestId,
-                    .success = true,
-                    .renderable = std::move(renderable) // 2nd move for this guy
+                    .success = true
                 });
             }
         }
         catch (...) {
-            // PEPPYYYY!!!!
+            uint32_t slotIdx = 0;
             {
                 std::scoped_lock lock(centerRec->renderableMutex);
                 if (centerRec->requestedRenderableId == requestId) {
                     centerRec->renderableState = RenderableBuildState::Failed;
                 }
+                slotIdx = centerRec->slotIndex;
             }
 
             if (admissionCtl_) {
                 admissionCtl_->release(center, admissionRadius_);
             }
 
-            completedRenderables_.push(procgen::RenderableCompletion{
-                .coord = center,
+            completedRenderables_.push(procgen::CompletionNotice{
+                .slotIndex = slotIdx,
                 .requestId = requestId,
-                .success = false,
-                .renderable = nullptr
+                .success = false
             });
         }
     }
 
-    // The old synchronous generate() is replaced by runGenerate() above.
-    // Kept as a stub for any remaining callers during migration.
-    std::unique_ptr<procgen::TerrainRenderable>
-        ChunkManager::generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
+    void ChunkManager::generate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
     {
-        // This path should no longer be reached -- runGenerate handles everything.
         assert(false && "generate() is deprecated; use runGenerate() instead.");
-        return nullptr;
     }
 
-    std::unique_ptr<procgen::TerrainRenderable> ChunkManager::buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
+    void ChunkManager::buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
         std::span<ChunkRecord*, 25> recs)
     {
         using namespace procgen;
@@ -1611,15 +1604,8 @@ namespace aveng {
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors); // inner 3x3 = [0..8]
 
-        /*
-        * TODO - This renderable comes from an array of 
-        */
-
-        // Center chunk coord is at [4]
-        auto renderable = recs[4]->recycledRenderable
-            ? std::move(recs[4]->recycledRenderable)
-            : std::make_unique<TerrainRenderable>();
-
+        TerrainRenderable* renderable = recs[4]->renderableTarget;
+        renderable->resetKeepCapacity();
         renderable->center = center;
 
         const float cs = cfg_.chunkSize;
@@ -1864,8 +1850,6 @@ namespace aveng {
         //    totalCoreTris, totalHaloTris, totalCoreVerts, totalHaloVerts,
         //    renderable->vbo.size(), renderable->ibo.size());
 #endif
-        return renderable;
-
     }
 
     //bool ChunkManager::tryTakeRenderable(

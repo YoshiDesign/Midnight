@@ -465,9 +465,6 @@ namespace aveng {
 
 	void Editor::renderTerrain() {
 
-		// NOTE: tick() is already called by AvengFrame::render() → renderer.tickTerrain().
-		// Calling update() here caused terrain to be ticked twice per frame (double drain/service/upload).
-
 		renderer.terrainController().setDrawCenter(cameraManager.active().transform.translation);
 
 		if (1) {

@@ -83,8 +83,6 @@ namespace xone {
 
         bool shouldEvict(aveng::ChunkCoord c, aveng::ChunkCoord playerChunk) const;
 
-        void evictChunks(aveng::StreamCommandBuffer& outCmds, aveng::TerrainController& terrain);
-
         static void requestIfNeeded(
             aveng::ChunkCoord coord,
             std::unordered_map<aveng::ChunkCoord,

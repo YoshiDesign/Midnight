@@ -31,7 +31,7 @@ namespace aveng {
     struct TerrainUploadBatch {
         VkFence fence = VK_NULL_HANDLE;
         VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-        std::vector<ChunkCoord> inFlightSlots;
+        std::vector<uint32_t> inFlightSlots;
         bool active = false;
     };
 
@@ -129,7 +129,7 @@ namespace aveng {
         VkResult result = vkAllocateDescriptorSets(engineDevice.device(), &allocInfo, &packed.computeDescriptorSet);
         if (result != VK_SUCCESS) {
             Logger::log(1, "%s error: could not allocate terrain compute descriptor set (error: %i)\n", __FUNCTION__, result);
-            return false;
+            return false;  
         }
 
         // All input bindings reference inputSsbo at their aligned offsets
@@ -248,17 +248,12 @@ namespace aveng {
         VkDeviceSize settingsUboSize_,
         TerrainResourcePool& pool)
     {
-        if (!slot.cpuRenderable) {
-            Logger::log(1, "%s error: slot has no cpu renderable\n", __FUNCTION__);
-            return false;
-        }
-
         if (settingsUboBuffer_ == VK_NULL_HANDLE) {
             Logger::log(1, "%s error: terrain settings UBO not set (call setTerrainSettingsUbo first)\n", __FUNCTION__);
             return false;
         }
 
-        auto& cpu = *slot.cpuRenderable;
+        auto& cpu = slot.renderable;
         auto& gpu = slot.gpu;
 
         gpu.draw.vertexCount = static_cast<uint32_t>(cpu.vbo.size());

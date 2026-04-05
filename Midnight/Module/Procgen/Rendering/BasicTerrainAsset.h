@@ -68,14 +68,23 @@ namespace procgen {
 		aveng::BasicTerrainAlignmentData alignment{};
 
 		aveng::ChunkCoord center{};
+
+		void resetKeepCapacity() {
+			vbo.clear();
+			ibo.clear();
+			packedPositions.clear();
+			packedTriangles.clear();
+			packedAdjacency.clear();
+			center = {};
+			alignment = {};
+		}
 	};
 
-	struct RenderableCompletion
+	struct CompletionNotice
 	{
-		aveng::ChunkCoord coord;
+		uint32_t slotIndex;
 		uint64_t requestId;
 		bool success;
-		std::unique_ptr<TerrainRenderable> renderable;
 	};
 
 	// In case any configurables come to mind.
@@ -145,9 +154,9 @@ namespace procgen {
 
 		uint64_t requestId = 0;
 
-		std::unique_ptr<procgen::TerrainRenderable> cpuRenderable;
+		TerrainRenderable renderable;
 
-		procgen::TerrainGpuChunk gpu;
+		TerrainGpuChunk gpu;
 
 		TerrainGpuHandle gpuHandle{};
 	};
