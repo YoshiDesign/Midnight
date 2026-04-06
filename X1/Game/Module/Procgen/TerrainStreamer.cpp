@@ -15,6 +15,7 @@ namespace xone {
         , linear_(policy.linear)
         , allRange_(policy.allRange)
     {
+        streamed_.reserve(15);
         // Logger::log(1, "TerrainStreamer Initialized\n");
     }
 
@@ -41,12 +42,23 @@ namespace xone {
             frameIndex
         };
 
+#ifdef M_DEBUG
+        if (streamSize_ != lastStreamSize_) {
+            lastStreamSize_ = streamSize_;
+            std::printf("Latest stream_ size:\t%d\n", streamSize_);
+        }
+#endif
+
         StreamCommandBuffer cmds{};
 
         switch (policy_.mode) {
         case TerrainStreamMode::LinearFlight:
-            // // Logger::log(1, "Updating with LinearFlight Policy");
+            // Logger::log(1, "Updating with LinearFlight Policy");
             linear_.update(ctx, terrain_, streamed_, cmds);
+
+            // DEBUG
+            streamSize_ = streamed_.size();
+
             break;
 
         case TerrainStreamMode::AllRange:
@@ -62,7 +74,7 @@ namespace xone {
     void TerrainStreamer::applyRequests(const std::vector<ChunkCoord>& centers, uint64_t frameIndex)
     {
         for (const ChunkCoord& c : centers) {
-            // // Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
+            Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
             terrain_.generateChunks(c);
         }
     }
@@ -78,6 +90,11 @@ namespace xone {
 
             terrain_.evictChunk(c);
             streamed_.erase(it);
+
+            // DEBUG
+            streamSize_ = streamed_.size();
+
+
             ++evicted;
         }
     }
@@ -106,29 +123,24 @@ namespace xone {
         * Here we're synchronizing this to the LinearFlightStreamer's state_
         */
 
-        // Acquire stream starting point
+        // Acquire stream starting point: snap player position to the
+        // nearest chunk center and lock it as the fixed streaming origin.
+        // All wave coordinates are computed relative to this origin so that
+        // absolute wave numbers always map to the same spatial coordinates.
         if (!state_.initialized) {
-            state_.baseX = ctx.playerChunk.x;
-            state_.baseZ = ctx.playerChunk.z;
             state_.initialized = true;
-        }
-
-        // Update the authoritative state
-        if (ctx.playerChunk.x != state_.baseX) {
-            state_.baseX = ctx.playerChunk.x;
-            // baseZ intentionally preserved -- forward wave progress is kept
             state_.maxCenterWaveRequested = -1;
             state_.maxFanWaveRequested = -1;
+
+            ChunkCoord cdelta = procgen::centerOfRegion_linearPolicy_wrap(ctx.playerChunk.x, ctx.playerChunk.z);
+            state_.baseX = ctx.playerChunk.x + cdelta.x;
+            state_.baseZ = ctx.playerChunk.z + cdelta.z;
         }
 
-        if (ctx.playerChunk.z != state_.baseZ) {
-            state_.baseZ = ctx.playerChunk.z;
-        }
-
-        // Request chunks based on (X % 3 == 0 || Z % 3 == 0)
         if (state_.maxCenterWaveRequested < 0) {
             requestInitialCenter(streamed, outCmds);
         }
+
         advanceFrontier(ctx, terrain, streamed, outCmds);
         enqueueEvictions(ctx.playerChunk, streamed, outCmds);
     }
@@ -138,7 +150,6 @@ namespace xone {
         StreamCommandBuffer& outCmds
     )
     {
-        // Designate the first set of chunkCoords to be generated.
         const LinearWaveCoords w0 = makeLinearWave(0, state_.baseX, state_.baseZ);
 
         requestIfNeeded(w0.center, streamed, outCmds);
@@ -153,72 +164,92 @@ namespace xone {
         StreamCommandBuffer& outCmds
     )
     {
+        const int originX = state_.baseX;
+        const int originZ = state_.baseZ;
 
-        bool progressed = false;
-        int iter = 0;
+        // std::printf("[LinearFlightStreamer] Streaming Origin: {%d, %d}\n", originX, originZ);
 
-        ChunkCoord nearestCenter = procgen::centerOfRegion_linearPolicy_wrap(ctx.playerChunk.x, ctx.playerChunk.z);
+        // Rule 1:
+        // Request the two side fan chunks for a wave once the center is ready.
+        const int nextFanWave = state_.maxFanWaveRequested + 1;
+        if (nextFanWave <= state_.maxCenterWaveRequested) {
+            // std::printf("[F1] Ready for FAN candidates.\n");
+            
+            const LinearWaveCoords wave = makeLinearWave(nextFanWave, originX, originZ);
 
-        std::printf("Nearest Center: {%d, %d}\n", nearestCenter.x, nearestCenter.z);
+            if (wave.leftFan.z - ctx.playerChunk.z > policy_.forwardRows) {
+                //std::printf("[F] Beyond forward limit (fan z=%d, player z=%d, limit=%d)\n",
+                //    wave.leftFan.z, ctx.playerChunk.z, policy_.forwardRows);
+            }
+            else if (auto it = streamed.find(wave.leftFan); it == streamed.end()) {
+                /*std::printf("[F2] Wave...\nLeftFan\t{%d, %d}\nCenter\t{%d, %d}\nRightFan\t{%d, %d}\n",
+                    wave.leftFan.x, wave.leftFan.z,
+                    wave.center.x, wave.center.z,
+                    wave.rightFan.x, wave.rightFan.z);
 
-        do {
-            progressed = false;
-
-            //if (iter++ == policy_.kMaxRequests) { break; }
-            // Updated Algo:
-            /// Get the players chunk X/Z
-            /// 
-            /// - Using the new algo, derive the closest central (chunkX/Z%3 == 0) chunk based on the player's region
-            /// - 
-            /// 
-            /// Invariant: We only request chunks from centers that are at least 3 units apart
-
-            // Rule 1:
-            // Request the two side fan chunks for that wave once the center is ready enough.
-            const int nextFanWave = state_.maxFanWaveRequested + 1;
-            if (nextFanWave <= state_.maxCenterWaveRequested) {
-
-                // Based on the player's current state_.baseX/Z - Create a LinearWaveCoords based on that location
-                const LinearWaveCoords wave = makeLinearWave(nextFanWave, state_.baseX, state_.baseZ);
+                std::printf("[F3] Is last center ready?\t\n");*/
 
                 // Check that an entire 5x5 region has completed up to the spatial grid
                 if (terrain.hasRegionReady(wave.center)) {
+                    // std::printf("[F4] Yes!\n");
                     requestIfNeeded(wave.leftFan, streamed, outCmds);
                     requestIfNeeded(wave.rightFan, streamed, outCmds);
 
                     state_.maxFanWaveRequested = nextFanWave;
-                    progressed = true;
+                }
+                else {
+                   // std::printf("[F4] ...Nope...\n");
                 }
             }
+            else {
+                // std::printf("[F] Early Exit\n");
+            }
+        }
 
-            // Rule 2:
-            // Once both fan regions' 5x5 support have completed spatial grids, request the next center wave.
-            // The next center's runGenerate handles its own mesh-readiness checks internally via CAS retry,
-            // so we only need the support region's spatial data to be available, not the full pipeline.
-            if (state_.maxFanWaveRequested >= 0 &&
-                state_.maxCenterWaveRequested == state_.maxFanWaveRequested)
-            {
-                const LinearWaveCoords currentFanWave = makeLinearWave(state_.maxFanWaveRequested, state_.baseX, state_.baseZ);
+        // Rule 2:
+        // Once both fan regions' 5x5 support have completed spatial grids, request the next center wave.
+        // The next center's runGenerate handles its own mesh-readiness checks internally via CAS retry,
+        // so we only need the support region's spatial data to be available, not the full pipeline.
+        if (state_.maxFanWaveRequested >= 0 &&
+            state_.maxCenterWaveRequested == state_.maxFanWaveRequested)
+        {
+            // std::printf("[C1] Ready for CENTER candidates.\n");
 
-                // Check that an entire 5x5 region has completed up to the spatial grid
-                if (terrain.hasRegionReady(currentFanWave.leftFan) &&
-                    terrain.hasRegionReady(currentFanWave.rightFan))
+            const int nextCenterWave = state_.maxCenterWaveRequested + 1;
+            const LinearWaveCoords currentWave = makeLinearWave(state_.maxFanWaveRequested, originX, originZ);
+            const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave, originX, originZ);
+
+            if (nextWave.center.z - ctx.playerChunk.z > policy_.forwardRows) {
+                //std::printf("[C] Beyond forward limit (center z=%d, player z=%d, limit=%d)\n",
+                //    nextWave.center.z, ctx.playerChunk.z, policy_.forwardRows);
+            }
+            else if (auto it = streamed.find(nextWave.center); it == streamed.end()) {
+            
+               /* std::printf("[C2] Wave...\nLeftFan\t{%d, %d}\nCenter\t{%d, %d}\nRightFan\t{%d, %d}\n",
+                    nextWave.leftFan.x, nextWave.leftFan.z,
+                    nextWave.center.x, nextWave.center.z,
+                    nextWave.rightFan.x, nextWave.rightFan.z);*/
+
+                // std::printf("[C3] Is last fan ready?\t");
+
+                // Gate on the CURRENT wave's fans being ready
+                if (terrain.hasRegionReady(currentWave.leftFan) &&
+                    terrain.hasRegionReady(currentWave.rightFan))
                 {
-                    const int nextCenterWave = state_.maxCenterWaveRequested + 1;
-                    const LinearWaveCoords nextWave = makeLinearWave(nextCenterWave, state_.baseX, state_.baseZ);
-
-                    const int leadZ = nextWave.center.z - ctx.playerChunk.z;
-                    if (leadZ > policy_.forwardRows) {
-                        break;
-                    }
-
+                    // std::printf("[C4] Yes!\n");
                     requestIfNeeded(nextWave.center, streamed, outCmds);
                     state_.maxCenterWaveRequested = nextCenterWave;
-                    progressed = true;
+                }
+                else {
+                    // std::printf("[C4] ...Nope...\n");
                 }
             }
+            else {
+                // std::printf("[C] Early Exit\n");
+            }
+        }
 
-        } while (progressed);
+        // std::printf("[5 LinearFlightStreamer] Exiting Request Stage...\n");
     }
 
     void LinearFlightStreamer::enqueueEvictions(
@@ -246,9 +277,9 @@ namespace xone {
         const int dx = std::abs(c.x - playerChunk.x);
         const int dz = c.z - playerChunk.z;  // signed: positive = ahead, negative = behind
 
-        if (dx > policy_.evictRadiusX) return true;
+        if (dx > policy_.evictRadiusX) { return true; }
         // if (dz > policy_.evictRadiusZ) return true;       // too far ahead
-        if (dz < -policy_.evictBackwardZ) return true;     // too far behind
+        if (dz < -policy_.evictBackwardZ) { return true; }   // too far behind
 
         return false;
     }
@@ -265,9 +296,8 @@ namespace xone {
             StreamedChunkState{ StreamedChunkState::Status::Requested }
         );
 
-
         if (inserted) {
-            Logger::log(1, "[LinearFlightStreamer] Adding Request Cmd for {%d, %d}", coord.x, coord.z);
+            // Logger::log(1, "[LinearFlightStreamer] Adding Request Cmd for {%d, %d}\n", coord.x, coord.z);
             outCmds.requestCenters.push_back(coord);
         }
     }

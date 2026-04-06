@@ -67,7 +67,7 @@ namespace procgen {
 		// Alignment metadata UBO (still useful for SSBO packing and descriptor offset computation)
 		aveng::BasicTerrainAlignmentData alignment{};
 
-		aveng::ChunkCoord center{};
+		aveng::ChunkCoord center{-1, -1};
 
 		void resetKeepCapacity() {
 			vbo.clear();

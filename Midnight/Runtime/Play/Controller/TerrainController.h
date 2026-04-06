@@ -100,7 +100,7 @@ namespace aveng {
         int lateralRadius{ 1 };
         int forwardRows{ 6 };
         int backwardRows { 1 };
-        int evictRadiusX { 4 };
+        int evictRadiusX { 7 };
         // int evictRadiusZ {7};
         int evictBackwardZ { 2 };
         int kMaxRequests { 2 }; // 2 requests max per frame
@@ -261,8 +261,9 @@ namespace aveng {
 
         static constexpr uint64_t kDeferFrames = 3;
         static constexpr int kMaxChunksPerUploadBatch = 3;
-        static constexpr int kDrawRadius = 1;
+        static constexpr int kDrawRadius = 4;
         static constexpr int kSupportRadius = 2; // 5x5 neighborhood
+        static constexpr uint32_t kMinSlotReserve = 50;
 
         // std::unique_ptr<procgen::TerrainRenderable> lastRequested_;
 

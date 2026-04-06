@@ -49,6 +49,8 @@ namespace aveng {
             allocInfo.commandBufferCount = 1;
             vkAllocateCommandBuffers(engineDevice_.device(), &allocInfo, &uploadBatches_[i].cmdBuffer);
         }
+
+        slots_.reserve(kMinSlotReserve);
 	}
 
     TerrainController::~TerrainController() {
@@ -123,6 +125,21 @@ namespace aveng {
         }
         else {
             idx = static_cast<uint32_t>(slots_.size());
+#ifdef M_DEBUG
+            if (slots_.size() == slots_.capacity()) {
+                for (const auto& s : slots_) {
+                    if (s.state == procgen::TerrainRuntimeState::Requested) {
+                        std::printf("[TerrainController] FATAL: slots_ reallocation while slot {%d,%d} "
+                                    "is in Requested state -- worker pointers will dangle! "
+                                    "(size=%zu, capacity=%zu)\n",
+                                    s.coord.x, s.coord.z, slots_.size(), slots_.capacity());
+                        assert(false && "slots_ reallocation would invalidate in-flight renderable pointers");
+                    }
+                }
+                std::printf("[TerrainController] WARNING: slots_ growing beyond reserve "
+                            "(size=%zu, capacity=%zu)\n", slots_.size(), slots_.capacity());
+            }
+#endif
             slots_.emplace_back(); // init
         }
 
@@ -162,6 +179,11 @@ namespace aveng {
         uint32_t idx = it->second;
         auto& slot = slots_[idx];
 
+        if (slot.state == procgen::TerrainRuntimeState::Requested) {
+            std::printf("[TerrainController] WARNING: evicting slot[%d] {%d,%d} while still Requested!\n",
+                        idx, slot.coord.x, slot.coord.z);
+        }
+
 #ifdef M_DEBUG
         assert(slot.state != procgen::TerrainRuntimeState::Requested &&
                "Cannot evict a slot while a worker thread holds a pointer to its renderable");
@@ -180,11 +202,19 @@ namespace aveng {
 
         admission_.release(center, kSupportRadius);
 
+// #region agent log
+        auto _dbg_ev_t0 = std::chrono::steady_clock::now();
+// #endregion
+
         for (int dz = -2; dz <= 2; ++dz) {
             for (int dx = -2; dx <= 2; ++dx) {
                 chunks_->evictRecord({ center.x + dx, center.z + dz });
             }
         }
+
+// #region agent log
+        auto _dbg_ev_t1 = std::chrono::steady_clock::now();
+// #endregion
 
         // Move the retiree's vulkan resources into a deffered cleanup struct
         // TODO: Maybe just push the resources back onto the pool. This strategy predates the reusable pool resources
@@ -199,6 +229,16 @@ namespace aveng {
         deferredCleanups_.push_back(deferred);
 
         releaseSlot(idx);
+
+// #region agent log
+        { auto _dbg_ev_t2 = std::chrono::steady_clock::now();
+          float _evLoopMs = std::chrono::duration<float,std::milli>(_dbg_ev_t1-_dbg_ev_t0).count();
+          float _evRestMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t1).count();
+          float _evTotalMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t0).count();
+          FILE* _f;
+          fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
+          if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"E\",\"location\":\"TerrainController.cpp:223\",\"message\":\"eviction breakdown\",\"data\":{\"evictRecordLoopMs\":%.3f,\"deferredPushAndReleaseMs\":%.3f,\"totalMs\":%.3f,\"coord\":[%d,%d]},\"timestamp\":%lld}\n",_evLoopMs,_evRestMs,_evTotalMs,center.x,center.z,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+// #endregion
 
 #ifdef M_DEBUG
         renderData_.rdTerrainEvictionTime = evictionTimer.stop();
@@ -490,7 +530,9 @@ namespace aveng {
         uint32_t idx = allocateSlot(coord);
         auto& slot = slots_[idx];
 
-        std::printf("[TerrainController] Creating renderable at slot[%d]\n", idx);
+        std::printf("[TerrainController] Creating renderable at slot[%d] addr=%p "
+                    "(slots size=%zu cap=%zu)\n",
+                    idx, (void*)&slot.renderable, slots_.size(), slots_.capacity());
 
         /** 
          * @Step 2 - Async Generation
@@ -599,6 +641,14 @@ namespace aveng {
                 if (entry.computeDescriptorSet != VK_NULL_HANDLE) {
                     vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &entry.computeDescriptorSet);
                 }
+
+// #region agent log
+                {
+                    FILE* _f;
+                    fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
+                    if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:644\",\"message\":\"pool refill\",\"data\":{\"inputSsboPoolSize\":%zu,\"outputSsboPoolSize\":%zu,\"vboPoolSize\":%zu,\"iboPoolSize\":%zu,\"deferredRemaining\":%zu},\"timestamp\":%lld}\n",pool_.inputSsbo.size(),pool_.outputSsbo.size(),pool_.vbo.size(),pool_.ibo.size(),deferredCleanups_.size(),(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} 
+                }
+// #endregion
 
                 // O(1) swap-and-pop removal
                 deferredCleanups_[i] = std::move(deferredCleanups_.back());

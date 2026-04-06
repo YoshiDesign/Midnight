@@ -143,6 +143,8 @@ namespace xone {
         LinearFlightStreamer linear_;
         AllRangeStreamer allRange_;
         std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash> streamed_;
+        int streamSize_ = 0;
+        int lastStreamSize_ = 0;
         std::vector<aveng::ChunkCoord> pendingEvictions_;
     };
 

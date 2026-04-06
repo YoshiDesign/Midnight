@@ -1,0 +1,125 @@
+Why shared_ptr<promise> Exists
+Looking at the pattern in requestAllPoints (line 550-560):
+
+std::call_once(rec->allPointsOnce, [this, rec, c, frameIndex] {
+    rec->allPointsProm = std::make_shared<std::promise<AllPoints const*>>();
+    rec->allPointsF = rec->allPointsProm->get_future().share();
+    tasks_.enqueue([this, coord = c, frameIndex]() {
+        ChunkRecord* r = getOrCreateRecord(coord);
+        runAllPointsStage(*r, frameIndex);
+    });
+});
+And in runAllPointsStage (line 599-600):
+
+AllPoints const* result = buildAllPoints(rec);
+rec.allPointsProm->set_value(result);
+The shared_ptr was used because the promise needs to outlive the call_once scope and be accessible later when the task completes. But here's the thing: the task lambdas never capture the promise. They capture coord, look up the record via getOrCreateRecord(coord), and access the promise through the record. There is exactly one owner of each promise -- the record itself.
+
+So shared_ptr<promise> is completely unnecessary. A raw std::promise<T> or std::optional<std::promise<T>> stored directly in the record would work identically. The shared_ptr adds a control-block heap allocation, atomic reference counting, and an extra indirection -- all for zero benefit.
+
+But the Deeper Problem: The Entire Promise/Future/once_flag Stack
+Even replacing shared_ptr<promise> with a direct member only addresses one layer. The real waste is the entire promise + shared_future + once_flag trio per stage. Look at what each stage actually does:
+
+call_once -- ensures the stage is initiated exactly once
+promise -- a one-shot signaling channel: the task calls set_value when done
+shared_future -- allows polling via isReady() (which does wait_for(0ms))
+isReady() in Control.h -- polls the future with a zero-timeout wait
+But you already have the exact machinery to replace all of this:
+
+call_once → your CAS retry guards (allPointsRetryQueued, etc.) already prevent duplicate enqueues. A CAS on an atomic state flag does the same job as once_flag, and is resettable.
+promise::set_value → the product is arena-allocated and stored as a raw pointer in the record (rec.allPoints = result). The value is already there. All you need is a visibility fence.
+shared_future + isReady() → an atomic<StageState> load is O(1) with no shared state, no wait_for syscall overhead, no reference counting.
+The Replacement: Atomic Stage State
+Each stage's entire trio (once_flag + shared_ptr<promise<T>> + shared_future<T>) collapses to one atomic:
+
+enum class StageState : uint8_t {
+    NotStarted,
+    Queued,
+    Running,
+    Ready,
+    Failed
+};
+In ChunkRecord, replace:
+
+// BEFORE: 3 members per stage, 6 heap allocations (shared_ptr control blocks)
+std::once_flag allPointsOnce;
+std::shared_future<AllPoints const*> allPointsF;
+std::shared_ptr<std::promise<AllPoints const*>> allPointsProm;
+with:
+
+// AFTER: 1 atomic per stage, 0 heap allocations
+std::atomic<StageState> allPointsState{StageState::NotStarted};
+The request function transforms from:
+
+// BEFORE
+std::shared_future<AllPoints const*> ChunkManager::requestAllPoints(ChunkCoord c, uint64_t frameIndex) {
+    ChunkRecord* rec = getOrCreateRecord(c);
+    rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
+    std::call_once(rec->allPointsOnce, [this, rec, c, frameIndex] {
+        rec->allPointsProm = std::make_shared<std::promise<AllPoints const*>>();
+        rec->allPointsF = rec->allPointsProm->get_future().share();
+        tasks_.enqueue([this, coord = c, frameIndex]() {
+            ChunkRecord* r = getOrCreateRecord(coord);
+            runAllPointsStage(*r, frameIndex);
+        });
+    });
+    return rec->allPointsF;
+}
+to:
+
+// AFTER
+void ChunkManager::requestAllPoints(ChunkCoord c, uint64_t frameIndex) {
+    ChunkRecord* rec = getOrCreateRecord(c);
+    rec->lastTouchedFrame.store(frameIndex, std::memory_order_relaxed);
+    auto expected = StageState::NotStarted;
+    if (rec->allPointsState.compare_exchange_strong(expected, StageState::Queued)) {
+        tasks_.enqueue([this, coord = c, frameIndex]() {
+            ChunkRecord* r = getOrCreateRecord(coord);
+            runAllPointsStage(*r, frameIndex);
+        });
+    }
+}
+The stage runner transforms from:
+
+// BEFORE
+AllPoints const* result = buildAllPoints(rec);
+rec.allPointsProm->set_value(result);
+to:
+
+// AFTER
+AllPoints const* result = buildAllPoints(rec);
+rec.allPoints = result;
+rec.allPointsState.store(StageState::Ready, std::memory_order_release);
+And readiness checks go from:
+
+// BEFORE: zero-timeout future poll (involves shared_state mutex, syscall)
+if (!procgen::isReady(rec.allPointsF)) { ... }
+to:
+
+// AFTER: single atomic load
+if (rec.allPointsState.load(std::memory_order_acquire) != StageState::Ready) { ... }
+What This Eliminates Per ChunkRecord
+Component	Count	Heap allocs	Notes
+shared_ptr<promise<T>>	6	12	control block + promise object each
+shared_future<T>	7	7	internal shared state with ref counting
+once_flag	7	0	but non-resettable (blocks pooling)
+That's ~19 heap allocations per record eliminated. Over 25 records per eviction = ~475 fewer deallocations in the eviction path. Plus no reference counting atomics during normal operation.
+
+What This Enables
+Critically, atomic state flags are trivially resettable:
+
+void resetForReuse() {
+    allPointsState.store(StageState::NotStarted, std::memory_order_relaxed);
+    heightsState.store(StageState::NotStarted, std::memory_order_relaxed);
+    // ...
+    allPointsRetryQueued.store(false, std::memory_order_relaxed);
+    // ...
+    points = nullptr;
+    allPoints = nullptr;
+    // ...
+    scratch.reset();
+    final.reset();
+}
+This is impossible with std::once_flag (no reset API). With atomics, ChunkRecord pooling becomes straightforward -- you reset the state, reset the arenas (bump pointer to zero, backing memory stays allocated), and the record is ready for a completely new chunk coordinate.
+
+Would you like to proceed with this refactor? The changes are mechanical (same pattern in each of the 7 stages) and the retryQueued atomics you already have serve as a working template for the new pattern

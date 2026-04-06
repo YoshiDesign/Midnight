@@ -1568,6 +1568,7 @@ namespace aveng {
                     admissionCtl_->release(center, admissionRadius_);
                 }
 
+                // push onto the ConcurrentQueue
                 completedRenderables_.push(procgen::CompletionNotice{
                     .slotIndex = slotIdx,
                     .requestId = requestId,
@@ -1609,8 +1610,16 @@ namespace aveng {
 
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors); // inner 3x3 = [0..8]
-
+        std::printf("Building: {%d, %d}\n", center.x, center.z);
         TerrainRenderable* renderable = recs[4]->renderableTarget;
+#ifdef M_DEBUG
+        std::printf("[buildRenderablev2] center={%d,%d} renderableTarget=%p\n",
+                    center.x, center.z, (void*)renderable);
+        if (!renderable) {
+            std::printf("[buildRenderablev2] ERROR: renderableTarget is null!\n");
+            assert(false && "renderableTarget is null");
+        }
+#endif
         renderable->resetKeepCapacity();
         renderable->center = center;
 
