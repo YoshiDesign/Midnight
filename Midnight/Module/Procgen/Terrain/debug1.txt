@@ -1,0 +1,109 @@
+Latest stream_ size:    8
+[TerrainController] Creating renderable at slot[10] addr=00000268B202D520 (slots size=11 cap=50)
+[TerrainController] Creating renderable at slot[5] addr=00000268B202C9E0 (slots size=11 cap=50)
+Initializing New VBO...........
+Initializing New IBO..........
+[TerrainController::tick] 12.05 ms (flush: 0.00, drain: 0.19, service: 11.86)
+[Frame] tickTerrain: 12.42 ms
+Building: {3, 75}
+[buildRenderablev2] center={3,75} renderableTarget=00000268B202C9E0
+Building: {-3, 75}
+[buildRenderablev2] center={-3,75} renderableTarget=00000268B202D520
+Requesting {0, 75}
+[TerrainController] Creating renderable at slot[7] addr=00000268B202CE60 (slots size=11 cap=50)
+Initializing New SSBO..........
+Initializing New Output SSBO..........
+Initializing New VBO...........
+Initializing New IBO..........
+[TerrainController::tick] 36.56 ms (flush: 0.00, drain: 0.26, service: 36.30)
+[Frame] tickTerrain: 36.89 ms
+Latest stream_ size:    9
+Latest stream_ size:    7
+Latest stream_ size:    6
+Building: {0, 75}
+[buildRenderablev2] center={0,75} renderableTarget=00000268B202CE60
+Requesting {-3, 78}
+Requesting {3, 78}
+Latest stream_ size:    8
+[TerrainController] Creating renderable at slot[9] addr=00000268B202D2E0 (slots size=11 cap=50)
+[TerrainController] Creating renderable at slot[8] addr=00000268B202D0A0 (slots size=11 cap=50)
+Initializing New VBO...........
+Initializing New IBO..........
+[TerrainController::tick] 8.27 ms (flush: 0.00, drain: 0.67, service: 7.60)
+[Frame] tickTerrain: 9.77 ms
+Building: {-3, 78}
+[buildRenderablev2] center={-3,78} renderableTarget=00000268B202D2E0
+Building: {3, 78}
+[buildRenderablev2] center={3,78} renderableTarget=00000268B202D0A0
+Requesting {0, 78}
+Latest stream_ size:    9
+[TerrainController] Creating renderable at slot[6] addr=00000268B202CC20 (slots size=11 cap=50)
+Initializing New VBO...........
+Initializing New IBO..........
+Initializing New VBO...........
+Initializing New IBO..........
+[TerrainController::tick] 41.44 ms (flush: 0.00, drain: 0.27, service: 41.17)
+[Frame] tickTerrain: 41.52 ms
+Building: {0, 78}
+[buildRenderablev2] center={0,78} renderableTarget=00000268B202CC20
+Initializing New VBO...........
+Initializing New IBO..........
+Requesting {-3, 81}
+[TerrainController] Creating renderable at slot[1] addr=00000268B202C0E0 (slots size=11 cap=50)
+Requesting {3, 81}
+[TerrainController] Creating renderable at slot[2] addr=00000268B202C320 (slots size=11 cap=50)
+Latest stream_ size:    8
+[TerrainController::tick] 2.84 ms (flush: 2.75, drain: 0.00, service: 0.09)
+[Frame] tickTerrain: 3.00 ms
+Building: {-3, 81}
+[buildRenderablev2] center={-3,81} renderableTarget=00000268B202C0E0
+Building: {3, 81}
+[buildRenderablev2] center={3,81} renderableTarget=00000268B202C320
+Requesting {0, 81}
+Latest stream_ size:    9
+[TerrainController] Creating renderable at slot[0] addr=00000268B202BEA0 (slots size=11 cap=50)
+Initializing New VBO...........
+Initializing New IBO..........
+Initializing New VBO...........
+Initializing New IBO..........
+[TerrainController::tick] 43.28 ms (flush: 0.00, drain: 0.18, service: 43.10)
+[Frame] tickTerrain: 43.52 ms
+Building: {0, 81}
+[buildRenderablev2] center={0,81} renderableTarget=00000268B202BEA0
+Initializing New VBO...........
+Initializing New IBO..........
+Initializing New SSBO..........
+Requesting {-3, 84}
+[TerrainController] Creating renderable at slot[4] addr=00000268B202C7A0 (slots size=11 cap=50)
+Requesting {3, 84}
+[TerrainController] Creating renderable at slot[3] addr=00000268B202C560 (slots size=11 cap=50)
+Latest stream_ size:    8
+Building: {3, 84}
+[buildRenderablev2] center={3,84} renderableTarget=00000268B202C560
+Building: {-3, 84}
+[buildRenderablev2] center={-3,84} renderableTarget=00000268B202C7A0
+Requesting {0, 84}
+[TerrainController] Creating renderable at slot[7] addr=00000268B202CE60 (slots size=11 cap=50)
+Initializing New VBO...........
+Initializing New IBO..........
+Initializing New VBO...........
+Initializing New IBO..........
+[TerrainController::tick] 37.36 ms (flush: 0.00, drain: 0.21, service: 37.15)
+[Frame] tickTerrain: 37.53 ms
+Latest stream_ size:    9
+Building: {0, 84}
+[buildRenderablev2] center={0,84} renderableTarget=00000268B202CE60
+Initializing New Output SSBO..........
+Requesting {-3, 87}
+[TerrainController] Creating renderable at slot[10] addr=00000268B202D520 (slots size=11 cap=50)
+Requesting {3, 87}
+[TerrainController] Creating renderable at slot[5] addr=00000268B202C9E0 (slots size=11 cap=50)
+Latest stream_ size:    8
+[TerrainController] WARNING: evicting slot[5] {3,87} while still Requested!
+Assertion failed: slot.state != procgen::TerrainRuntimeState::Requested && "Cannot evict a slot while a worker thread holds a pointer to its renderable", file C:\Users\Yoshi\dev\Midnight\Midnight\Runtime\Play\Controller\TerrainController.cpp, line 189
+Building: {-3, 87}
+[buildRenderablev2] center={-3,87} renderableTarget=00000268B202D520
+Building: {3, 87}
+[buildRenderablev2] center={3,87} renderableTarget=00000268B202C9E0
+
+C:\Users\Yoshi\dev\Midnight\x64\Debug\X1.exe (process 47992) exited with code 3 (0x3).

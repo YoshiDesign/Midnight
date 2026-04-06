@@ -109,6 +109,7 @@ namespace aveng {
         void unpin(ChunkRecord* rec);
         void evictUnpinnedOlderThan(uint64_t frameIndex, uint64_t ageFrames);
         bool evictRecord(ChunkCoord coord);
+        int  batchEvictRegion(ChunkCoord center);
 
         /* Managers */
         void initManagers(procgen::ErosionManager* er);

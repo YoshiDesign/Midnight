@@ -1,6 +1,9 @@
+#include <chrono>
 #include "TerrainStreamer.h"
 #include "Game/Module/Procgen/Helpers/Helpers.h"
 #include "Utils/Logger.h"
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
 
 namespace xone {
 
@@ -81,6 +84,9 @@ namespace xone {
 
     void TerrainStreamer::applyEvictions(const std::vector<ChunkCoord>& evictCenters)
     {
+// #region agent log
+        auto _batch_t0 = std::chrono::steady_clock::now();
+// #endregion
         int evicted = 0;
         for (const ChunkCoord& c : evictCenters) {
             if (evicted >= kMaxEvictionsPerFrame) { break; }
@@ -97,6 +103,13 @@ namespace xone {
 
             ++evicted;
         }
+// #region agent log
+        if (evicted > 0) {
+            auto _batch_t1 = std::chrono::steady_clock::now();
+            float _batchMs = std::chrono::duration<float,std::milli>(_batch_t1-_batch_t0).count();
+            FILE* _f; fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
+            if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"batch-fix\",\"hypothesisId\":\"D\",\"location\":\"TerrainStreamer.cpp:applyEvictions\",\"message\":\"frame eviction batch\",\"data\":{\"evictedCount\":%d,\"candidateCount\":%d,\"batchMs\":%.3f},\"timestamp\":%lld}\n",evicted,(int)evictCenters.size(),_batchMs,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+// #endregion
     }
 
     void LinearFlightStreamer::reset()

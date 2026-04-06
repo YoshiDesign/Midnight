@@ -206,11 +206,7 @@ namespace aveng {
         auto _dbg_ev_t0 = std::chrono::steady_clock::now();
 // #endregion
 
-        for (int dz = -2; dz <= 2; ++dz) {
-            for (int dx = -2; dx <= 2; ++dx) {
-                chunks_->evictRecord({ center.x + dx, center.z + dz });
-            }
-        }
+        int _evSuccess = chunks_->batchEvictRegion(center);
 
 // #region agent log
         auto _dbg_ev_t1 = std::chrono::steady_clock::now();
@@ -236,8 +232,8 @@ namespace aveng {
           float _evRestMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t1).count();
           float _evTotalMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t0).count();
           FILE* _f;
-          fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
-          if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"E\",\"location\":\"TerrainController.cpp:223\",\"message\":\"eviction breakdown\",\"data\":{\"evictRecordLoopMs\":%.3f,\"deferredPushAndReleaseMs\":%.3f,\"totalMs\":%.3f,\"coord\":[%d,%d]},\"timestamp\":%lld}\n",_evLoopMs,_evRestMs,_evTotalMs,center.x,center.z,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+          fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
+          if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"batch-fix\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:evictChunk\",\"message\":\"eviction summary\",\"data\":{\"evictRecordLoopMs\":%.3f,\"deferredPushAndReleaseMs\":%.3f,\"totalMs\":%.3f,\"coord\":[%d,%d],\"evictSuccess\":%d},\"timestamp\":%lld}\n",_evLoopMs,_evRestMs,_evTotalMs,center.x,center.z,_evSuccess,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
 // #endregion
 
 #ifdef M_DEBUG
@@ -645,8 +641,8 @@ namespace aveng {
 // #region agent log
                 {
                     FILE* _f;
-                    fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
-                    if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:644\",\"message\":\"pool refill\",\"data\":{\"inputSsboPoolSize\":%zu,\"outputSsboPoolSize\":%zu,\"vboPoolSize\":%zu,\"iboPoolSize\":%zu,\"deferredRemaining\":%zu},\"timestamp\":%lld}\n",pool_.inputSsbo.size(),pool_.outputSsbo.size(),pool_.vbo.size(),pool_.ibo.size(),deferredCleanups_.size(),(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} 
+                    fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
+                    if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"post-fix\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:flushDeferredDeletes\",\"message\":\"pool refill\",\"data\":{\"inputSsboPoolSize\":%zu,\"outputSsboPoolSize\":%zu,\"vboPoolSize\":%zu,\"iboPoolSize\":%zu,\"deferredRemaining\":%zu},\"timestamp\":%lld}\n",pool_.inputSsbo.size(),pool_.outputSsbo.size(),pool_.vbo.size(),pool_.ibo.size(),deferredCleanups_.size(),(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} 
                 }
 // #endregion
 
