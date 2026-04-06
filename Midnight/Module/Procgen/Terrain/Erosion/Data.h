@@ -1,12 +1,19 @@
 #pragma once
 #include <memory_resource>
 #include <vector>
+#include <chrono>
 #include <future>
 #include <cstdint>
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/Terrain/Control.h"
 
 namespace procgen {
+
+	template<typename T>
+	static bool isReady(const std::shared_future<T>& fut) noexcept {
+		if (!fut.valid()) return false;
+		return fut.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+	}
 
 	// Scratch resources for erosion passes. These are allocated in the chunk's scratch arena and reused across passes.
     struct ErosionWorkingSet {

@@ -2,7 +2,6 @@
 #include <array>
 #include <cstdint>
 #include <vector>
-#include <future>
 #include <unordered_map>
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
@@ -181,8 +180,8 @@ namespace aveng {
          * in order to support computations (vertex normals, weights, adjacency data)
          *
          * Notes:
-         * - This does not block/is async. ChunkManager hands you a shared_future.
-         * - We keep the futures in an internal list for debugging / inspection.
+         * - This does not block/is async. ChunkManager enqueues work on the thread pool.
+         * - Completion is signaled via the ConcurrentQueue (CompletionNotice).
          */
         void generateChunks(ChunkCoord start_coord);
 

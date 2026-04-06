@@ -1,10 +1,9 @@
 #pragma once
 #include <memory_resource>
-#include <future>
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include <cstdint>
-#include <memory>
 #include "Utils/glm_includes.h"
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/SpatialGrid.h"
@@ -88,6 +87,15 @@ namespace aveng {
 		Failed
 	};
 
+	enum class StageState : uint8_t
+	{
+		NotStarted,
+		Queued,
+		Running,
+		Ready,
+		Failed
+	};
+
 	struct Points {
 		std::pmr::vector<Vec2> core; // core points only
 		explicit Points(std::pmr::memory_resource* mr) : core(mr) {}
@@ -137,7 +145,7 @@ namespace aveng {
 		}
 	};
 
-	// A registry of stage products + futures + residency
+	// A registry of stage products + atomic stage state + residency
 	struct ChunkRecord {
 
 		ChunkCoord coord{};
@@ -160,39 +168,18 @@ namespace aveng {
 		ErosionField* erosion = nullptr;
 		FinalMeshCPU* finalMesh = nullptr;
 
-		// Stage futures + promises
-		// Points uses submit() directly (no upstream dep), so no promise needed.
-		std::once_flag pointsOnce;
-		std::shared_future<Points const*> pointsF;
-
-
-		/* TODO - Why are all of these promises shared_ptr? */
-
-		// Stages with dependencies use promise + enqueue (non-blocking re-enqueue pattern).
-		// The promise is created in call_once and resolved when the build completes.
-		std::once_flag allPointsOnce;
-		std::shared_future<AllPoints const*> allPointsF;
-		std::shared_ptr<std::promise<AllPoints const*>> allPointsProm;
-
-		std::once_flag heightsOnce;
-		std::shared_future<HeightField const*> heightsF;
-		std::shared_ptr<std::promise<HeightField const*>> heightsProm;
-
-		std::once_flag triangOnce;
-		std::shared_future<Triangulation const*> triangF;
-		std::shared_ptr<std::promise<Triangulation const*>> triangProm;
-
-		std::once_flag spatialOnce;
-		std::shared_future<SpatialGrid const*> spatialF;
-		std::shared_ptr<std::promise<SpatialGrid const*>> spatialProm;
-
-		std::once_flag erosionOnce;
-		std::shared_future<ErosionField const*> erosionF;
-		std::shared_ptr<std::promise<ErosionField const*>> erosionProm;
-
-		std::once_flag meshOnce;
-		std::shared_future</*FinalMeshCPU const**/ bool> meshF;
-		std::shared_ptr<std::promise<bool>> meshProm;
+		// Stage completion: one atomic per stage replaces the old
+		// once_flag + shared_ptr<promise<T>> + shared_future<T> trio.
+		// CAS NotStarted->Queued replaces call_once for initial enqueue.
+		// store(Ready, release) replaces promise::set_value.
+		// load(acquire) replaces isReady(shared_future) polling.
+		std::atomic<StageState> pointsState{ StageState::NotStarted };
+		std::atomic<StageState> allPointsState{ StageState::NotStarted };
+		std::atomic<StageState> heightsState{ StageState::NotStarted };
+		std::atomic<StageState> triangState{ StageState::NotStarted };
+		std::atomic<StageState> spatialState{ StageState::NotStarted };
+		std::atomic<StageState> erosionState{ StageState::NotStarted };
+		std::atomic<StageState> meshState{ StageState::NotStarted };
 
 		// ---- top-level packed renderable state ----
 		mutable std::mutex renderableMutex;

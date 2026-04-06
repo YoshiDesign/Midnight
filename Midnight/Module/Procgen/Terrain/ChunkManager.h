@@ -94,13 +94,13 @@ namespace aveng {
 
         // Very dangerous Public API (extend as needed, but work in tandem with pin/unpin)
         // Lifetime safety is paramount.
-        std::shared_future<Points const*>           requestPoints(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<AllPoints const*>        requestAllPoints(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<HeightField const*>      requestHeights(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<Triangulation const*>    requestTriangulation(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<SpatialGrid const*>      requestSpatialGrid(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future<ErosionField const*>     requestErosion(ChunkCoord c, uint64_t frameIndex);
-        std::shared_future</*FinalMeshCPU const**/bool>     requestMesh(ChunkCoord c, uint64_t frameIndex);
+        void requestPoints(ChunkCoord c, uint64_t frameIndex);
+        void requestAllPoints(ChunkCoord c, uint64_t frameIndex);
+        void requestHeights(ChunkCoord c, uint64_t frameIndex);
+        void requestTriangulation(ChunkCoord c, uint64_t frameIndex);
+        void requestSpatialGrid(ChunkCoord c, uint64_t frameIndex);
+        void requestErosion(ChunkCoord c, uint64_t frameIndex);
+        void requestMesh(ChunkCoord c, uint64_t frameIndex);
 
         // Streaming helpers
         ChunkRecord* pin(ChunkCoord c, uint64_t frameIndex); // 

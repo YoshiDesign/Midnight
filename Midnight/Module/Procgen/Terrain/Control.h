@@ -1,7 +1,5 @@
 #pragma once
 #include <atomic>
-#include <chrono>
-#include <future>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -9,16 +7,6 @@
 #include "Utils/Logger.h"
 
 namespace procgen {
-
-    // -----------------------------------------------------------------------
-    // Readiness helper -- zero-cost poll on a shared_future
-    // -----------------------------------------------------------------------
-
-    template<typename T>
-    static bool isReady(const std::shared_future<T>& fut) noexcept {
-        if (!fut.valid()) return false;
-        return fut.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
-    }
 
     // -----------------------------------------------------------------------
     // Stage enumeration
