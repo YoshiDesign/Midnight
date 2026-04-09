@@ -54,7 +54,7 @@ namespace aveng {
 	bool AvengFrame::start_frame() {
 
 		frameStartTime_ = std::chrono::steady_clock::now();
-		mFrameTimer.start();
+		// mFrameTimer.start();
 
 		// Clear the Frame's vector of command buffer handles that we'll be submitting to the graphics queue
 		commandBuffers.clear();
@@ -141,22 +141,22 @@ namespace aveng {
 		}
 
 
-		mTerrainTickTimer.start();
+		// mTerrainTickTimer.start();
 		renderer.tickTerrain();
-		float terrainTickTime = mTerrainTickTimer.stop();
-		if (terrainTickTime > 2.0f) {
-			std::printf("[Frame] tickTerrain: %.2f ms\n", terrainTickTime);
-			fflush(stdout);
-		}
+		//float terrainTickTime = mTerrainTickTimer.stop();
+		//if (terrainTickTime > 2.0f) {
+		//	std::printf("[Frame] tickTerrain: %.2f ms\n", terrainTickTime);
+		//	fflush(stdout);
+		//}
 
-		mComputeTimer.start();
+		// mComputeTimer.start();
 		// Compute bone transforms for skinning mat's
 		int animComputeResult = renderer.dispatchCompute(modelLib__, pkt);
 		if (animComputeResult == WTF_BOOM) {
 			// Terrible sync issue. Die.
 			throw std::runtime_error("Failed to dispatch animation compute.");
 		}
-		renderData.rdComputeTime = mComputeTimer.stop();
+		// renderData.rdComputeTime = mComputeTimer.stop();
 
 		/* start graphics rendering - reset fence only after we're committed to submitting */
 		result = vkResetFences(engineDevice.device(), 1, &renderData.rdRenderFence.at(currentFrameIndex));
@@ -383,7 +383,7 @@ namespace aveng {
 			throw std::runtime_error("Frame Failure 2");
 		}
 		renderer.endFrame();
-		renderData.rdFrameTime = mFrameTimer.stop();
+		// renderData.rdFrameTime = mFrameTimer.stop();
 
 		constexpr auto kTargetFrameTime = std::chrono::microseconds(8333); // ~120 fps
 		while (std::chrono::steady_clock::now() - frameStartTime_ < kTargetFrameTime) {}

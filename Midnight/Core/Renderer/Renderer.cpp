@@ -362,7 +362,7 @@ namespace aveng {
 		// Wait for both fences to be signaled before getting the new framebuffer image
 		// Re-enabled compute fence to ensure compute command buffer is safe to reuse
 		std::vector<VkFence> waitFences = { renderData.rdComputeFence.at(currentFrameIndex), renderData.rdRenderFence.at(currentFrameIndex)};
-		mFenceWaitTimer.start();
+		// mFenceWaitTimer.start();
 		VkResult result = vkWaitForFences(
 			engineDevice.device(),
 			static_cast<uint32_t>(waitFences.size()),
@@ -370,7 +370,7 @@ namespace aveng {
 			VK_TRUE,
 			UINT64_MAX
 		);
-		renderData.rdFenceWaitTime = mFenceWaitTimer.stop();
+		// renderData.rdFenceWaitTime = mFenceWaitTimer.stop();
 
 		if (result != VK_SUCCESS) {
 			std::printf("%s error: waiting for fences failed (error: %i)\n", __FUNCTION__, result);
@@ -414,7 +414,7 @@ namespace aveng {
 		// Wait for any previous frame that was using this swapchain image to complete
 		// This handles the case where frame-in-flight index != swapchain image index
 		if (renderData.rdImagesInFlight[currentImageIndex] != VK_NULL_HANDLE) {
-			mAcquireTimer.start();
+			// mAcquireTimer.start();
 			result = vkWaitForFences(
 				engineDevice.device(),
 				1,
@@ -422,7 +422,7 @@ namespace aveng {
 				VK_TRUE,
 				UINT64_MAX
 			);
-			renderData.rdImageFenceWaitTime = mAcquireTimer.stop();
+			// renderData.rdImageFenceWaitTime = mAcquireTimer.stop();
 			//if (renderData.rdImageFenceWaitTime > renderData.rdImageFenceWaitTimeMAX) {
 			//	renderData.rdImageFenceWaitTimeMAX = renderData.rdImageFenceWaitTime;
 			//	std::printf("[Renderer] Image fence stall New Max: %.2f ms\n", renderData.rdImageFenceWaitTimeMAX);
@@ -830,7 +830,7 @@ namespace aveng {
 		*	   TRS and BoneMat buffers are updated by the compute shaders so you won't see uploadSsboData here on their behalf
 		*/
 		// Timer
-		mUploadToSSBO1Timer.start();
+		// mUploadToSSBO1Timer.start();
 		bool bufferResized = false;
 
 		// Compute stage 1 input
@@ -863,7 +863,7 @@ namespace aveng {
 		}
 
 		// Timer
-		renderData.rdUploadSSBO1Time += mUploadToSSBO1Timer.stop();
+		// renderData.rdUploadSSBO1Time += mUploadToSSBO1Timer.stop();
 
 		// Feels hacky
 		boneMatrixBufferSize = pkt.nodeTransformData.size();
@@ -919,13 +919,13 @@ namespace aveng {
 
 		// Timer
 		/* we need to update descriptors after the upload if buffer size changed - These 2 ubo's won't resize under normal circumstances */
-		mUploadToUBOTimer.start();
+		// mUploadToUBOTimer.start();
 		UniformBuffer::uploadPersistentData(engineDevice, mPerspectiveViewMatrixUBOBuffers.at(currentFrameIndex), mMatrices); // View/Proj Matrices
 		UniformBuffer::uploadPersistentData(engineDevice, mPointLightUBOBuffers.at(currentFrameIndex), mPointLightData);
-		renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();	
+		// renderData.rdUploadToUBOTime += mUploadToUBOTimer.stop();	
 
 		// Timer
-		mUploadToSSBO2Timer.start();
+		// mUploadToSSBO2Timer.start();
 
 		// Each instance's model matrix - TODO - Audit persistence
 		bool modelMatsResized = ShaderStorageBuffer::uploadSsboData(engineDevice, mModelMatrixBuffers.at(currentFrameIndex), pkt.instModelMats);
@@ -1035,7 +1035,7 @@ namespace aveng {
 		}
 
 		// Timer
-		renderData.rdUploadSSBO2Time = mUploadToSSBO2Timer.stop();
+		// renderData.rdUploadSSBO2Time = mUploadToSSBO2Timer.stop();
 
 	}
 
@@ -1262,8 +1262,8 @@ namespace aveng {
 	// Timers in this class
 	void Renderer::reset_timers()
 	{
-		renderData.rdDrawTime = mDrawTimer.stop();
-		mDrawTimer.start();
+		// renderData.rdDrawTime = mDrawTimer.stop();
+		//mDrawTimer.start();
 
 		renderData.rdMatricesSize = 0; // Not in use atm
 		renderData.rdUploadToUBOTime = 0.0f;

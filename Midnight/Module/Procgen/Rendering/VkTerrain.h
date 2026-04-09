@@ -263,17 +263,17 @@ namespace aveng {
         const size_t iboSize = cpu.ibo.size() * sizeof(uint32_t);
 
 #ifdef M_DEBUG
-        Timer vboIboTimer{};
-        Timer ssbo1Timer{};
-		Timer ssbo2Timer{};
-		Timer descriptor1Timer{};
-		Timer descriptor2Timer{};
-        vboIboTimer.start();
+  //      Timer vboIboTimer{};
+  //      Timer ssbo1Timer{};
+		//Timer ssbo2Timer{};
+		//Timer descriptor1Timer{};
+		//Timer descriptor2Timer{};
+  //      vboIboTimer.start();
 #endif
 
         // VBO: try pool first, fall back to init
         if (!pool.vbo.empty() && pool.vbo.back().bufferSize >= vboSize) {
-            Logger::log(1, "Initializing New VBO...........\n");
+            //Logger::log(1, "Initializing New VBO...........\n");
             gpu.draw.vertexBuffer = pool.vbo.back();
             pool.vbo.pop_back();
         } else {
@@ -290,7 +290,7 @@ namespace aveng {
 
         // IBO: try pool first, fall back to init
         if (!pool.ibo.empty() && pool.ibo.back().bufferSize >= iboSize) {
-            Logger::log(1, "Initializing New IBO..........\n");
+            // Logger::log(1, "Initializing New IBO..........\n");
             gpu.draw.indexBuffer = pool.ibo.back();
             pool.ibo.pop_back();
         } else {
@@ -316,11 +316,11 @@ namespace aveng {
         }
 
 #ifdef M_DEBUG
-        renderData.rdTerrainVboIboTime = vboIboTimer.stop();
+        /*renderData.rdTerrainVboIboTime = vboIboTimer.stop();
 		if (renderData.rdTerrainVboIboTime > renderData.rdTerrainVboIboTimeMAX) {
             renderData.rdTerrainVboIboTimeMAX = renderData.rdTerrainVboIboTime;
-        }
-        assert(cpu.alignment.baseCorePosition == 0  && "[1] missing cpu alignment value baseCorePosition");
+        }*/
+        /*assert(cpu.alignment.baseCorePosition == 0  && "[1] missing cpu alignment value baseCorePosition");
         assert(cpu.alignment.countCorePosition > 0  && "[2] missing cpu alignment value countCorePosition");
         assert(cpu.alignment.countHaloPosition > 0  && "[3] missing cpu alignment value countHaloPosition");
         assert(cpu.alignment.baseCoreTriangle == 0  && "[4] missing cpu alignment value baseCoreTriangle");
@@ -328,7 +328,7 @@ namespace aveng {
         assert(cpu.alignment.countHaloTriangle > 0  && "[6] missing cpu alignment value countHaloTriangle");
         assert(cpu.alignment.baseCoreAdjacency == 0 && "[7] missing cpu alignment value baseCoreAdjacency");
         assert(cpu.alignment.countCoreAdjacency > 0 && "[8] missing cpu alignment value countCoreAdjacency");
-        assert(cpu.alignment.countHaloAdjacency > 0 && "[9] missing cpu alignment value countHaloAdjacency");
+        assert(cpu.alignment.countHaloAdjacency > 0 && "[9] missing cpu alignment value countHaloAdjacency");*/
 #endif
 
         // ---- Compute SSBOs (CPU-visible, no staging copy needed) ----
@@ -352,37 +352,37 @@ namespace aveng {
 
         const VkDeviceSize inputTotalSize = gpu.packed.adjacencyOffset + adjacencySize;
 
-// #region agent log
-        auto _dbg_t0 = std::chrono::steady_clock::now();
-        auto _dbg_t1 = _dbg_t0, _dbg_t2 = _dbg_t0;
-        bool _dbg_poolHit1 = false;
-        size_t _dbg_poolSz1 = pool.inputSsbo.size();
-        size_t _dbg_backSz1 = (!pool.inputSsbo.empty()) ? pool.inputSsbo.back().bufferSize : 0;
-// #endregion
-
-#ifdef M_DEBUG
-        ssbo1Timer.start();
-#endif
+//// #region agent log
+//        auto _dbg_t0 = std::chrono::steady_clock::now();
+//        auto _dbg_t1 = _dbg_t0, _dbg_t2 = _dbg_t0;
+//        bool _dbg_poolHit1 = false;
+//        size_t _dbg_poolSz1 = pool.inputSsbo.size();
+//        size_t _dbg_backSz1 = (!pool.inputSsbo.empty()) ? pool.inputSsbo.back().bufferSize : 0;
+//// #endregion
+//
+//#ifdef M_DEBUG
+//        ssbo1Timer.start();
+//#endif
 
         // Input SSBO: try pool first, fall back to init
         if (!pool.inputSsbo.empty() && pool.inputSsbo.back().bufferSize >= inputTotalSize) {
             gpu.packed.inputSsbo = pool.inputSsbo.back();
             pool.inputSsbo.pop_back();
-            _dbg_poolHit1 = true; // agent log
+            // _dbg_poolHit1 = true; // agent log
         } else {
 
             if (!pool.inputSsbo.empty() && pool.inputSsbo.size() > 3) {
                 pool.inputSsbo.pop_back();
             }
 
-            Logger::log(1, "Initializing New SSBO..........\n");
+            // Logger::log(1, "Initializing New SSBO..........\n");
             if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.inputSsbo, MapMode::OnDemand, ResidentMode::CPU, inputTotalSize)) {
                 Logger::log(1, "%s error: could not create terrain input SSBO\n", __FUNCTION__);
                 return false;
             }
         }
 
-        _dbg_t1 = std::chrono::steady_clock::now(); // agent log
+        // _dbg_t1 = std::chrono::steady_clock::now(); // agent log
 
         {
             void* mapped = nullptr;
@@ -392,7 +392,7 @@ namespace aveng {
                 return false;
             }
 
-            _dbg_t2 = std::chrono::steady_clock::now(); // agent log
+            // _dbg_t2 = std::chrono::steady_clock::now(); // agent log
 
             auto* base = static_cast<std::byte*>(mapped);
             std::memcpy(base + gpu.packed.positionsOffset, cpu.packedPositions.data(), positionsSize);
@@ -405,24 +405,24 @@ namespace aveng {
 
             vmaUnmapMemory(engineDevice.allocator(), gpu.packed.inputSsbo.bufferAlloc);
 
-// #region agent log
-            { auto _t3 = std::chrono::steady_clock::now();
-              float _initMs = std::chrono::duration<float,std::milli>(_dbg_t1-_dbg_t0).count();
-              float _mapMs  = std::chrono::duration<float,std::milli>(_dbg_t2-_dbg_t1).count();
-              float _cpyMs  = std::chrono::duration<float,std::milli>(_t3-_dbg_t2).count();
-              float _totMs  = std::chrono::duration<float,std::milli>(_t3-_dbg_t0).count();
-              FILE* _f;
-              fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
-              if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"A\",\"location\":\"VkTerrain.h:393\",\"message\":\"ssbo1 breakdown\",\"data\":{\"poolHit\":%s,\"poolSize\":%zu,\"backBufSize\":%zu,\"needed\":%llu,\"initOrPoolMs\":%.3f,\"mapMs\":%.3f,\"cpyFlushMs\":%.3f,\"totalMs\":%.3f},\"timestamp\":%lld}\n",_dbg_poolHit1?"true":"false",_dbg_poolSz1,_dbg_backSz1,(unsigned long long)inputTotalSize,_initMs,_mapMs,_cpyMs,_totMs,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
-// #endregion
+//// #region agent log
+//            { auto _t3 = std::chrono::steady_clock::now();
+//              float _initMs = std::chrono::duration<float,std::milli>(_dbg_t1-_dbg_t0).count();
+//              float _mapMs  = std::chrono::duration<float,std::milli>(_dbg_t2-_dbg_t1).count();
+//              float _cpyMs  = std::chrono::duration<float,std::milli>(_t3-_dbg_t2).count();
+//              float _totMs  = std::chrono::duration<float,std::milli>(_t3-_dbg_t0).count();
+//              FILE* _f;
+//              fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
+//              if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"A\",\"location\":\"VkTerrain.h:393\",\"message\":\"ssbo1 breakdown\",\"data\":{\"poolHit\":%s,\"poolSize\":%zu,\"backBufSize\":%zu,\"needed\":%llu,\"initOrPoolMs\":%.3f,\"mapMs\":%.3f,\"cpyFlushMs\":%.3f,\"totalMs\":%.3f},\"timestamp\":%lld}\n",_dbg_poolHit1?"true":"false",_dbg_poolSz1,_dbg_backSz1,(unsigned long long)inputTotalSize,_initMs,_mapMs,_cpyMs,_totMs,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+//// #endregion
         }
-
-#ifdef M_DEBUG
-		renderData.rdTerrainSsbo1Time = ssbo1Timer.stop();
-        if (renderData.rdTerrainSsbo1Time > renderData.rdTerrainSsbo1TimeMAX) {
-			renderData.rdTerrainSsbo1TimeMAX = renderData.rdTerrainSsbo1Time;
-        }
-#endif
+//
+//#ifdef M_DEBUG
+//		renderData.rdTerrainSsbo1Time = ssbo1Timer.stop();
+//        if (renderData.rdTerrainSsbo1Time > renderData.rdTerrainSsbo1TimeMAX) {
+//			renderData.rdTerrainSsbo1TimeMAX = renderData.rdTerrainSsbo1Time;
+//        }
+//#endif
 
         const VkDeviceSize normalsSize = coreVerts * sizeof(glm::vec4);
         const VkDeviceSize steepnessSize = coreVerts * sizeof(float);
@@ -434,22 +434,22 @@ namespace aveng {
 
         const VkDeviceSize outputTotalSize = gpu.packed.weightsOffset + weightsSize;
 
-// #region agent log
-        auto _dbg_s2_t0 = std::chrono::steady_clock::now();
-        bool _dbg_poolHit2 = false;
-        size_t _dbg_poolSz2 = pool.outputSsbo.size();
-        size_t _dbg_backSz2 = (!pool.outputSsbo.empty()) ? pool.outputSsbo.back().bufferSize : 0;
-// #endregion
+//// #region agent log
+//        auto _dbg_s2_t0 = std::chrono::steady_clock::now();
+//        bool _dbg_poolHit2 = false;
+//        size_t _dbg_poolSz2 = pool.outputSsbo.size();
+//        size_t _dbg_backSz2 = (!pool.outputSsbo.empty()) ? pool.outputSsbo.back().bufferSize : 0;
+//// #endregion
 
-#ifdef M_DEBUG
-        ssbo2Timer.start();
-#endif
+//#ifdef M_DEBUG
+//        ssbo2Timer.start();
+//#endif
 
         // Output SSBO: try pool first (GPU-only, no mapping needed), fall back to init
         if (!pool.outputSsbo.empty() && pool.outputSsbo.back().bufferSize >= static_cast<size_t>(outputTotalSize)) {
             gpu.packed.outputSsbo = pool.outputSsbo.back();
             pool.outputSsbo.pop_back();
-            _dbg_poolHit2 = true; // agent log
+            // _dbg_poolHit2 = true; // agent log
         } else {
 
             if (!pool.outputSsbo.empty() && pool.outputSsbo.size() > 3) {
@@ -462,49 +462,49 @@ namespace aveng {
                 return false;
             }
         }
+//
+//// #region agent log
+//        { auto _s2_t1 = std::chrono::steady_clock::now();
+//          float _s2Ms = std::chrono::duration<float,std::milli>(_s2_t1-_dbg_s2_t0).count();
+//          FILE* _f;
+//          fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
+//          if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"B\",\"location\":\"VkTerrain.h:432\",\"message\":\"ssbo2 breakdown\",\"data\":{\"poolHit\":%s,\"poolSize\":%zu,\"backBufSize\":%zu,\"needed\":%llu,\"totalMs\":%.3f},\"timestamp\":%lld}\n",_dbg_poolHit2?"true":"false",_dbg_poolSz2,_dbg_backSz2,(unsigned long long)outputTotalSize,_s2Ms,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+//// #endregion
 
-// #region agent log
-        { auto _s2_t1 = std::chrono::steady_clock::now();
-          float _s2Ms = std::chrono::duration<float,std::milli>(_s2_t1-_dbg_s2_t0).count();
-          FILE* _f;
-          fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-6bde4a.log", "a");
-          if(_f){ std::fprintf(_f,"{\"sessionId\":\"6bde4a\",\"hypothesisId\":\"B\",\"location\":\"VkTerrain.h:432\",\"message\":\"ssbo2 breakdown\",\"data\":{\"poolHit\":%s,\"poolSize\":%zu,\"backBufSize\":%zu,\"needed\":%llu,\"totalMs\":%.3f},\"timestamp\":%lld}\n",_dbg_poolHit2?"true":"false",_dbg_poolSz2,_dbg_backSz2,(unsigned long long)outputTotalSize,_s2Ms,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
-// #endregion
-
-#ifdef M_DEBUG
-        renderData.rdTerrainSsbo2Time = ssbo2Timer.stop();
-        if (renderData.rdTerrainSsbo2Time > renderData.rdTerrainSsbo2TimeMAX) {
-            renderData.rdTerrainSsbo2TimeMAX = renderData.rdTerrainSsbo2Time;
-        }
-		descriptor1Timer.start();
-#endif
+//#ifdef M_DEBUG
+//        renderData.rdTerrainSsbo2Time = ssbo2Timer.stop();
+//        if (renderData.rdTerrainSsbo2Time > renderData.rdTerrainSsbo2TimeMAX) {
+//            renderData.rdTerrainSsbo2TimeMAX = renderData.rdTerrainSsbo2Time;
+//        }
+//		descriptor1Timer.start();
+//#endif
 
         if (!writeChunkComputeDescriptorSet(engineDevice, renderData, gpu.packed, settingsUboBuffer_, settingsUboSize_)) {
             Logger::log(1, "%s error: failed to write compute descriptor set\n", __FUNCTION__);
             return false;
         }
 
-#ifdef M_DEBUG
-		renderData.rdTerrainDescriptor1WriterTime = descriptor1Timer.stop();
-        if (renderData.rdTerrainDescriptor1WriterTime > renderData.rdTerrainDescriptor1WriterTimeMAX) {
-			renderData.rdTerrainDescriptor1WriterTimeMAX = renderData.rdTerrainDescriptor1WriterTime;
-        }
-
-        descriptor2Timer.start();
-#endif
+//#ifdef M_DEBUG
+//		renderData.rdTerrainDescriptor1WriterTime = descriptor1Timer.stop();
+//        if (renderData.rdTerrainDescriptor1WriterTime > renderData.rdTerrainDescriptor1WriterTimeMAX) {
+//			renderData.rdTerrainDescriptor1WriterTimeMAX = renderData.rdTerrainDescriptor1WriterTime;
+//        }
+//
+//        descriptor2Timer.start();
+//#endif
 
         if (!writeChunkGraphicsDescriptorSet(engineDevice, renderData, gpu.packed)) {
             Logger::log(1, "%s error: failed to write graphics descriptor set\n", __FUNCTION__);
             return false;
         }
 
-#ifdef M_DEBUG
-		renderData.rdTerrainDescriptor2WriterTime = descriptor2Timer.stop();
-        if (renderData.rdTerrainDescriptor2WriterTime > renderData.rdTerrainDescriptor2WriterTimeMAX) {
-			renderData.rdTerrainDescriptor2WriterTimeMAX = renderData.rdTerrainDescriptor2WriterTime;
-        }
-
-#endif
+//#ifdef M_DEBUG
+//		renderData.rdTerrainDescriptor2WriterTime = descriptor2Timer.stop();
+//        if (renderData.rdTerrainDescriptor2WriterTime > renderData.rdTerrainDescriptor2WriterTimeMAX) {
+//			renderData.rdTerrainDescriptor2WriterTimeMAX = renderData.rdTerrainDescriptor2WriterTime;
+//        }
+//
+//#endif
 
         return true;
     }
@@ -517,10 +517,10 @@ namespace aveng {
 #endif
     ) {
 
-#ifdef M_DEBUG
-		Timer queueSubmitTimer{};
-        queueSubmitTimer.start();
-#endif
+//#ifdef M_DEBUG
+//		Timer queueSubmitTimer{};
+//        queueSubmitTimer.start();
+//#endif
 
         VkMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -544,12 +544,12 @@ namespace aveng {
         vkQueueSubmit(engineDevice.graphicsQueue(), 1, &submitInfo, uploadBatch.fence);
         uploadBatch.active = true;
 
-#ifdef M_DEBUG
-		renderData.rdqueueSubmitTimer = queueSubmitTimer.stop();
-        if (renderData.rdqueueSubmitTimer > renderData.rdqueueSubmitTimerMAX) {
-            renderData.rdqueueSubmitTimerMAX = renderData.rdqueueSubmitTimer;
-        }
-#endif
+//#ifdef M_DEBUG
+//		renderData.rdqueueSubmitTimer = queueSubmitTimer.stop();
+//        if (renderData.rdqueueSubmitTimer > renderData.rdqueueSubmitTimerMAX) {
+//            renderData.rdqueueSubmitTimerMAX = renderData.rdqueueSubmitTimer;
+//        }
+//#endif
 
     }
 

@@ -153,9 +153,9 @@ namespace aveng {
         )
         {
 
-#ifdef M_DEBUG
-            mFramePacketTimer.start();
-#endif
+//#ifdef M_DEBUG
+//            mFramePacketTimer.start();
+//#endif
             // Ensure we have storage for this frame index
             if (frameIndex >= framePackets_.size()) {
                 framePackets_.resize(frameIndex + 1);
@@ -490,9 +490,9 @@ namespace aveng {
                 }
             }
 
-#ifdef M_DEBUG
-            renderData.rdFramePacketTime = mFramePacketTimer.stop();
-#endif
+//#ifdef M_DEBUG
+//            renderData.rdFramePacketTime = mFramePacketTimer.stop();
+//#endif
             return pkt;
         }
 

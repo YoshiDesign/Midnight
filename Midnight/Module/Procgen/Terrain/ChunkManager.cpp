@@ -489,6 +489,7 @@ namespace aveng {
         if (renderData_.rdTerrainManagerTimer_1 > renderData_.rdTerrainManagerTimer_1MAX) {
             renderData_.rdTerrainManagerTimer_1MAX = renderData_.rdTerrainManagerTimer_1;
         }
+        t2.stop();
 #endif
 
         return out;
@@ -1929,54 +1930,54 @@ namespace aveng {
         auto& bucket = records_[stripeIdx];
 
         std::unique_ptr<ChunkRecord> toFree;
-// #region agent log
-        auto _ev_t0 = std::chrono::steady_clock::now();
-        float _lockMs = 0.f, _clearMs = 0.f;
-// #endregion
+//// #region agent log
+//        auto _ev_t0 = std::chrono::steady_clock::now();
+//        float _lockMs = 0.f, _clearMs = 0.f;
+//// #endregion
         {
-// #region agent log
-            auto _tLock0 = std::chrono::steady_clock::now();
-// #endregion
+//// #region agent log
+//            auto _tLock0 = std::chrono::steady_clock::now();
+//// #endregion
             std::lock_guard<std::mutex> lock(bucket.mut);
-// #region agent log
-            _lockMs = std::chrono::duration<float,std::milli>(std::chrono::steady_clock::now()-_tLock0).count();
-// #endregion
+//// #region agent log
+//            _lockMs = std::chrono::duration<float,std::milli>(std::chrono::steady_clock::now()-_tLock0).count();
+//// #endregion
             auto it = bucket.map.find(coord);
             if (it == bucket.map.end()) return false;
 
             ChunkRecord* rec = it->second.get();
             if (rec->pinCount.load(std::memory_order_relaxed) != 0) return false;
 
-// #region agent log
-            auto _tClear0 = std::chrono::steady_clock::now();
-// #endregion
+//// #region agent log
+//            auto _tClear0 = std::chrono::steady_clock::now();
+//// #endregion
             clearSpatialGridReady(coord);
             clearAllStagesComplete(coord);
-// #region agent log
-            _clearMs = std::chrono::duration<float,std::milli>(std::chrono::steady_clock::now()-_tClear0).count();
-// #endregion
+//// #region agent log
+//            _clearMs = std::chrono::duration<float,std::milli>(std::chrono::steady_clock::now()-_tClear0).count();
+//// #endregion
             toFree = std::move(it->second);
             bucket.map.erase(it);
         }
-// #region agent log
-        auto _tDestroy0 = std::chrono::steady_clock::now();
-// #endregion
+//// #region agent log
+//        auto _tDestroy0 = std::chrono::steady_clock::now();
+//// #endregion
         toFree.reset();
-// #region agent log
-        auto _tDestroy1 = std::chrono::steady_clock::now();
-        float _destroyMs = std::chrono::duration<float,std::milli>(_tDestroy1-_tDestroy0).count();
-        float _totalMs = std::chrono::duration<float,std::milli>(_tDestroy1-_ev_t0).count();
-        { FILE* _f; fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
-          if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"hypothesisId\":\"A\",\"location\":\"ChunkManager.cpp:evictRecord\",\"message\":\"record destroy\",\"data\":{\"coord\":[%d,%d],\"lockMs\":%.3f,\"clearMs\":%.3f,\"destroyMs\":%.3f,\"totalMs\":%.3f},\"timestamp\":%lld}\n",coord.x,coord.z,_lockMs,_clearMs,_destroyMs,_totalMs,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
-// #endregion
+//// #region agent log
+//        auto _tDestroy1 = std::chrono::steady_clock::now();
+//        float _destroyMs = std::chrono::duration<float,std::milli>(_tDestroy1-_tDestroy0).count();
+//        float _totalMs = std::chrono::duration<float,std::milli>(_tDestroy1-_ev_t0).count();
+//        { FILE* _f; fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
+//          if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"hypothesisId\":\"A\",\"location\":\"ChunkManager.cpp:evictRecord\",\"message\":\"record destroy\",\"data\":{\"coord\":[%d,%d],\"lockMs\":%.3f,\"clearMs\":%.3f,\"destroyMs\":%.3f,\"totalMs\":%.3f},\"timestamp\":%lld}\n",coord.x,coord.z,_lockMs,_clearMs,_destroyMs,_totalMs,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+//// #endregion
         return true;
     }
 
     int ChunkManager::batchEvictRegion(ChunkCoord center)
     {
-// #region agent log
-        auto _t0 = std::chrono::steady_clock::now();
-// #endregion
+//// #region agent log
+//        auto _t0 = std::chrono::steady_clock::now();
+//// #endregion
         ChunkCoord region[25];
         get5x5Neighborhood(center, region);
 
@@ -1995,9 +1996,9 @@ namespace aveng {
             bucket.map.erase(it);
         }
         
-// #region agent log
-        auto _t1 = std::chrono::steady_clock::now();
-// #endregion
+//// #region agent log
+//        auto _t1 = std::chrono::steady_clock::now();
+//// #endregion
 
         // Phase 2 — Batch-clear global tracking sets (2 lock acquisitions total).
         {
@@ -2011,23 +2012,23 @@ namespace aveng {
                 allStagesComplete_.erase(region[i]);
         }
 
-// #region agent log
-        auto _t2 = std::chrono::steady_clock::now();
-// #endregion
+//// #region agent log
+//        auto _t2 = std::chrono::steady_clock::now();
+//// #endregion
 
         // Phase 3 — Destroy detached records outside all locks.
         for (int i = 0; i < evicted; ++i)
             detached[i].reset();
 
-// #region agent log
-        auto _t3 = std::chrono::steady_clock::now();
-        float _stripesMs = std::chrono::duration<float,std::milli>(_t1-_t0).count();
-        float _clearMs   = std::chrono::duration<float,std::milli>(_t2-_t1).count();
-        float _destroyMs = std::chrono::duration<float,std::milli>(_t3-_t2).count();
-        float _totalMs   = std::chrono::duration<float,std::milli>(_t3-_t0).count();
-        { FILE* _f; fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
-          if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"batch-fix\",\"hypothesisId\":\"F\",\"location\":\"ChunkManager.cpp:batchEvictRegion\",\"message\":\"batch eviction\",\"data\":{\"coord\":[%d,%d],\"evicted\":%d,\"stripesMs\":%.3f,\"clearMs\":%.3f,\"destroyMs\":%.3f,\"totalMs\":%.3f},\"timestamp\":%lld}\n",center.x,center.z,evicted,_stripesMs,_clearMs,_destroyMs,_totalMs,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
-// #endregion
+//// #region agent log
+//        auto _t3 = std::chrono::steady_clock::now();
+//        float _stripesMs = std::chrono::duration<float,std::milli>(_t1-_t0).count();
+//        float _clearMs   = std::chrono::duration<float,std::milli>(_t2-_t1).count();
+//        float _destroyMs = std::chrono::duration<float,std::milli>(_t3-_t2).count();
+//        float _totalMs   = std::chrono::duration<float,std::milli>(_t3-_t0).count();
+//        { FILE* _f; fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
+//          if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"batch-fix\",\"hypothesisId\":\"F\",\"location\":\"ChunkManager.cpp:batchEvictRegion\",\"message\":\"batch eviction\",\"data\":{\"coord\":[%d,%d],\"evicted\":%d,\"stripesMs\":%.3f,\"clearMs\":%.3f,\"destroyMs\":%.3f,\"totalMs\":%.3f},\"timestamp\":%lld}\n",center.x,center.z,evicted,_stripesMs,_clearMs,_destroyMs,_totalMs,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+//// #endregion
         return evicted;
     }
 

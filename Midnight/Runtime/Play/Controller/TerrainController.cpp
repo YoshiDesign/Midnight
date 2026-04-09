@@ -59,24 +59,24 @@ namespace aveng {
 
     void TerrainController::tick()
     {
-        tickPhaseTimer_.start();
+        //tickPhaseTimer_.start();
         flushDeferredDeletes();
-        float flushTime = tickPhaseTimer_.stop();
+        //float flushTime = tickPhaseTimer_.stop();
 
-        tickPhaseTimer_.start();
+        //tickPhaseTimer_.start();
         drainCompletedTerrain();
-        float drainTime = tickPhaseTimer_.stop();
+        //float drainTime = tickPhaseTimer_.stop();
 
-        tickPhaseTimer_.start();
+        //tickPhaseTimer_.start();
         serviceCpuReadyChunks();
-        float serviceTime = tickPhaseTimer_.stop();
+        //float serviceTime = tickPhaseTimer_.stop();
 
-        float total = flushTime + drainTime + serviceTime;
-        if (total > 2.0f) {
-            std::printf("[TerrainController::tick] %.2f ms (flush: %.2f, drain: %.2f, service: %.2f)\n",
-                total, flushTime, drainTime, serviceTime);
-            fflush(stdout);
-        }
+        //float total = flushTime + drainTime + serviceTime;
+        //if (total > 2.0f) {
+        //    std::printf("[TerrainController::tick] %.2f ms (flush: %.2f, drain: %.2f, service: %.2f)\n",
+        //        total, flushTime, drainTime, serviceTime);
+        //    fflush(stdout);
+        //}
     }
 
     void TerrainController::setTerrainConfig(TerrainConfig tcfg)
@@ -125,21 +125,21 @@ namespace aveng {
         }
         else {
             idx = static_cast<uint32_t>(slots_.size());
-#ifdef M_DEBUG
-            if (slots_.size() == slots_.capacity()) {
-                for (const auto& s : slots_) {
-                    if (s.state == procgen::TerrainRuntimeState::Requested) {
-                        std::printf("[TerrainController] FATAL: slots_ reallocation while slot {%d,%d} "
-                                    "is in Requested state -- worker pointers will dangle! "
-                                    "(size=%zu, capacity=%zu)\n",
-                                    s.coord.x, s.coord.z, slots_.size(), slots_.capacity());
-                        assert(false && "slots_ reallocation would invalidate in-flight renderable pointers");
-                    }
-                }
-                std::printf("[TerrainController] WARNING: slots_ growing beyond reserve "
-                            "(size=%zu, capacity=%zu)\n", slots_.size(), slots_.capacity());
-            }
-#endif
+//#ifdef M_DEBUG
+//            if (slots_.size() == slots_.capacity()) {
+//                for (const auto& s : slots_) {
+//                    if (s.state == procgen::TerrainRuntimeState::Requested) {
+//                        std::printf("[TerrainController] FATAL: slots_ reallocation while slot {%d,%d} "
+//                                    "is in Requested state -- worker pointers will dangle! "
+//                                    "(size=%zu, capacity=%zu)\n",
+//                                    s.coord.x, s.coord.z, slots_.size(), slots_.capacity());
+//                        assert(false && "slots_ reallocation would invalidate in-flight renderable pointers");
+//                    }
+//                }
+//                std::printf("[TerrainController] WARNING: slots_ growing beyond reserve "
+//                            "(size=%zu, capacity=%zu)\n", slots_.size(), slots_.capacity());
+//            }
+//#endif
             slots_.emplace_back(); // init
         }
 
@@ -154,10 +154,10 @@ namespace aveng {
 
     void TerrainController::releaseSlot(uint32_t idx) {
         auto& slot = slots_[idx];
-#ifdef M_DEBUG
-        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
-            "Cannot release a slot while a worker thread holds a pointer to its renderable");
-#endif
+//#ifdef M_DEBUG
+//        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
+//            "Cannot release a slot while a worker thread holds a pointer to its renderable");
+//#endif
         coordToSlot_.erase(slot.coord);
         slot.renderable.resetKeepCapacity();
         slot.state = procgen::TerrainRuntimeState::Unrequested;
@@ -172,45 +172,45 @@ namespace aveng {
     // The slot's GPU resource handles (VBO, IBO, input SSBO, output SSBO, descriptor sets) are copied into a DeferredGpuCleanup.
     // The slot is released to the free-list, but the VK resources are not destroyed yet, in case they're still in use
     void TerrainController::evictChunk(ChunkCoord center) {
-        evictionTimer.start();
+        // evictionTimer.start();
         auto it = coordToSlot_.find(center);
         if (it == coordToSlot_.end()) { return; }
 
         uint32_t idx = it->second;
         auto& slot = slots_[idx];
 
-        if (slot.state == procgen::TerrainRuntimeState::Requested) {
-            std::printf("[TerrainController] WARNING: evicting slot[%d] {%d,%d} while still Requested!\n",
-                        idx, slot.coord.x, slot.coord.z);
-        }
+        //if (slot.state == procgen::TerrainRuntimeState::Requested) {
+        //    std::printf("[TerrainController] WARNING: evicting slot[%d] {%d,%d} while still Requested!\n",
+        //                idx, slot.coord.x, slot.coord.z);
+        //}
 
-#ifdef M_DEBUG
-        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
-               "Cannot evict a slot while a worker thread holds a pointer to its renderable");
-
-        if (slot.state == procgen::TerrainRuntimeState::Uploading) {
-            for (const auto& batch : uploadBatches_) {
-                if (!batch.active) continue;
-                for (uint32_t batchIdx : batch.inFlightSlots) {
-                    if (batchIdx == idx) {
-                        throw std::runtime_error("Attempting to evict a chunk which is currently uploading.");
-                    }
-                }
-            }
-        }
-#endif
+//#ifdef M_DEBUG
+//        assert(slot.state != procgen::TerrainRuntimeState::Requested &&
+//               "Cannot evict a slot while a worker thread holds a pointer to its renderable");
+//
+//        if (slot.state == procgen::TerrainRuntimeState::Uploading) {
+//            for (const auto& batch : uploadBatches_) {
+//                if (!batch.active) continue;
+//                for (uint32_t batchIdx : batch.inFlightSlots) {
+//                    if (batchIdx == idx) {
+//                        throw std::runtime_error("Attempting to evict a chunk which is currently uploading.");
+//                    }
+//                }
+//            }
+//        }
+//#endif
 
         admission_.release(center, kSupportRadius);
 
-// #region agent log
-        auto _dbg_ev_t0 = std::chrono::steady_clock::now();
-// #endregion
-
-        int _evSuccess = chunks_->batchEvictRegion(center);
-
-// #region agent log
-        auto _dbg_ev_t1 = std::chrono::steady_clock::now();
-// #endregion
+//// #region agent log
+//        auto _dbg_ev_t0 = std::chrono::steady_clock::now();
+//// #endregion
+//
+//        int _evSuccess = chunks_->batchEvictRegion(center);
+//
+//// #region agent log
+//        auto _dbg_ev_t1 = std::chrono::steady_clock::now();
+//// #endregion
 
         // Move the retiree's vulkan resources into a deffered cleanup struct
         // TODO: Maybe just push the resources back onto the pool. This strategy predates the reusable pool resources
@@ -226,21 +226,21 @@ namespace aveng {
 
         releaseSlot(idx);
 
-// #region agent log
-        { auto _dbg_ev_t2 = std::chrono::steady_clock::now();
-          float _evLoopMs = std::chrono::duration<float,std::milli>(_dbg_ev_t1-_dbg_ev_t0).count();
-          float _evRestMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t1).count();
-          float _evTotalMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t0).count();
-          FILE* _f;
-          fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
-          if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"batch-fix\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:evictChunk\",\"message\":\"eviction summary\",\"data\":{\"evictRecordLoopMs\":%.3f,\"deferredPushAndReleaseMs\":%.3f,\"totalMs\":%.3f,\"coord\":[%d,%d],\"evictSuccess\":%d},\"timestamp\":%lld}\n",_evLoopMs,_evRestMs,_evTotalMs,center.x,center.z,_evSuccess,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
-// #endregion
+//// #region agent log
+//        { auto _dbg_ev_t2 = std::chrono::steady_clock::now();
+//          float _evLoopMs = std::chrono::duration<float,std::milli>(_dbg_ev_t1-_dbg_ev_t0).count();
+//          float _evRestMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t1).count();
+//          float _evTotalMs = std::chrono::duration<float,std::milli>(_dbg_ev_t2-_dbg_ev_t0).count();
+//          FILE* _f;
+//          fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
+//          if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"batch-fix\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:evictChunk\",\"message\":\"eviction summary\",\"data\":{\"evictRecordLoopMs\":%.3f,\"deferredPushAndReleaseMs\":%.3f,\"totalMs\":%.3f,\"coord\":[%d,%d],\"evictSuccess\":%d},\"timestamp\":%lld}\n",_evLoopMs,_evRestMs,_evTotalMs,center.x,center.z,_evSuccess,(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} }
+//// #endregion
 
 #ifdef M_DEBUG
-        renderData_.rdTerrainEvictionTime = evictionTimer.stop();
-        if (renderData_.rdTerrainEvictionTime > renderData_.rdTerrainEvictionTimeMAX) {
-            renderData_.rdTerrainEvictionTimeMAX = renderData_.rdTerrainEvictionTime;
-        }
+        //renderData_.rdTerrainEvictionTime = evictionTimer.stop();
+        //if (renderData_.rdTerrainEvictionTime > renderData_.rdTerrainEvictionTimeMAX) {
+        //    renderData_.rdTerrainEvictionTimeMAX = renderData_.rdTerrainEvictionTime;
+        //}
 #endif
     }
 
@@ -398,9 +398,9 @@ namespace aveng {
     */
     void TerrainController::retireCompletedUploads()
     {
-#ifdef M_DEBUG
-        retireTimer.start();
-#endif
+//#ifdef M_DEBUG
+//        retireTimer.start();
+//#endif
         for (auto& batch : uploadBatches_) {
             if (!batch.active) { continue; }
 
@@ -418,13 +418,13 @@ namespace aveng {
             batch.inFlightSlots.clear();
             batch.active = false;
         }
-
-#ifdef M_DEBUG
-        renderData_.rdTerrainRetireTime = retireTimer.stop();
-        if (renderData_.rdTerrainRetireTime > renderData_.rdTerrainRetireTimeMAX) {
-            renderData_.rdTerrainRetireTimeMAX = renderData_.rdTerrainRetireTime;
-        }
-#endif
+//
+//#ifdef M_DEBUG
+//        renderData_.rdTerrainRetireTime = retireTimer.stop();
+//        if (renderData_.rdTerrainRetireTime > renderData_.rdTerrainRetireTimeMAX) {
+//            renderData_.rdTerrainRetireTimeMAX = renderData_.rdTerrainRetireTime;
+//        }
+//#endif
 
     }
 
@@ -445,15 +445,15 @@ namespace aveng {
 
         if (batch.active) { return; }
 
-#ifdef M_DEBUG
-        if (batch.fence != VK_NULL_HANDLE) {
-            VkResult fenceStatus = vkGetFenceStatus(engineDevice_.device(), batch.fence);
-            if (fenceStatus == VK_NOT_READY) {
-                std::printf("[TerrainController] BUG: uploadBatch[%d].cmdBuffer reuse attempted while fence is still unsignaled!\n", batchIdx);
-                assert(false && "Upload command buffer reuse before fence signaled");
-            }
-        }
-#endif
+//#ifdef M_DEBUG
+//        if (batch.fence != VK_NULL_HANDLE) {
+//            VkResult fenceStatus = vkGetFenceStatus(engineDevice_.device(), batch.fence);
+//            if (fenceStatus == VK_NOT_READY) {
+//                std::printf("[TerrainController] BUG: uploadBatch[%d].cmdBuffer reuse attempted while fence is still unsignaled!\n", batchIdx);
+//                assert(false && "Upload command buffer reuse before fence signaled");
+//            }
+//        }
+//#endif
 
         engineDevice_.beginSingleShotCommand(batch.cmdBuffer);
 
@@ -464,28 +464,28 @@ namespace aveng {
             auto& slot = slots_[i];
             if (slot.state != procgen::TerrainRuntimeState::CpuReady) { continue; }
             // TODO : Remember that this is just 1 iteration's time 
-#ifdef M_DEBUG
-            vkBufferInitTimer.start();
-#endif
+//#ifdef M_DEBUG
+//            vkBufferInitTimer.start();
+//#endif
             if (!prepareChunkUpload(engineDevice_, renderData_, slot, settingsUboBuffer_, settingsUboSize_, pool_)) {
                 slot.state = procgen::TerrainRuntimeState::Failed;
                 continue;
             }
-#ifdef M_DEBUG
-            renderData_.rdTerrainBufferTimeInit = vkBufferInitTimer.stop();
-            if (renderData_.rdTerrainBufferTimeInit > renderData_.rdTerrainBufferTimeInitMAX) {
-                renderData_.rdTerrainBufferTimeInitMAX = renderData_.rdTerrainBufferTimeInit;
-            }
-            vkCopyBufferTimer.start();
-#endif
+//#ifdef M_DEBUG
+//            renderData_.rdTerrainBufferTimeInit = vkBufferInitTimer.stop();
+//            if (renderData_.rdTerrainBufferTimeInit > renderData_.rdTerrainBufferTimeInitMAX) {
+//                renderData_.rdTerrainBufferTimeInitMAX = renderData_.rdTerrainBufferTimeInit;
+//            }
+//            vkCopyBufferTimer.start();
+//#endif
 
             recordChunkCopies(batch.cmdBuffer, slot);
-#ifdef M_DEBUG
-            renderData_.rdTerrainCopyBufferTime = vkCopyBufferTimer.stop();
-            if (renderData_.rdTerrainCopyBufferTime > renderData_.rdTerrainCopyBufferTimeMAX) {
-                renderData_.rdTerrainCopyBufferTimeMAX = renderData_.rdTerrainCopyBufferTime;
-            }
-#endif
+//#ifdef M_DEBUG
+//            renderData_.rdTerrainCopyBufferTime = vkCopyBufferTimer.stop();
+//            if (renderData_.rdTerrainCopyBufferTime > renderData_.rdTerrainCopyBufferTimeMAX) {
+//                renderData_.rdTerrainCopyBufferTimeMAX = renderData_.rdTerrainCopyBufferTime;
+//            }
+//#endif
             slot.state = procgen::TerrainRuntimeState::Uploading;
             batch.inFlightSlots.push_back(i);
             chunksThisBatch++;
@@ -526,9 +526,9 @@ namespace aveng {
         uint32_t idx = allocateSlot(coord);
         auto& slot = slots_[idx];
 
-        std::printf("[TerrainController] Creating renderable at slot[%d] addr=%p "
-                    "(slots size=%zu cap=%zu)\n",
-                    idx, (void*)&slot.renderable, slots_.size(), slots_.capacity());
+        //std::printf("[TerrainController] Creating renderable at slot[%d] addr=%p "
+        //            "(slots size=%zu cap=%zu)\n",
+        //            idx, (void*)&slot.renderable, slots_.size(), slots_.capacity());
 
         /** 
          * @Step 2 - Async Generation
@@ -536,9 +536,9 @@ namespace aveng {
          * The worker thread writes directly into this renderable. Completion is signaled
          * via a lightweight CompletionNotice containing the slot index.
          */
-#ifdef M_DEBUG
-        assert(slot.coord == coord && "slot coord mismatch\n");
-#endif
+//#ifdef M_DEBUG
+//        assert(slot.coord == coord && "slot coord mismatch\n");
+//#endif
         slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_, &slot.renderable, idx);
         slot.state = procgen::TerrainRuntimeState::Requested;
     }
@@ -546,9 +546,9 @@ namespace aveng {
     /* called every frame */
     void TerrainController::drainCompletedTerrain()
     {
-#ifdef M_DEBUG
-        drainTimer.start();
-#endif
+//#ifdef M_DEBUG
+//        drainTimer.start();
+//#endif
         /** 
          * @Step 3: The lambda itself is a simple O(1), but the concurrent queue processes in O(n).
          * No ownership transfers -- the renderable was written in-place by the worker.
@@ -567,12 +567,12 @@ namespace aveng {
                 : procgen::TerrainRuntimeState::Failed;
         });
 
-#ifdef M_DEBUG
-        renderData_.rdTerrainDrainTime = drainTimer.stop();
-        if (renderData_.rdTerrainDrainTime > renderData_.rdTerrainDrainTimeMAX) {
-            renderData_.rdTerrainDrainTimeMAX = renderData_.rdTerrainDrainTime;
-        }
-#endif
+//#ifdef M_DEBUG
+//        renderData_.rdTerrainDrainTime = drainTimer.stop();
+//        if (renderData_.rdTerrainDrainTime > renderData_.rdTerrainDrainTimeMAX) {
+//            renderData_.rdTerrainDrainTimeMAX = renderData_.rdTerrainDrainTime;
+//        }
+//#endif
 
         if (!deferredRequests_.empty()) {
             std::vector<ChunkCoord> pending;
@@ -609,9 +609,9 @@ namespace aveng {
     void TerrainController::flushDeferredDeletes()
     {
 
-#ifdef M_DEBUG
-        vkCleanupDeferredDeletesTimer.start();
-#endif
+//#ifdef M_DEBUG
+//        vkCleanupDeferredDeletesTimer.start();
+//#endif
 
         // TODO: This may actually be wiser to perform when we retire slots
         size_t i = 0;
@@ -638,13 +638,13 @@ namespace aveng {
                     vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &entry.computeDescriptorSet);
                 }
 
-// #region agent log
-                {
-                    FILE* _f;
-                    fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
-                    if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"post-fix\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:flushDeferredDeletes\",\"message\":\"pool refill\",\"data\":{\"inputSsboPoolSize\":%zu,\"outputSsboPoolSize\":%zu,\"vboPoolSize\":%zu,\"iboPoolSize\":%zu,\"deferredRemaining\":%zu},\"timestamp\":%lld}\n",pool_.inputSsbo.size(),pool_.outputSsbo.size(),pool_.vbo.size(),pool_.ibo.size(),deferredCleanups_.size(),(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} 
-                }
-// #endregion
+//// #region agent log
+//                {
+//                    FILE* _f;
+//                    fopen_s(&_f, "c:/Users/Yoshi/dev/Midnight/debug-ed8025.log", "a");
+//                    if(_f){ std::fprintf(_f,"{\"sessionId\":\"ed8025\",\"runId\":\"post-fix\",\"hypothesisId\":\"B\",\"location\":\"TerrainController.cpp:flushDeferredDeletes\",\"message\":\"pool refill\",\"data\":{\"inputSsboPoolSize\":%zu,\"outputSsboPoolSize\":%zu,\"vboPoolSize\":%zu,\"iboPoolSize\":%zu,\"deferredRemaining\":%zu},\"timestamp\":%lld}\n",pool_.inputSsbo.size(),pool_.outputSsbo.size(),pool_.vbo.size(),pool_.ibo.size(),deferredCleanups_.size(),(long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); std::fclose(_f);} 
+//                }
+//// #endregion
 
                 // O(1) swap-and-pop removal
                 deferredCleanups_[i] = std::move(deferredCleanups_.back());
@@ -671,12 +671,12 @@ namespace aveng {
             pool_.outputSsbo.pop_back();
         }
 
-#ifdef M_DEBUG
-        renderData_.rdTerrainCleanupDeferredDeletesTime = vkCleanupDeferredDeletesTimer.stop();
-        if (renderData_.rdTerrainCleanupDeferredDeletesTime > renderData_.rdTerrainCleanupDeferredDeletesTimeMAX) {
-            renderData_.rdTerrainCleanupDeferredDeletesTimeMAX = renderData_.rdTerrainCleanupDeferredDeletesTime;
-        }
-#endif
+//#ifdef M_DEBUG
+//        renderData_.rdTerrainCleanupDeferredDeletesTime = vkCleanupDeferredDeletesTimer.stop();
+//        if (renderData_.rdTerrainCleanupDeferredDeletesTime > renderData_.rdTerrainCleanupDeferredDeletesTimeMAX) {
+//            renderData_.rdTerrainCleanupDeferredDeletesTimeMAX = renderData_.rdTerrainCleanupDeferredDeletesTime;
+//        }
+//#endif
     }
 
     // Cleanup all -- Funnels all resources into pool objects and then destroys from there.
