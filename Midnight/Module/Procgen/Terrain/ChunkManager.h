@@ -13,6 +13,11 @@
 #include "Module/Procgen/Terrain/Control.h"
 #include "Core/Math/wyhash.h"
 
+#ifdef M_DEBUG
+#include "Utils/Timer.h"
+#include "CoreVK/VkRenderData.h"
+#endif
+
 /*
  * TODO: Review scratch vs. final
  *
@@ -39,6 +44,7 @@ namespace procgen {
 
 namespace aveng {
 
+    struct VkRenderData;
     struct Points;
     struct AllPoints;
     struct HeightField;
@@ -55,7 +61,12 @@ namespace aveng {
     class ChunkManager {
     public:
 
-        explicit ChunkManager(ThreadPoolTaskSystem& tasks);
+        explicit ChunkManager(
+            ThreadPoolTaskSystem& tasks
+#ifdef M_DEBUG
+            ,VkRenderData& renderData
+#endif
+        );
 
         /*
         * Note: Configs & Params are bound to balloon into a sub-system
@@ -213,6 +224,12 @@ namespace aveng {
 
         mutable std::mutex allStagesCompleteMut_;
         std::unordered_set<ChunkCoord, ChunkCoordHash> allStagesComplete_;
+
+#ifdef M_DEBUG
+        VkRenderData& renderData_;
+        Timer t1{};
+#endif
+
     };
 
 }

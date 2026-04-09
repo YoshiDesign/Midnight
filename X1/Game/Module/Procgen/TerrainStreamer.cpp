@@ -145,7 +145,7 @@ namespace xone {
             state_.maxCenterWaveRequested = -1;
             state_.maxFanWaveRequested = -1;
 
-            ChunkCoord cdelta = procgen::centerOfRegion_linearPolicy_wrap(ctx.playerChunk.x, ctx.playerChunk.z);
+            ChunkCoord cdelta = procgen::centerOfRegion_linearPolicy(ctx.playerChunk.x, ctx.playerChunk.z);
             state_.baseX = ctx.playerChunk.x + cdelta.x;
             state_.baseZ = ctx.playerChunk.z + cdelta.z;
         }

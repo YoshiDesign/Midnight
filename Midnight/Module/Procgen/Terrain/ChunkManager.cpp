@@ -330,8 +330,17 @@ namespace aveng {
         }
     };
 
-    ChunkManager::ChunkManager(ThreadPoolTaskSystem& tasks)
+    ChunkManager::ChunkManager(
+        ThreadPoolTaskSystem& tasks
+#ifdef M_DEBUG
+		, VkRenderData& renderData
+#endif
+
+    )
         : tasks_(tasks)
+#ifdef M_DEBUG
+		, renderData_(renderData)
+#endif
     {
         cfg_ = defaultTerrainConfig(); // Global Config
         cfg_.noise = defaultNoiseParams();
@@ -421,6 +430,10 @@ namespace aveng {
     //
     ChunkRecord* ChunkManager::getOrCreateRecord(ChunkCoord coord)
     {
+#ifdef M_DEBUG
+        Timer t2; // stops when destroyed
+        t2.start();
+#endif
         const size_t hash = ChunkCoordHash{}(coord); // turns (x,z) into a size_t
         
 #ifdef MIDNIGHT_WYHASH
@@ -440,10 +453,19 @@ namespace aveng {
         // Insert the key if it's missing, with a null unique_ptr placeholder.
         auto [it, inserted] = bucket.map.try_emplace(coord, nullptr);
         if (!inserted) {
+#ifdef M_DEBUG
+            renderData_.rdTerrainManagerTimer_2 = t2.stop();
+			if (renderData_.rdTerrainManagerTimer_2 > renderData_.rdTerrainManagerTimer_2MAX) {
+                renderData_.rdTerrainManagerTimer_2MAX = renderData_.rdTerrainManagerTimer_2;
+			}
+#endif
             // std::printf("%s Record Already Created for (%d, %d)...\n", __FUNCTION__, coord.x, coord.z);
             return it->second.get();
         }
 
+#ifdef M_DEBUG
+		t1.start();
+#endif
         // Create a new record - still holding the lock
         auto rec = std::make_unique<ChunkRecord>();
         rec->coord = coord;
@@ -461,6 +483,14 @@ namespace aveng {
 
         ChunkRecord* out = rec.get();
         it->second = std::move(rec); // "overwrite" the nullptr with the new record
+
+#ifdef M_DEBUG
+        renderData_.rdTerrainManagerTimer_1 = t1.stop();
+        if (renderData_.rdTerrainManagerTimer_1 > renderData_.rdTerrainManagerTimer_1MAX) {
+            renderData_.rdTerrainManagerTimer_1MAX = renderData_.rdTerrainManagerTimer_1;
+        }
+#endif
+
         return out;
     }
 
@@ -921,7 +951,7 @@ namespace aveng {
         // std::printf("Build Triangulation\n");
         // Note, I haven't designed any configurations for Triangulation. Potential options:
         // - omit the circumcenter calculations. They're only needed if we'd like a voronoi layer, but enabled by default.
-        // - add different triangulation algorithms for better quality meshes, but maybe a perf tradeoff.
+        // - add different triangulation algorithms while generating a more dense mesh, but maybe a perf tradeoff.
 
         // Prereq: allPoints must exist (caller discipline or assert/hard dependency)
         assert(rec.allPoints && "Triangulation requires AllPoints");
@@ -1118,8 +1148,9 @@ namespace aveng {
                         return false;
                 }
 
-                if (!ctx.allValueFuturesReady())
+                if (!ctx.allValueFuturesReady()) {
                     return false;
+                }
 
                 procgen::ReduceHydraulicResults(ws, ctx.valueFutures);
                 ctx.clearFutures();
@@ -1963,7 +1994,7 @@ namespace aveng {
             detached[evicted++] = std::move(it->second);
             bucket.map.erase(it);
         }
-
+        
 // #region agent log
         auto _t1 = std::chrono::steady_clock::now();
 // #endregion

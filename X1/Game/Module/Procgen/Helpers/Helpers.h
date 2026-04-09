@@ -6,14 +6,25 @@
 
 namespace procgen {
 
-	struct ModCoord {
-		int x;
-		int z;
+	// Fastest
+	inline int wrapMod3(int v) noexcept {
+		int r = v % 3;
+		return (r < 0) ? r + 3 : r;
+	}
 
-		bool operator==(const ModCoord& other) const noexcept {
-			return x == other.x && z == other.z;
-		}
-	};
+	inline aveng::ChunkCoord centerOfRegion_linearPolicy(int px, int pz) noexcept {
+		static constexpr int map[3] = { 0, -1, 1 };
+		return { map[wrapMod3(px)], map[wrapMod3(pz)] };
+	}
+
+	//struct ModCoord {
+	//	int x;
+	//	int z;
+
+	//	bool operator==(const ModCoord& other) const noexcept {
+	//		return x == other.x && z == other.z;
+	//	}
+	//};
 
 	//// Simple hash. Please inline this, o wise compiler overloard
 	//struct ModCoordHash {
@@ -45,7 +56,7 @@ namespace procgen {
 	//	/// This is strictly for the linear streaming policy - Z is never negative
 	//};
 
-	///  Newbie implementation (above)
+	//  Newbie implementation (above)
 
 	//struct ModEntry {
 	//	ModCoord key;
@@ -82,33 +93,28 @@ namespace procgen {
 	//		}
 	//	}
 
-	//	// Noob
-	//	// if (auto coords = lmod.find(pmod); coords != lmod.end()) {
-	//	// 	return coords->second;
-	//	// }
-
 	//	return { 999, 999 };
 	//	
 	//}
 	//
 	// Better use of this algo's symmetry - This works because Z is never negative 
 	// and we're just tracking x as it wraps around the central point
-	inline int wrapMod3(int v, int o) noexcept {
-		return ((v % o) + o) % o; // "equivalence-class normalization"
-	}
+	//inline int wrapMod3(int v, int o) noexcept {
+	//	return ((v % o) + o) % o; // "equivalence-class normalization"
+	//}
 
-	// 3x3 table formula to know where we are in relation to the center coordinate
-	inline aveng::ChunkCoord centerOfRegion_linearPolicy_wrap(int px, int pz, int offset = aveng::chunk_center_spacing) noexcept {
-		const int mx = wrapMod3(px, offset);
-		const int mz = wrapMod3(pz, offset);
+	//// 3x3 table formula to know where we are in relation to the center coordinate
+	//inline aveng::ChunkCoord centerOfRegion_linearPolicy_wrap(int px, int pz, int offset = aveng::chunk_center_spacing) noexcept {
+	//	const int mx = wrapMod3(px, offset);
+	//	const int mz = wrapMod3(pz, offset);
 
-		// mz == 0 means center row, mx == 0 means center column
-		// mz == 1 means one row above center, mx == 1 means right column
-		// mz == 2 means one row below center, mx == 2 means left column
-		const int dx = (mx == 0) ? 0 : (mx == 1 ? -1 : 1);
-		const int dz = (mz == 0) ? 0 : (mz == 1 ? -1 : 1);
+	//	// mz == 0 means center row, mx == 0 means center column
+	//	// mz == 1 means one row above center, mx == 1 means right column
+	//	// mz == 2 means one row below center, mx == 2 means left column
+	//	const int dx = (mx == 0) ? 0 : (mx == 1 ? -1 : 1);
+	//	const int dz = (mz == 0) ? 0 : (mz == 1 ? -1 : 1);
 
-		return { dx, dz };
-	}
+	//	return { dx, dz };
+	//}
 
 }

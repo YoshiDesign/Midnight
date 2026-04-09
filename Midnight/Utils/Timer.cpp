@@ -12,6 +12,10 @@ namespace aveng {
         mStartTime = std::chrono::steady_clock::now();
     }
 
+    Timer::~Timer() {
+        stop();
+    }
+
     float Timer::stop() {
         if (!mRunning) {
             std::printf("%s error: timer not running\n", __FUNCTION__);

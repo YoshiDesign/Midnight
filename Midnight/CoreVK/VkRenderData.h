@@ -349,6 +349,10 @@ namespace aveng {
 		float rdTerrainCleanupDeferredDeletesTimeMAX = 0.f;
 		float rdTerrainEvictionTime = 0.f;
 		float rdTerrainEvictionTimeMAX = 0.f;
+		float rdTerrainManagerTimer_1 = 0.f;
+		float rdTerrainManagerTimer_1MAX = 0.f;
+		float rdTerrainManagerTimer_2 = 0.f;
+		float rdTerrainManagerTimer_2MAX = 0.f;
 
 		// Frame-level fence wait timing (diagnostic)
 		float rdFenceWaitTime = 0.f;

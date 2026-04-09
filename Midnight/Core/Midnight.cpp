@@ -9,7 +9,11 @@ namespace aveng {
 		: taskSystem_{ std::thread::hardware_concurrency() }
 		, aveng_window(WIDTH, HEIGHT, "MIDNIGHT ENGINE")
 		, engineDevice(aveng_window)
-		, chunkManager_(taskSystem_)
+		, chunkManager_(taskSystem_
+#ifdef M_DEBUG
+			, renderData
+#endif
+		)
 		, terrain_(engineDevice, renderData, chunkManager_)
 		, debug_{}
 		, game_data(gd)

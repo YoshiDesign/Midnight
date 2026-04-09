@@ -13,6 +13,16 @@ namespace aveng {
         ImGui::SameLine();
         ImGui::Text("%.6f", renderData.rdTerrainBufferTimeInitMAX);
 
+        ImGui::Text("getOrCreate T1:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainManagerTimer_1MAX);
+        ImGui::Text("Current:\t%.6f", renderData.rdTerrainManagerTimer_1);
+
+        ImGui::Text("getOrCreate T2 GET only:\t");
+        ImGui::SameLine();
+        ImGui::Text("%.6f", renderData.rdTerrainManagerTimer_2MAX);
+        ImGui::Text("Current:\t%.6f", renderData.rdTerrainManagerTimer_2);
+
         ImGui::Separator();
 
         ImGui::Text("1. VBO / IBO Init + Copy:\t");

@@ -195,7 +195,7 @@ namespace procgen {
 
                         const aveng::Vec2 oldPos = d.pos;
                         d.pos = { d.pos.x + d.dir.x, d.pos.y + d.dir.y };
-
+                        // This is repeated from above.
                         auto [t2, ok2] = sg.LocateTriangle(d.pos.x, d.pos.y);
                         if (!ok2) { d.alive = false; break; }
 

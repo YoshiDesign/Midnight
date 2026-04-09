@@ -6,6 +6,7 @@ namespace aveng {
     class Timer {
     public:
         Timer() {};
+        ~Timer();
         void start();
         /* stops timer and returns millisconds since start, in microsecond resolution */
         float stop();
