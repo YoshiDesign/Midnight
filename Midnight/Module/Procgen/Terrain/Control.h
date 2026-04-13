@@ -111,7 +111,7 @@ namespace procgen {
                 [&](const ActiveRegion& r) {
                     return r.center.x == center.x
                         && r.center.z == center.z 
-                        && r.radius == supportRadius;
+                        && r.radius == supportRadius; // weird...
                 });
             //aveng::Logger::log(1, "release: Releasing! {%d, %d}\n", center.x, center.z);
             active_.erase(it, active_.end());

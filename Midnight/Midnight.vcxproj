@@ -228,6 +228,7 @@
     <ClCompile Include="Module\Procgen\Terrain\Erosion\RidgeEnhancement.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ThermalErosion.cpp" />
     <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
+    <ClCompile Include="Runtime\Memory\Arena.cpp" />
     <ClCompile Include="Runtime\Memory\ChunkArena.h" />
     <ClCompile Include="Runtime\Play\Controller\DebugController.cpp" />
     <ClCompile Include="Runtime\Play\Controller\TerrainController.cpp" />
@@ -331,6 +332,7 @@
     <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
     <ClInclude Include="Runtime\Debug.h" />
     <ClInclude Include="Runtime\Facade\SceneFacade.h" />
+    <ClInclude Include="Runtime\Memory\Arena.h" />
     <ClInclude Include="Runtime\Play\Controller\DebugController.h" />
     <ClInclude Include="Runtime\Play\Controller\TerrainController.h" />
     <ClInclude Include="Runtime\Play\GameContext.h" />

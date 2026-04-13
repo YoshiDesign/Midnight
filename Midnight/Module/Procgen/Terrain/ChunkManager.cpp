@@ -431,8 +431,8 @@ namespace aveng {
     ChunkRecord* ChunkManager::getOrCreateRecord(ChunkCoord coord)
     {
 #ifdef M_DEBUG
-        Timer t2; // stops when destroyed
-        t2.start();
+        //Timer t2; // stops when destroyed
+        //t2.start();
 #endif
         const size_t hash = ChunkCoordHash{}(coord); // turns (x,z) into a size_t
         
@@ -454,17 +454,17 @@ namespace aveng {
         auto [it, inserted] = bucket.map.try_emplace(coord, nullptr);
         if (!inserted) {
 #ifdef M_DEBUG
-            renderData_.rdTerrainManagerTimer_2 = t2.stop();
-			if (renderData_.rdTerrainManagerTimer_2 > renderData_.rdTerrainManagerTimer_2MAX) {
-                renderData_.rdTerrainManagerTimer_2MAX = renderData_.rdTerrainManagerTimer_2;
-			}
+//          renderData_.rdTerrainManagerTimer_2 = t2.stop();
+//			if (renderData_.rdTerrainManagerTimer_2 > renderData_.rdTerrainManagerTimer_2MAX) {
+//                renderData_.rdTerrainManagerTimer_2MAX = renderData_.rdTerrainManagerTimer_2;
+//			}
 #endif
             // std::printf("%s Record Already Created for (%d, %d)...\n", __FUNCTION__, coord.x, coord.z);
             return it->second.get();
         }
 
 #ifdef M_DEBUG
-		t1.start();
+		// t1.start();
 #endif
         // Create a new record - still holding the lock
         auto rec = std::make_unique<ChunkRecord>();
@@ -485,11 +485,11 @@ namespace aveng {
         it->second = std::move(rec); // "overwrite" the nullptr with the new record
 
 #ifdef M_DEBUG
-        renderData_.rdTerrainManagerTimer_1 = t1.stop();
-        if (renderData_.rdTerrainManagerTimer_1 > renderData_.rdTerrainManagerTimer_1MAX) {
-            renderData_.rdTerrainManagerTimer_1MAX = renderData_.rdTerrainManagerTimer_1;
-        }
-        t2.stop();
+        //renderData_.rdTerrainManagerTimer_1 = t1.stop();
+        //if (renderData_.rdTerrainManagerTimer_1 > renderData_.rdTerrainManagerTimer_1MAX) {
+        //    renderData_.rdTerrainManagerTimer_1MAX = renderData_.rdTerrainManagerTimer_1;
+        //}
+        //t2.stop();
 #endif
 
         return out;
@@ -1533,6 +1533,7 @@ namespace aveng {
 
             if (shouldPublish) {
                 if (admissionCtl_) {
+                    // This probably doesn't need to happen...
                     admissionCtl_->release(center, admissionRadius_);
                 }
 
@@ -1574,20 +1575,20 @@ namespace aveng {
     void ChunkManager::buildRenderablev2(ChunkCoord center, uint64_t frameIndex,
         std::span<ChunkRecord*, 25> recs)
     {
-        using namespace procgen;
+        using namespace procgen; // eh...
 
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors); // inner 3x3 = [0..8]
-        std::printf("Building: {%d, %d}\n", center.x, center.z);
+        // std::printf("Building: {%d, %d}\n", center.x, center.z);
         TerrainRenderable* renderable = recs[4]->renderableTarget;
-#ifdef M_DEBUG
-        std::printf("[buildRenderablev2] center={%d,%d} renderableTarget=%p\n",
-                    center.x, center.z, (void*)renderable);
-        if (!renderable) {
-            std::printf("[buildRenderablev2] ERROR: renderableTarget is null!\n");
-            assert(false && "renderableTarget is null");
-        }
-#endif
+//#ifdef M_DEBUG
+//        std::printf("[buildRenderablev2] center={%d,%d} renderableTarget=%p\n",
+//                    center.x, center.z, (void*)renderable);
+//        if (!renderable) {
+//            std::printf("[buildRenderablev2] ERROR: renderableTarget is null!\n");
+//            assert(false && "renderableTarget is null");
+//        }
+//#endif
         renderable->resetKeepCapacity();
         renderable->center = center;
 
