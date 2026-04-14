@@ -218,15 +218,18 @@
     <ClCompile Include="Core\Texture.cpp" />
     <ClCompile Include="Core\UUID.cpp" />
     <ClCompile Include="Module\Procgen\Delaunay.cpp" />
+    <ClCompile Include="Module\Procgen\Delaunay2.cpp" />
     <ClCompile Include="Module\Procgen\Helpers.cpp" />
     <ClCompile Include="Module\Procgen\Noise\Bluenoise.cpp" />
     <ClCompile Include="Module\Procgen\SpatialGrid.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\ChunkManager.cpp" />
+    <ClCompile Include="Module\Procgen\Terrain\ChunkManager2.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ErosionManager.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\Initialization.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\RidgeEnhancement.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ThermalErosion.cpp" />
+    <ClCompile Include="Module\Procgen\Terrain\SpatialGrid2.cpp" />
     <ClCompile Include="Runtime\Facade\SceneFacade.cpp" />
     <ClCompile Include="Runtime\Memory\Arena.cpp" />
     <ClCompile Include="Runtime\Memory\ChunkArena.h" />
@@ -308,6 +311,7 @@
     <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\UUID.h" />
     <ClInclude Include="Module\Procgen\Delaunay.h" />
+    <ClInclude Include="Module\Procgen\Delaunay2.h" />
     <ClInclude Include="Module\Procgen\Helpers.h" />
     <ClInclude Include="Module\Procgen\Noise\Bluenoise.h" />
     <ClInclude Include="Module\Procgen\Noise\Config.h" />
@@ -317,7 +321,9 @@
     <ClInclude Include="Module\Procgen\Rng.h" />
     <ClInclude Include="Module\Procgen\SpatialGrid.h" />
     <ClInclude Include="Module\Procgen\Terrain\ChunkManager.h" />
+    <ClInclude Include="Module\Procgen\Terrain\ChunkManager2.h" />
     <ClInclude Include="Module\Procgen\Terrain\ChunkRecord.h" />
+    <ClInclude Include="Module\Procgen\Terrain\ChunkRecord2.h" />
     <ClInclude Include="Module\Procgen\Terrain\Control.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\Data.h" />
     <ClInclude Include="Module\Procgen\Terrain\Erosion\HydraulicErosion.h" />
@@ -328,7 +334,10 @@
     <ClInclude Include="Module\Procgen\Terrain\Erosion\ThermalErosion.h" />
     <ClInclude Include="Module\Procgen\Terrain\GpuResources.h" />
     <ClInclude Include="Module\Procgen\Rendering\VkTerrain.h" />
+    <ClInclude Include="Module\Procgen\Terrain\SpatialGrid2.h" />
+    <ClInclude Include="Module\Procgen\Terrain\TerrainPool.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
+    <ClInclude Include="Module\Procgen\Types2.h" />
     <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
     <ClInclude Include="Runtime\Debug.h" />
     <ClInclude Include="Runtime\Facade\SceneFacade.h" />

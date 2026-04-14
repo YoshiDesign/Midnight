@@ -64,10 +64,7 @@ namespace aveng {
 
         // ---- Queries ----
 
-        // Alias
-        std::pair<float, bool> Raycast(float x, float z) const { return SampleHeight(x, z); }
-
-        std::span<const TriIndex> trianglesForCell(uint32_t cell) const
+        inline std::span<const TriIndex> trianglesForCell(uint32_t cell) const
         {
             const uint32_t begin = cellOffsets[cell];
             const uint32_t end = cellOffsets[cell + 1];
@@ -75,8 +72,10 @@ namespace aveng {
         }
 
         std::pair<TriIndex, bool> LocateTriangle(float x, float z) const;
-
         bool pointInTriangle(TriIndex ti, const Vec2& p) const;
+
+        // Alias
+        inline std::pair<float, bool> Raycast(float x, float z) const { return SampleHeight(x, z); }
 
         // Returns (height, ok) ok = non-degenerate triangle
         std::pair<float, bool> SampleHeight(float x, float z) const;

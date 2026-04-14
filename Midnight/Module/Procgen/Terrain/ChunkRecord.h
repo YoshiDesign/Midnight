@@ -133,7 +133,7 @@ namespace aveng {
 		explicit ErosionField(std::pmr::memory_resource* mr) : eHeights(mr) {}
 	};
 
-	// Final durable product example (you’ll extend)
+	// DEPRECATED - We now write directly into the destination
 	struct FinalMeshCPU {
 		std::pmr::vector<glm::vec3> vbo_positions;
 		std::pmr::vector<uint32_t>  ibo_indices;

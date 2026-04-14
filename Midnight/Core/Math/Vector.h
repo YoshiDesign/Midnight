@@ -1,6 +1,6 @@
 #pragma once
 #include <cmath>
-namespace aveng{
+namespace aveng {
     
     struct Vec2 {
         float x = 0.f;

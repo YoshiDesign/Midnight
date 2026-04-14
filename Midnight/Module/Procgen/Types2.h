@@ -7,13 +7,13 @@
 
 #define MIDNIGHT_WYHASH
 
-namespace aveng {
+namespace procgen {
 
 	using EdgeIndex = uint32_t;
 	using TriIndex = uint32_t;
 	using SiteIndex = uint32_t;
 	static constexpr EdgeIndex kInvalidEdge = -1; // NOTE - These wrap... bc their types are uint32_t. I oops'd, but we can scale to 64 if we really need validity at that scale.
-	static constexpr TriIndex  kInvalidTri = -1;  // NOTE - So be consistently aware of this subtle alarm bell.
+	static constexpr TriIndex  kInvalidTri = 0xfffffffc;  // NOTE - So be consistently aware of this subtle alarm bell.
 	static constexpr uint8_t chunk_center_spacing = 3;
 
 	const enum Border {
@@ -28,9 +28,9 @@ namespace aveng {
 		SiteIndex A, B, C;
 	};
 
-	// AoS is perfectly suitable for this struct.
-	// If we needed to perform linear operations over
-	// thousands of half-edges, then we might consider SoA for better perf.
+	// TODO - Ponder this:
+	// If we needed to perform linear operations over thousands of half-edges, 
+	// then we might want to consider SoA for better perf instead of packing these into arrays (AoS)
 	// Note that we don't have a `prev` member. We just use delaunay traversal based on next/twin to do that
 	struct HalfEdge {
 		SiteIndex origin;
@@ -50,8 +50,8 @@ namespace aveng {
 	// Member of the Triangulation ChunkRecord product.
 	// AoS feels suitable here for now.
 	struct TriangleCache {
-		Vec2 ab;
-		Vec2 ac;
+		aveng::Vec2 ab;
+		aveng::Vec2 ac;
 		float invDenom;
 	};
 
@@ -68,7 +68,7 @@ namespace aveng {
 		SiteIndex site = -1;
 		bool closed = false;
 		std::pmr::vector<TriIndex> tris;
-		std::pmr::vector<Vec2> vertices;
+		std::pmr::vector<aveng::Vec2> vertices;
 
 		explicit VoronoiCell(std::pmr::memory_resource* mr)
 			: tris(mr), vertices(mr) {
@@ -99,7 +99,7 @@ namespace aveng {
 	}
 
 	inline uint64_t mix64(uint64_t a, uint64_t b) {
-		return wyhash64(a, b); // from wyhash
+		return aveng::wyhash64(a, b); // from wyhash
 	}
 
 	inline uint64_t chunkSeed(uint64_t worldSeed, ChunkCoord c) {
@@ -144,20 +144,20 @@ namespace aveng {
 
 	/* Global Terrain Config - Used by the ChunkManager to orchestrate and define chunk generation */
 	struct TerrainConfig {
-		uint64_t worldSeed	{ 42 };
-		float chunkSize		{ 256.f };	// This determines the resolution of our chunks
-		float minPointDist	{ 8.f };	// Min distance between points - This number has a large influence on the perf of BlueNoise
-		float halo			{ 32.f };	// 4x minPointDist, for now
-		uint16_t nThreads	{ 0 };
-		noise::NoiseParams noise{};
+		uint64_t worldSeed{ 42 };
+		float chunkSize{ 256.f };	// This determines the resolution of our chunks
+		float minPointDist{ 8.f };	// Min distance between points - This number has a large influence on the perf of BlueNoise
+		float halo{ 32.f };	// 4x minPointDist, for now
+		uint16_t nThreads{ 0 };
+		aveng::noise::NoiseParams noise{};
 	};
 
-	/* Stage Params 
+	/* Stage Params
 	 * [IMPORTANT] Stage params set a hard limit on parallelism
 	 * by reading ITaskSystem::nThreads. Set this or else.
 	 * TODO - Remove defaults from this declaration
 	 */
-	struct HydraulicErosionParams{
+	struct HydraulicErosionParams {
 		uint32_t numDroplets;   // total droplets
 		uint32_t maxSteps;		// steps per droplet (upper bound)
 		uint32_t batchSize;		// droplets per task
@@ -220,9 +220,6 @@ namespace aveng {
 		bool ridgeEnhancementEnabled = true;
 		bool hardnessMapEnabled = true;
 	};
-}
-
-namespace procgen {
 
 	const int MAX_ADJACENT_TRIS = 12;
 
@@ -232,7 +229,7 @@ namespace procgen {
 		// IMPORTANT
 		// triangleIndices[] are CHUNK-LOCAL triangle IDs in [0..numTriangles).
 		// We'll add pc.baseTriangle when indexing shared triangle/face arrays.
-		aveng::TriIndex triangleIndices[MAX_ADJACENT_TRIS];
+		TriIndex triangleIndices[MAX_ADJACENT_TRIS];
 		uint32_t count;
 		uint32_t _pad0;
 		uint32_t _pad1;
@@ -240,32 +237,3 @@ namespace procgen {
 	};
 
 }
-
-
-/* CHUNK RECORD NOTES
-* Hard Invariants:
-*	Scratch outputs: not published (or published only as a completion signal), or published as "handle + owner"
-*	Final outputs: safe to publish as raw pointers because they’re stable until eviction
-*
-* Why?
-*	`discardScratchIntermediates()` resets the arena and nulls pointers, but:
-*	the futures may still exist and be shared elsewhere
-*	shared_future<Points const*> might still return a pointer that now points into freed arena memory
-*
-*	[IMPORTANT] Be sure to clearly delineate between what is an internal dependency and what is a public artifact,
-*	while also being clear about the state of the chunk record (generating, gpu_ready, uploaded, evicted, freed, etc)
-*	Do not let this become a lifetime safety nightmare by resetting scratch when futures still exist.
-* 
-* Policy: after mesh is built, you can drop intermediates.
-*
-* This is our solution to:
-*	- Task A publishes Heights* from scratch arena
-*	- Task B gets future, hasn't called .get() yet
-*	- Task C calls rec.scratch.reset()
-*	- Task B calls fut.get() -> dangling pointer
-* I've probably said this elsewhere, but just in case.
-* Only reset scratch after:
-*	- Final mesh is complete (all intermediate futures resolved)
-*	- No external references to intermediate data exist
-*	- ChunkRecord is in a valid state
-*/

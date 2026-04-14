@@ -78,6 +78,10 @@
 
 namespace {
 
+    /*
+        Island of misfit functions (TODO)
+    */
+
     struct TriRef
     {
         aveng::ChunkRecord* rec = nullptr;
