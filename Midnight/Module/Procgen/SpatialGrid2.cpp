@@ -6,25 +6,28 @@
 
 namespace procgen {
 
-    SpatialGrid2* BuildSpatialGrid(const Triangulation* triangulation, const AllPoints* allPoints, const HeightField* heightField, float cellSize, float minX, float minZ, float maxX, float maxZ)
+    SpatialGrid2* BuildSpatialGrid(
+        const Triangulation* triangulation, 
+        const AllPoints* allPoints, 
+        const HeightField* heightField, 
+        float cellSize, 
+        float minX, float minZ, float maxX, float maxZ)
     {
+
+#ifdef M_DEBUG
         if (!triangulation || !allPoints || !heightField) {
             return nullptr;
         }
-        if (triangulation->size_tris == 0) {
-            return nullptr;
-        }
-
-        const auto& triVec = triangulation->tris;
-        const auto& posVec = allPoints->all_pts;
-        const auto& hVec = heightField->heights;
 
         // We assume triangulation indices refer into allPoints->pts and heightField->heights
-        if (posVec.empty() || hVec.empty() || posVec.size() != hVec.size()) {
+        if (triangulation->size_tris  == 0 ||
+            allPoints->size_all_pts   == 0 ||
+            heightField->size_heights == 0 ||
+            allPoints->size_all_pts != heightField->size_heights) {
             return nullptr;
         }
-
-        const float width = maxX - minX; // This should be the same for every chunk, just saying.
+#endif
+        const float width = maxX - minX;  // Typically, this would be the same for every chunk
         const float height = maxZ - minZ; // same
         if (width <= 0.0f || height <= 0.0f || cellSize <= 0.0f) {
             return nullptr;
@@ -37,6 +40,7 @@ namespace procgen {
 
         const int numCells = gridW * gridH;
 
+        // TODO - Alloc in the Terrain Arena
         auto sg = std::make_unique<SpatialGrid>();
 
         // Wire pointers/spans to ChunkRecord-owned data
@@ -45,9 +49,9 @@ namespace procgen {
         sg->hf = heightField;
 
         // "Convenience Spans"
-        sg->tris = std::span<const Triangle>(triVec.data(), triVec.size());
-        sg->vertexPos = std::span<const Vec2>(posVec.data(), posVec.size());
-        sg->heights = std::span<const float>(hVec.data(), hVec.size());
+        sg->tris = std::span<const Triangle>(triangulation->tris, triangulation->size_tris);
+        sg->vertexPos = std::span<const aveng::Vec2>(allPoints->all_pts, allPoints->size_all_pts);
+        sg->heights = std::span<const float>(heightField->heights, heightField->size_heights);
         sg->vertexCount = sg->heights.size();
 
         sg->cellSize = cellSize;
@@ -164,9 +168,11 @@ namespace procgen {
 	TriIndex LocateTriangle(SpatialGrid2* sg, float x, float z)
 	{
 
-        if (!sg->tri || !sg->pts || sg->tris.empty()) {
+#ifdef M_DEBUG
+        if (!sg->tri || !sg->pts || sg->tri->size_tris == 0) {
             return kInvalidTri;
         }
+#endif
 
         const int cx = (x - sg->minx) / sg->cellSize; // Implicit truncation toward 0
         const int cz = (z - sg->minz) / sg->cellSize; // Implicit truncation toward 0
@@ -191,8 +197,9 @@ namespace procgen {
 	// Point-in-triangle test using barycentric coordinates. Allows points on edge.
     bool pointInTriangle(SpatialGrid2* sg, TriIndex ti, const aveng::Vec2& p)
     {
+#ifdef M_DEBUG
         if (!sg->pts || !sg->tri) return false;
-
+#endif
         aveng::BaryWeights w{};
         constexpr float denomEps = 1e-8f; // for degenerate tri rejection
 

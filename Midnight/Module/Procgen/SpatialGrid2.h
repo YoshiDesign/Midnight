@@ -23,11 +23,6 @@ namespace procgen {
         const AllPoints* pts = nullptr;   // provides pts->pts (Vec2 positions)
         const HeightField* hf = nullptr;   // provides hf->heights
 
-        // Convenience spans (set at build time; derived from pointers above)
-        std::span<const Triangle> tris;
-        std::span<const aveng::Vec2>     vertexPos;
-        std::span<const float>    heights;
-
         size_t vertexCount = 0;
 
         // ---- Grid config ----
