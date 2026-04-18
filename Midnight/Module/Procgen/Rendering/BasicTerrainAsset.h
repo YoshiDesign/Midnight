@@ -147,18 +147,17 @@ namespace procgen {
 		Failed
 	};
 
-	struct TerrainChunkSlot
-	{
-		aveng::ChunkCoord coord{};
-		TerrainRuntimeState state = TerrainRuntimeState::Unrequested;
+	//struct TerrainChunkSlot
+	//{
+	//	aveng::ChunkCoord coord{};
+	//	TerrainRuntimeState state = TerrainRuntimeState::Unrequested;
 
-		uint64_t requestId = 0;
+	//	uint64_t requestId = 0;
 
-		TerrainRenderable renderable;
+	//	TerrainRenderable renderable;
 
-		TerrainGpuChunk gpu;
+	//	TerrainGpuChunk gpu;
 
-		TerrainGpuHandle gpuHandle{};
-	};
+	//};
 
 }

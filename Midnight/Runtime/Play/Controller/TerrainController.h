@@ -8,6 +8,7 @@
 #include "Module/Procgen/Terrain/Control.h"
 #include "Module/Procgen/Rendering/VkTerrain.h"
 #include "Module/Procgen/Rendering/TerrainResourcePool.h"
+#include "Module/Procgen/Terrain/TerrainPool.h"
 #include "Module/Procgen/Types.h"
 #include "Utils/Timer.h"
 
@@ -17,18 +18,18 @@
 /**
  * Notes about the new resource pool:
  * The pool is not pre-populated -- it's a recycling pool that starts empty and fills up organically as chunks complete their lifecycle. Here's the flow:
-
-Cold start (pool empty): The very first wave of chunks will always hit the "fall back to init" path because there's nothing to recycle yet. This is expected -- the first N chunks pay the full vmaCreateBuffer cost just like they do today.
-
-Steady state (pool warm): Once the player starts moving and chunks cycle through eviction, buffers flow into the pool from two sources:
-
-retireCompletedUploads -- when a GPU upload fence signals, the renderable's vectors are cleared (preserving capacity) via resetKeepCapacity(). The slot is ready for reuse without any heap allocation.
-
-flushDeferredDeletes -- when an evicted chunk's deferred frame count elapses (after kDeferFrames), its VBO, IBO, input SSBO, and output SSBO structs get moved into pool_.vbo, pool_.ibo, etc. instead of being destroyed. The Vulkan handles survive -- device buffer, staging buffer, VMA allocations -- all still valid.
-
-Then when prepareChunkUpload runs for the next incoming chunk, it checks the pool first. If there's a buffer whose bufferSize >= needed, it grabs it. The existing Vulkan allocation is reused: fillStaging just maps the same staging buffer and overwrites its contents, recordCopy copies to the same device buffer. Zero vmaCreateBuffer / vmaDestroyBuffer calls on the hot path.
-
-So the lifecycle looks like:
+ *
+ *  Cold start (pool empty): The very first wave of chunks will always hit the "fall back to init" path because there's nothing to recycle yet. This is expected -- the first N chunks pay the full vmaCreateBuffer cost just like they do today.
+ *
+ *  Steady state (pool warm): Once the player starts moving and chunks cycle through eviction, buffers flow into the pool from two sources:
+ *
+ *  retireCompletedUploads -- when a GPU upload fence signals, the renderable's vectors are cleared (preserving capacity) via resetKeepCapacity(). The slot is ready for reuse without any heap allocation.
+ *
+ *  flushDeferredDeletes -- when an evicted chunk's deferred frame count elapses (after kDeferFrames), its VBO, IBO, input SSBO, and output SSBO structs get moved into pool_.vbo, pool_.ibo, etc. instead of being destroyed. The Vulkan handles survive -- device buffer, staging buffer, VMA allocations -- all still valid.
+ *
+ *  Then when prepareChunkUpload runs for the next incoming chunk, it checks the pool first. If there's a buffer whose bufferSize >= needed, it grabs it. The existing Vulkan allocation is reused: fillStaging just maps the same staging buffer and overwrites its contents, recordCopy copies to the same device buffer. Zero vmaCreateBuffer / vmaDestroyBuffer calls on the hot path.
+ *
+ *  So the lifecycle looks like:
  */
 
 namespace aveng {
@@ -69,7 +70,7 @@ namespace aveng {
     // Forward declarations to keep compile-times sane.
     struct FinalMeshCPU;
     struct VkRenderData;
-    class ChunkManager;
+    class ChunkManager2;
     class EngineDevice;
 
     enum class TerrainStreamMode {
@@ -173,7 +174,7 @@ namespace aveng {
 
         void cleanup();
 
-        void cleanupOne(procgen::TerrainChunkSlot& slot);
+        void cleanupOne(procgen::ChunkSlot& slot);
         /**
          * Request the final renderable data for compute and graphics.
          * The renderable comprises a 3x3 region of space with up to a 5x5 region
@@ -198,9 +199,9 @@ namespace aveng {
         bool hasRegionComplete(ChunkCoord center) noexcept;
 
         // Diagnostics for frame pacing
-        int countActiveUploads() const;
-        int countCpuReadySlots() const;
-        int countResidentSlots() const;
+        //int countActiveUploads() const;
+        //int countCpuReadySlots() const;
+        //int countResidentSlots() const;
 
         // Expose what was last requested for debug overlays, etc.
         // std::unique_ptr<procgen::TerrainRenderable> const& lastRequestedRenderable() const noexcept;
@@ -215,9 +216,9 @@ namespace aveng {
          * freeSlots_ recycles indices so the vector never grows during gameplay.
          * Exactly how our model instances work.
          */
-        std::vector<procgen::TerrainChunkSlot> slots_;
-        std::unordered_map<ChunkCoord, uint32_t, ChunkCoordHash> coordToSlot_;
-        std::vector<uint32_t> freeSlots_;
+        procgen::ChunkSlot* slots_; // Stored in the arena
+        std::unordered_map<ChunkCoord, procgen::ChunkHandle, ChunkCoordHash> coordToSlot_;
+        //std::vector<uint32_t> freeSlots_;
 
         // Region admission control: prevents overlapping 5x5 support footprints
         // from being built concurrently (the primary fix for dependency starvation).
@@ -232,6 +233,8 @@ namespace aveng {
 
         // Recycling pool for Vulkan buffers and CPU renderables
         TerrainResourcePool pool_;
+        procgen::TerrainPool terrain_pool;
+
 
         std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash> managed_;
         ChunkCoord currentCenter_;
@@ -267,7 +270,7 @@ namespace aveng {
         // std::unique_ptr<procgen::TerrainRenderable> lastRequested_;
 
         // CEO (Chunk Executive Officer)
-        ChunkManager* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
+        procgen::ChunkManager2* chunks_ = nullptr; // Primary Manager for Chunk Orchestration - non-owning
         EngineDevice& engineDevice_;
         VkRenderData& renderData_;
         procgen::ErosionManager erosionMgr_;

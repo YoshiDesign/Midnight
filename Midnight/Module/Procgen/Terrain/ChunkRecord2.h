@@ -77,9 +77,6 @@ namespace procgen {
 		float       halo = 0.f;
 		uint64_t chunkSeed = 0;
 
-		// Maybe - 
-		uint32_t packed_offset;
-
 		// Pointers into final Arena memory
 		Points* points = nullptr;
 		AllPoints* allPoints = nullptr;
@@ -87,9 +84,9 @@ namespace procgen {
 		Triangulation* triangulation = nullptr;
 		ErosionField* erosion = nullptr;
 
-		// Streaming / residency
-		int32_t pinCount{ 0 };
-		uint64_t lastTouchedFrame{ 0 };
+		// Streaming / residency - This will be built into a map on the ChunkManager
+		//int32_t pinCount{ 0 };
+		//uint64_t lastTouchedFrame{ 0 };
 
 	};
 

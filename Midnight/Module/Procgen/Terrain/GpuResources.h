@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "Module/Procgen/Types.h"
+#include "Module/Procgen/Types2.h"
 #include "Utils/glm_includes.h"
 
 namespace aveng {

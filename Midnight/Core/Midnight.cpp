@@ -70,6 +70,12 @@ namespace aveng {
 		initialize();
 	}
 
+	Midnight::~Midnight()
+	{
+		DestroyArena(terrain_arena);
+		DestroyArena(frame_arena);
+	}
+
 	void Midnight::render(float frameTime) {
 
 		// Load new models if any are pending. Side-Effect: Creates descriptor sets for this model
@@ -159,6 +165,10 @@ namespace aveng {
 
 	void Midnight::initialize() {
 		renderer.initialize();
+		/* terrain_arena must outlive the chunkManager */
+		terrain_arena = CreateArena(1024 * 1024 * 1024);
+		frame_arena = CreateArena(1024 * 1024 * 512);
+		chunkManager_.init(terrain_arena);
 
 #ifdef ENABLE_EDITOR
 		if (editor_) {

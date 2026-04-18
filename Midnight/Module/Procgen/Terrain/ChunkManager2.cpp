@@ -1,4 +1,18 @@
 #include "ChunkManager2.h"
+
+#ifdef M_DEBUG
+#include <filesystem>
+#include <string>
+#include <cstdint>
+#include <format>
+#include "Runtime/Debug.h"
+#endif
+#include "CoreVK/VkRenderData.h"
+#include "Module/Procgen/Terrain/Erosion/Data.h"
+#include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
+#include "Module/Procgen/Terrain/Erosion/HydraulicErosion.h"
+#include "Module/Procgen/Terrain/Erosion/RidgeEnhancement.h"
+#include "Module/Procgen/Terrain/Erosion/ThermalErosion.h"
 #include "Module/Procgen/Terrain/TerrainPool.h"
 #include "Module/Procgen/Terrain/ChunkRecord2.h"
 
@@ -75,6 +89,54 @@ namespace procgen {
         }
     };
 
+    ChunkManager2::ChunkManager2(
+        aveng::ThreadPoolTaskSystem& tasks
+#ifdef M_DEBUG
+        , aveng::VkRenderData& renderData
+#endif
+
+    )
+        : tasks_(tasks)
+#ifdef M_DEBUG
+        , renderData_(renderData)
+#endif
+    {
+        cfg_ = defaultTerrainConfig(); // Global Config
+        cfg_.noise = defaultNoiseParams();
+    }
+
+
+    ChunkManager2::~ChunkManager2()
+    {
+        // Invalidate the pointer, Midnight will destroy the arena properly from its dtor.
+        aveng::ArenaReset(terrain_arena);
+        terrain_arena = nullptr;
+    }
+
+    void ChunkManager2::init(aveng::Arena* arena) {
+        // Arena already allocated by Midnight::initialize
+        terrain_arena = arena;
+        aveng::ArenaReset(terrain_arena);
+		ChunkRecord2* chunkRecords = (ChunkRecord2*)aveng::ArenaAlloc(terrain_arena, sizeof(ChunkRecord2) * terrain_pool->capacity);
+    }
+
+    /* Manager Setups */
+    void ChunkManager2::initManagers(ErosionManager* er)
+    {
+        // So far we only have an ErosionManager
+        erosionMgr_ = er;
+        initManagerDefaults();
+    }
+
+    void ChunkManager2::initManagerDefaults()
+    {
+        // nThreads is required for init.
+        if (!erosionMgr_->switchToDefaultSettings(cfg_.nThreads)) {
+			throw std::runtime_error("failed to initialize default erosion settings");
+        }
+    }
+
+
     /* Lifetime saftey features & eviction policy (below) */
 
     ChunkRecord2* ChunkManager2::getOrCreateRecord(ChunkCoord coord)
@@ -90,31 +152,30 @@ namespace procgen {
         // 2 if found, validate handle and return record
         // 3 otherwise allocate a slot, create record, insert into map, return handle
 
-
         return ;
     }
 
     // Pin based on chunk coord - this can end up creating a chunk record
     ChunkRecord2* ChunkManager2::pin(ChunkCoord c, uint64_t frameIndex) {
         ChunkRecord2* rec = getOrCreateRecord(c);
-        rec->pinCount++;
-        rec->lastTouchedFrame = frameIndex;
+        //rec->pinCount++;
+        //rec->lastTouchedFrame = frameIndex;
         return rec;
     }
 
     // Pin via pointer - for when we already have the record
     void ChunkManager2::pin(ChunkRecord2* rec, uint64_t frameIndex) {
-        rec->pinCount++;
-        rec->lastTouchedFrame = frameIndex;
+        //rec->pinCount++;
+        //rec->lastTouchedFrame = frameIndex;
     }
 
     // Pin without perturbing frame count (touch)
     void ChunkManager2::pin(ChunkRecord2* rec) {
-        rec->pinCount++;
+       // rec->pinCount++;
     }
 
     // Unpin from pointer - Note: Don't ever do unpin(ChunkCoord) because passing a coord implies we'd call getOrCreateRecord (at the moment)
     void ChunkManager2::unpin(ChunkRecord2* rec) {
-        rec->pinCount++;
+        // rec->pinCount++;
     }
 }

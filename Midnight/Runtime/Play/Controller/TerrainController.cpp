@@ -2,7 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include "TerrainController.h"
-#include "Module/Procgen/Terrain/ChunkManager.h"
+#include "Module/Procgen/Terrain/ChunkManager2.h"
 #include "CoreVK/EngineDevice.h"
 #include "Utils/Logger.h"
 #include "CoreVK/IndexBuffer.h"
@@ -35,6 +35,7 @@ namespace aveng {
 		std::printf("[%s] Constructing TerrainController\n", __FUNCTION__);
         chunks_->initManagers(&erosionMgr_);
         chunks_->setAdmissionController(&admission_, kSupportRadius);
+        chunks_->setTerrainPool(terrain_pool); // This needs to occur before midnight calls chunkManager_.init()
 
         for (size_t i = 0; i < uploadBatches_.size(); ++i) {
             VkFenceCreateInfo fenceInfo{};
@@ -50,7 +51,6 @@ namespace aveng {
             vkAllocateCommandBuffers(engineDevice_.device(), &allocInfo, &uploadBatches_[i].cmdBuffer);
         }
 
-        slots_.reserve(kMinSlotReserve);
 	}
 
     TerrainController::~TerrainController() {
@@ -116,7 +116,45 @@ namespace aveng {
         ensureChunkRequested(start_coord);
     }
 
+    /*
+* @Step 1 `ensureChunkRequested`: Allocates a slot from the registry and submits
+* an async renderable build. The admission controller ensures this chunk's 5x5
+* support footprint doesn't overlap any chunk currently being built.
+*/
+    void TerrainController::ensureChunkRequested(ChunkCoord coord)
+    {
+        if (!admission_.tryAcquire(coord, kSupportRadius)) {
+            // Requested, but the admission controller deems we're not ready for another request.
+            // This happens due to two requests including overlapping regions.
+            // Deferred requests are still considered "active" regions within the admission controller.
+            deferredRequests_.push_back(coord);
+            return;
+        }
+
+        uint32_t idx = allocateSlot(coord);
+        auto& slot = slots_[idx];
+
+        //std::printf("[TerrainController] Creating renderable at slot[%d] addr=%p "
+        //            "(slots size=%zu cap=%zu)\n",
+        //            idx, (void*)&slot.renderable, slots_.size(), slots_.capacity());
+
+        /**
+         * @Step 2 - Async Generation
+         * A raw pointer to the slot's inline renderable is passed to the ChunkManager.
+         * The worker thread writes directly into this renderable. Completion is signaled
+         * via a lightweight CompletionNotice containing the slot index.
+         */
+         //#ifdef M_DEBUG
+         //        assert(slot.coord == coord && "slot coord mismatch\n");
+         //#endif
+        slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_, &slot.renderable, idx);
+        slot.state = procgen::TerrainRuntimeState::Requested;
+    }
+
     uint32_t TerrainController::allocateSlot(ChunkCoord coord) {
+
+        procgen::ChunkHandle handle;
+
         uint32_t idx;
         if (!freeSlots_.empty()) {
             // Free slots are LIFO
@@ -164,7 +202,7 @@ namespace aveng {
         slot.coord = {};
         slot.requestId = 0;
         slot.gpu = {};
-        slot.gpuHandle = {};
+
         freeSlots_.push_back(idx);
     }
 
@@ -250,28 +288,28 @@ namespace aveng {
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-        for (const auto& slot : slots_) {
-            if (slot.state != procgen::TerrainRuntimeState::Resident) {
+        for (int i = 0; i < procgen::MAX_CHUNK_RECORDS; i++) {
+            if (slots_[i].state != procgen::TerrainRuntimeState::Resident) {
                 continue;
             }
 
-            if (!slot.gpu.valid || slot.gpu.draw.indexCount == 0) {
+            if (!slots_[i].gpu.valid || slots_[i].gpu.draw.indexCount == 0) {
                 continue;
             }
 
             // Rudimentary culling - This refers to chunk-space coordinates
-            int dx = slot.coord.x - currentCenter_.x;
-            int dz = slot.coord.z - currentCenter_.z;
+            int dx = slots_[i].record.coord.x - currentCenter_.x;
+            int dz = slots_[i].record.coord.z - currentCenter_.z;
             if (dx > kDrawRadius || dx < -kDrawRadius ||
                 dz > kDrawRadius || dz < -kDrawRadius) {
                 continue;
             }
 
-            if (slot.gpu.packed.graphicsDescriptorSet == VK_NULL_HANDLE) {
+            if (slots_[i].gpu.packed.graphicsDescriptorSet == VK_NULL_HANDLE) {
                 continue;
             }
 
-            VkDescriptorSet chunkSets[] = { slot.gpu.packed.graphicsDescriptorSet };
+            VkDescriptorSet chunkSets[] = { slots_[i].gpu.packed.graphicsDescriptorSet };
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                 renderData_.rdTerrainLitPipelineLayout, 1, 1, chunkSets, 0, nullptr);
 
@@ -287,13 +325,13 @@ namespace aveng {
                 &dpc
             );
 
-            VkBuffer vb = slot.gpu.draw.vertexBuffer.buffer;
+            VkBuffer vb = slots_[i].gpu.draw.vertexBuffer.buffer;
             VkDeviceSize offsets[] = { 0 };
 
             vkCmdBindVertexBuffers(cmd, 0, 1, &vb, offsets);
-            vkCmdBindIndexBuffer(cmd, slot.gpu.draw.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindIndexBuffer(cmd, slots_[i].gpu.draw.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdDrawIndexed(cmd, slot.gpu.draw.indexCount, 1, 0, 0, 0);
+            vkCmdDrawIndexed(cmd, slots_[i].gpu.draw.indexCount, 1, 0, 0, 0);
         }
     }
     
@@ -306,18 +344,18 @@ namespace aveng {
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData_.rdAvengBasicTerrainPipelineLayout, 
                                 0, 1, renderSets, 0, nullptr);
 
-        for (const auto& slot : slots_) {
-            if (slot.state != procgen::TerrainRuntimeState::Resident) {
+        for (int i = 0; i < procgen::MAX_CHUNK_RECORDS; i++) {
+            if (slots_[i].state != procgen::TerrainRuntimeState::Resident) {
                 continue;
             }
 
-            if (!slot.gpu.valid || slot.gpu.draw.indexCount == 0) {
+            if (!slots_[i].gpu.valid || slots_[i].gpu.draw.indexCount == 0) {
                 continue;
             }
 
             // Rudimentary culling - This refers to chunk-space coordinates
-            int dx = slot.coord.x - currentCenter_.x;
-            int dz = slot.coord.z - currentCenter_.z;
+            int dx = slots_[i].record.coord.x - currentCenter_.x;
+            int dz = slots_[i].record.coord.z - currentCenter_.z;
             if (dx > kDrawRadius || dx < -kDrawRadius ||
                 dz > kDrawRadius || dz < -kDrawRadius) {
                 continue;
@@ -336,13 +374,13 @@ namespace aveng {
                 &dpc
             );
 
-            VkBuffer vb = slot.gpu.draw.vertexBuffer.buffer;
+            VkBuffer vb = slots_[i].gpu.draw.vertexBuffer.buffer;
             VkDeviceSize offsets[] = { 0 };
 
             vkCmdBindVertexBuffers(cmd, 0, 1, &vb, offsets);
-            vkCmdBindIndexBuffer(cmd, slot.gpu.draw.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindIndexBuffer(cmd, slots_[i].gpu.draw.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdDrawIndexed(cmd, slot.gpu.draw.indexCount, 1, 0, 0, 0);
+            vkCmdDrawIndexed(cmd, slots_[i].gpu.draw.indexCount, 1, 0, 0, 0);
         }
     }
 
@@ -352,7 +390,7 @@ namespace aveng {
         buildAndSubmitUploadBatch();
     }
 
-    int TerrainController::countActiveUploads() const
+    /*int TerrainController::countActiveUploads() const
     {
         int count = 0;
         for (const auto& batch : uploadBatches_) {
@@ -377,7 +415,7 @@ namespace aveng {
             if (slot.state == procgen::TerrainRuntimeState::Resident) ++count;
         }
         return count;
-    }
+    }*/
 
     /**
     * @Step 5:
@@ -440,6 +478,7 @@ namespace aveng {
     void TerrainController::buildAndSubmitUploadBatch()
     {
         // Buffering
+        // TODO - get rid of this modulo!!!
         const int batchIdx = static_cast<int>(frameIndex_ % renderData_.MAX_FRAMES_IN_FLIGHT);
         auto& batch = uploadBatches_[batchIdx];
 
@@ -459,7 +498,7 @@ namespace aveng {
 
         int chunksThisBatch = 0;
 
-        for (uint32_t i = 0; i < static_cast<uint32_t>(slots_.size()); ++i) {
+        for (uint32_t i = 0; i < terrain_pool.nActive; ++i) {
             if (chunksThisBatch >= kMaxChunksPerUploadBatch) { break; }
             auto& slot = slots_[i];
             if (slot.state != procgen::TerrainRuntimeState::CpuReady) { continue; }
@@ -508,41 +547,6 @@ namespace aveng {
         );
     }
 
-    /*
-    * @Step 1 `ensureChunkRequested`: Allocates a slot from the registry and submits
-    * an async renderable build. The admission controller ensures this chunk's 5x5 
-    * support footprint doesn't overlap any chunk currently being built.
-    */
-    void TerrainController::ensureChunkRequested(ChunkCoord coord)
-    {
-        if (!admission_.tryAcquire(coord, kSupportRadius)) {
-            // Requested, but the admission controller deems we're not ready for another request.
-            // This happens due to two requests including overlapping regions.
-            // Deferred requests are still considered "active" regions within the admission controller.
-            deferredRequests_.push_back(coord);
-            return;
-        }
-
-        uint32_t idx = allocateSlot(coord);
-        auto& slot = slots_[idx];
-
-        //std::printf("[TerrainController] Creating renderable at slot[%d] addr=%p "
-        //            "(slots size=%zu cap=%zu)\n",
-        //            idx, (void*)&slot.renderable, slots_.size(), slots_.capacity());
-
-        /** 
-         * @Step 2 - Async Generation
-         * A raw pointer to the slot's inline renderable is passed to the ChunkManager.
-         * The worker thread writes directly into this renderable. Completion is signaled
-         * via a lightweight CompletionNotice containing the slot index.
-         */
-//#ifdef M_DEBUG
-//        assert(slot.coord == coord && "slot coord mismatch\n");
-//#endif
-        slot.requestId = chunks_->requestRenderableAsync(coord, frameIndex_, &slot.renderable, idx);
-        slot.state = procgen::TerrainRuntimeState::Requested;
-    }
-
     /* called every frame */
     void TerrainController::drainCompletedTerrain()
     {
@@ -557,9 +561,6 @@ namespace aveng {
          */
         chunks_->drainCompletedRenderables([this](const procgen::CompletionNotice& notice) {
             auto& slot = slots_[notice.slotIndex];
-            if (slot.requestId != notice.requestId) {
-                throw std::runtime_error("slot index does not match completion notice");
-            }
 
             // This slot is now targeted for rendering, or it failed
             slot.state = notice.success
@@ -703,26 +704,26 @@ namespace aveng {
         }
 
         // 3. Recycle all slot resources into pool (free descriptor sets immediately)
-        for (auto& slot : slots_) {
-            if (slot.state == procgen::TerrainRuntimeState::Unrequested) continue;
+        for (int i = 0; i < procgen::MAX_CHUNK_RECORDS; i++) {
+            if (slots_[i].state == procgen::TerrainRuntimeState::Unrequested) continue;
 
-            pool_.vbo.push_back(std::move(slot.gpu.draw.vertexBuffer));
-            pool_.ibo.push_back(std::move(slot.gpu.draw.indexBuffer));
+            pool_.vbo.push_back(std::move(slots_[i].gpu.draw.vertexBuffer));
+            pool_.ibo.push_back(std::move(slots_[i].gpu.draw.indexBuffer));
 
-            if (slot.gpu.packed.inputSsbo.buffer != VK_NULL_HANDLE) {
-                pool_.inputSsbo.push_back(std::move(slot.gpu.packed.inputSsbo));
+            if (slots_[i].gpu.packed.inputSsbo.buffer != VK_NULL_HANDLE) {
+                pool_.inputSsbo.push_back(std::move(slots_[i].gpu.packed.inputSsbo));
             }
 
-            if (slot.gpu.packed.outputSsbo.buffer != VK_NULL_HANDLE) {
-                pool_.outputSsbo.push_back(std::move(slot.gpu.packed.outputSsbo));
+            if (slots_[i].gpu.packed.outputSsbo.buffer != VK_NULL_HANDLE) {
+                pool_.outputSsbo.push_back(std::move(slots_[i].gpu.packed.outputSsbo));
             }
 
-            if (slot.gpu.packed.graphicsDescriptorSet != VK_NULL_HANDLE) {
-                vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool, 1, &slot.gpu.packed.graphicsDescriptorSet);
+            if (slots_[i].gpu.packed.graphicsDescriptorSet != VK_NULL_HANDLE) {
+                vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainLitDescriptorPool, 1, &slots_[i].gpu.packed.graphicsDescriptorSet);
             }
             
-            if (slot.gpu.packed.computeDescriptorSet != VK_NULL_HANDLE) {
-                vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &slot.gpu.packed.computeDescriptorSet);
+            if (slots_[i].gpu.packed.computeDescriptorSet != VK_NULL_HANDLE) {
+                vkFreeDescriptorSets(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, 1, &slots_[i].gpu.packed.computeDescriptorSet);
             }
         }
 
@@ -760,7 +761,7 @@ namespace aveng {
         vkDestroyDescriptorPool(engineDevice_.device(), renderData_.avengTerrainComputeDescriptorPool, nullptr);
     }
 
-    void TerrainController::cleanupOne(procgen::TerrainChunkSlot& slot) {
+    void TerrainController::cleanupOne(procgen::ChunkSlot& slot) {
 
         VertexBuffer::cleanup(engineDevice_, slot.gpu.draw.vertexBuffer);
         IndexBuffer::cleanup(engineDevice_, slot.gpu.draw.indexBuffer);

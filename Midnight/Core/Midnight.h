@@ -12,8 +12,9 @@
 #include "Runtime/Play/Controller/TerrainController.h"
 #include "Runtime/Play/Controller/DebugController.h"
 #include "Runtime/Play/GameContext.h"
-#include "Module/Procgen/Terrain/ChunkManager.h"
-
+#include "Module/Procgen/Terrain/ChunkManager2.h"
+#include "Runtime/Memory/Arena.h"
+	
 #include "Game/data.h"
 #ifdef ENABLE_EDITOR
 #include "Editor/Editor.h"
@@ -28,7 +29,7 @@ namespace aveng {
 
 	public:
 		Midnight(GameData& _gamedata);
-		~Midnight() = default;
+		~Midnight();
 
 		const GameServices& gameServices() const noexcept { return gameServices_; };
 
@@ -80,13 +81,16 @@ namespace aveng {
 		GameData& game_data;
 		VkRenderData renderData{};
 
+		Arena* terrain_arena;
+		Arena* frame_arena;
+
 		// State
 		AvengWindow  aveng_window{ WIDTH, HEIGHT, "MIDNIGHT ENGINE" };
 		EngineDevice engineDevice{ aveng_window };
 		CameraManager cameraManager;
 		ModelLibrary modelLib_;
 		SceneFacade sceneFacade_;
-		ChunkManager chunkManager_;
+		procgen::ChunkManager2 chunkManager_;
 		TerrainController terrain_;
 		Renderer renderer;
 

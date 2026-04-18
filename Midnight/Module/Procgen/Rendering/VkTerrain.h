@@ -375,6 +375,7 @@ namespace aveng {
                 pool.inputSsbo.pop_back();
             }
 
+            // TODO - Could this be persistent instead? 
             // Logger::log(1, "Initializing New SSBO..........\n");
             if (!ShaderStorageBuffer::init(engineDevice, gpu.packed.inputSsbo, MapMode::OnDemand, ResidentMode::CPU, inputTotalSize)) {
                 Logger::log(1, "%s error: could not create terrain input SSBO\n", __FUNCTION__);
@@ -384,6 +385,8 @@ namespace aveng {
 
         // _dbg_t1 = std::chrono::steady_clock::now(); // agent log
 
+
+        // TODO: You have an abstraction for this
         {
             void* mapped = nullptr;
             VkResult mapResult = vmaMapMemory(engineDevice.allocator(), gpu.packed.inputSsbo.bufferAlloc, &mapped);
