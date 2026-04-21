@@ -1,4 +1,6 @@
 #include "Arena.h"
+#include <cstddef>
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -41,7 +43,7 @@ namespace aveng {
         }
 #endif
 
-        arena->base_ptr = (char*)block;
+        arena->base_ptr = (std::byte*)block;
         arena->reserved_size = size;
         arena->committed_size = 0;
         arena->current_offset = 0;

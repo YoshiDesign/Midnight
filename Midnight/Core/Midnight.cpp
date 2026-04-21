@@ -164,10 +164,15 @@ namespace aveng {
 	}
 
 	void Midnight::initialize() {
+
 		renderer.initialize();
+
 		/* terrain_arena must outlive the chunkManager */
 		terrain_arena = CreateArena(1024 * 1024 * 1024);
 		frame_arena = CreateArena(1024 * 1024 * 512);
+
+		// Terrain System Setup
+		terrain_.init();
 		chunkManager_.init(terrain_arena);
 
 #ifdef ENABLE_EDITOR

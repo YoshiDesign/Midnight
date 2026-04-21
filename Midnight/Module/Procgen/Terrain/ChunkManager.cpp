@@ -1755,7 +1755,7 @@ namespace aveng {
         std::memset(
             renderable->packedAdjacency.data(),
             0,
-            totalVerts * sizeof(VertexAdjacency)
+            totalVerts * sizeof(procgen::VertexAdjacency)
         );
 
         for (uint32_t triIdx = 0; triIdx < totalTris; ++triIdx) {

@@ -5,13 +5,14 @@
 #include <cstdint>
 #include <unordered_set>
 #include "Runtime/Threading/ITaskSystem.h"
+#include "Module/Procgen/Terrain/Control.h"
 #include "Module/Procgen/Noise/Config.h"
-#include "Runtime/Threading/Types.h"
 #include "Module/Procgen/Types2.h"
+#include "Runtime/Memory/Arena.h"
+#include "Runtime/Threading/Scratch.h"
+#include "Runtime/Threading/Types.h"
 // #include "Module/Procgen/Rendering/BasicTerrainAsset.h" // We might only need to reuse the draw/gpu structs from here
 #include "Module/Procgen/Terrain/GpuResources.h"
-#include "Module/Procgen/Terrain/Control.h"
-#include "Runtime/Memory/Arena.h"
 #include "Module/Procgen/Noise/Config.h"
 
 namespace aveng {
@@ -63,6 +64,27 @@ namespace procgen {
                 defaultNoiseParams()
             };
         }
+       
+        /* Config/Settings */
+        void setGlobalConfig(TerrainConfig& tcfg) {
+            cfg_.worldSeed = tcfg.worldSeed;
+            cfg_.chunkSize = tcfg.chunkSize;
+            cfg_.halo = tcfg.halo;
+            cfg_.minPointDist = tcfg.minPointDist;
+        }
+
+        void setNoiseParams(aveng::noise::NoiseParams noise) {
+            std::printf("Amplitude: %f\tFrequency: %f\n", noise.amplitude, noise.frequency);
+            std::printf("Updated Noise\n");
+            cfg_.noise = noise;
+        }
+
+        void setErosionParameters(ErosionSettings eroCfg);
+
+        /* Getter */
+        float chunkSize() {
+            return cfg_.chunkSize;
+        }
 
         void init(aveng::Arena* arena);
 
@@ -91,6 +113,22 @@ namespace procgen {
 
         ChunkRecord2* getOrCreateRecord(ChunkCoord coord);
 
+        uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex, procgen::TerrainRenderable* target, uint32_t slotIndex);
+
+        void runGenerate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId);
+
+        void runAllPointsStage(ChunkRecord2& rec, uint64_t frameIndex);
+
+        Points const* buildPoints(ChunkRecord2& rec);
+
+        AllPoints const* buildAllPoints(ChunkRecord2& rec);
+
+        bool isSpatialGridReady(const ChunkCoord coord) const;
+
+        bool isRegionSpatialGridReady(ChunkCoord center) const;
+
+        bool isRegionAllStagesComplete(ChunkCoord center) const;
+
         /* Lifetime safety */
         ChunkRecord2* pin(ChunkCoord c, uint64_t frameIndex);
         void pin(ChunkRecord2* rec, uint64_t frameIndex);
@@ -104,18 +142,22 @@ namespace procgen {
         aveng::Arena* terrain_arena{};
         TerrainPool* terrain_pool = nullptr;
 
+		// I don't think I should ever use these pointers, they're just here... use slots to access each base directly
+        std::byte* scratch_space;
+        std::byte* final_space;
+
         aveng::ThreadPoolTaskSystem& tasks_;
 
         TerrainAdmissionController* admissionCtl_ = nullptr;
         int admissionRadius_ = 0;
-
+        
         ErosionManager* erosionMgr_ = nullptr;
 
         TerrainConfig cfg_; // Note that this differs from our prototype, where each Chunk owned its own config
                             // Settings can be modulated during runtime to produce different results over time.
                             // There are per-stage settings too, naturally
 #ifdef M_DEBUG
-        VkRenderData& renderData_;
+        aveng::VkRenderData& renderData_;
 #endif
     };
 

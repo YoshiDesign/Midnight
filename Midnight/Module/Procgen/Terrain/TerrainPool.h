@@ -11,32 +11,24 @@ namespace procgen {
 	* ChunkRecord* rec = &pool->slots_[i].record; // Try not to do this - always prefer a handle
 	*/
 	
-	struct ChunkSlot
-	{
-		ChunkRecord2 record{};
-		uint32_t generation{0};
-		bool active{false};
+	//struct ChunkSlot
+	//{
+	//	ChunkRecord2 record{};
+	//	uint32_t generation{0};
+	//	bool active{false};
 
-		TerrainRuntimeState state{ TerrainRuntimeState::Unrequested };
+	//	TerrainRuntimeState state{ TerrainRuntimeState::Unrequested };
 
-		TerrainRenderable renderable;
-		TerrainGpuChunk gpu;
-	};
-	
-	struct ChunkHandle {
-		uint32_t index;
-		bool active;
-		uint32_t generation;
-	};
-	
-	struct TerrainPool {
-
-		uint32_t nActive{0};
-		ChunkSlot* slots_;
-		ChunkHandle* handles_;
-		size_t capacity{ MAX_CHUNK_RECORDS };
-		
-	};
+	//	TerrainRenderable renderable;
+	//	TerrainGpuChunk gpu;
+	//};
+	//
+	//struct ChunkHandle {
+	//	uint32_t index;
+	//	bool active;
+	//	uint32_t generation;
+	//};
+	//
 
 	inline void InitTerrainPool(TerrainPool* pool) {
 		

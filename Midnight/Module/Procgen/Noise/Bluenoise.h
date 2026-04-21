@@ -7,6 +7,7 @@
 #include "Module/Procgen/Types.h"
 #include "Module/Procgen/Rng.h"
 #include "Module/Procgen/Noise/Config.h"
+#include "Module/Procgen/TerrainArena.h"
 
 /**
  * Performance Improvements:
@@ -29,25 +30,25 @@ namespace aveng {
 	//int32_t UniformInt(Rng& rng, int32_t minVal, int32_t maxVal);
 	
 	// Core APIs (Go parity)
-	std::pmr::vector<Vec2> GenerateBlueNoise(
+	procgen::PointsRange GenerateBlueNoise(
 		Rng& rng,
 		float minX, float minZ,
 		float maxX, float maxZ,
 		noise::BlueNoiseConfig cfg,
-		std::pmr::memory_resource* mr
+		procgen::ScratchArena& mr
 #ifdef M_DEBUG
 		, ChunkCoord coord
 #endif
 	);
 	
-	std::pmr::vector<Vec2> GenerateBlueNoiseSeeded(
+	procgen::PointsRange GenerateBlueNoiseSeeded(
 		uint64_t seed,
 		float minX, float minZ,
 		float maxX, float maxZ,
 		noise::BlueNoiseConfig cfg,
-		std::pmr::memory_resource* mr
+		procgen::ScratchArena& mr
 #ifdef M_DEBUG
-		, ChunkCoord coord
+		, procgen::ChunkCoord coord
 #endif
 	);
 	

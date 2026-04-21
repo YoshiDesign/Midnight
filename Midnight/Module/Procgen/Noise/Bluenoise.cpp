@@ -9,7 +9,7 @@ namespace aveng {
 
 #ifdef M_DEBUG
 
-    void dumpChunkData(ChunkCoord coord, std::pmr::vector<Vec2> data)
+    void dumpChunkData(procgen::ChunkCoord coord, Vec2* data, uint32_t data_size)
     {
         namespace fs = std::filesystem;
 
@@ -20,7 +20,7 @@ namespace aveng {
         fs::path fullPath = exeDir /
             std::format("chunk_{}.txt", name);
 
-        Debug::writeBlueNoiseDataToFile(fullPath, data);
+        Debug::writeBlueNoiseDataToFile(fullPath, data, data_size);
     }
 #endif
 
@@ -31,14 +31,14 @@ namespace aveng {
     // TODO: If indices are never conceptually negative in the grid which this
     // algorithm produces, then we don't need all of these static casts, perhaps.
     // ---------------------------
-    std::pmr::vector<Vec2> GenerateBlueNoise(
+    procgen::PointsRange GenerateBlueNoise(
         Rng& rng,
         float minX, float minZ,
         float maxX, float maxZ,
         noise::BlueNoiseConfig cfg,
-        std::pmr::memory_resource* mr
+        procgen::ScratchArena& mr
 #ifdef M_DEBUG
-        , ChunkCoord coord
+        , procgen::ChunkCoord coord
 #endif
     ) {
         if (cfg.MinDist <= 0.0) {
@@ -72,14 +72,17 @@ namespace aveng {
         // }
 
         // Grid stores index into points, or -1 if empty
-        std::pmr::vector<int> grid(mr);
-        grid.assign(_w * _h, -1);
+        int* grid = procgen::ScratchAlloc<int>(mr, static_cast<uint32_t>(_w * _h));
+		int grid_size = _w * _h;
+        int grid_idx = 0;
 
-        std::pmr::vector<Vec2> points(mr);
-        points.reserve(_w * _h / 4);
+        Vec2* points = procgen::ScratchAlloc<Vec2>(mr, static_cast<uint32_t>(_w * _h / 4));
+		int points_size = _w * _h / 4;
+        int points_idx = 0;
 
-        std::pmr::vector<int> active(mr);
-        active.reserve(128);
+		int* active = procgen::ScratchAlloc<int>(mr, static_cast<uint32_t>(128));
+        int active_size = 128;
+        int active_idx = 0;
 
         // This could just live inside of `toGrid` - Compiler will hopefully inline it until then
         auto clampi = [](int v, int lo, int hi) -> int {
@@ -126,9 +129,21 @@ namespace aveng {
         };
 
         auto insert = [&](const Vec2& p) {
-            const int idx = static_cast<int>(points.size());
-            points.push_back(p);
-            active.push_back(idx);
+
+#ifdef M_DEBUG
+            assert(points_idx < points_size && "Bluenoise points[] overflowed");
+            assert(active_idx < active_size && "Bluenoise active[] overflowed");
+
+            if (points_idx >= points_size) {
+                return; // or assert(false), or handle failure
+            }
+            if (active_idx >= active_size) {
+                return;
+            }
+#endif
+            const int idx = points_idx;
+            points[points_idx++] = p;
+            active[active_idx++] = idx;
 
             const auto [gx, gz] = toGrid(p);
             grid[static_cast<size_t>(gz) * _w + static_cast<size_t>(gx)] = idx;
@@ -141,9 +156,10 @@ namespace aveng {
 
         constexpr float TAU = 6.2831855f;
 
-        while (!active.empty()) {
+        //while (!active.empty()) {
+        while (active_idx >= 0) {
             // Pick random active point index: ai in [0, len(active)-1]
-            const int ai = UniformInt(rng, 0, static_cast<int>(active.size()) - 1);
+            const int ai = UniformInt(rng, 0, static_cast<int>(active_idx) - 1);
             const int pi = active[static_cast<size_t>(ai)];
             const Vec2 p = points[static_cast<size_t>(pi)];
 
@@ -166,26 +182,26 @@ namespace aveng {
 
             if (!found) {
                 // swap-remove active[ai]
-                active[static_cast<size_t>(ai)] = active.back();
-                active.pop_back();
+                active[static_cast<size_t>(ai)] = active[active_idx - 1];
+                active_idx--;
             }
         }
 
 #ifdef M_DEBUG
-        // std::cout << "writing chunk data..." << std::endl;
-        // dumpChunkData(coord, points);
+        std::cout << "writing chunk data..." << std::endl;
+        dumpChunkData(coord, points, points_idx);
 #endif
-        return points;
+        return { points, static_cast<uint32_t>(points_idx) };
     }
 
-    std::pmr::vector<Vec2> GenerateBlueNoiseSeeded(
+    procgen::PointsRange GenerateBlueNoiseSeeded(
         uint64_t seed,
         float minX, float minZ,
         float maxX, float maxZ,
         noise::BlueNoiseConfig cfg,
-        std::pmr::memory_resource* mr
+        procgen::ScratchArena& mr
 #ifdef M_DEBUG
-        , ChunkCoord coord
+        , procgen::ChunkCoord coord
 #endif
     ) {
         Rng rng{};

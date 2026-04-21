@@ -9,8 +9,6 @@
 
 namespace procgen {
 
-	const uint32_t MAX_CHUNK_RECORDS = 36;
-
 	using EdgeIndex = uint32_t;
 	using TriIndex = uint32_t;
 	using SiteIndex = uint32_t;

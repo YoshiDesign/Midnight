@@ -43,7 +43,8 @@ namespace aveng {
 	public:
 		
         static void writeBlueNoiseDataToFile(const fs::path& path,
-            const std::pmr::vector<Vec2>& data)
+            const Vec2* data,
+            uint32_t data_size)
         {
             // Ensure parent directory exists
             if (!path.parent_path().empty())
@@ -60,12 +61,12 @@ namespace aveng {
             }
 
             file << "--- Blue Noise Points ---\n";
-            file << "Count: " << data.size() << "\n\n";
+            file << "Count: " << data_size << "\n\n";
 
             // Column header
             file << "Index,X,Z\n";
 
-            for (size_t i = 0; i < data.size(); ++i)
+            for (size_t i = 0; i < data_size; ++i)
             {
                 file << i << ","
                     << data[i].x << ","

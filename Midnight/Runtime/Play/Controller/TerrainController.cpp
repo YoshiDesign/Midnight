@@ -29,13 +29,22 @@
 
 namespace aveng {
 	
-	TerrainController::TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, ChunkManager& chunks) noexcept 
+	TerrainController::TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, procgen::ChunkManager2& chunks) noexcept 
         : chunks_(&chunks), engineDevice_(engineDevice), renderData_{renderData}
 	{
 		std::printf("[%s] Constructing TerrainController\n", __FUNCTION__);
+	}
+
+    TerrainController::~TerrainController() {
+        cleanup();
+    }
+
+    void TerrainController::init() {
+
+        std::printf("[%s] Initializing TerrainController\n", __FUNCTION__);
         chunks_->initManagers(&erosionMgr_);
         chunks_->setAdmissionController(&admission_, kSupportRadius);
-        chunks_->setTerrainPool(terrain_pool); // This needs to occur before midnight calls chunkManager_.init()
+        chunks_->setTerrainPool(&terrain_pool); // This needs to occur before midnight calls chunkManager_.init()
 
         for (size_t i = 0; i < uploadBatches_.size(); ++i) {
             VkFenceCreateInfo fenceInfo{};
@@ -50,11 +59,7 @@ namespace aveng {
             allocInfo.commandBufferCount = 1;
             vkAllocateCommandBuffers(engineDevice_.device(), &allocInfo, &uploadBatches_[i].cmdBuffer);
         }
-
-	}
-
-    TerrainController::~TerrainController() {
-        cleanup();
+    
     }
 
     void TerrainController::tick()
@@ -79,7 +84,7 @@ namespace aveng {
         //}
     }
 
-    void TerrainController::setTerrainConfig(TerrainConfig tcfg)
+    void TerrainController::setTerrainConfig(procgen::TerrainConfig tcfg)
     {
         chunks_->setGlobalConfig(tcfg);
     }
@@ -89,7 +94,7 @@ namespace aveng {
         chunks_->setNoiseParams(noise);
     }
 
-    void TerrainController::setTerrainWeatheringParams(ErosionSettings erosion)
+    void TerrainController::setTerrainWeatheringParams(procgen::ErosionSettings erosion)
     {
         chunks_->setErosionParameters(erosion);
     }
@@ -585,17 +590,17 @@ namespace aveng {
     }
 
     // Check 1 chunk - Not very useful here, honestly
-    bool TerrainController::hasSpatialGridReady(const ChunkCoord coord) noexcept {
+    bool TerrainController::hasSpatialGridReady(const procgen::ChunkCoord coord) noexcept {
         return chunks_->isSpatialGridReady(coord);
     }
 
     // Check that an entire 5x5 region has completed up to the spatial grid
-    bool TerrainController::hasRegionReady(ChunkCoord center) noexcept {
+    bool TerrainController::hasRegionReady(procgen::ChunkCoord center) noexcept {
         return chunks_->isRegionSpatialGridReady(center);
     }
 
     // Check that an entire 5x5 region has completed up to the spatial grid and its inner 3x3 has fully completed
-    bool TerrainController::hasRegionComplete(ChunkCoord center) noexcept {
+    bool TerrainController::hasRegionComplete(procgen::ChunkCoord center) noexcept {
         return chunks_->isRegionSpatialGridReady(center)
             && chunks_->isRegionAllStagesComplete(center);
     }

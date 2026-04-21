@@ -32,6 +32,10 @@
  *  So the lifecycle looks like:
  */
 
+namespace procgen {
+    class ChunkManager2;
+}
+
 namespace aveng {
 
     /*
@@ -70,7 +74,7 @@ namespace aveng {
     // Forward declarations to keep compile-times sane.
     struct FinalMeshCPU;
     struct VkRenderData;
-    class ChunkManager2;
+    
     class EngineDevice;
 
     enum class TerrainStreamMode {
@@ -133,19 +137,21 @@ namespace aveng {
     class TerrainController {
 
     public:
-        explicit TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, ChunkManager& chunks) noexcept;
+        explicit TerrainController(EngineDevice& engineDevice, VkRenderData& renderData, procgen::ChunkManager2& chunks) noexcept;
 
         ~TerrainController();
+
+        void init();
 
         // Called once per tick by the engine (Midnight) so gameplay doesn't need to thread frame indices everywhere.
         void setFrameIndex(uint64_t frameIndex) noexcept;
 
         // Forward requested params to the ChunkManager
-        void setTerrainConfig(TerrainConfig tcfg);
+        void setTerrainConfig(procgen::TerrainConfig tcfg);
         // Forward requested params to the ChunkManager
         void setTerrainNoiseParams(noise::NoiseParams noise);
         // Forward requested params to the ChunkManager
-        void setTerrainWeatheringParams(ErosionSettings erosion);
+        void setTerrainWeatheringParams(procgen::ErosionSettings erosion);
 
         // VK Data - Compute Shader Terrain Rendering Settings
         void setTerrainSettingsUbo(VkBuffer buffer, VkDeviceSize size) noexcept {
@@ -194,9 +200,9 @@ namespace aveng {
 
         void drainCompletedTerrain();
 
-        bool hasSpatialGridReady(const ChunkCoord coord) noexcept ;
-        bool hasRegionReady(ChunkCoord center) noexcept;
-        bool hasRegionComplete(ChunkCoord center) noexcept;
+        bool hasSpatialGridReady(const procgen::ChunkCoord coord) noexcept ;
+        bool hasRegionReady(procgen::ChunkCoord center) noexcept;
+        bool hasRegionComplete(procgen::ChunkCoord center) noexcept;
 
         // Diagnostics for frame pacing
         //int countActiveUploads() const;
@@ -208,7 +214,7 @@ namespace aveng {
 
     private:
 
-        uint32_t allocateSlot(ChunkCoord coord);
+        uint32_t allocateSlot(procgen::ChunkCoord coord);
         void releaseSlot(uint32_t idx);
 
         /* Contiguous slot storage with index-based access.
@@ -216,8 +222,8 @@ namespace aveng {
          * freeSlots_ recycles indices so the vector never grows during gameplay.
          * Exactly how our model instances work.
          */
-        procgen::ChunkSlot* slots_; // Stored in the arena
-        std::unordered_map<ChunkCoord, procgen::ChunkHandle, ChunkCoordHash> coordToSlot_;
+
+        std::unordered_map<procgen::ChunkCoord, procgen::ChunkHandle, ChunkCoordHash> coordToSlot_;
         //std::vector<uint32_t> freeSlots_;
 
         // Region admission control: prevents overlapping 5x5 support footprints
@@ -263,7 +269,7 @@ namespace aveng {
 
         static constexpr uint64_t kDeferFrames = 3;
         static constexpr int kMaxChunksPerUploadBatch = 3;
-        static constexpr int kDrawRadius = 4;
+        static constexpr int kDrawRadius = 4;    // Chunk space
         static constexpr int kSupportRadius = 2; // 5x5 neighborhood
         static constexpr uint32_t kMinSlotReserve = 50;
 

@@ -1571,6 +1571,9 @@
     <ClInclude Include="Module\Procgen\Delaunay2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Module\Procgen\TerrainArena.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="vendor\glm\detail\func_common.inl">

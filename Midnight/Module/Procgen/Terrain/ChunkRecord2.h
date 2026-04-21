@@ -1,8 +1,13 @@
 #pragma once
 #include "Core/Math/Vector.h"
 #include "Module/Procgen/Types2.h"
+#include "Module/Procgen/TerrainArena.h"
 
 namespace procgen {
+
+	const uint32_t INVALID_CHUNK_INDEX = 0xfffffffe;
+	const uint64_t INVALID_CHUNK_REQUEST = 0xfffffefe;
+
 
 	enum class RenderableBuildState : uint8_t
 	{
@@ -66,23 +71,37 @@ namespace procgen {
 		uint32_t size_eHeights;
 	};
 
+	// TODO - Store points of boundary regions for more compaction IF NECESSARY
+	struct HaloPoints {
+		std::vector<aveng::Vec3> north;
+		std::vector<aveng::Vec3> south;
+		std::vector<aveng::Vec3> east;
+		std::vector<aveng::Vec3> west;
+	};
+
 	/**
 	 * One of the challenges of our V2 architecture is to keep the chunk record trivial to copy.
 	 * This allows for more efficient memory management and easier serialization. (E.g. Pop n' Swap)
 	 */
 
 	struct ChunkRecord2 {
-		ChunkCoord     coord{};
-		Bounds2   coreBounds{};
-		float       halo = 0.f;
-		uint64_t chunkSeed = 0;
+		bool			active = false; 
+		uint32_t		generation = 0;
+		uint32_t		index = INVALID_CHUNK_INDEX;
+		ChunkCoord		coord{};
+		Bounds2			coreBounds{};
+		float			halo = 32.f;
+		uint64_t		chunkSeed = 42;
 
-		// Pointers into final Arena memory
-		Points* points = nullptr;
-		AllPoints* allPoints = nullptr;
-		HeightField* heightField = nullptr;
-		Triangulation* triangulation = nullptr;
-		ErosionField* erosion = nullptr;
+		ScratchArena*	scratch = nullptr;	// Pointer to the TerrainPool scratch segment for this record
+		ScratchArena*	final = nullptr;	// Pointer to the TerrainPool final segment for this record
+
+		// Pointers into final segment 
+		Points*			points = nullptr;
+		AllPoints*		allPoints = nullptr;
+		HeightField*	heightField = nullptr;
+		Triangulation*	triangulation = nullptr;
+		ErosionField*	erosion = nullptr;
 
 		// Streaming / residency - This will be built into a map on the ChunkManager
 		//int32_t pinCount{ 0 };
