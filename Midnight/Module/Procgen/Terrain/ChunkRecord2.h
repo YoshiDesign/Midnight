@@ -8,6 +8,19 @@ namespace procgen {
 	const uint32_t INVALID_CHUNK_INDEX = 0xfffffffe;
 	const uint64_t INVALID_CHUNK_REQUEST = 0xfffffefe;
 
+	//// Packed bin layout -> [SW][S][SE][W][C][E][NW][N][NE] 
+	enum class BIN_REGION : uint8_t 
+	{
+		SouthWest = 0,
+		South = 1,
+		SouthEast = 2,
+		West = 3,
+		Center = 4,
+		East = 5,
+		NorthWest = 6,
+		North = 7,
+		NorthEast = 8
+	};
 
 	enum class RenderableBuildState : uint8_t
 	{
@@ -27,20 +40,16 @@ namespace procgen {
 		Failed
 	};
 
+	struct PointPartition {
+		uint32_t begin{};
+		uint32_t count{};
+	};
+
 	struct Points {
 		aveng::Vec2* core{};
 		uint32_t size_core{};
 
-		// same backing storage as core, but reordered into contiguous regions
-		uint32_t begin_northWest{}, count_northWest{};
-		uint32_t begin_north{}, count_north{};
-		uint32_t begin_northEast{}, count_northEast{};
-		uint32_t begin_west{}, count_west{};
-		uint32_t begin_center{}, count_center{};
-		uint32_t begin_east{}, count_east{};
-		uint32_t begin_southWest{}, count_southWest{};
-		uint32_t begin_south{}, count_south{};
-		uint32_t begin_southEast{}, count_southEast{};
+		PointPartition bins[BIN_COUNT];
 	};
 
 	struct AllPoints {

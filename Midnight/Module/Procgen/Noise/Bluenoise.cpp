@@ -162,6 +162,7 @@ namespace aveng {
             const int zBand = classifyAxis(p.y, bottomBandMax, topBandMin);
             const int bin = zBand * 3 + xBand; // 0..8
 
+            // Referentially save the point index to a bin
             binPerPoint[idx] = bin;
             ++binCounts[bin];
         };

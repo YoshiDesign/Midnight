@@ -622,14 +622,24 @@ namespace procgen {
 
             // Compute offsets for regional bins
             uint32_t begin[BIN_COUNT]{};
-			// Starting at 1 because begin[0] is always 0
+
+            // Build persistent bin metadata directly
+            rec.points->bins[0] = { 0, candidates.binCounts[0] };
+
+            // Record the rest of the metadata
             for (int binIdx = 1; binIdx < BIN_COUNT; ++binIdx) {
-                // begin[binIdx] = starting index of the region represented by bin
-                begin[binIdx] = begin[binIdx - 1] + candidates.binCounts[binIdx - 1];
+                rec.points->bins[binIdx].begin =
+                    rec.points->bins[binIdx - 1].begin +
+                    rec.points->bins[binIdx - 1].count;
+
+                rec.points->bins[binIdx].count = candidates.binCounts[binIdx];
             }
 
+            // Working write cursors - This holds the write offset we'll use to pack regions contiguously
             uint32_t cursor[BIN_COUNT];
-            std::memcpy(cursor, begin, sizeof(begin));
+            for (int binIdx = 0; binIdx < BIN_COUNT; ++binIdx) {
+                cursor[binIdx] = rec.points->bins[binIdx].begin;
+            }
 
             // Scatter directly into final packed storage using precomputed per-point bins
             for (uint32_t i = 0; i < candidates.points_size; ++i) {
@@ -640,6 +650,7 @@ namespace procgen {
                 assert(bin < BIN_COUNT && "binPerPoint contained invalid bin");
 #endif
                 // Packed bin layout -> [SW][S][SE][W][C][E][NW][N][NE]
+                // Push the point onto its bin
                 rec.points->core[cursor[bin]++] = p;
             }
 
