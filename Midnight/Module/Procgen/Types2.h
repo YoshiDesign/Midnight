@@ -24,6 +24,16 @@ namespace procgen {
 		Border_West = 4,
 	};
 
+	/* Helper Types */
+	const uint8_t BIN_COUNT = 9;
+	struct PointsRange {
+		aveng::Vec2* points{};
+		uint32_t points_size{};
+
+		uint8_t* binPerPoint{};              // parallel with points[]
+		uint32_t binCounts[BIN_COUNT]{};     // total counts per bin
+	};
+
 	struct Triangle {
 		SiteIndex A, B, C;
 	};

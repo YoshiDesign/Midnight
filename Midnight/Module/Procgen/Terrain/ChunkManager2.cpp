@@ -8,19 +8,19 @@
 #include <format>
 #include "Runtime/Debug.h"
 #endif
-#include "Module/Procgen/TerrainArena.h";
+#include "Utils/Logger.h"
 #include "Core/Math/quantize.h"
 #include "CoreVK/VkRenderData.h"
+#include "Module/Procgen/TerrainArena.h";
+#include "Module/Procgen/Noise/Bluenoise.h"
+#include "Module/Procgen/Terrain/TerrainPool.h"
 #include "Module/Procgen/Terrain/Erosion/Data.h"
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
-#include "Module/Procgen/Noise/Bluenoise.h"
 #include "Module/Procgen/Terrain/Erosion/HydraulicErosion.h"
 #include "Module/Procgen/Terrain/Erosion/RidgeEnhancement.h"
 #include "Module/Procgen/Terrain/Erosion/ThermalErosion.h"
-#include "Module/Procgen/Terrain/TerrainPool.h"
-#include "Module/Procgen/TerrainArena.h"
+
 #include "Module/Procgen/Terrain/ChunkRecord2.h"
-#include "Utils/Logger.h"
 
 namespace {
 
@@ -360,7 +360,8 @@ namespace procgen {
         * - distributing them across workers
         * - load balancing (including how steals happen)
         * - sleeping/waking workers
-        * - global injector (?)
+        * - global injector (external submissions we can store tasks on in addition to each thread-local deque (Chase-Lev))
+        *   workers can check the global queue, or alternatively we could round-robin these types of tasks into worker deques.
         * - stealing when local work dries up
         */
         // This separation is important
@@ -597,16 +598,16 @@ namespace procgen {
             bnCfg.MinDist = cfg_.minPointDist;
             bnCfg.MaxTries = 30;
 
-            PointsRange  candidates = aveng::GenerateBlueNoiseSeeded(
+            PointsRange candidates = aveng::GenerateBlueNoiseSeeded(
                 rec.chunkSeed,
                 rec.coreBounds.minX,
                 rec.coreBounds.minZ,
                 rec.coreBounds.maxX,
                 rec.coreBounds.maxZ,
                 bnCfg,
-                mr  // Use thread-local scratch
+                mr
 #ifdef M_DEBUG
-                , rec.coord // instead of this, just pass the file path
+                , rec.coord
 #endif
             );
 
@@ -614,12 +615,33 @@ namespace procgen {
 
             // 4) Publish to final arena
             ScratchArena& fmr = terrain_pool->_final[rec.index];
-            *rec.points = { 
-                ScratchAlloc<aveng::Vec2>(fmr, candidates.points_size), 
-                candidates.points_size 
-            };
 
-            std::memcpy(rec.points->core, candidates.points, sizeof(candidates.points_size));
+            // Allocate final packed point storage directly into rec.points->core
+            rec.points->core = ScratchAlloc<aveng::Vec2>(fmr, candidates.points_size);
+            rec.points->size_core = candidates.points_size;
+
+            // Compute offsets for regional bins
+            uint32_t begin[BIN_COUNT]{};
+			// Starting at 1 because begin[0] is always 0
+            for (int binIdx = 1; binIdx < BIN_COUNT; ++binIdx) {
+                // begin[binIdx] = starting index of the region represented by bin
+                begin[binIdx] = begin[binIdx - 1] + candidates.binCounts[binIdx - 1];
+            }
+
+            uint32_t cursor[BIN_COUNT];
+            std::memcpy(cursor, begin, sizeof(begin));
+
+            // Scatter directly into final packed storage using precomputed per-point bins
+            for (uint32_t i = 0; i < candidates.points_size; ++i) {
+                const aveng::Vec2& p = candidates.points[i];
+                const uint8_t bin = candidates.binPerPoint[i];
+
+#ifdef M_DEBUG
+                assert(bin < BIN_COUNT && "binPerPoint contained invalid bin");
+#endif
+                // Packed bin layout -> [SW][S][SE][W][C][E][NW][N][NE]
+                rec.points->core[cursor[bin]++] = p;
+            }
 
         }
 
@@ -651,7 +673,7 @@ namespace procgen {
             }
 
             // Filter points within halo bounds
-            // TODO - Pre-compute these during point generation. We can easily add them to `PointsRange` in a new member
+            // TODO - Pre-compute these during point generation?? We can easily add them to `PointsRange` in a new member
             //      - This would allow us to skip this inner loop
             for (uint32_t j = 0; j < nrec->points->size_core; j++) {
                 if (inBoundsInclusiveMax(

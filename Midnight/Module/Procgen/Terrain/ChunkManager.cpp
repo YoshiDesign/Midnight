@@ -991,7 +991,7 @@ namespace aveng {
         // Build half-edge mesh and accelerators into `tri`
         BuildHalfEdgeMesh(
             vertexPos,
-            *tri,   // output parameter
+            *tri,   // output parameter - Also, our final mr backs this
             vertexCount,
             scratchMr
         );

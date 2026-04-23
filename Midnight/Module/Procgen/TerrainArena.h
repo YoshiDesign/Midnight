@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include <cassert>
 #include "Core/Math/Vector.h"
 
 namespace {
@@ -57,10 +58,8 @@ namespace procgen {
     template<typename T>
     T* ScratchAlloc(ScratchArena& scratch, uint32_t count = 1, size_t alignment = alignof(T)) noexcept {
 
-        
-
 #ifdef M_DEBUG
-        assert(scratch.base != nullptr);
+        assert(scratch.base != nullptr && "scratch base is uninitialized");
         assert(alignment != 0 && (alignment & (alignment - 1)) == 0);
 #endif
         const uintptr_t base = reinterpret_cast<uintptr_t>(scratch.base);
@@ -77,12 +76,5 @@ namespace procgen {
         scratch.offset = static_cast<uint32_t>(newOffset);
         return reinterpret_cast<T*>(aligned);
     }
-
-    /* Helper Types */
-
-    struct PointsRange {
-		aveng::Vec2* points  = nullptr;
-        uint32_t points_size = 0;
-    };
 
 }

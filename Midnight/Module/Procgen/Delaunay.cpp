@@ -411,11 +411,15 @@ namespace aveng {
         std::pmr::memory_resource* scratchMr,
         std::pmr::memory_resource* finalMr
     ) {
+
+#ifdef M_DEBUG
         // Doubtful this will every be true but let's handle it anyway.
         if (points.size() < 3) {
+            assert(points.size() > 3 && "invalid triangulation input");
             auto* out = static_cast<Triangulation*>(finalMr->allocate(sizeof(Triangulation), alignof(Triangulation)));
             return new (out) Triangulation(finalMr);
         }
+#endif
 
         // Scratch containers
         std::pmr::vector<Vec2> allPts(scratchMr);
@@ -438,7 +442,7 @@ namespace aveng {
         float midY = (minY + maxY) * 0.5f;
 
         Vec2 superA{ midX - 20.0f * deltaMax, midY - 1.0f * deltaMax };
-        Vec2 superB{ midX,                 midY + 20.0f * deltaMax };
+        Vec2 superB{ midX, midY + 20.0f * deltaMax };
         Vec2 superC{ midX + 20.0f * deltaMax, midY - 1.0f * deltaMax };
 
         const SiteIndex super0 = (SiteIndex)allPts.size(); allPts.push_back(superA);

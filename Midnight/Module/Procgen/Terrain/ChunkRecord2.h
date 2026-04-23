@@ -28,8 +28,19 @@ namespace procgen {
 	};
 
 	struct Points {
-		aveng::Vec2*  core; // core points only
-		uint32_t size_core;
+		aveng::Vec2* core{};
+		uint32_t size_core{};
+
+		// same backing storage as core, but reordered into contiguous regions
+		uint32_t begin_northWest{}, count_northWest{};
+		uint32_t begin_north{}, count_north{};
+		uint32_t begin_northEast{}, count_northEast{};
+		uint32_t begin_west{}, count_west{};
+		uint32_t begin_center{}, count_center{};
+		uint32_t begin_east{}, count_east{};
+		uint32_t begin_southWest{}, count_southWest{};
+		uint32_t begin_south{}, count_south{};
+		uint32_t begin_southEast{}, count_southEast{};
 	};
 
 	struct AllPoints {
@@ -69,14 +80,6 @@ namespace procgen {
 	struct ErosionField {
 		float*        eHeights; // parallel with AllPoints::all_pts
 		uint32_t size_eHeights;
-	};
-
-	// TODO - Store points of boundary regions for more compaction IF NECESSARY
-	struct HaloPoints {
-		std::vector<aveng::Vec3> north;
-		std::vector<aveng::Vec3> south;
-		std::vector<aveng::Vec3> east;
-		std::vector<aveng::Vec3> west;
 	};
 
 	/**

@@ -4,7 +4,8 @@
 #include <memory_resource>
 #include <cstdint>
 #include "Core/Math/Vector.h"
-#include "Module/Procgen/Types.h"
+// #include "Module/Procgen/Types.h"
+#include "Module/Procgen/Types2.h"
 #include "Module/Procgen/Rng.h"
 #include "Module/Procgen/Noise/Config.h"
 #include "Module/Procgen/TerrainArena.h"
