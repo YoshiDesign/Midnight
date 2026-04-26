@@ -34,27 +34,27 @@ namespace procgen {
 		
 	}
 	
-	inline ChunkHandle AddTerrain(TerrainPool* pool) {
-		pool->slots_[pool->nActive].generation = 1;
-		pool->slots_[pool->nActive].active = true;
-		return { pool->nActive++, true };
+	//inline ChunkHandle AddTerrain(TerrainPool* pool) {
+	//	pool->slots_[pool->nActive].generation = 1;
+	//	pool->slots_[pool->nActive].active = true;
+	//	return { pool->nActive++, true };
 
-	}
-	
-	inline void RemoveTerrain(TerrainPool* pool, ChunkHandle handle) {
-		if (pool == nullptr) return;
+	//}
+	//
+	//inline void RemoveTerrain(TerrainPool* pool, ChunkHandle handle) {
+	//	if (pool == nullptr) return;
 
-		uint32_t last_index = pool->nActive - 1;
+	//	uint32_t last_index = pool->nActive - 1;
 
-		// swap
-		pool->slots_[handle.index].record = pool->slots_[last_index].record;
+	//	// swap
+	//	pool->slots_[handle.index].record = pool->slots_[last_index].record;
 
-		// pop
-		pool->nActive--;
+	//	// pop
+	//	pool->nActive--;
 
-		pool->slots_[handle.index].generation++;
-		handle.generation++;
+	//	pool->slots_[handle.index].generation++;
+	//	handle.generation++;
 
-		return;
-	}
+	//	return;
+	//}
 }

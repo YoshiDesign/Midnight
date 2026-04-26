@@ -62,11 +62,7 @@ namespace procgen {
 		uint32_t index{INVALID_CHUNK_INDEX}; // const from ChunkRecord2
 		bool active{false};
 		uint32_t generation{0}; // Unused until we need to promote a different architecture
-	};
-
-	struct DependencyCache {
-		HaloPoints* verts; // TODO - Probably
-		uint32_t count;
+		uint64_t frameRequested{ 0 }; 
 	};
 
 	/**
@@ -172,15 +168,13 @@ namespace procgen {
 		size_t capacity{ MAX_CHUNK_RECORDS };
 
 		// Synchronization & Validation
-		std::array<std::atomic<bool>, MAX_CHUNK_RECORDS> in_use_flag;
+		std::array<std::atomic<bool>, MAX_CHUNK_RECORDS> in_use_flag; 
 		std::array<std::atomic<RenderableBuildState>, MAX_CHUNK_RECORDS> build_state_flag;
 		std::array<int, MAX_CHUNK_RECORDS> current_request_id; // For validating async renderable requests
 
 		// Primary chunk data
 		std::array<ChunkRecord2, MAX_CHUNK_RECORDS> records{};
 
-		// Inter-chunk dependencies (e.g. core points) and packed renderable data
-		std::array<DependencyCache, MAX_CHUNK_RECORDS> deps{};
 		std::array<TerrainRenderable, MAX_CHUNK_RECORDS> renderable{};
 
 		// Arenas

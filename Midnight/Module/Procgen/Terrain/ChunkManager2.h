@@ -111,7 +111,7 @@ namespace procgen {
         void requestErosion(ChunkCoord c, uint64_t frameIndex);
         void requestMesh(ChunkCoord c, uint64_t frameIndex);
 
-        ChunkRecord2* getOrCreateRecord(ChunkCoord coord);
+        ChunkRecord2* getOrCreateRecord(ChunkCoord coord, uint64_t frameIndex);
 
         uint64_t requestRenderableAsync(ChunkCoord center, uint64_t frameIndex, procgen::TerrainRenderable* target, uint32_t slotIndex);
 

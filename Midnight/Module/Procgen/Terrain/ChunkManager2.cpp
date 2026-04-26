@@ -119,6 +119,9 @@ namespace procgen {
         , renderData_(renderData)
 #endif
     {
+        coord_to_handle.reserve(MAX_CHUNK_RECORDS * 2);
+        coord_to_handle.max_load_factor(0.7f);
+
         cfg_ = defaultTerrainConfig(); // Global Config
         cfg_.noise = defaultNoiseParams();
     }
@@ -196,11 +199,11 @@ namespace procgen {
 
 
 
-    ChunkRecord2* ChunkManager2::getOrCreateRecord(ChunkCoord coord)
+    ChunkRecord2* ChunkManager2::getOrCreateRecord(ChunkCoord coord, uint64_t frameIndex = 0)
     {
 
         /*
-        * IMPORTANT: WE ARE NOT RECYCLING HANDLES
+        * IMPORTANT: WE ARE NOT RECYCLING HANDLES - they get pop n' swapped, I believe
         *            WE ARE RECYCLING CHUNKRECORDS
         * Things we need to do upon retiring a chunk.
         * - Set handle.active to false
@@ -212,13 +215,23 @@ namespace procgen {
         * - Erase [coord] from coord_to_handle - In the future we'll reuse handles + generation
         */
 
-        // Too many chunks in memory
-        if (coord_to_handle.size() >= MAX_CHUNK_RECORDS) { return nullptr; }
-
         ChunkHandle handle = coord_to_handle[coord];
 
         // A new handle was inserted - there is no corresponding chunk record. (invariant)
         if (!handle.active) {
+
+#ifdef M_DEBUG
+            assert(frameIndex != 0 && "frameIndex was not provided during handle creation");
+#endif
+
+            handle.frameRequested = frameIndex;
+
+            // Too many chunks in memory
+            if (coord_to_handle.size() > MAX_CHUNK_RECORDS) { 
+                coord_to_handle.erase(coord); // Not thread safe, but logically contained 
+                return nullptr; 
+            }
+
             // CAS! 
             bool expected = false;
             if (!terrain_pool->in_use_flag[handle.index].compare_exchange_strong(
@@ -304,7 +317,7 @@ namespace procgen {
 
     void ChunkManager2::runGenerate(ChunkCoord center, uint64_t frameIndex, uint64_t requestId)
     {
-        ChunkRecord2* centerRec = getOrCreateRecord(center);
+        ChunkRecord2* centerRec = getOrCreateRecord(center, frameIndex);
 
         ChunkCoord neighbors[25];
         get5x5Neighborhood(center, neighbors);
@@ -330,10 +343,10 @@ namespace procgen {
         * Hello weary reader. Please accept these architectural notes.
         * Please notice that we do not use CAS unconditionally.
         * Let's try to keep a thread's atomic usage isolated to the chunk it is working on.
-		* One exception I'll need to address, is within the AllPoints stage, where we check 
-        * the readiness of 9 neighbors' Points stages. Let's figure out how we can avoid
-        * cache-missing when checking on the atomics that don't belong to the central chunk
-		* we're generating. Good luck, and may the odds be ever in your favor.
+		* 
+		* If you follow this basic model to generate terrain the god's will smile upon you and your performance will be good.
+		* - Build the points for a 5x5 region independently (no CAS, no atomics, just pure worker-local work)
+		* - TODO
         * 
         * We might want to reconsider the task graph overall.
         * How much useful work happens per synchronization event?
@@ -584,7 +597,13 @@ namespace procgen {
 
     Points const* ChunkManager2::buildPoints(ChunkRecord2& rec)
     {
+        // Note: this cache-reuse pattern (this `if` statement) is NOT SAFE
+        // unless we strictly adhere to the checkerboard request structure.
+        // Even then, it's still a high risk pattern. DO NOT LET THREADS
+		// READ FROM THE SAME rec.points CONCURRENTLY UNLESS YOU KNOW WHAT YOU ARE DOING.
+        // The nullptr check is a cache optimization, not a synchronization mechanism.
         if (rec.points == nullptr) {
+
             // 1) Scratch memory resource
             ScratchArena& mr = terrain_pool->_scratch[rec.index];
 		    mr.offset = 0; // reset for this job
@@ -623,7 +642,10 @@ namespace procgen {
             // Compute offsets for regional bins
             uint32_t begin[BIN_COUNT]{};
 
-            // Build persistent bin metadata directly
+            // Bins represent individual regions of points within a chunk
+            // This allows neighbors to quickly grab what they need.
+
+            // Build persistent bin metadata directly. Bins are in a fixed order based on cardinal/intercardinal directions
             rec.points->bins[0] = { 0, candidates.binCounts[0] };
 
             // Record the rest of the metadata

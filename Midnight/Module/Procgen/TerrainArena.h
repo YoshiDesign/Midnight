@@ -22,7 +22,7 @@ namespace {
 
 namespace procgen {
 
-    const uint32_t MAX_CHUNK_RECORDS = 36;
+    const uint32_t MAX_CHUNK_RECORDS = 256;
 
     /* Final allocation constants - 8 MB per slot */
     constexpr uint32_t kFinalSlots = MAX_CHUNK_RECORDS;
