@@ -1,10 +1,7 @@
 #pragma once
 #include <atomic>
-#include <mutex>
-#include <thread>
 #include <vector>
-#include "Module/Procgen/Types.h"
-#include "Utils/Logger.h"
+#include "Module/Procgen/Types2.h"
 
 namespace procgen {
 
@@ -66,7 +63,7 @@ namespace procgen {
     // -----------------------------------------------------------------------
 
     struct ActiveRegion {
-        aveng::ChunkCoord center;
+        ChunkCoord center;
         int radius;
     };
 
@@ -79,48 +76,37 @@ namespace procgen {
     }
 
     /*
-    * Admission Control - how much concurrency is allowed to enter the terrain pipeline. 
-    * (Correctness and backpressure for the TerrainController)
+    * Admission Control - Correctness and backpressure for the TerrainController
     * The purpose of this is to prevent the terrain system from becoming self destructive under load.
-    * Because: NOT ALL PARALLEL WORK IS GOOD PARALLEL WORK (contention, dependency cycles, dupe's, etc.)
     * 
     * Current Policy Detail:
-    * Only lets a region begin if its support footprint does not overlap another active build.
-    * Otherwise defer it.
+    * TODO
     */
     class TerrainAdmissionController {
     public:
 
-        bool tryAcquire(aveng::ChunkCoord center, int supportRadius) {
-            std::lock_guard<std::mutex> lock(mut_);
-            ActiveRegion incoming{ center, supportRadius };
-            for (const auto& r : active_) {
-                if (regionsOverlap(r, incoming)) {
-                    return false;
-                }
-            }
-            //aveng::Logger::log(1, "tryAcquire: Acquired!\n");
-            active_.push_back(incoming);
-            //aveng::Logger::log(1, "New Active Size: %d\n", active_.size());
+        /*
+        * Note: I'm leaving the atomic counter in here for now, but if we design
+        * a system in which the TerrainAdmissionController is only ever operated
+        * on by the main OS thread, then we don't need atomics at all
+        */
+
+        bool allow(ChunkCoord center, int supportRadius) {
+            if (activeCount_.load(std::memory_order_relaxed) > 2) { return false; }
+            activeCount_.fetch_add(1, std::memory_order_relaxed);
             return true;
         }
 
-        void release(aveng::ChunkCoord center, int supportRadius) {
-            std::lock_guard<std::mutex> lock(mut_);
-            auto it = std::remove_if(active_.begin(), active_.end(),
-                [&](const ActiveRegion& r) {
-                    return r.center.x == center.x
-                        && r.center.z == center.z 
-                        && r.radius == supportRadius; // weird...
-                });
-            //aveng::Logger::log(1, "release: Releasing! {%d, %d}\n", center.x, center.z);
-            active_.erase(it, active_.end());
-            //aveng::Logger::log(1, "Active Size: %d\n", active_.size());
+        bool release() {
+#ifdef M_DEBUG
+            aveng::Logger::log(1, "[TerrainAdmissionController] - RELEASE\n");
+#endif
+            activeCount_.fetch_sub(1, std::memory_order_relaxed);
+            return true;
         }
 
     private:
-        std::mutex mut_;
-        std::vector<ActiveRegion> active_;
+		std::atomic<uint32_t> activeCount_{ 0 };
     };
 
 } // namespace procgen

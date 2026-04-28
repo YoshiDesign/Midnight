@@ -116,19 +116,9 @@ namespace aveng {
     }
 
     // Direct access to generate a chunk for debugging/editor
-    void TerrainController::generateChunks(ChunkCoord start_coord) {
-        //Logger::log(1, "Start {%d, %d}\tFrameIndex", start_coord.x, start_coord.z, frameIndex_);
-        ensureChunkRequested(start_coord);
-    }
+    void TerrainController::generateChunks(procgen::ChunkCoord coord) {
 
-    /*
-* @Step 1 `ensureChunkRequested`: Allocates a slot from the registry and submits
-* an async renderable build. The admission controller ensures this chunk's 5x5
-* support footprint doesn't overlap any chunk currently being built.
-*/
-    void TerrainController::ensureChunkRequested(ChunkCoord coord)
-    {
-        if (!admission_.tryAcquire(coord, kSupportRadius)) {
+        if (!admission_.allow(coord, kSupportRadius)) {
             // Requested, but the admission controller deems we're not ready for another request.
             // This happens due to two requests including overlapping regions.
             // Deferred requests are still considered "active" regions within the admission controller.
@@ -156,7 +146,7 @@ namespace aveng {
         slot.state = procgen::TerrainRuntimeState::Requested;
     }
 
-    uint32_t TerrainController::allocateSlot(ChunkCoord coord) {
+    uint32_t TerrainController::allocateSlot(procgen::ChunkCoord coord) {
 
         procgen::ChunkHandle handle;
 
@@ -584,7 +574,7 @@ namespace aveng {
             std::vector<ChunkCoord> pending;
             pending.swap(deferredRequests_);
             for (const ChunkCoord& coord : pending) {
-                ensureChunkRequested(coord);
+                generateChunks(coord);
             }
         }
     }

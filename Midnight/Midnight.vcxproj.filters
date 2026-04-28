@@ -231,6 +231,9 @@
     <ClCompile Include="Module\Procgen\Delaunay2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Module\Procgen\SpatialGrid2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreVK\aveng_buffer.h">
@@ -1572,6 +1575,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Module\Procgen\TerrainArena.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\SpatialGrid2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

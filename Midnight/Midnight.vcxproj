@@ -222,6 +222,7 @@
     <ClCompile Include="Module\Procgen\Helpers.cpp" />
     <ClCompile Include="Module\Procgen\Noise\Bluenoise.cpp" />
     <ClCompile Include="Module\Procgen\SpatialGrid.cpp" />
+    <ClCompile Include="Module\Procgen\SpatialGrid2.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\ChunkManager.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\ChunkManager2.cpp" />
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ErosionManager.cpp" />
@@ -310,6 +311,7 @@
     <ClInclude Include="Core\Renderer\Renderer.h" />
     <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\UUID.h" />
+    <ClInclude Include="Module\Procgen\SpatialGrid2.h" />
     <ClInclude Include="Module\Procgen\TerrainArena.h" />
     <ClInclude Include="Module\Procgen\Delaunay.h" />
     <ClInclude Include="Module\Procgen\Delaunay2.h" />

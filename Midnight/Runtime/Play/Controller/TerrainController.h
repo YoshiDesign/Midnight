@@ -91,13 +91,13 @@ namespace aveng {
     };
 
     struct StreamUpdateContext {
-        ChunkCoord playerChunk;
+        procgen::ChunkCoord playerChunk;
         uint64_t frameIndex;
     };
 
     struct StreamCommandBuffer {
-        std::vector<ChunkCoord> requestCenters;
-        std::vector<ChunkCoord> evictCenters;
+        std::vector<procgen::ChunkCoord> requestCenters;
+        std::vector<procgen::ChunkCoord> evictCenters;
     };
 
     struct LinearStreamPolicy {
@@ -163,7 +163,7 @@ namespace aveng {
         float getChunkSize();
 
         void setDrawCenter(glm::vec3 worldPos) noexcept;
-        const ChunkCoord getDrawCenter() { return currentCenter_; };
+        const procgen::ChunkCoord getDrawCenter() { return currentCenter_; };
 
         /* Streaming Policy */
 
@@ -180,7 +180,7 @@ namespace aveng {
 
         void cleanup();
 
-        void cleanupOne(procgen::ChunkSlot& slot);
+        void cleanupOne(); // TODO
         /**
          * Request the final renderable data for compute and graphics.
          * The renderable comprises a 3x3 region of space with up to a 5x5 region
@@ -190,13 +190,9 @@ namespace aveng {
          * - This does not block/is async. ChunkManager enqueues work on the thread pool.
          * - Completion is signaled via the ConcurrentQueue (CompletionNotice).
          */
-        void generateChunks(ChunkCoord start_coord);
+        void generateChunks(procgen::ChunkCoord start_coord);
 
-        void evictChunk(ChunkCoord center);
-
-        // void collectRenderable();
-
-        void ensureChunkRequested(ChunkCoord coord);
+        void evictChunk(procgen::ChunkCoord center);
 
         void drainCompletedTerrain();
 
@@ -223,13 +219,13 @@ namespace aveng {
          * Exactly how our model instances work.
          */
 
-        std::unordered_map<procgen::ChunkCoord, procgen::ChunkHandle, ChunkCoordHash> coordToSlot_;
+        std::unordered_map<procgen::ChunkCoord, procgen::ChunkHandle, procgen::ChunkCoordHash> coordToSlot_;
         //std::vector<uint32_t> freeSlots_;
 
         // Region admission control: prevents overlapping 5x5 support footprints
         // from being built concurrently (the primary fix for dependency starvation).
         procgen::TerrainAdmissionController admission_;
-        std::vector<ChunkCoord> deferredRequests_;
+        std::vector<procgen::ChunkCoord> deferredRequests_;
 
         // Non-blocking batched GPU upload infrastructure (Buffered: one per frame-in-flight)
         std::array<TerrainUploadBatch, 3> uploadBatches_;
@@ -242,8 +238,8 @@ namespace aveng {
         procgen::TerrainPool terrain_pool;
 
 
-        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash> managed_;
-        ChunkCoord currentCenter_;
+        std::unordered_map<procgen::ChunkCoord, StreamedChunkState, procgen::ChunkCoordHash> managed_;
+        procgen::ChunkCoord currentCenter_;
 
         TerrainStreamMode currentMode_;
         TerrainStreamPolicy policy_{};
