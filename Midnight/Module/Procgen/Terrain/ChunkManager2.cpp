@@ -356,14 +356,14 @@ namespace procgen {
         * 
         * For a work-stealing deque, the common fast path is:
         * - owner pushes/pops from bottom
-        * - thieves rarely steal
+        * - thieves rarely steal (from the top only)
         * - most tasks execute locally
         * 
         * So even though the deque uses atomics, the scheduler remains efficient because the ownership model reduces contention.
         * Steals are intentionally more expensive. If stealing becomes frequent, that's a bug stemming from:
         * - poor locality
         * - bad task distribution
-        * - tasks too smal
+        * - tasks too smol
         * - too much dependency churn
         */
         // New Architecture Discussion: https://chatgpt.com/g/g-p-68aca1c346e48191ae5d1ae21818ac34-cpp/c/69e6da7b-c600-83ea-87d9-87893736603e
@@ -491,10 +491,10 @@ namespace procgen {
             }
 
             if (shouldPublish) {
-                if (admissionCtl_) {
-                    // This probably doesn't need to happen...
-                    admissionCtl_->release(center, admissionRadius_);
-                }
+                //if (admissionCtl_) {
+                //    // This probably doesn't need to happen...
+                //    admissionCtl_->release(center, admissionRadius_);
+                //}
 
                 // push onto the ConcurrentQueue
                 completedRenderables_.push(procgen::CompletionNotice{
@@ -514,9 +514,9 @@ namespace procgen {
                 slotIdx = centerRec->slotIndex;
             }
 
-            if (admissionCtl_) {
-                admissionCtl_->release(center, admissionRadius_);
-            }
+            //if (admissionCtl_) {
+            //    admissionCtl_->release(center, admissionRadius_);
+            //}
 
             completedRenderables_.push(procgen::CompletionNotice{
                 .slotIndex = slotIdx,

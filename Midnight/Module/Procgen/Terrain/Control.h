@@ -89,9 +89,12 @@ namespace procgen {
         * Note: I'm leaving the atomic counter in here for now, but if we design
         * a system in which the TerrainAdmissionController is only ever operated
         * on by the main OS thread, then we don't need atomics at all
+        * 
+        * This behaves very much like Go's WaitGroup. There's a lot of room 
+        * for additional features but for now it's just the bare minimum.
         */
 
-        bool allow(ChunkCoord center, int supportRadius) {
+        bool allow() {
             if (activeCount_.load(std::memory_order_relaxed) > 2) { return false; }
             activeCount_.fetch_add(1, std::memory_order_relaxed);
             return true;

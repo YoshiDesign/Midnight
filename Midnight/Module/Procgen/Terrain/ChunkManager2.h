@@ -148,6 +148,9 @@ namespace procgen {
 
         aveng::ThreadPoolTaskSystem& tasks_;
 
+        /// <summary>
+        ///  Acquired via pointer and likely to be factored out
+        /// </summary>
         TerrainAdmissionController* admissionCtl_ = nullptr;
         int admissionRadius_ = 0;
         
