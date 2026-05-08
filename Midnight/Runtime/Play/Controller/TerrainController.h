@@ -278,4 +278,43 @@ namespace aveng {
         procgen::ErosionManager erosionMgr_;
 
     };
+
+    struct TerrainRequest {
+        procgen::TerrainPool* pool = nullptr;
+        TerrainController* controller = nullptr;
+
+        ChunkCoord center{};
+        uint32_t requestId = 0;
+        uint32_t batchesPerChunk = 0;
+
+        uint16_t slots[49]{};
+        ChunkCoord coords[49]{};
+
+        alignas(64) std::atomic<uint32_t> pointsRemaining{ 0 };
+        alignas(64) std::atomic<uint32_t> terminalRemaining{ 0 };
+        alignas(64) std::atomic<uint32_t> erosionPerChunk[9]{};
+
+        void init(
+            TerrainController* owner,
+            procgen::TerrainPool* p,
+            ChunkCoord c,
+            uint32_t id,
+            uint32_t batches
+        ) {
+            controller = owner;
+            pool = p;
+            center = c;
+            requestId = id;
+            batchesPerChunk = batches;
+
+            pointsRemaining.store(49, std::memory_order_relaxed);
+            terminalRemaining.store(25, std::memory_order_relaxed);
+
+            for (auto& e : erosionPerChunk) {
+                e.store(0, std::memory_order_relaxed);
+            }
+
+            // Fill slots[] and coords[] separately during admission.
+        }
+    };
 }

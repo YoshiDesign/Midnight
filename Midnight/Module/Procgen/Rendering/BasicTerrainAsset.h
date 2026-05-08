@@ -48,6 +48,9 @@
 
 namespace procgen {
 
+	constexpr uint32_t MAX_CHUNK_RECORDS = 49; // or 64, 128, etc.
+	constexpr uint32_t MAX_TERRAIN_REQUESTS = 4; // maybe 2, 4, 8, etc.
+
 	enum class TerrainRuntimeState : uint8_t
 	{
 		Unrequested,
@@ -161,6 +164,7 @@ namespace procgen {
 
 	// New Primary resource pool for all terrain happenings. 
 	// Owns all of its resources.
+	// Perhaps humorous is my std::array of pointers to arena allocations
 	struct TerrainPool {
 
 		// State
@@ -172,7 +176,7 @@ namespace procgen {
 		std::array<std::atomic<RenderableBuildState>, MAX_CHUNK_RECORDS> build_state_flag;
 		std::array<int, MAX_CHUNK_RECORDS> current_request_id; // For validating async renderable requests
 
-		// Primary chunk data
+		// Primary chunk data - These hold pointers into _scratch and _final
 		std::array<ChunkRecord2, MAX_CHUNK_RECORDS> records{};
 
 		std::array<TerrainRenderable, MAX_CHUNK_RECORDS> renderable{};

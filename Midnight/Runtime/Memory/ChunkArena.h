@@ -3,6 +3,9 @@
 #include <memory_resource>
 namespace aveng {
 
+	/*
+	* DEPRECATED
+	*/
 
 	/*
 	* Arena Allocator - (AKA Bump allocator or Region allocator)

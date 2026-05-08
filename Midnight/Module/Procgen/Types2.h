@@ -24,7 +24,7 @@ namespace procgen {
 		Border_West = 4,
 	};
 
-	/* Helper Types */
+	/* These bins refer to the */
 	const uint8_t BIN_COUNT = 9;
 	struct PointsRange {
 		aveng::Vec2* points{};
