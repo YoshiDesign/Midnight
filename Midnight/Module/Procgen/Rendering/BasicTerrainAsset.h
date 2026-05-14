@@ -174,6 +174,7 @@ namespace procgen {
 		// Synchronization & Validation
 		std::array<std::atomic<bool>, MAX_CHUNK_RECORDS> in_use_flag; 
 		std::array<std::atomic<RenderableBuildState>, MAX_CHUNK_RECORDS> build_state_flag;
+
 		std::array<int, MAX_CHUNK_RECORDS> current_request_id; // For validating async renderable requests
 
 		// Primary chunk data - These hold pointers into _scratch and _final

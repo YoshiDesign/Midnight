@@ -4,6 +4,8 @@
 #include <iostream>
 namespace aveng {
 
+    // DERPRECATED
+
 	thread_local bool ThreadPoolTaskSystem::workerFlag_ = false;
 
     ThreadPoolTaskSystem::ThreadPoolTaskSystem(uint32_t threadCount) {

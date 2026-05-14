@@ -1,9 +1,9 @@
 #include "Runtime/Threading/Types.h"
 #include "Module/Procgen/Terrain/ChunkRecord.h"   // must make ChunkRecord complete
 
-namespace aveng {
+namespace mtools {
 
-	StripeBucket::StripeBucket() = default;
-	StripeBucket::~StripeBucket() = default;
+	//StripeBucket::StripeBucket() = default; // DEPRECATED (until further notice)
+	//StripeBucket::~StripeBucket() = default; // DEPRECATED (until further notice)
 
 }

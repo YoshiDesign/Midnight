@@ -11,6 +11,10 @@
 #include <cassert>
 
 /*
+    SUPERCALIDEPRECATED
+*/
+
+/* 
 * FIFO thread pool with submit/enqueue and helping-wait.
 *
 * Concurrency policy (terrain generation and beyond):

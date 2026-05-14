@@ -1,6 +1,9 @@
 #pragma once
 #include <mutex>
 #include <vector>
+
+// DEPRECATED (unless you really need a concurrent queue with locks)
+
 namespace mtools {
     template <typename T>
     class ConcurrentQueue
