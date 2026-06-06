@@ -22,10 +22,15 @@ namespace mtools
     * (Or ditch the general-purpose scheduler in favor of bespoke tooling per feature)
     */
     enum class JobKind : uint8_t {
-        BuildPoints,        // Terrain Generation
-        BuildAllPoints,     // Terrain Generation
-        BuildHeightField,   // Terrain Generation
-        Triangulate         // Terrain Generation
+        Empty = 0,
+        BuildPoints,
+        BuildAllPoints,
+        BuildHeightField,
+        Triangulate,
+        ErosionBatch,    // fanout job for hydraulic erosion droplets within one ring-0 chunk
+        ThermalPass,
+        Finalize,        // ring-0 only: copies products into _final, stamps TerrainRenderable
+        NotifyComplete,  // region-level terminal: publishes one CompletionNotice
     };
 
     struct Job {
@@ -45,19 +50,6 @@ namespace mtools
         std::condition_variable cv;
         std::atomic<bool> sleeping{ false };
     };
-
-    struct GlobalInjector {
-
-    };
-
-
-
-
-
-
-
-
-
 
 
 	// OLD LEGECY/DEPRECATED STUFF BELOW

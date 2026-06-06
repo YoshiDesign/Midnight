@@ -41,7 +41,7 @@ namespace procgen {
         const int numCells = gridW * gridH;
 
         // TODO - Alloc in the Terrain Arena
-        auto sg = std::make_unique<SpatialGrid>();
+        auto sg = std::make_unique<SpatialGrid2>();
 
         // Wire pointers/spans to ChunkRecord-owned data
         sg->tri = triangulation;

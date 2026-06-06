@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
+#include <vulkan/vulkan_core.h>
 #include "Module/Procgen/Terrain/Erosion/ErosionManager.h"
 #include "Module/Procgen/Rendering/BasicTerrainAsset.h"
 #include "Module/Procgen/Terrain/Control.h"
@@ -12,64 +13,12 @@
 #include "Module/Procgen/Types.h"
 #include "Utils/Timer.h"
 
-// TODO - We're going to make a TerrainRenderSystem
-#include <vulkan/vulkan_core.h>
-
-/**
- * Notes about the new resource pool:
- * The pool is not pre-populated -- it's a recycling pool that starts empty and fills up organically as chunks complete their lifecycle. Here's the flow:
- *
- *  Cold start (pool empty): The very first wave of chunks will always hit the "fall back to init" path because there's nothing to recycle yet. This is expected -- the first N chunks pay the full vmaCreateBuffer cost just like they do today.
- *
- *  Steady state (pool warm): Once the player starts moving and chunks cycle through eviction, buffers flow into the pool from two sources:
- *
- *  retireCompletedUploads -- when a GPU upload fence signals, the renderable's vectors are cleared (preserving capacity) via resetKeepCapacity(). The slot is ready for reuse without any heap allocation.
- *
- *  flushDeferredDeletes -- when an evicted chunk's deferred frame count elapses (after kDeferFrames), its VBO, IBO, input SSBO, and output SSBO structs get moved into pool_.vbo, pool_.ibo, etc. instead of being destroyed. The Vulkan handles survive -- device buffer, staging buffer, VMA allocations -- all still valid.
- *
- *  Then when prepareChunkUpload runs for the next incoming chunk, it checks the pool first. If there's a buffer whose bufferSize >= needed, it grabs it. The existing Vulkan allocation is reused: fillStaging just maps the same staging buffer and overwrites its contents, recordCopy copies to the same device buffer. Zero vmaCreateBuffer / vmaDestroyBuffer calls on the hot path.
- *
- *  So the lifecycle looks like:
- */
 
 namespace procgen {
     class ChunkManager2;
 }
 
 namespace aveng {
-
-    /*
-    * The TerrainController is a scheduler, in charge of:
-    * - What work is allowed to begin
-    * - What work is currently in flight
-    * - When completed work becomes usable
-    * - When old GPU resources are actually safe to destroy
-    * 
-    * The recurring engine ideas are:
-    * - work admission       [Requested, Deferred]
-    * - in-flight tracking   [Building]
-    * - async completion     [CpuReady] 
-    * - residency state      [Resident]
-    * - deferred destruction [Retired, Destroyed]
-    * - budget enforcement
-    * 
-    * This is just the first place I'm utilizing this philosophy
-    * 
-    * This results in:
-    * - frame-budgeted work
-    * - asynchronous resource lifetime management
-    * - admission / backpressure control
-    * - GPU pipeline latency awareness
-    * 
-    * Implemented Principles:
-    * ## `deferredCleanups_` - frame-latency-aware cleanup. 
-    * Destruction is also work, and on the GPU it has timing constraints. 
-    * We do not want to use vkQueueWaitIdle to clean up evicted chunks.
-    * (i.e.) If a chunk was recently used by commands the GPU may still be executing, then destroying 
-    * its buffers immediately is dangerous unless you force a hard sync like vkQueueWaitIdle.
-    * 
-    * TODO: Document the rest
-    */
 
     // Forward declarations to keep compile-times sane.
     struct FinalMeshCPU;

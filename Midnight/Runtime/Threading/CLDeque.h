@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include "Runtime/Memory/Arena.h"
 
 /* Chase-Lev Deque */
 

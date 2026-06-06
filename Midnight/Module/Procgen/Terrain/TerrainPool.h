@@ -6,7 +6,7 @@
 
 namespace procgen {
 
-	inline void InitTerrainPool(TerrainPool* pool) {
+	void InitTerrainPool(TerrainPool* pool) {
 		
 	}
 	

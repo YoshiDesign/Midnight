@@ -75,6 +75,7 @@ namespace procgen {
         return !(sepX || sepZ);
     }
 
+    /* Needs an audit */
     /*
     * Admission Control - Correctness and backpressure for the TerrainController
     * The purpose of this is to prevent the terrain system from becoming self destructive under load.

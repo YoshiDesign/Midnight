@@ -203,11 +203,11 @@ namespace procgen {
     {
 
         /*
-        * IMPORTANT: WE ARE NOT RECYCLING HANDLES - they get pop n' swapped, I believe
+        * IMPORTANT: WE ARE NOT RECYCLING HANDLES - they get pop n' swapped, I believe...
         *            WE ARE RECYCLING CHUNKRECORDS
         * Things we need to do upon retiring a chunk.
-        * - Set handle.active to false
-		* - Set rec->active to false
+        * - Set handle.active to false (non-atomic operation is fine)
+		* - Set rec->active to false (non-atomic operation is fine)
         * - Set pool in-use flag to false
         * - Set pool build state to None
         * - Set handle.index to INVALID_CHUNK_INDEX (see ChunkRecord2.h)
