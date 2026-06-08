@@ -118,7 +118,7 @@ namespace aveng {
     // Direct access to generate a chunk for debugging/editor
     void TerrainController::generateChunks(procgen::ChunkCoord coord) {
 
-        if (!admission_.allow(coord, kSupportRadius)) {
+        if (!admission_.allow()) {
             // Requested, but the admission controller deems we're not ready for another request.
             // This happens due to two requests including overlapping regions.
             // Deferred requests are still considered "active" regions within the admission controller.

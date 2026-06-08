@@ -8,9 +8,9 @@ namespace xone {
 
     // Use this if you need to debug, otherwise we just use LinearWaveCoords
     //struct LinearWave {
-    //    aveng::ChunkCoord center;
-    //    aveng::ChunkCoord leftFan;
-    //    aveng::ChunkCoord rightFan;
+    //    procgen::ChunkCoord center;
+    //    procgen::ChunkCoord leftFan;
+    //    procgen::ChunkCoord rightFan;
 
     //    bool centerRequested = false;
     //    bool leftRequested = false;
@@ -22,9 +22,9 @@ namespace xone {
     //};
 
     struct LinearWaveCoords {
-        aveng::ChunkCoord center;
-        aveng::ChunkCoord leftFan;
-        aveng::ChunkCoord rightFan;
+        procgen::ChunkCoord center;
+        procgen::ChunkCoord leftFan;
+        procgen::ChunkCoord rightFan;
     };
 
     // Determine the required set of renderable coordinate based on X/Z
@@ -50,44 +50,45 @@ namespace xone {
         void update(
             const aveng::StreamUpdateContext& ctx,
             aveng::TerrainController& terrain,
-            std::unordered_map<aveng::ChunkCoord,
-            aveng::StreamedChunkState,
-            aveng::ChunkCoordHash>& streamed,
+            std::unordered_map<
+                procgen::ChunkCoord,
+                aveng::StreamedChunkState,
+                procgen::ChunkCoordHash>& streamed,
             aveng::StreamCommandBuffer& outCmds
         );
 
     private:
         void requestInitialCenter(
-            std::unordered_map<aveng::ChunkCoord,
+            std::unordered_map<procgen::ChunkCoord,
             aveng::StreamedChunkState,
-            aveng::ChunkCoordHash>& streamed,
+            procgen::ChunkCoordHash>& streamed,
             aveng::StreamCommandBuffer& outCmds
         );
 
         void advanceFrontier(
             const aveng::StreamUpdateContext& ctx,
             aveng::TerrainController& terrain,
-            std::unordered_map<aveng::ChunkCoord,
+            std::unordered_map<procgen::ChunkCoord,
             aveng::StreamedChunkState,
-            aveng::ChunkCoordHash>& streamed,
+            procgen::ChunkCoordHash>& streamed,
             aveng::StreamCommandBuffer& outCmds
         );
 
         void enqueueEvictions(
-            aveng::ChunkCoord playerChunk,
-            std::unordered_map<aveng::ChunkCoord,
+            procgen::ChunkCoord playerChunk,
+            std::unordered_map<procgen::ChunkCoord,
             aveng::StreamedChunkState,
-            aveng::ChunkCoordHash>& streamed,
+            procgen::ChunkCoordHash>& streamed,
             aveng::StreamCommandBuffer& outCmds
         );
 
-        bool shouldEvict(aveng::ChunkCoord c, aveng::ChunkCoord playerChunk) const;
+        bool shouldEvict(procgen::ChunkCoord c, procgen::ChunkCoord playerChunk) const;
 
         static void requestIfNeeded(
-            aveng::ChunkCoord coord,
-            std::unordered_map<aveng::ChunkCoord,
+            procgen::ChunkCoord coord,
+            std::unordered_map<procgen::ChunkCoord,
             aveng::StreamedChunkState,
-            aveng::ChunkCoordHash>& streamed,
+            procgen::ChunkCoordHash>& streamed,
             aveng::StreamCommandBuffer& outCmds
         );
 
@@ -108,9 +109,9 @@ namespace xone {
         void update(
             const aveng::StreamUpdateContext& ctx,
             aveng::TerrainController& terrain,
-            std::unordered_map<aveng::ChunkCoord,
+            std::unordered_map<procgen::ChunkCoord,
             aveng::StreamedChunkState,
-            aveng::ChunkCoordHash>& streamed,
+            procgen::ChunkCoordHash>& streamed,
             aveng::StreamCommandBuffer& outCmds
         );
 
@@ -129,11 +130,11 @@ namespace xone {
         void reset();
 
         void update(const aveng::AvengCamera& cam, uint64_t frameIndex);
-        aveng::ChunkCoord worldToChunk(glm::vec3 pos) const;
+        procgen::ChunkCoord worldToChunk(glm::vec3 pos) const;
 
     private:
-        void applyRequests(const std::vector<aveng::ChunkCoord>& centers, uint64_t frameIndex);
-        void applyEvictions(const std::vector<aveng::ChunkCoord>& evictCenters);
+        void applyRequests(const std::vector<procgen::ChunkCoord>& centers, uint64_t frameIndex);
+        void applyEvictions(const std::vector<procgen::ChunkCoord>& evictCenters);
 
         static constexpr int kMaxEvictionsPerFrame = 2;
 
@@ -142,10 +143,10 @@ namespace xone {
         aveng::TerrainStreamPolicy policy_;
         LinearFlightStreamer linear_;
         AllRangeStreamer allRange_;
-        std::unordered_map<aveng::ChunkCoord, aveng::StreamedChunkState, aveng::ChunkCoordHash> streamed_;
+        std::unordered_map<procgen::ChunkCoord, aveng::StreamedChunkState, procgen::ChunkCoordHash> streamed_;
         int streamSize_ = 0;
         int lastStreamSize_ = 0;
-        std::vector<aveng::ChunkCoord> pendingEvictions_;
+        std::vector<procgen::ChunkCoord> pendingEvictions_;
     };
 
 }

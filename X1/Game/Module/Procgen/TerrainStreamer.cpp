@@ -74,18 +74,18 @@ namespace xone {
         applyEvictions(cmds.evictCenters);
     }
 
-    void TerrainStreamer::applyRequests(const std::vector<ChunkCoord>& centers, uint64_t frameIndex)
+    void TerrainStreamer::applyRequests(const std::vector<procgen::ChunkCoord>& centers, uint64_t frameIndex)
     {
-        for (const ChunkCoord& c : centers) {
+        for (const procgen::ChunkCoord& c : centers) {
             Logger::log(1, "Requesting {%d, %d}\n", c.x, c.z);
             terrain_.generateChunks(c);
         }
     }
 
-    void TerrainStreamer::applyEvictions(const std::vector<ChunkCoord>& evictCenters)
+    void TerrainStreamer::applyEvictions(const std::vector<procgen::ChunkCoord>& evictCenters)
     {
         int evicted = 0;
-        for (const ChunkCoord& c : evictCenters) {
+        for (const procgen::ChunkCoord& c : evictCenters) {
             if (evicted >= kMaxEvictionsPerFrame) { break; }
 
             auto it = streamed_.find(c);
@@ -110,7 +110,7 @@ namespace xone {
     void LinearFlightStreamer::update(
         const StreamUpdateContext& ctx,
         TerrainController& terrain,
-        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        std::unordered_map<procgen::ChunkCoord, StreamedChunkState, procgen::ChunkCoordHash>& streamed,
         StreamCommandBuffer& outCmds
     )
     {
@@ -149,7 +149,7 @@ namespace xone {
     }
 
     void LinearFlightStreamer::requestInitialCenter(
-        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        std::unordered_map<procgen::ChunkCoord, StreamedChunkState, procgen::ChunkCoordHash>& streamed,
         StreamCommandBuffer& outCmds
     )
     {
@@ -163,7 +163,7 @@ namespace xone {
     void LinearFlightStreamer::advanceFrontier(
         const StreamUpdateContext& ctx,
         TerrainController& terrain,
-        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        std::unordered_map<procgen::ChunkCoord, StreamedChunkState, procgen::ChunkCoordHash>& streamed,
         StreamCommandBuffer& outCmds
     )
     {
@@ -256,10 +256,10 @@ namespace xone {
     }
 
     void LinearFlightStreamer::enqueueEvictions(
-        ChunkCoord playerChunk,
-        std::unordered_map<ChunkCoord,
+        procgen::ChunkCoord playerChunk,
+        std::unordered_map<procgen::ChunkCoord,
         StreamedChunkState,
-        ChunkCoordHash>& streamed,
+        procgen::ChunkCoordHash>& streamed,
         StreamCommandBuffer& outCmds
     )
     {
@@ -275,7 +275,7 @@ namespace xone {
         }
     }
 
-    bool LinearFlightStreamer::shouldEvict(ChunkCoord c, ChunkCoord playerChunk) const
+    bool LinearFlightStreamer::shouldEvict(procgen::ChunkCoord c, procgen::ChunkCoord playerChunk) const
     {
         const int dx = std::abs(c.x - playerChunk.x);
         const int dz = c.z - playerChunk.z;  // signed: positive = ahead, negative = behind
@@ -289,8 +289,8 @@ namespace xone {
 
     /* Add to the command's requestCenters. Requests are assumed to be validated given regional readiness */
     void LinearFlightStreamer::requestIfNeeded(
-        ChunkCoord coord,
-        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        procgen::ChunkCoord coord,
+        std::unordered_map<procgen::ChunkCoord, StreamedChunkState, procgen::ChunkCoordHash>& streamed,
         StreamCommandBuffer& outCmds
     )
     {
@@ -312,7 +312,7 @@ namespace xone {
     void AllRangeStreamer::update(
         const StreamUpdateContext& ctx,
         TerrainController& terrain,
-        std::unordered_map<ChunkCoord, StreamedChunkState, ChunkCoordHash>& streamed,
+        std::unordered_map<procgen::ChunkCoord, StreamedChunkState, procgen::ChunkCoordHash>& streamed,
         StreamCommandBuffer& outCmds
     )
     {
