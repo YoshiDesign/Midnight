@@ -20,6 +20,7 @@ It consists of three layers:
 - **Advanced Debugging** support for validation layers: GPU Assisted and Synchronization validation can be enabled if desired (at a great performance cost, naturally)
 - Unified Compute and Graphics queue when available.
 - See the `manage2` branch for high performance concurrency structures as the procedural terrain generation system comes together.
+- Vulkan will prioritize discreet graphics over integrated
 
 ## Notes on Dep's
 Vulkan 1.3^ must be included and linked against from your machine. Every other dependency is included in the project.
