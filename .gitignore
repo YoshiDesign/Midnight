@@ -1,5 +1,9 @@
 3D/
 x64/
+Debug/
+Release/
 textures/
 .vs/
 dump/
+imgui.ini
+
