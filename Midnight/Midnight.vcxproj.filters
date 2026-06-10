@@ -183,9 +183,6 @@
     <ClCompile Include="Runtime\Memory\ChunkArena.h">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Runtime\Threading\Types.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Module\Procgen\Terrain\Erosion\ThermalErosion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -232,6 +229,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Module\Procgen\SpatialGrid2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Runtime\Threading\Worker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1457,9 +1457,6 @@
     <ClInclude Include="Runtime\Play\Controller\TerrainController.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Runtime\Commands\TerrainCMD.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Runtime\Play\Controller\DebugController.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1586,7 +1583,19 @@
     <ClInclude Include="Runtime\Threading\MidnightScheduler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Runtime\Threading\MPMCIQueue.h">
+    <ClInclude Include="Runtime\Threading\MPMCQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\System\Types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Module\Procgen\System\Terrain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Runtime\Threading\Worker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Runtime\Threading\Job.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

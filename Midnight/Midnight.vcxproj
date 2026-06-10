@@ -239,7 +239,7 @@
     <ClCompile Include="Runtime\Play\WorldManager.cpp" />
     <ClCompile Include="Runtime\Threading\ITaskSystem.cpp" />
     <ClCompile Include="Runtime\Threading\Scratch.cpp" />
-    <ClCompile Include="Runtime\Threading\Types.cpp" />
+    <ClCompile Include="Runtime\Threading\Worker.cpp" />
     <ClCompile Include="Utils\AssetResolution.cpp" />
     <ClCompile Include="Utils\Logger.cpp" />
     <ClCompile Include="Utils\Timer.cpp" />
@@ -312,6 +312,8 @@
     <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\UUID.h" />
     <ClInclude Include="Module\Procgen\SpatialGrid2.h" />
+    <ClInclude Include="Module\Procgen\System\Terrain.h" />
+    <ClInclude Include="Module\Procgen\System\Types.h" />
     <ClInclude Include="Module\Procgen\TerrainArena.h" />
     <ClInclude Include="Module\Procgen\Delaunay.h" />
     <ClInclude Include="Module\Procgen\Delaunay2.h" />
@@ -341,7 +343,6 @@
     <ClInclude Include="Module\Procgen\Terrain\TerrainPool.h" />
     <ClInclude Include="Module\Procgen\Types.h" />
     <ClInclude Include="Module\Procgen\Types2.h" />
-    <ClInclude Include="Runtime\Commands\TerrainCMD.h" />
     <ClInclude Include="Runtime\Debug.h" />
     <ClInclude Include="Runtime\Facade\SceneFacade.h" />
     <ClInclude Include="Runtime\Memory\Arena.h" />
@@ -355,10 +356,12 @@
     <ClInclude Include="Runtime\Threading\CLDeque.h" />
     <ClInclude Include="Runtime\Threading\ConcurrentQueue.h" />
     <ClInclude Include="Runtime\Threading\ITaskSystem.h" />
+    <ClInclude Include="Runtime\Threading\Job.h" />
     <ClInclude Include="Runtime\Threading\MidnightScheduler.h" />
-    <ClInclude Include="Runtime\Threading\MPMCIQueue.h" />
+    <ClInclude Include="Runtime\Threading\MPMCQueue.h" />
     <ClInclude Include="Runtime\Threading\Scratch.h" />
     <ClInclude Include="Runtime\Threading\Types.h" />
+    <ClInclude Include="Runtime\Threading\Worker.h" />
     <ClInclude Include="Runtime\World\InstanceManager.h" />
     <ClInclude Include="Services\InstanceServices.h" />
     <ClInclude Include="Services\IRenderSceneView.h" />
