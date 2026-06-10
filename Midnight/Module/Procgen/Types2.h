@@ -16,6 +16,16 @@ namespace procgen {
 	static constexpr TriIndex  kInvalidTri = 0xfffffffc;  // NOTE - So be consistently aware of this subtle alarm bell.
 	static constexpr uint8_t chunk_center_spacing = 3;
 
+	/* Global Terrain Config - Used by the ChunkManager to orchestrate and define chunk generation */
+	struct TerrainConfig {
+		uint64_t worldSeed{ 42 };
+		float chunkSize{ 256.f };	// This determines the resolution of our chunks
+		float minPointDist{ 8.f };	// Min distance between points - This number has a large influence on the perf of BlueNoise
+		float halo{ 32.f };	// 4x minPointDist, for now
+		uint16_t nThreads{ 0 };
+		aveng::noise::NoiseParams noise{};
+	};
+
 	const enum Border {
 		Border_None = 0,
 		Border_North = 1,
@@ -151,16 +161,6 @@ namespace procgen {
 	* It owns a TerrainConfig, while each of the other managers
 	* Have their own "Params" struct.
 	*/
-
-	/* Global Terrain Config - Used by the ChunkManager to orchestrate and define chunk generation */
-	struct TerrainConfig {
-		uint64_t worldSeed{ 42 };
-		float chunkSize{ 256.f };	// This determines the resolution of our chunks
-		float minPointDist{ 8.f };	// Min distance between points - This number has a large influence on the perf of BlueNoise
-		float halo{ 32.f };	// 4x minPointDist, for now
-		uint16_t nThreads{ 0 };
-		aveng::noise::NoiseParams noise{};
-	};
 
 	/* Stage Params
 	 * [IMPORTANT] Stage params set a hard limit on parallelism

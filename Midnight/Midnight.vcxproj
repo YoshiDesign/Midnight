@@ -356,7 +356,7 @@
     <ClInclude Include="Runtime\Threading\ConcurrentQueue.h" />
     <ClInclude Include="Runtime\Threading\ITaskSystem.h" />
     <ClInclude Include="Runtime\Threading\MidnightScheduler.h" />
-    <ClInclude Include="Runtime\Threading\MPMCInjector.h" />
+    <ClInclude Include="Runtime\Threading\MPMCIQueue.h" />
     <ClInclude Include="Runtime\Threading\Scratch.h" />
     <ClInclude Include="Runtime\Threading\Types.h" />
     <ClInclude Include="Runtime\World\InstanceManager.h" />

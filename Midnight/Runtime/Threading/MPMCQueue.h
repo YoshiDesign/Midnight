@@ -1,33 +1,3 @@
-#pragma once
-//#include <cassert>
-//namespace mtools {
-//
-//	template <typename T, long Q_SIZE>
-//	class MPMCInjector
-//	{
-//		MPMCInjector() {
-//#ifdef M_DEBUG
-//			assert((Q_SIZE != 0 && (Q_SIZE & (Q_SIZE - 1)) == 0) 
-//				&& "MPMC Must be sized to a power of 2 and non-zero");
-//#endif
-//		}
-//
-//		void push(T* x) {}
-//
-//		T* pop() {}
-//
-//		// For now this is just a placeholder for the future multi-producer multi-consumer job injector.
-//		// The idea is to have a single global injector that all systems can submit jobs to, and all workers can steal from.
-//		// This will replace the current single-producer single-consumer injectors that are currently embedded within each system (e.g. TerrainController).
-//	private:
-//		static const unsigned long Q_MASK = Q_SIZE - 1;
-//		long size;
-//		unsigned long head_;
-//		unsigned long tail_;
-//		T* buffer;
-//	};
-//}
-//
 //#pragma once
 
 #include <atomic>
@@ -65,9 +35,10 @@ namespace mtools {
             mask_(capacity - 1),
             buffer_(std::make_unique<Cell[]>(capacity))
         {
+#ifdef M_DEBUG
             assert(detail::is_power_of_two(capacity_) &&
                 "MPMCQueue capacity must be a power of two");
-
+#endif
             for (std::size_t i = 0; i < capacity_; ++i) {
                 buffer_[i].sequence.store(i, std::memory_order_relaxed);
             }
@@ -79,7 +50,7 @@ namespace mtools {
         ~MPMCQueue() {
             // The queue must not be accessed concurrently during destruction.
             T item;
-            while (try_dequeue(item)) {
+            while (try_pop(item)) {
                 // Drain remaining live elements.
             }
         }
@@ -91,9 +62,12 @@ namespace mtools {
         MPMCQueue& operator=(MPMCQueue&&) = delete;
 
         template <typename U>
-        bool try_enqueue(U&& value) {
+        bool try_push(U&& value) {
+
+#ifdef M_DEBUG
             static_assert(std::is_constructible_v<T, U&&>,
                 "T must be constructible from U&&");
+#endif
 
             Cell* cell;
             std::size_t pos = enqueue_pos_.load(std::memory_order_relaxed);
@@ -110,7 +84,8 @@ namespace mtools {
                         pos,
                         pos + 1,
                         std::memory_order_relaxed,
-                        std::memory_order_relaxed)) {
+                        std::memory_order_relaxed)) 
+                    {
                         break;
                     }
 
@@ -137,7 +112,7 @@ namespace mtools {
             return true;
         }
 
-        bool try_dequeue(T& out) {
+        bool try_pop(T& out) {
             Cell* cell;
             std::size_t pos = dequeue_pos_.load(std::memory_order_relaxed);
 
@@ -153,7 +128,8 @@ namespace mtools {
                         pos,
                         pos + 1,
                         std::memory_order_relaxed,
-                        std::memory_order_relaxed)) {
+                        std::memory_order_relaxed)) 
+                    {
                         break;
                     }
 
@@ -195,9 +171,11 @@ namespace mtools {
         };
 
         static T* cell_ptr(Cell* cell) {
+            // Can these uses of std::launder instead be: `T* item = reinterpret_cast<T*>(&cell->storage);` ???
             return std::launder(reinterpret_cast<T*>(cell->storage));
         }
 
+        // Const correct override
         static const T* cell_ptr(const Cell* cell) {
             return std::launder(reinterpret_cast<const T*>(cell->storage));
         }

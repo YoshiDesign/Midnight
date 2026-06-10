@@ -1,3 +1,4 @@
+// DEPRECATED
 #pragma once
 namespace aveng {
     class ChunkArena;

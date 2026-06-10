@@ -1,3 +1,4 @@
+// DEPRECATED
 #include "Scratch.h"
 #include <cassert>
 #include "Runtime/Memory/ChunkArena.h"
