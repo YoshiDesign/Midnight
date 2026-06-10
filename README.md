@@ -15,7 +15,8 @@ It consists of three layers:
 **shaders/** - (GLSL) Shaders compiled to SPIR-V using `glslc`
 
 ## Cool Features
-- **Multi-buffered** and easily configurable in this regard.
+- Easily configurable **Multi-buffering** 
+- Low power consumption by default. This can easily be addressed by the swapchain if more power is required for smoother refresh rates
 - Classic descriptor sets are available but **bindless descriptor set** support is available and in use for the performance benefits. Recommend sticking with this architecture unless your needs are very simple.
 - **Advanced Debugging** support for validation layers: GPU Assisted and Synchronization validation can be enabled if desired (at a great performance cost, naturally)
 - Unified Compute and Graphics queue when available.
